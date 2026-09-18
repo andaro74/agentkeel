@@ -4,7 +4,8 @@ Claim 0: every later number is a delta against a frozen naive baseline.
 
 Order of this note: the `product-spec-reviewer` report, the seats'
 rulings on it, the false state, the code that will read the answer, the
-falsifiers, the raw results of the two PR 1 local runs.
+falsifiers and Finding F0.1, the raw results of the two PR 1 local runs,
+the first items for M01 open.
 
 ## 1. `product-spec-reviewer` report (pasted verbatim, 2026-09-18)
 
@@ -290,25 +291,65 @@ match.
 **10.** GNU make exiting 2 on a recipe that exits 1 is fine; the
 `Makefile` says so. Seven seats in the ruling file is correct.
 
+### Second round: rulings on the run-2 report (2026-09-18)
+
+Run 2 passed trap `g-012` (§6.2). Work stopped, as ruling 4 required, and
+the seats ruled again. Where these differ from the first round, these
+stand.
+
+**R2-1. The plant is run 2 (`22b5499`). Threshold Owner, Product.** Run 1
+is the finding. The one revision is spent. No third run.
+
+**R2-2. F0.1 is a finding, not a falsifier. Product, ADR-0003.** Claim 0
+is that later numbers are deltas against a frozen naive baseline, not
+that the baseline loses every trap. A baseline that gets a trap right by
+luck is a fact about the trap. The falsifiers of claim 0 are F0.2 and
+F0.3 only. Finding F0.1 is still read on `score` and still recorded every
+time. M00 is not RED on it. This supersedes "traps must still be 0/3" in
+ruling 4.
+
+**R2-3. `g-012` stays as is for M00. Data Owner.** Why it passed, and
+what happens to it, is in §6.4 and §7.
+
+**R2-4. Row 0's expected gate output. Product.** "Baseline card written;
+`score` and `cites` recorded per golden; traps expected 1/3 on the plant,
+F0.1 recorded as a finding." PR 2's CI run reading 1/3 is the expected
+value. A 0/3 or a 2/3 there is a non-determinism finding to record; it
+becomes the A-vs-A control at M04.
+
+**R2-5. The remaining paths. Product, ADR-0003.** `README.md`, `LICENSE`:
+Product. `tests/**`: Engineering. `evals/history/**`: Engineering,
+CI-written only; a human commit touching it is a two-key change.
+`evals/local/**`: Engineering, gitignored, no gate. §5 amended.
+
+**R2-6.** The unasked edit to the seats table in `CLAUDE.md` stands:
+keeping the two files in agreement is Product's job and the edit was
+listed under Product in the ruling file.
+
+**R2-7.** The count correction (eight identical replies in run 1, not
+nine) is noted. The wording of ruling 4 above is this note's, not the
+seat's original.
+
 Every other FINDING and NOTE in the report is unruled and stands as
 written in §1.
 
 ## 3. The false state
 
-Claim 0 is false if any of these is true:
+Claim 0 is false if either of these is true:
 
-1. The baseline answers a trap correctly. The traps are then too easy to
-   show a delta, and "measured against a baseline that loses" is not what
-   later rows are measured against.
-2. An envelope exists with no baseline card ref. A later number is then a
+1. An envelope exists with no baseline card ref. A later number is then a
    number, not a delta.
-3. A PR merges after M00 PR 2 with no ruling file naming it.
+2. A PR merges after M00 PR 2 with no ruling file naming it.
+
+Not a false state (ruling R2-2): the baseline answering a trap
+correctly. The first draft of this note listed it first. It is a fact
+about the trap and is recorded as Finding F0.1.
 
 What this PR plants (the seeded commit is recorded in the ledger row):
 
 - `evals/goldens/v1/g-010.yaml`, `g-011.yaml`, `g-012.yaml`: the three
-  traps. The input that makes the claim false is any one of these three
-  questions answered with the `answer_fields` in its file.
+  traps. They do not decide row 0. They are what later rows' deltas are
+  read on, so how the baseline does on them is recorded from the start.
 - `evals/goldens/v1/g-013.yaml` to `g-015.yaml`: the three guardrail
   goldens. No guardrail exists, so under the plant rule (§5) they are
   goldens that have never passed, not plants, and `plants_expected = 0`
@@ -346,14 +387,6 @@ None of it exists in this PR.
 
 ## 5. Falsifiers, and what each would look like in the repo
 
-**F0.1 — the baseline passes a trap.** It fires on `score` (ruling 1).
-In this PR: §6 below shows a trap whose parsed `available`, `exclusive`
-and `constraints` equal the golden's `answer_fields`. From PR 2: an
-envelope under `evals/history/` whose per-golden entry for `g-010`,
-`g-011` or `g-012` has `pass: true` on a baseline run. Response if it
-fires: record it here, do not edit the trap or the prompt in this
-milestone. **It fired on run 2 (`g-012`, commit `22b5499`); see §6.4.**
-
 **F0.2 — an envelope validates without a baseline ref.**
 From PR 2: a test under `tests/` that takes an envelope `build.py` wrote,
 removes the baseline card ref, and finds it still validates against
@@ -367,6 +400,15 @@ that commit. `git log --merges main` plus a grep shows it. Outside the
 repo: `cold-review-ruling` not listed as a required check on `main`
 (Security enables it after this PR merges). No seeded case for F0.3
 exists in M00 (report 3.4).
+
+**Finding F0.1 (not a falsifier, ruling R2-2) — the baseline passes a
+trap.** Read on `score`. In this PR: §6 shows a trap whose parsed
+`available`, `exclusive` and `constraints` equal the golden's
+`answer_fields`. From PR 2: an envelope under `evals/history/` whose
+per-golden entry for `g-010`, `g-011` or `g-012` has `pass: true` on a
+baseline run. Response every time: record it, do not edit the trap or
+the prompt in this milestone. **Recorded once so far: run 2, `g-012`,
+commit `22b5499`; see §6.4.**
 
 ## 6. Raw results of the two PR 1 local runs
 
@@ -602,22 +644,52 @@ right. It did not stop collapsing: 5 of 12 replies are still the same
 self-contradictory object. And it passed a trap, which ruling 4 said
 must not happen.
 
-## 6.4 F0.1 — recorded, and work stopped
+## 6.4 Finding F0.1 — `g-012` on the plant, and why it passed
 
 F0.1: "baseline passes a trap (the traps are too easy — record, do not
-tighten in this milestone)". It fired on run 2, `g-012`, at `22b5499`.
+tighten in this milestone)". Recorded on run 2, `g-012`, at `22b5499`.
+When it happened the PR was not pushed and not opened, as ruling 4
+required, and nothing was edited in response. The seats then ruled
+(second round, §2): the plant is run 2, F0.1 is a finding, `g-012` stays
+as is for M00, and M00 is not RED on this.
 
-Per ruling 4 the PR was not pushed and not opened. Nothing was edited in
-response: `g-012` and `src/baseline/prompt.txt` are as committed in
-`22b5499`. The permitted revision is spent.
+Why `g-012` passed (Data Owner, R2-3):
 
-What the seats have to rule, and nothing here decides it:
+- **Three guessable fields.** `score` reads two booleans and a list.
+  Nothing in it needs the table.
+- **The expected `constraints` is the baseline's default.** `g-012`
+  expects `[window_not_open]`. The baseline returned exactly that list in
+  9 of 12 replies in run 1 and 6 of 12 in run 2, whatever the question.
+- **The two booleans are then a one-in-four guess.** The baseline's most
+  common object is `true / false / [window_not_open]` (8 of 12 in run 1,
+  5 of 12 in run 2). `g-012` expects `false / true / [window_not_open]`,
+  which the baseline produced once in 24 replies: here. The ruling as
+  given said the expected object itself appears in 5 of 12 replies; the
+  run files show it is the `constraints` value that is shared, not the
+  whole object. The conclusion is the same.
+- **Wrong reasoning.** The baseline tied the sequel's window to the
+  original's term running to May 2028. `score` reads fields, not reasons.
 
-- Whether the plant is run 2 with F0.1 recorded against row 0 at open, or
-  run 1's prompt restored (0/3, and a control the Threshold Owner has
-  already called broken). Threshold Owner and Product.
-- Whether one trap passing on a local run, at temperature 0, by a
-  baseline whose stated reason is wrong, means `g-012` is too easy. Data
-  Owner. F0.1's text says record and do not tighten in this milestone.
-- The expected gate output in row 0 still reads "traps 0/3". If run 2 is
-  the plant, PR 2's CI run will most likely read 1/3. Product.
+The weakness is in the golden design, not in the trap: a trap whose
+expected `constraints` is also the model's default `constraints` cannot
+discriminate on that field, and two booleans are not enough to carry it.
+`g-010` and `g-011` do not share it: they expect `[holdback]` and
+`[non_exclusive]`, which the baseline returned zero times as a whole
+list in either run.
+
+## 7. First items for M01 open
+
+1. **`g-012`. Data Owner, at M01 PR 1.** The Data Owner may retire
+   `g-012` and add `g-016` with an expected `constraints` value the
+   default object cannot produce, for example one that must include
+   `sequel_no_inherit`. Retire, never rename (R11): `g-012` keeps its id
+   and gets `retired: M01`; retiring is a two-key change. `g-016` is
+   currently promised to the first red-team golden (§9: `g-016` to
+   `g-020` at M03), so the Data Owner also rules the numbering.
+   `sequel_no_inherit` is not among the six constraint codes in the
+   baseline prompt, and the baseline is frozen at `m00`; the Data Owner
+   and Threshold Owner rule how a frozen control meets a new code.
+2. **Is Nova Micro still a fair control? Threshold Owner, at M01 open.**
+   On the plant it is right on 2 of 12 and 5 of 12 replies are one
+   self-contradictory object. Once refagent has numbers, the Threshold
+   Owner rules whether a delta against this control says enough.

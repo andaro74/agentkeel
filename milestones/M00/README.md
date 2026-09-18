@@ -13,7 +13,8 @@
 
 From M01, if refagent fails a trap, fix the trap or the prompt, not the
 model. This does not apply to the baseline: if the baseline passes a
-trap, that is F0.1; record it and change nothing in this milestone.
+trap, that is Finding F0.1; record it and change nothing in this
+milestone.
 
 ## Findings
 
@@ -38,9 +39,10 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
 | Field | Row 0 |
 |---|---|
 | Claim | Every later number is a delta against a frozen naive baseline |
-| Falsifiers | F0.1 baseline passes a trap (record, do not tighten in this milestone). F0.2 an envelope validates without a baseline ref. F0.3 a PR merges without a ruling file after PR 2. |
-| Seeded commit | `8a31e8d` on `m00-pr1`: goldens `g-001` to `g-015`, `src/baseline/`, `data/` |
-| Expected gate output | Baseline traps 0/3. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0` under the plant rule. A run without a baseline card is rejected by `verdict.build`. |
+| Falsifiers | F0.2 an envelope validates without a baseline ref. F0.3 a PR merges without a ruling file after PR 2. |
+| Finding, not a falsifier | F0.1 baseline passes a trap (record, do not tighten in this milestone; ADR-0003). Recorded at open: `g-012` on the plant. |
+| Seeded commit | `22b5499` on `m00-pr1`: the plant. Goldens `g-001` to `g-015`, `data/` and the baseline code are from `8a31e8d`; the baseline prompt is as revised once in `22b5499`. |
+| Expected gate output | Baseline card written; `score` and `cites` recorded per golden; traps expected 1/3 on the plant, F0.1 recorded as a finding. A 0/3 or 2/3 in PR 2's CI run is a non-determinism finding to record. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0` under the plant rule. A run without a baseline card is rejected by `verdict.build`. |
 | Measured | — (filled at close) |
 | PRs used / cap | 1 / 4 |
 | State | OPEN |
@@ -50,13 +52,13 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
 - Feasibility note: `milestones/M00/feasibility.md`. The
   `product-spec-reviewer` report in it has 2 BLOCK, 17 FINDING, 9 NOTE.
   Both BLOCKs were ruled before the PR opened (feasibility.md §2): the
-  Data Owner split scoring into `score` (answer fields; F0.1 fires on
-  it) and `cites` (row and clause exist; gates from M01); Product gave
+  Data Owner split scoring into `score` (answer fields; Finding F0.1 is
+  read on it) and `cites` (row and clause exist; gates from M01); Product gave
   seats to the unlisted paths by ADR-0001 amendment 2.
 - Planted: three traps (`g-010` holdback did not move with the theatrical
   date, `g-011` non-exclusive licence, `g-012` sequel does not inherit),
   three guardrail goldens (`g-013` to `g-015`) with no guardrail to
-  enforce them, and the baseline that must lose.
+  enforce them, and the baseline, which is expected to lose.
 - Not planted: the run without a baseline card. It needs the card format,
   which is `src/verdict/` in PR 2. PR 2 plants it before `build.py`.
 - Baseline parameters, stated here because nothing else pins them:
@@ -71,10 +73,15 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
   collapses again it is frozen as is.
 - PR 1 local runs (not evidence): both are in feasibility.md §6 with
   their commit hashes. Run 1 is the finding, run 2 is the plant.
-- **F0.1 fired on run 2**: the baseline passed trap `g-012` on `score`
-  at `22b5499` (traps 1/3, ordinary 1/9). Recorded in feasibility.md
-  §6.4. The trap and the prompt were not edited. Work stopped there for
-  the seats to rule; the PR was not opened.
+- **Finding F0.1, recorded at open**: on run 2 the baseline passed trap
+  `g-012` on `score` at `22b5499` (traps 1/3, ordinary 1/9). Work
+  stopped and the seats ruled: the plant is run 2; F0.1 is a finding,
+  not a falsifier (ADR-0003); `g-012` stays as is for M00; M00 is not
+  RED on this. The trap and the prompt were not edited. Why it passed
+  is in feasibility.md §6.4.
+- Carried to M01 open (feasibility.md §7): the Data Owner may retire
+  `g-012` and add a replacement; the Threshold Owner rules whether Nova
+  Micro is still a fair control.
 - The reader lands in PR 2: `src/verdict/` (`verdict.schema.json`,
   `build.py`, `gate.py`), the P5 disagreement test, `make evals`,
   `make plants`, `make ledger`.

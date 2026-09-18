@@ -12,6 +12,7 @@ authorises:
   # Product
   - SPEC/00-overview.md
   - docs/adr/ADR-0001-spec00-adopted.md
+  - docs/adr/ADR-0003-remaining-path-ownership.md
   - CLAUDE.md
   - milestones/README.md
   - milestones/M00/**
@@ -55,21 +56,22 @@ no gate tests, no skills. `cold-review-ruling` is in the tree and is not
 yet a required check; Security enables it after this PR merges (R9: it
 enforces from PR 2).
 
-This PR also carries ADR-0001 amendment 2, which amends SPEC/00 §5 and
-§5.1. `SPEC/**`, `docs/adr/**` and `CLAUDE.md` are Product paths and this
-file is the ruling that authorises the change.
+This PR also carries ADR-0001 amendment 2 (SPEC/00 §5 and §5.1) and
+ADR-0003 (§5 again, and §8 M00: F0.1 is a finding, not a falsifier).
+`SPEC/**`, `docs/**` and `CLAUDE.md` are Product paths and this file is
+the ruling that authorises the change.
 
 ## Seat per path
 
 | Seat | Paths |
 |---|---|
-| Product | `SPEC/00-overview.md`, `docs/adr/ADR-0001-spec00-adopted.md`, `CLAUDE.md`, `milestones/README.md`, `milestones/M00/**`, `docs/milestones/M00.md`, `.claude/agents/product-spec-reviewer.md` |
+| Product | `SPEC/00-overview.md`, `docs/adr/ADR-0001-spec00-adopted.md`, `docs/adr/ADR-0003-remaining-path-ownership.md`, `CLAUDE.md`, `milestones/README.md`, `milestones/M00/**`, `docs/milestones/M00.md`, `.claude/agents/product-spec-reviewer.md` |
 | Data Owner | `evals/goldens/v1/**`, `data/clause_index.json`, `data/slate.json`, `data/rights_table.json`, `.claude/agents/data-owner.md` |
 | Engineering | `src/baseline/**`, `src/validate/**`, `scripts/seed_slate.py`, `Makefile`, `.claude/agents/engineering-cold-reviewer.md` |
 | Security | `.github/workflows/cold-review-ruling.yml`, `.claude/agents/security-reviewer.md` |
 | Rule Owner, Tool Owner, Threshold Owner | `.claude/agents/rule-owner.md`, `tool-owner.md`, `threshold-owner.md` |
 
-Every path is in §5 as amended by ADR-0001 amendment 2.
+Every path is in §5 as amended by ADR-0001 amendment 2 and ADR-0003.
 
 ## Rulings applied in this PR
 
@@ -82,8 +84,8 @@ Recorded in full in `milestones/M00/feasibility.md` §2.
 3. Rule Owner, Data Owner: only `guardrail_intervened` counts as BLOCKED
    or MASKED. `g-015` stays a fail. Becomes P12 at M03.
 4. Threshold Owner, Product: one prompt revision for the baseline, the
-   prompt a reasonable engineer would write first. Traps must still be
-   0/3.
+   prompt a reasonable engineer would write first. ("Traps must still
+   be 0/3" is superseded by R2-2 below.)
 5. Product: the "fix the trap or the prompt" sentence applies to
    refagent from M01.
 6. `evals/local/` is not evidence; this file cites feasibility.md §6.
@@ -91,6 +93,20 @@ Recorded in full in `milestones/M00/feasibility.md` §2.
 8. Product: the cold reviewer outputs `ruling: DRAFT`; Engineering
    commits it (§5.1, amendment 2).
 9. Data Owner: `added:` and `retired:` are milestone ids.
+
+Second round, after run 2 passed trap `g-012`:
+
+- R2-1. Threshold Owner, Product: the plant is run 2 (`22b5499`); run 1
+  is the finding; no third run.
+- R2-2. Product, ADR-0003: F0.1 is a finding, not a falsifier. The
+  falsifiers of claim 0 are F0.2 and F0.3. M00 is not RED on it.
+- R2-3. Data Owner: `g-012` stays as is for M00; it may be retired at
+  M01 PR 1 (feasibility.md §7).
+- R2-4. Product: row 0 expects the baseline card written, `score` and
+  `cites` per golden, traps 1/3 on the plant.
+- R2-5. Product, ADR-0003: seats for `README.md`, `LICENSE`, `tests/**`,
+  `evals/history/**`, `evals/local/**`.
+- R2-6. Product: the `CLAUDE.md` seats-table edit stands.
 
 ## What a reader can falsify
 
@@ -121,18 +137,11 @@ Recorded in full in `milestones/M00/feasibility.md` §2.
 
 ## What this ruling does not settle
 
-- **F0.1 fired on the second local run**: `g-012` passed on `score` at
-  `22b5499` (feasibility.md §6.4). Ruling 4 said to record it and stop.
-  Whether run 2 is the plant with F0.1 on the record, or run 1's prompt
-  is restored, is for the Threshold Owner and Product. This file does
-  not rule it and the PR is not opened until they do.
-- `README.md` and `LICENSE` at the root, `tests/**`, `evals/history/**`
-  and `evals/local/**` still have no seat in §5. PR 2 writes `tests/**`
-  and `evals/history/**`. Product.
-- ADR-0001 has now used both amendments. The next change to its rulings
-  is a new ADR.
-- The 17 FINDINGs and 9 NOTEs of the `product-spec-reviewer` report that
-  the seats did not rule on. Several bind PR 2: 2.1 (what records the
+- Whether Nova Micro remains a fair control once refagent has numbers.
+  Threshold Owner, at M01 open (feasibility.md §7).
+- The FINDINGs and NOTEs of the `product-spec-reviewer` report that the
+  seats did not rule on. They are on the record in feasibility.md §1, not
+  open questions for this PR. Several bind PR 2: 2.1 (what records the
   plant firing), 2.3 (no CI credential path to Bedrock at M00), 3.2 (how
   F0.2 is observed without a hand-written envelope), 4.2 (who writes the
   measured cell).

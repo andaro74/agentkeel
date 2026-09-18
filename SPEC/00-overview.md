@@ -3,7 +3,8 @@
 Status: DRAFT · Owner: Product seat · Rulings R1–R11 recorded at open ·
 N (detection bar) = 10 minutes (R10) · Adopted by ADR-0001, which carries
 amendment 1 (the rulings applied at adoption) and amendment 2 (seats for
-paths §5 did not list; the cold reviewer drafts, M00 PR 1)
+paths §5 did not list; the cold reviewer drafts, M00 PR 1) · Amended by
+ADR-0003 (remaining path ownership; F0.1 is a finding, M00 PR 1)
 
 ## 1. What this is
 
@@ -85,13 +86,13 @@ P11. **Only CI-written envelopes are evidence.** A local run
 
 | Seat | Owns the truth about | Owned paths | May not |
 |---|---|---|---|
-| Product | what to build, when it's acceptable | `SPEC/**`, `milestones/**`, `CLAUDE.md`, `.claude/skills/**`, `docs/**` | define correctness; merge code |
+| Product | what to build, when it's acceptable | `SPEC/**`, `milestones/**`, `CLAUDE.md`, `.claude/skills/**`, `docs/**`, `README.md`, `LICENSE` | define correctness; merge code |
 | Rule Owner | what the agent may say and do | `rules/**`, guardrail id/version in manifest | edit goldens; write product code |
 | Data Owner | what CORRECT means | `evals/goldens/**`, `data/**` (slate, rights table, clause index, corpus), rulings on FRAGILE, corpus admission | weaken a golden to green a build |
 | Tool Owner | tool and edge contracts | `tools/**` schemas, `may_call`, `may_be_called_by` | change a schema without a major bump |
 | Threshold Owner | the bars, and which models are measured | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region (A-vs-A compares the pair) | move a bar without two keys |
 | Security | what tooling and infra MAY DO | platform repo: workflows, construct, bootstrap stack, KMS key policy, cosign identity, security account | define scope |
-| Engineering | that it works | `src/**`, `scripts/**`, `Makefile`, root config (`pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`) | self-approve any of the above |
+| Engineering | that it works | `src/**`, `scripts/**`, `Makefile`, root config (`pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`), `tests/**`, `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | self-approve any of the above |
 | (the seat named in its front matter) | its own routing | `.claude/agents/<name>.md` | rule; write to any seat-owned path |
 
 Ownership notes:
@@ -125,7 +126,8 @@ approval. The mechanical gates are, exhaustively:
   itself the ruling for that milestone's build paths; a PR cites it as
   `SPEC/00-overview.md#8-MNN`;
 - `two-key` — a diff that relaxes a threshold, retires a rule or golden,
-  or changes retention cites rulings from two distinct seats;
+  changes retention, or is a human commit touching `evals/history/**`
+  cites rulings from two distinct seats;
 - `regression` — the eval gate: RED on any regressed golden or any
   silent plant (`plants_expected ≠ plants_fired`). **Plant rule:** a
   plant is a plant only when its enforcing control exists in the repo;
@@ -293,15 +295,20 @@ close.
 Rulings cited: PR 1 cites `SPEC/00-overview.md#8-M00` for
 `evals/goldens/`, `src/baseline/`, `scripts/` and `data/`, and names the
 seat per path in the PR body.
-Seeded: baseline must fail the traps; a run without a baseline card is
-rejected by `verdict.build`.
-Expected on the baseline: traps 0/3; the three guardrail plants fail (no
-guardrail exists yet) and land in `never_passed`, with
-`plants_expected = 0` under the plant rule (§5) — that is the delta,
-not F0.1.
-Falsifiers: F0.1 baseline passes a trap (the traps are too easy — record,
-do not tighten in this milestone). F0.2 an envelope validates without a
-baseline ref. F0.3 a PR merges without a ruling file after PR 2.
+Seeded: the baseline answers the traps with no table to read; a run
+without a baseline card is rejected by `verdict.build`.
+Expected on the baseline: the baseline card is written, with `score`
+(answer fields match) and `cites` (row and clause present and existing)
+recorded per golden; traps 1/3 on the plant as opened (Finding F0.1);
+the three guardrail plants fail (no guardrail exists yet) and land in
+`never_passed`, with `plants_expected = 0` under the plant rule (§5). A
+different trap count in CI is a non-determinism finding to record; it
+becomes the A-vs-A control at M04.
+Falsifiers: F0.2 an envelope validates without a baseline ref. F0.3 a PR
+merges without a ruling file after PR 2.
+Finding F0.1 (not a falsifier, ADR-0003): the baseline passes a trap.
+That is a fact about the trap, not about claim 0 — record, do not
+tighten in this milestone.
 Done when: `make evals` writes an envelope with the baseline card and the
 row 0 measured value in `milestones/README.md`.
 
