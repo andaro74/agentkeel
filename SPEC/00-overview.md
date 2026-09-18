@@ -101,14 +101,23 @@ Ownership notes:
   deprecation plant, judge candidates) are pinned by the Threshold Owner
   at the top of `milestones/M00/README.md` until the manifest exists at
   M01, then in the manifest.
+- Every file on `main` has a seat. A file no seat owns is deleted, not
+  adopted; an unowned file is a path with no seat.
+- `seat:` is the front matter field that names the owning seat, in
+  subagent prompts and in ruling files alike.
 
 **Ruling R1 (one human).** Every seat is one person. Seats are real as
 responsibilities and as routing for the subagents in `.claude/agents/`;
 they are not real as reviewers. Therefore no gate depends on a human
 approval. The mechanical gates are, exhaustively:
-- `validate` — manifest schema, seats assigned to real groups,
-  CODEOWNERS ↔ manifest, edges two-sided, no cycles, ceilings within
-  bounds, cdk-nag, workflow file hash unchanged;
+- `validate` — grows by milestone; the header of `milestones/README.md`
+  lists what it checked at each tag, so a reader knows what "validate
+  was green" meant. At M00: golden front matter (the §6 schema,
+  immutable id format, `kind` enum) and ruling front matter (the §6
+  fields present, `authorises` paths exist in the tree). From M01 PR 1,
+  when their inputs exist: manifest schema, seats assigned to real
+  groups, CODEOWNERS ↔ manifest, edges two-sided, no cycles, ceilings
+  within bounds, cdk-nag, workflow file hash unchanged;
 - `signature` — bundle cosign-verified, digest matches manifest;
 - `ruling-cited` — a PR touching a seat-owned path cites a ruling on
   `main` whose `authorises:` matches that path. SPEC/00 §8 MNN is
@@ -134,8 +143,8 @@ README says so.
 ### 5.1 Subagents and specialists (`.claude/agents/`)
 
 Seats are one person (R1); the subagents make them real as routing.
-Each has a fixed prompt in Git, owned by the seat it serves; changing a
-prompt is a PR. A subagent's output is a draft or a report, never a
+Each has a fixed prompt in Git, owned by the seat named in its `seat:`
+front matter; changing a prompt is a PR. A subagent's output is a draft or a report, never a
 ruling. No subagent writes to `evals/goldens/`, `thresholds.yaml` or
 `rules/`; it proposes a diff, the seat's PR carries it.
 
@@ -210,7 +219,8 @@ by hand; M00 itself opens and closes without them.
   `seat`, `added`, `retired`. A golden is retired, never renamed or
   reused; `replay_history` is keyed on id.
 - **Ledger** — one file, `milestones/README.md`, machine-read by
-  `make ledger` and `docs-current`. **Ledger row** (written on milestone
+  `make ledger` and `docs-current`. Its header lists what `validate`
+  checked at each tag (§5). **Ledger row** (written on milestone
   open, in the ledger and in `milestones/MNN/README.md` with the
   open/close detail): claim, falsifiers, seeded commit, expected gate
   output, measured value (filled at close), PRs used / cap.
@@ -269,7 +279,8 @@ corpus exists at M01. Golden set v1 on the slate: 15 goldens, 9 ordinary,
 `g-015.yaml`. `verdict.schema.json`, `verdict.build`, `verdict.gate`
 (with the plant rule of §5 as one line at PR 2), the ledger
 (`milestones/README.md`), `replay_history`. `Makefile` with all five
-targets: at PR 1 `evals-local` and `validate` run and `evals`, `plants`,
+targets: at PR 1 `evals-local` and `validate` run (`validate` checks
+golden and ruling front matter only, §5) and `evals`, `plants`,
 `ledger` exit 1 with "not until M00 PR 2"; at PR 2 all five run, and
 `plants` returns an empty list so the F0.2 test can read
 `plants_expected = 0`. The seven seat subagents (§5.1),

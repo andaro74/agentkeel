@@ -19,9 +19,10 @@ amendments: 1
 SPEC/00-overview.md was written before the repo had anything else in it.
 A read of SPEC/00 against CLAUDE.md (session of 2026-09-18) found twelve
 things neither file specified and eight places the two files disagreed.
-Product ruled on all twenty. This ADR records the adoption of SPEC/00 as
+Product ruled on all twenty, and on three more raised by the re-report
+against the amended files. This ADR records the adoption of SPEC/00 as
 the authority, records rulings R1–R11 as recorded in SPEC/00 §11, and
-carries the twenty rulings as amendment 1.
+carries the twenty-three rulings as amendment 1.
 
 ## Decision
 
@@ -121,6 +122,25 @@ Rulings on where the two files disagreed (SPEC/00 wins unless stated):
 8. M00 PR 4 also writes the three skills from by-hand PRs 1–3 (SPEC
    wins); added to CLAUDE.md's PR 4 list. Later milestones close through
    `/close-milestone`.
+
+Rulings on what the re-report against the amended files still left open:
+
+21. Judge candidates are six: Llama 4 Maverick, Llama 3.3 70B, Mistral
+    Large 2407, gpt-oss-120b, gpt-6-astra, Nova Pro. Nova Pro stays as
+    the Amazon entry; a studio would have Amazon approved by default.
+    Threshold Owner. (`milestones/M00/README.md`)
+22. `make validate` at M00 PR 1 validates golden front matter (schema,
+    immutable id format, `kind` enum) and ruling front matter (fields
+    present, `authorises` paths exist in the tree). Manifest, seats,
+    edges and cdk-nag are added at M01 PR 1 when their inputs exist. The
+    header of `milestones/README.md` records what `validate` checked at
+    each tag. Engineering, Product on scope. `seat:` is the front matter
+    field naming the owning seat in subagents and rulings. (§5, §6,
+    §8 M00, CLAUDE.md)
+23. `main.py` is deleted. Nothing in SPEC/00 names it, and an unowned
+    file on `main` is a path with no seat. Rule recorded in §5: every
+    file on `main` has a seat; a file no seat owns is deleted, not
+    adopted. (§5, CLAUDE.md)
 
 Also changed to match: §15 done-when names the ledger file and the ruling
 file per PR; §8 M00 build list names every artifact above.

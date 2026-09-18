@@ -81,12 +81,13 @@ the diff; you do not merge.
 | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region | Threshold Owner | `two-key` on any downward move |
 | `.github/workflows/**`, `infra/**`, key policy, cosign identity | Security | `ruling-cited`, `security-reviewer` |
 | `src/**`, `Makefile` | Engineering | `cold-review-ruling` |
-| `.claude/agents/<name>.md` | the seat in its front matter | `ruling-cited` |
+| `.claude/agents/<name>.md` | the seat in its `seat:` front matter | `ruling-cited` |
 
 Every seat is one human (R1). No gate waits for a human approval; all
 gates are mechanical and the list in SPEC/00 §5 is exhaustive. If a task
 seems to need a new gate, that is a SPEC/00 amendment, not a workflow
 edit. Each ADR's `authorises:` names the seat whose rule it changes.
+Every file on `main` has a seat; a file no seat owns is deleted.
 
 ## Subagents (`.claude/agents/`)
 
@@ -134,7 +135,9 @@ Makefile              Engineering; all five targets exist from M00 PR 1
 ```
 make evals            baseline, plus refagent from M01, against goldens, CI-equivalent
 make evals-local      same, your credentials, writes evals/local/ only
-make validate         schema, seats, edges, semver preview, cdk-nag
+make validate         grows by milestone; the ledger header says what it
+                      checked at each tag. M00: golden and ruling front
+                      matter. M01+: schema, seats, edges, semver, cdk-nag
 make plants           list plants and whether each fired on last run
 make ledger           print the ledger with measured values; --plain writes
                       docs/milestones/README.md
