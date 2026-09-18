@@ -1,0 +1,15 @@
+# Availability with a constraint: available, and the licence is non-exclusive.
+id: g-006
+kind: ordinary
+question: >-
+  Can we publish 'A Ledger of Small Mercies' on SVOD in France on 2026-09-01, and is it exclusive to us?
+expected:
+  table_row: r-033
+  clause_id: ML-5.2
+  answer_fields:
+    available: true
+    exclusive: false
+    constraints: [non_exclusive]
+seat: Data Owner
+added: M00
+retired: null

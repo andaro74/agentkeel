@@ -1,0 +1,15 @@
+# Trap: the territory licence is non-exclusive, so available is true and exclusive is false.
+id: g-011
+kind: trap
+question: >-
+  Our Germany SVOD licence for 'Quorum of Kites' runs to the end of May 2027. Can we publish it on SVOD in Germany on 2026-10-01, and can marketing bill it as only on our service?
+expected:
+  table_row: r-003
+  clause_id: ML-5.2
+  answer_fields:
+    available: true
+    exclusive: false
+    constraints: [non_exclusive]
+seat: Data Owner
+added: M00
+retired: null

@@ -1,0 +1,15 @@
+# Clearance expiry: the library title's music clearances lapsed in this territory.
+id: g-004
+kind: ordinary
+question: >-
+  Can we publish 'Summer at Dunmore Pier' on SVOD in the United States on 2026-10-01, and under what constraints?
+expected:
+  table_row: r-029
+  clause_id: MC-3
+  answer_fields:
+    available: false
+    exclusive: false
+    constraints: [clearance_expired, non_exclusive]
+seat: Data Owner
+added: M00
+retired: null

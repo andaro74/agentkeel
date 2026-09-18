@@ -1,0 +1,142 @@
+{
+  "fictional": true,
+  "titles": [
+    {
+      "title_id": "t-001",
+      "title": "Quorum of Kites",
+      "year": 2024,
+      "kind": "feature",
+      "franchise": "kites",
+      "sequel_of": null,
+      "note": null
+    },
+    {
+      "title_id": "t-002",
+      "title": "Quorum of Kites: Second Wind",
+      "year": 2026,
+      "kind": "feature",
+      "franchise": "kites",
+      "sequel_of": "t-001",
+      "note": null
+    },
+    {
+      "title_id": "t-003",
+      "title": "Brackenfield Nine",
+      "year": 2023,
+      "kind": "feature",
+      "franchise": "brackenfield",
+      "sequel_of": null,
+      "note": null
+    },
+    {
+      "title_id": "t-004",
+      "title": "Brackenfield Nine: The Tenth",
+      "year": 2027,
+      "kind": "feature",
+      "franchise": "brackenfield",
+      "sequel_of": "t-003",
+      "note": null
+    },
+    {
+      "title_id": "t-005",
+      "title": "Pim and the Paper Whale",
+      "year": 2025,
+      "kind": "animated_family",
+      "franchise": null,
+      "sequel_of": null,
+      "note": null
+    },
+    {
+      "title_id": "t-006",
+      "title": "The Ninth Aquifer",
+      "year": 2027,
+      "kind": "tentpole",
+      "franchise": null,
+      "sequel_of": null,
+      "note": "unreleased; under embargo"
+    },
+    {
+      "title_id": "t-007",
+      "title": "Summer at Dunmore Pier",
+      "year": 1987,
+      "kind": "library",
+      "franchise": null,
+      "sequel_of": null,
+      "note": "music clearances expired in some territories"
+    },
+    {
+      "title_id": "t-008",
+      "title": "A Ledger of Small Mercies",
+      "year": 2025,
+      "kind": "feature",
+      "franchise": null,
+      "sequel_of": null,
+      "note": null
+    },
+    {
+      "title_id": "t-009",
+      "title": "Turnstile Saints",
+      "year": 2026,
+      "kind": "feature",
+      "franchise": null,
+      "sequel_of": null,
+      "note": null
+    },
+    {
+      "title_id": "t-010",
+      "title": "Algebra for Apiarists",
+      "year": 2024,
+      "kind": "feature",
+      "franchise": null,
+      "sequel_of": null,
+      "note": null
+    },
+    {
+      "title_id": "t-011",
+      "title": "Nightbus to Varnholt",
+      "year": 2026,
+      "kind": "feature",
+      "franchise": null,
+      "sequel_of": null,
+      "note": null
+    },
+    {
+      "title_id": "t-012",
+      "title": "Tin Orchard",
+      "year": 2022,
+      "kind": "feature",
+      "franchise": null,
+      "sequel_of": null,
+      "note": null
+    }
+  ],
+  "territories": {
+    "AU": {
+      "reference_tz": "Australia/Sydney"
+    },
+    "BR": {
+      "reference_tz": "America/Sao_Paulo"
+    },
+    "DE": {
+      "reference_tz": "Europe/Berlin"
+    },
+    "FR": {
+      "reference_tz": "Europe/Paris"
+    },
+    "GB": {
+      "reference_tz": "Europe/London"
+    },
+    "JP": {
+      "reference_tz": "Asia/Tokyo"
+    },
+    "US": {
+      "reference_tz": "America/New_York"
+    }
+  },
+  "platforms": [
+    "THEATRICAL",
+    "PVOD",
+    "SVOD",
+    "AVOD"
+  ]
+}

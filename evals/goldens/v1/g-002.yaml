@@ -1,0 +1,15 @@
+# Availability, plain no: the window closed two months before the date asked.
+id: g-002
+kind: ordinary
+question: >-
+  Can we publish 'Brackenfield Nine' on SVOD in Brazil on 2026-11-01, and under what constraints?
+expected:
+  table_row: r-014
+  clause_id: ML-3.1
+  answer_fields:
+    available: false
+    exclusive: true
+    constraints: [window_closed]
+seat: Data Owner
+added: M00
+retired: null

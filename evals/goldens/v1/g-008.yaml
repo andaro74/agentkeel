@@ -1,0 +1,15 @@
+# Clearance expiry, the other way: the same library title is still cleared in Australia.
+id: g-008
+kind: ordinary
+question: >-
+  Can we publish 'Summer at Dunmore Pier' on AVOD in Australia on 2026-10-01, and under what constraints?
+expected:
+  table_row: r-031
+  clause_id: MC-4
+  answer_fields:
+    available: true
+    exclusive: false
+    constraints: [non_exclusive]
+seat: Data Owner
+added: M00
+retired: null
