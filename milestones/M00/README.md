@@ -44,7 +44,7 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
 | Seeded commit | `22b5499` on `m00-pr1`: the plant. Goldens `g-001` to `g-015`, `data/` and the baseline code are from `8a31e8d`; the baseline prompt is as revised once in `22b5499`. |
 | Expected gate output | Baseline card written; `score` and `cites` recorded per golden; traps expected 1/3 on the plant, F0.1 recorded as a finding. A 0/3 or 2/3 in PR 2's CI run is a non-determinism finding to record. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0` under the plant rule. A run without a baseline card is rejected by `verdict.build`. |
 | Measured | — (filled at close) |
-| PRs used / cap | 1 / 4 |
+| PRs used / cap | 2 / 4 |
 | State | OPEN |
 
 ### Open detail (PR 1, 2026-09-18)
@@ -85,6 +85,24 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
 - The reader lands in PR 2: `src/verdict/` (`verdict.schema.json`,
   `build.py`, `gate.py`), the P5 disagreement test, `make evals`,
   `make plants`, `make ledger`.
+
+### PR 2 detail (measure, 2026-09-18)
+
+- The second seed went in first, before any reader:
+  `tests/fixtures/hand_written_envelope_no_baseline_card_ref.json`, with
+  a test that failed because `src/verdict/` did not exist (`f9f1342`).
+- The reader: `src/verdict/schema.json`, `build.py`, `gate.py`,
+  `plants.py`, `replay_history.py`. On the seed the gate exits 2,
+  REJECTED, `'baseline_card_ref' is a required property`. A run with no
+  baseline card makes `build` exit 3, REFUSED, and write nothing.
+- The F0.3 seeded case is PR #4: no ruling file, `cold-review-ruling`
+  failed on it, closed unmerged. `milestones/M00/runs/f0_3.yaml` points
+  the observer at it.
+- The rulings that bound this PR are in feasibility.md §2, third round.
+  The file formats are in §8. What was found on the way is in §9; the
+  first item there decides `checks.F0_3`.
+- The measurement is the CI-written envelope under `evals/history/`.
+  Nothing here states it. Read the envelope, or run `make ledger`.
 
 ### Close detail
 

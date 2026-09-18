@@ -333,6 +333,47 @@ seat's original.
 Every other FINDING and NOTE in the report is unruled and stands as
 written in §1.
 
+### Third round: rulings that bind PR 2 (2026-09-18, at PR 2 open)
+
+The four report findings that `rulings/pr1.md` listed as binding PR 2.
+Ruled by the seats before PR 2 was written. The formats they needed are
+named in §8.
+
+**R3-1. CI credential path (report 2.3). Security.** PR 2 adds
+`infra/eval-role/`: a minimal CDK stack with one IAM role trusted by the
+GitHub OIDC provider (repo `andaro74/agentkeel`; any branch for
+`pull_request`, `main` for `push`). Permissions are
+`bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on the
+six pinned profile and model ARNs only, and no S3. The OIDC provider
+already exists; the stack imports it. M01's bootstrap stack absorbs the
+role. Security deploys it once with admin. CI assumes it through
+`aws-actions/configure-aws-credentials` pinned to a commit SHA. The
+workflow file is `.github/workflows/evals.yml`.
+
+**R3-2. Observing F0.2 (report 3.2). Engineering.** A pytest builds an
+envelope dict with no `baseline_card_ref` in memory and asserts (a)
+`verdict.build` refuses to emit it and (b) `verdict.gate` rejects it if
+written by hand. An in-memory dict is not a committed envelope; P11 is
+not violated. The second seed itself is a hand-written file under
+`tests/fixtures/`, committed first, with the test that expects the gate
+to reject it.
+
+**R3-3. Recording the plant (report 2.1). Engineering, Threshold Owner.**
+The envelope gains `checks`, keyed by falsifier id, each with `pass` or
+`fail` and the CI URL. At M00: `checks.F0_2` from the pytest above;
+`checks.F0_3` from a deliberate PR opened without a ruling file, left
+unmerged and closed, whose failed check run is the evidence.
+`plants_expected = 0` at M00 under the plant rule.
+
+**R3-4. The measured cell (report 4.2). Product.** Written in the close
+PR by Product, copied from the CI-written envelope, citing its commit
+and run URL. `make ledger` fails if the cell differs from the envelope.
+
+**R3-5. cost-cap. Threshold Owner.** Enforced from `thresholds.yaml` at
+M00: 20,000 tokens per run. SPEC/00 §5 says the cap is "in `evals.yml`"
+and §8 lists `cost-cap` under M03; this ruling is earlier and names a
+different file. SPEC/00 has not been amended to match.
+
 ## 3. The false state
 
 Claim 0 is false if either of these is true:
@@ -693,3 +734,55 @@ list in either run.
    On the plant it is right on 2 of 12 and 5 of 12 replies are one
    self-contradictory object. Once refagent has numbers, the Threshold
    Owner rules whether a delta against this control says enough.
+
+## 8. Formats and paths named at PR 2 (Engineering; report 1.2, 8.3, 8.4)
+
+One CI run writes three files, all named for the commit that ran:
+
+| File | Written by | What it is |
+|---|---|---|
+| `evals/history/<commit>.baseline-raw.json` | `src/baseline/run.py` (the runner) | Raw observations: each reply, its parse, stop reason, usage, latency. Scores nothing. Format unchanged from PR 1. |
+| `evals/history/<commit>.baseline-card.json` | `src/verdict/build.py card` | The baseline card: the baseline's `score`, `cites` and `pass` per golden, counts per kind, `traps_passed` (Finding F0.1), the run's model, parameters and prompt hash, and the content hash of the raw file. |
+| `evals/history/<commit>.json` | `src/verdict/build.py envelope` | The envelope, `src/verdict/schema.json` (`$id: verdict.schema.json`). `baseline_card_ref` is `{path, sha256}`: the card's path and the hash of its content. |
+
+- At M00 the run under measurement is the baseline itself, so the
+  envelope and its card score the same replies. The gate rejects an
+  envelope whose per-golden results differ from its card when both name
+  the same model. From M01 the envelope is refagent's and the card is
+  the baseline re-run at the same commit (P6). Which card a later
+  envelope points at was report 1.4; this PR builds "same run" and the
+  Threshold Owner has not ruled.
+- Hashes are of content, not bytes (`canonical_sha256`), so a Windows
+  checkout with CRLF reads the same hash CI wrote.
+- `make evals-local` writes the same three files under `evals/local/`.
+  `verdict.build` refuses `evals/history/` outside CI.
+- The schema file is `src/verdict/schema.json`, as CLAUDE.md has it. Its
+  `$id` is `verdict.schema.json`, as SPEC/00 §6 has it (report 8.4).
+- Fields the envelope cannot fill at M00 are `null`, and the schema says
+  why on each: `guardrail_version`, `judge_model_id`,
+  `corpus_fingerprint`, `cost_usd`, `rejected_over_ceiling`,
+  `alarm_latency_s`. `cost_usd` is null because no seat owns a price
+  table; the cap is in tokens.
+
+## 9. Found while building PR 2
+
+1. **`cold-review-ruling` is not a required check.** On 2026-09-18 the
+   API reported `main` unprotected: no branch protection, no rulesets,
+   `required_status_checks.contexts: []`. The check runs and fails on a
+   PR with no ruling file (PR #4), and nothing stops that PR merging.
+   The F0.3 observer reads required-ness, so `checks.F0_3` is `fail`
+   until Security requires the check. A ruleset is readable by the
+   workflow's token and has the `bypass_actors` field P9 names; classic
+   branch protection may not be readable by it.
+2. **`make ledger --plain` cannot run as written.** GNU make takes
+   `--plain` for one of its own options and exits 2. `make ledger --
+   --plain` and `make ledger PLAIN=1` work. SPEC/00 and CLAUDE.md write
+   the first form. Product.
+3. **Temperature 0 is not deterministic here.** A local run at
+   `e12ab7d` (not evidence) read traps 1/3 (`g-012`), ordinary 0/9. Six
+   of fifteen parsed replies differ from the PR 1 plant run with the
+   same prompt hash; `g-001`, which passed on the plant, failed. R2-4
+   names the trap count; the ordinary count moves too.
+4. **cdk-nag 3.0.2 does not load as a Python aspect** (`aspect.visit is
+   not a function`, jsii 1.140.0, Python 3.14). The `infra` group pins
+   `cdk-nag<3`.

@@ -23,7 +23,7 @@ A milestone that closes without a measurement is RED.
 
 | # | M | Claim | Falsifiers | Seeded commit | Expected gate output | Measured | PRs used / cap | State |
 |---|---|---|---|---|---|---|---|---|
-| 0 | M00 | Every later number is a delta against a frozen naive baseline | F0.2 an envelope validates without a baseline ref. F0.3 a PR merges without a ruling file after PR 2. Finding F0.1, not a falsifier: baseline passes a trap (recorded at open: `g-012`). | `22b5499` | Baseline card written; `score` and `cites` recorded per golden; traps expected 1/3 on the plant, F0.1 recorded as a finding. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0`. A run without a baseline card is rejected by `verdict.build`. | — | 1 / 4 | OPEN |
+| 0 | M00 | Every later number is a delta against a frozen naive baseline | F0.2 an envelope validates without a baseline ref. F0.3 a PR merges without a ruling file after PR 2. Finding F0.1, not a falsifier: baseline passes a trap (recorded at open: `g-012`). | `22b5499` | Baseline card written; `score` and `cites` recorded per golden; traps expected 1/3 on the plant, F0.1 recorded as a finding. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0`. A run without a baseline card is rejected by `verdict.build`. | — | 2 / 4 | OPEN |
 | 1 | M01 | An unsigned or tampered bundle never loads; refagent runs inside the construct | — | — | — | — | 0 / 4 | OPEN |
 | 2 | M02 | Seat-owned files change only with a ruling; relaxations need two keys | — | — | — | — | 0 / 4 | OPEN |
 | 3 | M03 | The eval gate goes RED on a regression or a silent plant, and never on a never-passed golden | — | — | — | — | 0 / 4 | OPEN |
