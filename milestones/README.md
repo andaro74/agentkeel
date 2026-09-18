@@ -1,0 +1,37 @@
+# Ledger
+
+One file. `make ledger` and `docs-current` read it. Rows are written on
+milestone open and the "Measured" cell is filled at close.
+`docs/milestones/README.md` is generated from this file by
+`make ledger --plain`; neither exists before M00 PR 2.
+
+The adoption PR (#1, `milestones/adoption/rulings/adopt-spec00.md`) is
+not counted against any milestone's cap of four.
+
+States: OPEN → GREEN | RED | UNMEASURED | UNSCHEDULED (two-key) | RETIRED.
+A milestone that closes without a measurement is RED.
+
+## What `make validate` checked, by tag
+
+"validate was green" means only what its row here says.
+
+| At | `make validate` checks |
+|---|---|
+| M00 PR 1 (no tag) | Golden files `evals/goldens/v1/g-NNN.yaml`: the §6 fields and no others, `id` format `g-NNN` and equal to the file name, no duplicate id, `kind` in `ordinary\|trap\|guardrail\|redteam`, `expected` shaped for its kind. Ruling files `milestones/*/rulings/*.md`: front matter has `ruling`, `seat`, `authorises`, `evidence`, `pr`; every `authorises` path matches something in the tree. Every ordinary and trap golden's `table_row` is in `data/rights_table.json` and its `clause_id` is in `data/clause_index.json`. Nothing else: not answers, not seats, not that an id never changed. |
+
+## Rows
+
+| # | M | Claim | Falsifiers | Seeded commit | Expected gate output | Measured | PRs used / cap | State |
+|---|---|---|---|---|---|---|---|---|
+| 0 | M00 | Every later number is a delta against a frozen naive baseline | F0.1 baseline passes a trap. F0.2 an envelope validates without a baseline ref. F0.3 a PR merges without a ruling file after PR 2. | `8a31e8d` | Baseline traps 0/3. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0`. A run without a baseline card is rejected by `verdict.build`. | — | 1 / 4 | OPEN |
+| 1 | M01 | An unsigned or tampered bundle never loads; refagent runs inside the construct | — | — | — | — | 0 / 4 | OPEN |
+| 2 | M02 | Seat-owned files change only with a ruling; relaxations need two keys | — | — | — | — | 0 / 4 | OPEN |
+| 3 | M03 | The eval gate goes RED on a regression or a silent plant, and never on a never-passed golden | — | — | — | — | 0 / 4 | OPEN |
+| 4 | M04 | A breaking model swap goes RED; an equivalent swap promotes; A-vs-A is zero diff | — | — | — | — | 0 / 4 | OPEN |
+| 5 | M05 | Five hostile attempts fail and appear in the security account within 10 minutes | — | — | — | — | 0 / 4 | OPEN |
+| 6 | M06 | A developer ships a governed agent from the template in under one day | — | — | — | — | 0 / 4 | OPEN |
+| 7 | M07 | An agent takes a platform, model or retirement upgrade without a workflow edit | — | — | — | — | 0 / 4 | OPEN |
+| 8 | M08 | The platform detects, contains and recovers from a hostile agent end to end; the evidence is complete without anyone editing it | — | — | — | — | 0 / 4 | OPEN |
+
+Rows 1–8 carry the claim from SPEC/00 §7 only. Falsifiers, seeded commit
+and expected gate output are written when each milestone opens.

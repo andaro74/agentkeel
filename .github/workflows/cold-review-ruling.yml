@@ -1,0 +1,50 @@
+# cold-review-ruling (SPEC/00 §5, R9). Security seat.
+# Authorised by SPEC/00-overview.md#8-M00.
+#
+# Fails unless a ruling file under milestones/*/rulings/ names this PR in
+# its front matter (`pr: <number>` or the PR's full URL). The checkout is
+# the PR's merge ref, which is main plus this PR, so a ruling on main and
+# a ruling carried by the PR both count.
+#
+# What this does not do: judge the ruling, or stop someone with write
+# access from editing this file. Nothing gates that until M02.
+name: cold-review-ruling
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  cold-review-ruling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: A ruling file names this PR
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          case "$PR" in ''|*[!0-9]*) echo "::error::no PR number"; exit 1 ;; esac
+          repo_re=$(printf '%s' "$REPO" | sed 's/[.[\*^$+?(){}|]/\\&/g')
+          found=0
+          for f in milestones/*/rulings/*.md; do
+            [ -f "$f" ] || continue
+            # front matter only: the lines between the first two '---'
+            if awk '/^---[[:space:]]*$/ { n++; next } n == 1' "$f" \
+              | grep -Eq "^pr:[[:space:]]*(#?${PR}|https://github\.com/${repo_re}/pull/${PR})[[:space:]]*$"; then
+              echo "ruling for PR #${PR}: $f"
+              found=1
+            fi
+          done
+          if [ "$found" -ne 1 ]; then
+            echo "::error::no file under milestones/*/rulings/ has 'pr: ${PR}' in its front matter"
+            exit 1
+          fi

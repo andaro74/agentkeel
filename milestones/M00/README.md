@@ -30,4 +30,42 @@ If a trap fails, fix the trap or the prompt, not the model.
 
 ## Ledger row
 
-Written at M00 PR 1 open.
+Written at M00 PR 1 open. The row in `milestones/README.md` is the one
+`make ledger` reads; this is the same row with the open detail.
+
+| Field | Row 0 |
+|---|---|
+| Claim | Every later number is a delta against a frozen naive baseline |
+| Falsifiers | F0.1 baseline passes a trap (record, do not tighten in this milestone). F0.2 an envelope validates without a baseline ref. F0.3 a PR merges without a ruling file after PR 2. |
+| Seeded commit | `8a31e8d` on `m00-pr1`: goldens `g-001` to `g-015`, `src/baseline/`, `data/` |
+| Expected gate output | Baseline traps 0/3. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0` under the plant rule. A run without a baseline card is rejected by `verdict.build`. |
+| Measured | — (filled at close) |
+| PRs used / cap | 1 / 4 |
+| State | OPEN |
+
+### Open detail (PR 1, 2026-09-18)
+
+- Feasibility note: `milestones/M00/feasibility.md`. The
+  `product-spec-reviewer` report in it has 2 BLOCK, 17 FINDING, 9 NOTE.
+  Neither BLOCK is ruled; both are carried as stated assumptions for the
+  Data Owner (which `expected` fields score the baseline) and Product
+  (seats for paths §5 does not list).
+- Planted: three traps (`g-010` holdback did not move with the theatrical
+  date, `g-011` non-exclusive licence, `g-012` sequel does not inherit),
+  three guardrail goldens (`g-013` to `g-015`) with no guardrail to
+  enforce them, and the baseline that must lose.
+- Not planted: the run without a baseline card. It needs the card format,
+  which is `src/verdict/` in PR 2. PR 2 plants it before `build.py`.
+- Baseline parameters, stated here because nothing else pins them:
+  `us.amazon.nova-micro-v1:0`, us-west-2, Converse, temperature 0,
+  `maxTokens` 512, one system prompt (`src/baseline/prompt.txt`), no
+  tools, no guardrail, no retrieval. Threshold Owner confirms or changes
+  them before tag `m00`; after the tag they are frozen with the code.
+- PR 1 local run (not evidence): see feasibility.md §6.
+- The reader lands in PR 2: `src/verdict/` (`verdict.schema.json`,
+  `build.py`, `gate.py`), the P5 disagreement test, `make evals`,
+  `make plants`, `make ledger`.
+
+### Close detail
+
+Written at the close PR.
