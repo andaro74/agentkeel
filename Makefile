@@ -11,5 +11,6 @@ evals-local:
 validate:
 	uv run python -m src.validate
 
+# The recipe exits 1. GNU make then exits 2, as it does for any failed recipe.
 evals plants ledger:
 	@echo not until M00 PR 2 && exit 1

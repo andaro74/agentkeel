@@ -2,7 +2,8 @@
 
 Status: DRAFT · Owner: Product seat · Rulings R1–R11 recorded at open ·
 N (detection bar) = 10 minutes (R10) · Adopted by ADR-0001, which carries
-amendment 1 (the rulings applied at adoption)
+amendment 1 (the rulings applied at adoption) and amendment 2 (seats for
+paths §5 did not list; the cold reviewer drafts, M00 PR 1)
 
 ## 1. What this is
 
@@ -84,13 +85,13 @@ P11. **Only CI-written envelopes are evidence.** A local run
 
 | Seat | Owns the truth about | Owned paths | May not |
 |---|---|---|---|
-| Product | what to build, when it's acceptable | `SPEC/**`, `milestones/**`, `CLAUDE.md`, `.claude/skills/**`, `docs/adr/**` | define correctness; merge code |
+| Product | what to build, when it's acceptable | `SPEC/**`, `milestones/**`, `CLAUDE.md`, `.claude/skills/**`, `docs/**` | define correctness; merge code |
 | Rule Owner | what the agent may say and do | `rules/**`, guardrail id/version in manifest | edit goldens; write product code |
-| Data Owner | what CORRECT means | `evals/goldens/**`, `data/corpus/**`, `data/clause_index.json`, rulings on FRAGILE, corpus admission | weaken a golden to green a build |
+| Data Owner | what CORRECT means | `evals/goldens/**`, `data/**` (slate, rights table, clause index, corpus), rulings on FRAGILE, corpus admission | weaken a golden to green a build |
 | Tool Owner | tool and edge contracts | `tools/**` schemas, `may_call`, `may_be_called_by` | change a schema without a major bump |
 | Threshold Owner | the bars, and which models are measured | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region (A-vs-A compares the pair) | move a bar without two keys |
 | Security | what tooling and infra MAY DO | platform repo: workflows, construct, bootstrap stack, KMS key policy, cosign identity, security account | define scope |
-| Engineering | that it works | `src/**`, `Makefile` | self-approve any of the above |
+| Engineering | that it works | `src/**`, `scripts/**`, `Makefile`, root config (`pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`) | self-approve any of the above |
 | (the seat named in its front matter) | its own routing | `.claude/agents/<name>.md` | rule; write to any seat-owned path |
 
 Ownership notes:
@@ -171,7 +172,7 @@ case; a specialist with no milestone to serve is a prompt nobody tests.
 | `tool-owner` | Tool Owner | reviews tool and edge schemas: `additionalProperties: false`, semver preview, edge declared both sides |
 | `threshold-owner` | Threshold Owner | reviews bars and the judge rubric: relative policy stated, two keys on any downward move |
 | `security-reviewer` | Security | reviews construct, bootstrap, workflows, IAM, SGs, key policy, anything touching the security account; reads cdk-nag output |
-| `engineering-cold-reviewer` | Engineering | the cold read per PR: diff and ledger row only, no PR description; writes the ruling file `cold-review-ruling` requires |
+| `engineering-cold-reviewer` | Engineering | the cold read per PR: diff and ledger row only, no PR description; outputs the ruling text with `ruling: DRAFT`; the Engineering seat commits it as the ruling file `cold-review-ruling` requires |
 
 **Specialists (called by a seat; never rule)**
 

@@ -11,7 +11,9 @@
 | M04 known-breaking swap | `meta.llama3-1-8b-instruct-v1:0` | `us.meta.llama3-1-8b-instruct-v1:0` | ACTIVE; ON_DEMAND and profile | smallest ACTIVE Meta or Mistral model that supports Converse tool use, so the break is a schema break, not a missing feature. Not Mistral 7B: a failure for a missing feature is not the RED M04 wants. |
 | M03 judge candidates (pick at M03 PR 1 by scoring the graded-examples set, R6) | `meta.llama4-maverick-17b-instruct-v1:0`; `meta.llama3-3-70b-instruct-v1:0`; `mistral.mistral-large-2407-v1:0`; `openai.gpt-oss-120b-1:0`; `openai.gpt-6-astra`; `amazon.nova-pro-v1:0` | `us.meta.llama4-maverick-17b-instruct-v1:0`; `us.meta.llama3-3-70b-instruct-v1:0`; `mistral.mistral-large-2407-v1:0` (no profile; ON_DEMAND); `openai.gpt-oss-120b-1:0` (no profile; ON_DEMAND); `us.openai.gpt-6-astra`; `us.amazon.nova-pro-v1:0` | all ACTIVE | strongest ACTIVE non-Anthropic models from providers a studio would already have approved. Six candidates; a studio would have Amazon approved by default. `gpt-6-astra` is the one closed-weight entry: the listing's only GPT-6-generation model; the GPT-5.6 variants (sol, terra, luna) are the prior generation and the listing does not rank them. Nova Pro is the Amazon entry after Nova Premier was found end-of-life. |
 
-If a trap fails, fix the trap or the prompt, not the model.
+From M01, if refagent fails a trap, fix the trap or the prompt, not the
+model. This does not apply to the baseline: if the baseline passes a
+trap, that is F0.1; record it and change nothing in this milestone.
 
 ## Findings
 
@@ -47,9 +49,10 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
 
 - Feasibility note: `milestones/M00/feasibility.md`. The
   `product-spec-reviewer` report in it has 2 BLOCK, 17 FINDING, 9 NOTE.
-  Neither BLOCK is ruled; both are carried as stated assumptions for the
-  Data Owner (which `expected` fields score the baseline) and Product
-  (seats for paths §5 does not list).
+  Both BLOCKs were ruled before the PR opened (feasibility.md §2): the
+  Data Owner split scoring into `score` (answer fields; F0.1 fires on
+  it) and `cites` (row and clause exist; gates from M01); Product gave
+  seats to the unlisted paths by ADR-0001 amendment 2.
 - Planted: three traps (`g-010` holdback did not move with the theatrical
   date, `g-011` non-exclusive licence, `g-012` sequel does not inherit),
   three guardrail goldens (`g-013` to `g-015`) with no guardrail to
@@ -61,7 +64,13 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
   `maxTokens` 512, one system prompt (`src/baseline/prompt.txt`), no
   tools, no guardrail, no retrieval. Threshold Owner confirms or changes
   them before tag `m00`; after the tag they are frozen with the code.
-- PR 1 local run (not evidence): see feasibility.md §6.
+- The prompt was revised once in this PR, by ruling of the Threshold
+  Owner and Product: the first prompt made the baseline a near-constant
+  responder (0/15, nine identical replies). The revision asks the plain
+  question for three fields. No further revision is permitted; if it
+  collapses again it is frozen as is.
+- PR 1 local runs (not evidence): both are in feasibility.md §6 with
+  their commit hashes. Run 1 is the finding, run 2 is the plant.
 - The reader lands in PR 2: `src/verdict/` (`verdict.schema.json`,
   `build.py`, `gate.py`), the P5 disagreement test, `make evals`,
   `make plants`, `make ledger`.

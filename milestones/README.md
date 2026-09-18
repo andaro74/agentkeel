@@ -17,7 +17,7 @@ A milestone that closes without a measurement is RED.
 
 | At | `make validate` checks |
 |---|---|
-| M00 PR 1 (no tag) | Golden files `evals/goldens/v1/g-NNN.yaml`: the §6 fields and no others, `id` format `g-NNN` and equal to the file name, no duplicate id, `kind` in `ordinary\|trap\|guardrail\|redteam`, `expected` shaped for its kind. Ruling files `milestones/*/rulings/*.md`: front matter has `ruling`, `seat`, `authorises`, `evidence`, `pr`; every `authorises` path matches something in the tree. Every ordinary and trap golden's `table_row` is in `data/rights_table.json` and its `clause_id` is in `data/clause_index.json`. Nothing else: not answers, not seats, not that an id never changed. |
+| M00 PR 1 (no tag) | Golden files `evals/goldens/v1/g-NNN.yaml`: the §6 fields and no others, `id` format `g-NNN` and equal to the file name, no duplicate id, `kind` in `ordinary\|trap\|guardrail\|redteam`, `expected` shaped for its kind, `added` a milestone id (`MNN`), `retired` null or a milestone id. Ruling files `milestones/*/rulings/*.md`: front matter has `ruling`, `seat`, `authorises`, `evidence`, `pr`; every `authorises` path matches something in the tree. Every ordinary and trap golden's `table_row` is in `data/rights_table.json` and its `clause_id` is in `data/clause_index.json`. Nothing else: not answers, not seats, not that an id never changed. |
 
 ## Rows
 

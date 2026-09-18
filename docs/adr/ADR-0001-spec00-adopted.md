@@ -9,7 +9,7 @@ authorises:
   - Threshold Owner  # agent model id + version + region ownership (§5)
   - Data Owner     # goldens path, golden schema, golden count, data/ paths (§5, §6, §9)
   - Engineering    # Makefile ownership and PR 1 / PR 2 targets (§5, §8 M00)
-amendments: 1
+amendments: 2
 ---
 
 # ADR-0001 — SPEC/00 adopted
@@ -145,6 +145,30 @@ Rulings on what the re-report against the amended files still left open:
 Also changed to match: §15 done-when names the ledger file and the ruling
 file per PR; §8 M00 build list names every artifact above.
 
+## Amendment 2 (M00 PR 1, 2026-09-18)
+
+Rulings on two points the `product-spec-reviewer` report raised against
+SPEC/00 at M00 open (`milestones/M00/feasibility.md`, BLOCK 7.1 and
+FINDING 8.2). Carried by M00 PR 1 under `milestones/M00/rulings/pr1.md`.
+
+1. Seats for paths §5 did not list. Product. (§5, CLAUDE.md table)
+   - `scripts/**` is Engineering's.
+   - `data/**` is the Data Owner's. This takes in `data/slate.json` and
+     `data/rights_table.json`, and replaces the two narrower entries
+     `data/corpus/**` and `data/clause_index.json`.
+   - `docs/**` is Product's. This takes in `docs/milestones/**` and
+     replaces the narrower entry `docs/adr/**`.
+   - Root config is Engineering's: `pyproject.toml`, `uv.lock`,
+     `.python-version`, `.gitignore`, with `Makefile` as before.
+2. `engineering-cold-reviewer` outputs the ruling text with
+   `ruling: DRAFT`; the Engineering seat commits it as the ruling. A
+   subagent still never rules and never writes to a seat-owned path.
+   Product. (§5.1)
+
+Not settled by this amendment: `README.md` and `LICENSE` at the root,
+`tests/**`, `evals/history/**` and `evals/local/**` still have no seat in
+§5.
+
 ## Consequences
 
 - `ruling-cited` has a concrete matching rule to implement at M02.
@@ -152,5 +176,5 @@ file per PR; §8 M00 build list names every artifact above.
   inherits them.
 - Before M03 the envelope's `plants_expected` is 0 by rule, not by
   accident; the F0.2 test reads it.
-- One more amendment is available to this ADR. A third change to these
+- This ADR has used both of its amendments. The next change to these
   rulings is a new ADR.

@@ -74,13 +74,13 @@ the diff; you do not merge.
 
 | Path | Seat | Gate |
 |---|---|---|
-| `SPEC/**`, `milestones/**`, `CLAUDE.md`, `.claude/skills/**`, `docs/adr/**` | Product | `ruling-cited` |
+| `SPEC/**`, `milestones/**`, `CLAUDE.md`, `.claude/skills/**`, `docs/**` | Product | `ruling-cited` |
 | `rules/**`, guardrail id/version | Rule Owner | `ruling-cited`, `two-key` on relaxation |
-| `evals/goldens/**`, `data/corpus/**`, `data/clause_index.json` | Data Owner | `ruling-cited`, `two-key` on retire |
+| `evals/goldens/**`, `data/**` | Data Owner | `ruling-cited`, `two-key` on retire |
 | `tools/**`, `may_call`, `may_be_called_by` | Tool Owner | `ruling-cited`, computed semver |
 | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region | Threshold Owner | `two-key` on any downward move |
 | `.github/workflows/**`, `infra/**`, key policy, cosign identity | Security | `ruling-cited`, `security-reviewer` |
-| `src/**`, `Makefile` | Engineering | `cold-review-ruling` |
+| `src/**`, `scripts/**`, `Makefile`, `pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore` | Engineering | `cold-review-ruling` |
 | `.claude/agents/<name>.md` | the seat in its `seat:` front matter | `ruling-cited` |
 
 Every seat is one human (R1). No gate waits for a human approval; all

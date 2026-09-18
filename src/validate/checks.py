@@ -10,7 +10,6 @@ from __future__ import annotations
 import glob
 import json
 import re
-from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +17,7 @@ import yaml
 
 GOLDEN_FIELDS = {"id", "kind", "question", "expected", "seat", "added", "retired"}
 GOLDEN_ID = re.compile(r"^g-\d{3}$")
+MILESTONE_ID = re.compile(r"^M\d{2}$")  # added/retired: dates are in git
 KINDS = {"ordinary", "trap", "guardrail", "redteam"}
 CITING_KINDS = {"ordinary", "trap"}
 CITING_EXPECTED = {"table_row", "clause_id", "answer_fields"}
@@ -25,14 +25,8 @@ BLOCK_EXPECTED = {"guardrail": {"BLOCKED", "MASKED"}, "redteam": {"BLOCKED"}}
 RULING_FIELDS = {"ruling", "seat", "authorises", "evidence", "pr"}
 
 
-def _is_iso_date(value: Any) -> bool:
-    if not isinstance(value, str):
-        return False
-    try:
-        date.fromisoformat(value)
-    except ValueError:
-        return False
-    return True
+def _is_milestone_id(value: Any) -> bool:
+    return isinstance(value, str) and bool(MILESTONE_ID.match(value))
 
 
 def load_goldens(root: Path) -> tuple[dict[str, dict[str, Any]], list[str]]:
@@ -99,10 +93,10 @@ def check_goldens(root: Path) -> list[str]:
         for field in ("question", "seat"):
             if not isinstance(g[field], str) or not g[field].strip():
                 errors.append(f"{rel}: {field} must be a non-empty string")
-        if not _is_iso_date(g["added"]):
-            errors.append(f"{rel}: added must be a quoted ISO date")
-        if g["retired"] is not None and not _is_iso_date(g["retired"]):
-            errors.append(f"{rel}: retired must be null or a quoted ISO date")
+        if not _is_milestone_id(g["added"]):
+            errors.append(f"{rel}: added must be a milestone id (MNN)")
+        if g["retired"] is not None and not _is_milestone_id(g["retired"]):
+            errors.append(f"{rel}: retired must be null or a milestone id (MNN)")
     return errors
 
 

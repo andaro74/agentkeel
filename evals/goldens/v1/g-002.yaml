@@ -11,5 +11,5 @@ expected:
     exclusive: true
     constraints: [window_closed]
 seat: Data Owner
-added: "2026-09-18"
+added: M00
 retired: null
