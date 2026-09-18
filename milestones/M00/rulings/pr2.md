@@ -1,7 +1,7 @@
 ---
-# Both CI-written envelopes are in evidence. This line is the Engineering
-# seat's; it is changed in a commit of its own.
-ruling: DRAFT
+# Ruled by the Engineering seat, in a commit of its own, after both
+# CI-written envelopes were in evidence and rulings A to F were applied.
+ruling: pr2
 seat:
   - Engineering
   - Security
@@ -70,7 +70,7 @@ evidence:
 pr: 3
 ---
 
-# Ruling: M00 PR 2 (measure) — DRAFT
+# Ruling: M00 PR 2 (measure)
 
 Cites `SPEC/00-overview.md#8-M00` for `src/verdict/`, `replay_history`,
 the `Makefile` targets and the tests. §8 M00 does not list `evals.yml`,
