@@ -19,6 +19,12 @@ from cdk_nag import AwsSolutionsChecks
 from constructs import Construct
 
 REPO = "andaro74/agentkeel"
+# This repo issues GitHub's immutable OIDC subject (`use_immutable_subject`,
+# read from `gh api repos/andaro74/agentkeel/actions/oidc/customization/sub`
+# on 2026-09-18): the owner id and the repo id ride in the claim, so a renamed
+# or re-created `andaro74/agentkeel` does not match. The classic form,
+# `repo:andaro74/agentkeel:...`, is never issued here and is not trusted.
+SUBJECT = "repo:andaro74@3157440/agentkeel@1376369685"
 REGION = "us-west-2"
 ROLE_NAME = "agentkeel-m00-evals"
 
@@ -63,8 +69,8 @@ class EvalRoleStack(cdk.Stack):
                     "StringEquals": {
                         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
                         "token.actions.githubusercontent.com:sub": [
-                            f"repo:{REPO}:pull_request",
-                            f"repo:{REPO}:ref:refs/heads/main",
+                            f"{SUBJECT}:pull_request",
+                            f"{SUBJECT}:ref:refs/heads/main",
                         ],
                     }
                 },

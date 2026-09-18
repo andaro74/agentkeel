@@ -9,6 +9,15 @@ One IAM role, `agentkeel-m00-evals`.
   account's existing GitHub OIDC provider. `pull_request` runs from any
   branch; `push` runs from `main` only. Both `aud` and `sub` are matched
   with `StringEquals`; there is no wildcard.
+- **The subject is the immutable one.** This repo has
+  `use_immutable_subject` on, so the claim is
+  `repo:andaro74@3157440/agentkeel@1376369685:pull_request`, with the
+  owner id and repo id in it. The first deploy trusted the classic form,
+  `repo:andaro74/agentkeel:pull_request`, which this repo never issues;
+  the assume failed with `Not authorized to perform
+  sts:AssumeRoleWithWebIdentity` (run 35402876499, attempt 2). If the
+  setting is ever turned off, the assume fails again until this is
+  changed back. It fails closed both ways.
 - **What it can do:** `bedrock:InvokeModel` and
   `bedrock:InvokeModelWithResponseStream` on the six inference profiles
   pinned in `milestones/M00/README.md`, and on the foundation models

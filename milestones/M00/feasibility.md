@@ -786,3 +786,16 @@ One CI run writes three files, all named for the commit that ran:
 4. **cdk-nag 3.0.2 does not load as a Python aspect** (`aspect.visit is
    not a function`, jsii 1.140.0, Python 3.14). The `infra` group pins
    `cdk-nag<3`.
+5. **The first deploy of the eval role trusted a subject this repo never
+   issues.** The repo has GitHub's immutable OIDC subject on
+   (`use_immutable_subject: true`), so the claim is
+   `repo:andaro74@3157440/agentkeel@1376369685:pull_request`. R3-1 and
+   the first `infra/eval-role/app.py` had the classic form,
+   `repo:andaro74/agentkeel:pull_request`, matched with `StringEquals`.
+   The assume failed closed: `Not authorized to perform
+   sts:AssumeRoleWithWebIdentity` (run 35402876499, attempt 2). The
+   stack now trusts the immutable form, which also survives a renamed or
+   re-created repo. Security redeploys. Nobody reviewed the claim format
+   before the first deploy; the `security-reviewer` checked the audience
+   and not the subject.
+
