@@ -11,7 +11,7 @@ evidence:
   - SPEC/00-overview.md
   - docs/adr/ADR-0001-spec00-adopted.md
   - milestones/M00/README.md
-pr: adopt SPEC/00 (number filled after the PR is opened)
+pr: https://github.com/andaro74/agentkeel/pull/1
 ---
 
 # Ruling: adopt SPEC/00
