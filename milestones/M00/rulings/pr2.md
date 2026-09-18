@@ -60,12 +60,13 @@ by the Security and Threshold Owner seats under R3-1 and R3-5.
 
 ## Where this stands
 
-- **The plant went RED locally and in tests, not yet in CI.** On the
-  second seed the gate exits 2, REJECTED, `'baseline_card_ref' is a
-  required property`. A run with no baseline card makes build exit 3 and
-  write nothing. Six tests in `tests/test_f0_2.py` hold that; removing
-  `baseline_card_ref` from the schema's `required` list fails four of
-  them. None of this is evidence of row 0 (P11).
+- **The plant goes RED.** On the second seed the gate exits 2, REJECTED,
+  `'baseline_card_ref' is a required property`. A run with no baseline
+  card makes build exit 3 and write nothing. Six tests in
+  `tests/test_f0_2.py` hold that; removing `baseline_card_ref` from the
+  schema's `required` list fails four of them. Those tests ran in the CI
+  run below, and their junit result is `checks.F0_2: pass` in the
+  envelope. Run locally, the same commands are not evidence (P11).
 - **Measured in CI, 2026-09-18.** [Run 35404446711](https://github.com/andaro74/agentkeel/actions/runs/35404446711) at
   `8fb4b80` assumed the role, ran `make evals`, and its `record` job
   committed `evals/history/8fb4b809abcdc00919012e7db65baa495779d3c8.*` as `github-actions[bot]` (`42ed278`).
