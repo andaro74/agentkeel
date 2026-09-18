@@ -1,7 +1,6 @@
 ---
-# The CI-written envelope is in evidence (BLOCK 1 below is cured). This line
-# is still DRAFT because the Engineering seat changes it; the cold reviewer
-# and the session that wrote the diff do not rule.
+# Both CI-written envelopes are in evidence. This line is the Engineering
+# seat's; it is changed in a commit of its own.
 ruling: DRAFT
 seat:
   - Engineering
@@ -40,9 +39,17 @@ authorises:
   - milestones/M00/rulings/pr2.md
   - docs/milestones/README.md
 evidence:
-  # the measurement: the CI run, and the envelope its `record` job committed
+  # PRIMARY. The measurement under ADR-0004: the CI run at 9407615, and the
+  # envelope, card and raw observations its `record` job committed (76fa683).
+  - https://github.com/andaro74/agentkeel/actions/runs/35406351135
+  - evals/history/9407615dcde09308490f6699c21a18100bfedcd2.json
+  - evals/history/9407615dcde09308490f6699c21a18100bfedcd2.baseline-card.json
+  - evals/history/9407615dcde09308490f6699c21a18100bfedcd2.baseline-raw.json
+  # SECONDARY. The gate before scope existed: the first CI run, at 8fb4b80,
+  # and its envelope (42ed278). Moved to pre-scope/, not edited; the gate
+  # does not read it. Its card and raw file stay where CI wrote them, so its
+  # baseline_card_ref still resolves.
   - https://github.com/andaro74/agentkeel/actions/runs/35404446711
-  # secondary: the gate before scope existed. Moved, not edited; not read by the gate.
   - evals/history/pre-scope/8fb4b809abcdc00919012e7db65baa495779d3c8.json
   - evals/history/8fb4b809abcdc00919012e7db65baa495779d3c8.baseline-card.json
   - evals/history/8fb4b809abcdc00919012e7db65baa495779d3c8.baseline-raw.json
@@ -89,7 +96,51 @@ Ruling A changes a measured path, so `evals` measures again. The first
 envelope, for `8fb4b80`, stays as evidence of the gate before scope
 existed, under `evals/history/pre-scope/`.
 
+## The measurement this ruling rests on
+
+[Run 35406351135](https://github.com/andaro74/agentkeel/actions/runs/35406351135) at `9407615`, the commit that applied rulings
+A to E. Its `record` job committed `evals/history/9407615dcde09308490f6699c21a18100bfedcd2.*` as
+`github-actions[bot]` (`76fa683`). What the gate reads in that envelope:
+
+> control: traps 1/3 (g-012); ordinary 0/9; guardrail 0/3; never_passed
+> 14; regressed 0; plants 0/0; F0_2 pass; F0_3 pass; GREEN
+
+- **As the ruling expected:** all fifteen results are `scope: control`;
+  `regressed` is 0 by construction; `checks.F0_2` and `checks.F0_3` pass
+  and decide the verdict; GREEN. 5,912 tokens against a cap of 20,000.
+  Clean tree, no failed call, the plant's prompt hash.
+- **Traps 1/3 on `g-012`,** as row 0 expects. No trap-count entry under
+  Finding F0.4.
+- **Ordinary 0/9.** The first CI run had 1/9, on `g-006`. That is
+  Finding F0.4, now in CI evidence twice over: feasibility.md §6.5 has
+  the five runs side by side. Under the first gate, a second measurement
+  beside the first would have been RED on `g-006`. Under ADR-0004 it is
+  reported and not gated.
+- **GREEN means no check failed and nothing the gate reads regressed.**
+  At M00 the gate reads no golden at all. It does not mean 1 of 15 is good.
+- `make ledger` prints the full cell, with both URLs. Product copies it
+  at the close.
+
+What the run also showed:
+
+- The role's new trust condition names `job_workflow_ref`. The run
+  printed the claim: `andaro74/agentkeel/.github/workflows/evals.yml@refs/pull/3/merge`.
+  The pinned pattern matches it. This run assumed the role **as deployed
+  at `8fb4b80`**, the wider one; S-1 takes effect when Security redeploys,
+  and only a run that assumes the redeployed role shows STS evaluates
+  the claim.
+- The `record` job's push does start runs of both workflows, by
+  `github-actions[bot]`, which GitHub parks at `action_required` with no
+  jobs. The header of `evals.yml` says such a push "starts no workflow".
+  The effect is what it says (the envelope commit has no checks; the
+  next human push is what `cold-review-ruling` reads). The sentence is
+  not exact. Left as is: `evals.yml` is a measured path, and a comment is
+  not worth a third measurement. For the close PR.
+
 ## Where this stands
+
+The section below was written at the first measurement, before the
+fourth round of rulings. It stands as the record of that run.
 
 - **The plant goes RED.** On the second seed the gate exits 2, REJECTED,
   `'baseline_card_ref' is a required property`. A run with no baseline

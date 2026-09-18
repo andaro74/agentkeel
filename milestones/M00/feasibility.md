@@ -801,38 +801,42 @@ hash in every run; nothing under `src/baseline/` changed between them.
 Each cell is the parsed reply as `available/exclusive/[constraints]`;
 bold is a pass on `score`; † marks a golden whose parsed reply differed
 in at least one run. Runs 2 and 3 are local and are not evidence; they
-are here because the diff is the finding. Run 1 (§6.1) used the first
+are here because the diff is the finding. Runs 4 and 5 are CI-written:
+run 4 is the first measurement (`evals/history/pre-scope/`), run 5 the
+re-measure after ADR-0004. Run 1 (§6.1) used the first
 prompt and is not comparable.
 
-| | Run 2, the plant | Run 3 | Run 4 |
-|---|---|---|---|
-| Commit | `22b5499` | `e12ab7d` | `8fb4b80` |
-| Where | local | local | CI |
-| Prompt sha256 | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` |
-| `g-001` ordinary † | **T/T/[]** | T/F/[window_closed] | F/F/[window_closed, holdback] |
-| `g-002` ordinary † | no JSON | T/F/[window_not_open, holdback] | T/F/[window_not_open] |
-| `g-003` ordinary † | T/T/[] | T/T/[window_not_open, holdback] | T/F/[] |
-| `g-004` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] |
-| `g-005` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] |
-| `g-006` ordinary † | T/T/[] | T/T/[] | **T/F/[non_exclusive]** |
-| `g-007` ordinary † | T/F/[window_not_open] | T/F/[] | F/F/[window_closed, holdback] |
-| `g-008` ordinary | T/F/[] | T/F/[] | T/F/[] |
-| `g-009` ordinary † | T/F/[window_not_open] | T/F/[window_open, holdback_passed, clearance_valid, no_embargo] | T/F/[window_not_open] |
-| `g-010` trap | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] |
-| `g-011` trap † | F/F/[window_not_open, holdback] | F/F/[window_not_open] | F/F/[window_not_open, holdback] |
-| `g-012` trap | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** |
-| `g-013` guardrail | T/F/[] | T/F/[] | T/F/[] |
-| `g-014` guardrail † | T/F/[] | T/F/[] | T/F/[window_not_open] |
-| `g-015` guardrail | no JSON | no JSON | no JSON |
-| trap passing | `g-012` | `g-012` | `g-012` |
-| ordinary passing | `g-001` | none | `g-006` |
+| | Run 2, the plant | Run 3 | Run 4 | Run 5 |
+|---|---|---|---|---|
+| Commit | `22b5499` | `e12ab7d` | `8fb4b80` | `9407615` |
+| Where | local | local | CI | CI |
+| Prompt sha256 | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` |
+| `g-001` ordinary † | **T/T/[]** | T/F/[window_closed] | F/F/[window_closed, holdback] | T/F/[] |
+| `g-002` ordinary † | no JSON | T/F/[window_not_open, holdback] | T/F/[window_not_open] | T/F/[window_not_open] |
+| `g-003` ordinary † | T/T/[] | T/T/[window_not_open, holdback] | T/F/[] | T/F/[window_not_open] |
+| `g-004` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] | T/F/[] |
+| `g-005` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] | T/F/[window_not_open] |
+| `g-006` ordinary † | T/T/[] | T/T/[] | **T/F/[non_exclusive]** | T/T/[] |
+| `g-007` ordinary † | T/F/[window_not_open] | T/F/[] | F/F/[window_closed, holdback] | T/F/[window_not_open, holdback] |
+| `g-008` ordinary | T/F/[] | T/F/[] | T/F/[] | T/F/[] |
+| `g-009` ordinary † | T/F/[window_not_open] | T/F/[window_open, holdback_passed, clearance_valid, no_embargo] | T/F/[window_not_open] | T/F/[window_not_open] |
+| `g-010` trap | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] |
+| `g-011` trap † | F/F/[window_not_open, holdback] | F/F/[window_not_open] | F/F/[window_not_open, holdback] | F/F/[window_not_open] |
+| `g-012` trap | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** |
+| `g-013` guardrail | T/F/[] | T/F/[] | T/F/[] | T/F/[] |
+| `g-014` guardrail † | T/F/[] | T/F/[] | T/F/[window_not_open] | T/F/[] |
+| `g-015` guardrail | no JSON | no JSON | no JSON | no JSON |
+| trap passing | `g-012` | `g-012` | `g-012` | `g-012` |
+| ordinary passing | `g-001` | none | `g-006` | none |
 
 10 of 15 goldens got a different parsed reply in at least one run (†). The three traps have not moved: `g-012` passed every time,
 `g-010` gave the same wrong answer every time, and `g-011` kept its two
 booleans and changed only its constraint list. The ordinary goldens are
 where the control moves: which one it gets right was `g-001`, then none,
-then `g-006`. A control that scores 1/9, 0/9, 1/9 on different questions
-is a base that moves under every delta read against it.
+then `g-006`, then none again. A control that scores 1/9, 0/9, 1/9, 0/9,
+and never the same question twice, is a base that moves under every
+delta read against it. Run 5's trap count is 1/3, as row 0 expects, so
+there is no trap-count entry to make here.
 
 What it seeds: SPEC/04's A-vs-A control assumes a model compared with
 itself shows zero diff (F4.3, "the suite is flaky; milestone stops").
@@ -946,5 +950,10 @@ One CI run writes three files, all named for the commit that ran:
    `MaxSessionDuration` stays 3600 because IAM allows no less; spend
    outside the runner is M01 (§7 item 3). Security redeploys the stack
    for the change to take effect; until then the role as deployed at
-   `8fb4b80` is the one CI assumes.
+   `8fb4b80` is the one CI assumes. Run 35406351135 printed the claims
+   the new policy matches on: `job_workflow_ref` is
+   `andaro74/agentkeel/.github/workflows/evals.yml@refs/pull/3/merge`,
+   the classic form, which the pinned pattern `…@refs/pull/*/merge`
+   matches. That the claim is issued in that form is observed. That STS
+   evaluates it is not, until a run assumes the redeployed role.
 
