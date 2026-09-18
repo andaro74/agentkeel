@@ -4,7 +4,11 @@ Runners write raw observations. `build` is the only writer of envelopes.
 `gate` is the only reader that rules on one; `replay_history` reads past
 envelopes for both, keyed on golden id. A test asserts they can disagree.
 
-What is shared here is the schema and the hash, nothing that scores.
+What build and the gate share: the schema, the hash, `plants.plant_ids` and
+`replay_history`. So they agree on the plant rule and on "ever passed" by
+construction; a bug in either is a bug in both. They can disagree on what
+they are given (the history, the tree) and on everything the gate works out
+again from `goldens`. Only build reads `expected`.
 """
 
 from __future__ import annotations

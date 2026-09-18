@@ -86,7 +86,14 @@ def test_a_dropped_golden_is_red(chain):
 
 def test_measured_is_what_the_ledger_cell_must_say(chain):
     envelope_path, _, _ = chain(right={"g-001", "g-012"})
-    assert gate.measured(gate.read(envelope_path)) == (
+    assert gate.measured_at(envelope_path, envelope_path.parent) == (
         "traps 1/3 (g-012); ordinary 1/9; guardrail 0/3; never_passed 13; regressed 0; "
         f"plants 0/0; GREEN; envelope `{'a' * 40}`"
     )
+
+
+def test_a_bad_history_file_is_rejected_not_red(chain, capsys):
+    envelope_path, _, _ = chain()
+    (envelope_path.parent / f"{'b' * 40}.json").write_text("{}", encoding="utf-8")
+    assert gate.main([str(envelope_path), "--history-dir", str(envelope_path.parent)]) == 2
+    assert "history cannot be replayed" in capsys.readouterr().out

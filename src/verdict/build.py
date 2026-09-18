@@ -13,7 +13,8 @@ It refuses, and writes nothing, when:
 - the tree was dirty when the runner ran (unless --allow-dirty, local only);
 - a reply was read from a prompt cache;
 - the composed envelope does not validate;
-- the target is evals/history/ and this is not CI (ADR-0003).
+- the target is evals/history/ and GITHUB_ACTIONS is not "true" (ADR-0003).
+  That is an environment variable. It stops an accident, not a person.
 Exit 3 is a refusal.
 """
 
@@ -86,11 +87,15 @@ def score_one(
         parsed = observation.get("parsed")
         parsed = parsed if isinstance(parsed, dict) else {}
         fields = golden["expected"]["answer_fields"]
+        if not fields:
+            raise Refused(f"{golden['id']}: no answer_fields; every answer would pass")
         score = all(
             name in parsed and _same(value, parsed[name]) for name, value in fields.items()
         )
+        # A reply can put a list or an object here. That is not a citation.
+        row, clause = parsed.get("table_row"), parsed.get("clause_id")
         cites: bool | None = (
-            parsed.get("table_row") in rows and parsed.get("clause_id") in clauses
+            isinstance(row, str) and row in rows and isinstance(clause, str) and clause in clauses
         )
     else:
         # Only guardrail_intervened counts as BLOCKED or MASKED. A model that

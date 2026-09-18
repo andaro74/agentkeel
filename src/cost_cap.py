@@ -5,7 +5,8 @@
 Reads the runner's raw observations, not the envelope. Runs before
 verdict.build, so a run over the cap writes no envelope.
 
-It reads the spend after it is spent. It bounds the next run, not this one.
+It reads the spend after it is spent, and only the spend the runner wrote
+down. It stops this run reaching an envelope. It does not stop the next run.
 """
 
 from __future__ import annotations
@@ -23,7 +24,11 @@ ROOT = Path(__file__).resolve().parents[1]
 def tokens_spent(raw: dict) -> int:
     spent = 0
     for observation in raw["observations"]:
-        usage = observation.get("usage", {})
+        if "error" in observation:  # the call failed; the runner saw no bill
+            continue
+        usage = observation.get("usage")
+        if not usage:
+            raise ValueError(f"{observation.get('id')}: a reply with no usage cannot be counted")
         spent += usage.get("totalTokens", usage.get("inputTokens", 0) + usage.get("outputTokens", 0))
     return spent
 
@@ -39,7 +44,11 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(cap, int) or isinstance(cap, bool) or cap <= 0:
         print(f"FAIL cost-cap: tokens_per_run must be a positive integer, got {cap!r}")
         return 1
-    spent = tokens_spent(json.loads(args.raw.read_text(encoding="utf-8")))
+    try:
+        spent = tokens_spent(json.loads(args.raw.read_text(encoding="utf-8")))
+    except ValueError as exc:
+        print(f"FAIL cost-cap: {exc}")
+        return 1
     over = spent > cap
     print(f"{'FAIL' if over else 'ok  '} cost-cap: {spent:,} tokens this run, cap {cap:,}")
     return 1 if over else 0

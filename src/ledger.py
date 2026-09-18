@@ -5,9 +5,10 @@
 
 A Measured cell is written by Product in the close PR, copied from the
 CI-written envelope (ruling on report 4.2). This does not write the cell.
-It reads the cell, finds the envelope the cell names, asks verdict.gate
-what that envelope measured, and fails if the two differ. It reads no
-envelope itself; gate does.
+It reads the cell, finds the envelope the cell names, asks verdict.gate to
+rule on it, and fails if the cell differs from the envelope's numbers under
+the gate's verdict. It also fails a GREEN State over an empty cell, and a
+State that is not the cell's verdict. It reads no envelope itself; gate does.
 """
 
 from __future__ import annotations
@@ -48,18 +49,21 @@ def rows() -> list[dict[str, str]]:
 
 def check_measured(row: dict[str, str], history_dir: Path) -> str | None:
     """None if the cell is empty or equals what its envelope measured; else what is wrong."""
-    cell = row["Measured"]
+    cell, state = row["Measured"], row["State"]
     if cell == UNMEASURED:
-        return None
+        # SPEC/00 section 7: a milestone that closes without a measurement is RED, never GREEN.
+        return f"row {row['#']}: State {state} with no measurement" if state == "GREEN" else None
     cited = CITES.search(cell)
     if not cited:
         return f"row {row['#']}: Measured names no envelope"
     try:
-        envelope = gate.read(history_dir / f"{cited[1]}.json")
+        expected = gate.measured_at(history_dir / f"{cited[1]}.json", history_dir)
     except gate.Rejected as rejection:
         return f"row {row['#']}: {rejection}"
-    if cell != (expected := gate.measured(envelope)):
+    if cell != expected:
         return f"row {row['#']}: Measured differs from the envelope.\n  ledger:   {cell}\n  envelope: {expected}"
+    if state in ("GREEN", "RED") and f"; {state}; " not in cell:
+        return f"row {row['#']}: State {state} is not the verdict in the Measured cell"
     return None
 
 
@@ -68,7 +72,7 @@ def plain(ledger_rows: list[dict[str, str]]) -> str:
     out = [
         "# Milestones",
         "",
-        "Generated from `milestones/README.md` by `make ledger --plain`. Do not edit.",
+        "Generated from `milestones/README.md` by `make ledger -- --plain`. Do not edit.",
         "",
         "| Milestone | In plain words | Result | Video |",
         "|---|---|---|---|",
@@ -115,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if path := gate.latest(args.history_dir):
         try:
-            print(f"\nlatest CI-written envelope reads:\n    {gate.measured(gate.read(path))}")
+            print(f"\nlatest CI-written envelope reads:\n    {gate.measured_at(path, args.history_dir)}")
         except gate.Rejected as rejection:
             problems.append(str(rejection))
     else:

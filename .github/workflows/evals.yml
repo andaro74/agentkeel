@@ -6,18 +6,30 @@
 # That commit is what "CI-written" means (ADR-0003); a human commit to
 # evals/history/ needs two keys.
 #
-# Two jobs, so the job that runs the PR's code has no write token and the
-# job that has the write token runs none of the PR's code.
+# Two jobs. The job that runs the PR's code, and whatever `uv sync` pulls
+# in, has no write token. The job with the write token runs git only. It
+# still commits bytes the first job produced, so "CI-written" means who
+# pushed the file, not what wrote it: a PR that edits src/verdict/ or the
+# Makefile decides what its own envelope says. Known gap until the reader
+# can be taken from main.
 #
 # A commit pushed with GITHUB_TOKEN starts no workflow. So the envelope
 # commit has no check runs of its own, and the next human push is what
 # `cold-review-ruling` reads. That next push does not spend again: the
 # first step finds the envelope whose commit differs from HEAD only in
-# prose and history, and stops.
+# prose and history. It then asks verdict.gate to rule on that envelope,
+# and the gate's exit code is the job's. A RED envelope stays RED.
 #
-# What this does not do: stop someone with write access from editing this
-# file. Nothing gates that until M02. On `push` to main it measures and
-# does not record; nothing may push to main outside a PR.
+# checks.F0_3 is read from GitHub, not from the tree. If the ruleset on
+# main changes, a prose-only push does not measure again; change a
+# measured path, such as milestones/M00/runs/f0_3.yaml.
+#
+# What this does not do:
+# - stop someone with write access from editing this file, or from adding
+#   a workflow that assumes the same role. Nothing gates that until M02.
+# - tell a hand-written evals/history/<commit>.json from a recorded one,
+#   beyond what verdict.gate checks. `two-key` on a human commit there is M02.
+# - record on `push` to main. It measures and gates only.
 name: evals
 
 on:
@@ -65,23 +77,29 @@ jobs:
             case "$sha" in *[!0-9a-f]*) continue ;; esac
             [ "${#sha}" -eq 40 ] || continue
             git merge-base --is-ancestor "$sha" HEAD || continue
-            # Prose, the ledger and history do not change what is measured.
+            # Prose, the ledger, subagent prompts and history do not change
+            # what the tree measures.
             if git diff --quiet "$sha" HEAD -- . \
-              ':(exclude)evals/history' ':(exclude)docs' ':(exclude)SPEC' \
+              ':(exclude)evals/history' ':(exclude)docs' ':(exclude)SPEC' ':(exclude).claude' \
               ':(exclude,glob)milestones/**/*.md' \
               ':(exclude)README.md' ':(exclude)CLAUDE.md' ':(exclude)LICENSE'; then
-              echo "::notice::measured at $sha; nothing measured has changed since. Not spending again."
+              echo "::notice::measured at $sha; nothing measured has changed since. Not spending again; the gate rules on that envelope."
               echo "measured_at=$sha" >> "$GITHUB_OUTPUT"
               break
             fi
           done
 
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        if: steps.current.outputs.measured_at == ''
 
       - name: Install
-        if: steps.current.outputs.measured_at == ''
         run: uv sync --frozen
+
+      # The skip path. No AWS, no spend. The gate decides, not this file.
+      - name: Gate the recorded envelope
+        if: steps.current.outputs.measured_at != ''
+        env:
+          MEASURED_AT: ${{ steps.current.outputs.measured_at }}
+        run: uv run python -m src.verdict.gate "evals/history/$MEASURED_AT.json"
 
       - name: make validate
         if: steps.current.outputs.measured_at == ''

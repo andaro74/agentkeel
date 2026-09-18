@@ -41,8 +41,17 @@ gh variable set AWS_EVAL_ROLE_ARN --body "$(aws cloudformation describe-stacks \
   absorbs this role. Delete this stack then.
 - A pull request from any branch of this repo can assume the role and
   spend tokens. `cost-cap` (`thresholds.yaml`) reads the spend after the
-  run, not before it. The worst case per run is 15 calls at 512 output
-  tokens each.
+  run, and only the spend the PR's own runner wrote down. `make evals` as
+  written makes 15 calls at 512 output tokens each, on Nova Micro. That
+  is not the worst case. Any step that runs PR code can mint its own
+  OIDC token, assume the role for up to one hour, and invoke any of the
+  six models at the account's quota. M00 calls one of the six. A Budgets
+  alarm on Bedrock would be the observation; there is none yet.
+- Not observed yet: a direct call to a foundation model, and a call
+  through an unpinned profile, both being denied. Two `AccessDenied`
+  results from the deployed role would show it.
+- `agentkeel-m00-evals` is a fixed name. An M01 stack that reuses it will
+  collide until this stack is deleted.
 - cdk-nag (`AwsSolutionsChecks`) runs on synth. Zero findings, zero
   suppressions on 2026-09-18, cdk-nag 2.38.2. cdk-nag 3.0.2 fails to
   load as a Python aspect (`aspect.visit is not a function`), so the

@@ -1,8 +1,11 @@
-# Threshold Owner. Any downward move needs two keys (SPEC/00 §5).
-# Opened at M00 PR 2 by ruling of the Threshold Owner
-# (milestones/M00/rulings/pr2.md). It holds one bar.
+# Threshold Owner. Any relaxation needs two keys (SPEC/00 §5 `two-key`).
+# Each bar says which direction relaxes it.
+# Opened at M00 PR 2 by ruling of the Threshold Owner: R3-5 in
+# milestones/M00/feasibility.md §2, carried by milestones/M00/rulings/pr2.md.
+# It holds one bar.
 
 # cost-cap: total tokens, in plus out, for one `make evals` run.
+# A budget, not a quality bar. Relaxes upward: a higher number needs two keys.
 # The PR 1 plant run spent 5,662. The worst case at M00 is about 11,500:
 # 15 calls, 512 output tokens each, about 3,600 tokens in.
 cost_cap:

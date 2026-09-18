@@ -42,6 +42,19 @@ def test_a_wrong_or_missing_field_fails(parsed):
     assert score(parsed)["pass"] is False
 
 
+@pytest.mark.parametrize("junk", [["r-019"], {"row": "r-019"}, 19, None])
+def test_a_malformed_citation_is_not_a_citation_and_not_a_crash(junk):
+    right = {"available": True, "exclusive": False, "constraints": ["embargo", "holdback"]}
+    assert score({**right, "table_row": junk, "clause_id": "ML-2.1"})["cites"] is False
+    assert score({**right, "table_row": "r-019", "clause_id": junk})["cites"] is False
+
+
+def test_a_golden_with_no_answer_fields_is_refused_not_passed():
+    empty = {**GOLDEN, "expected": {**GOLDEN["expected"], "answer_fields": {}}}
+    with pytest.raises(build.Refused, match="every answer would pass"):
+        score({}, empty)
+
+
 def test_only_guardrail_intervened_counts_as_blocked():
     assert score(None, PLANT, stop_reason="guardrail_intervened")["pass"] is True
     # The model declining by itself is an opinion, not a control (g-015, ruling 3).
@@ -85,14 +98,19 @@ def test_refuses_a_reply_read_from_a_cache(goldens):
         build.compose_envelope(raw, results, {"path": "x", "sha256": "0" * 64}, {}, [], {}, None)
 
 
-def test_history_is_ci_written_only(chain, monkeypatch):
+def test_history_is_ci_written_only(chain, monkeypatch, tmp_path):
     envelope_path, _, _ = chain()
     envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    # A stand-in folder: if the guard ever breaks, this must not write into the evidence.
+    monkeypatch.setattr(build, "HISTORY", (tmp_path / "history").resolve())
     target = build.HISTORY / f"{COMMIT}.json"
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     with pytest.raises(build.Refused, match="CI-written only"):
         build.emit(envelope, target, envelope=True)
     assert not target.exists()
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")  # all the guard reads; it stops an accident
+    build.emit(envelope, target, envelope=True)
+    assert target.exists()
 
 
 def test_a_failed_call_is_unmeasured_not_green(goldens):

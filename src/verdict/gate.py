@@ -35,7 +35,7 @@ from src.verdict import (
     schema_errors,
 )
 
-__all__ = ["Rejected", "judge", "measured", "read", "schema_errors"]
+__all__ = ["Rejected", "judge", "measured", "measured_at", "read", "rule", "schema_errors"]
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -117,8 +117,8 @@ def judge(
     return verdict, reasons
 
 
-def measured(envelope: dict[str, Any]) -> str:
-    """The ledger's Measured cell for this envelope. `make ledger` compares the cell to this."""
+def measured(envelope: dict[str, Any], verdict: str) -> str:
+    """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's."""
     results = envelope["goldens"]
 
     def tally(kind: str) -> str:
@@ -134,7 +134,7 @@ def measured(envelope: dict[str, Any]) -> str:
         f"regressed {len(envelope['regressed'])}",
         f"plants {envelope['plants_fired']}/{envelope['plants_expected']}",
         *(f"{name} {c['status']} {c['url']}" for name, c in sorted(envelope["checks"].items())),
-        envelope["verdict"],
+        verdict,
         f"envelope `{envelope['commit']}`",
     ]
     return "; ".join(parts)
@@ -151,16 +151,29 @@ def latest(history_dir: Path = HISTORY) -> Path | None:
 
 def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
     envelope = read(path)
-    history = replay_history.load(history_dir, exclude_commit=envelope["commit"])
+    try:
+        history = replay_history.load(history_dir, exclude_commit=envelope["commit"])
+    except ValueError as exc:  # a bad file in history: the gate cannot rule, which is not RED
+        raise Rejected(f"history cannot be replayed: {exc}") from exc
     kinds = load_golden_kinds(GOLDENS)
     return judge(envelope, kinds, history, plants.plant_ids(kinds, ROOT))
+
+
+def measured_at(path: Path, history_dir: Path = HISTORY) -> str:
+    """What `make ledger` holds a Measured cell to: the envelope's numbers under the gate's verdict."""
+    verdict, _ = rule(path, history_dir)
+    return measured(read(path), verdict)
 
 
 def print_plants() -> int:
     kinds = load_golden_kinds(GOLDENS)
     plant_ids = plants.plant_ids(kinds, ROOT)
     path = latest()
-    results = read(path)["goldens"] if path else {}
+    try:
+        results = read(path)["goldens"] if path else {}
+    except Rejected as rejection:
+        print(f"REJECTED {rejection}")
+        return 2
     print(f"plants_expected = {len(plant_ids)}")
     for g in plant_ids:
         fired = {True: "fired", False: "SILENT", None: "not run"}[results.get(g, {}).get("pass")]
