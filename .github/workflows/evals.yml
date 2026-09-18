@@ -119,6 +119,20 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: uv run python scripts/observe_pr_check.py milestones/M00/runs/f0_3.yaml --out "$RUNNER_TEMP/f0_3.json"
 
+      # The three claims the role's trust policy matches on: `aud` and `sub`
+      # exactly, `job_workflow_ref` by pattern. When an assume is refused, look
+      # here first: the first deploy trusted a `sub` this repo never issues
+      # (feasibility.md §9.5). Prints the claims, never the token. A diagnostic:
+      # if it fails, the measurement goes on.
+      - name: OIDC claims the role trusts
+        if: steps.current.outputs.measured_at == ''
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
+            | python3 -c 'import base64, json, sys; p = json.load(sys.stdin)["value"].split(".")[1]; c = json.loads(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4))); [print(k, "=", c.get(k)) for k in ("aud", "sub", "job_workflow_ref")]'
+
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         if: steps.current.outputs.measured_at == ''
         with:

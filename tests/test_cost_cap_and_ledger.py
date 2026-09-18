@@ -74,16 +74,16 @@ def test_ledger_holds_state_to_the_measurement(chain):
     assert "is not the verdict" in ledger.check_measured(row(cell, "RED"), history_dir)
 
 
-def test_ledger_sides_with_the_gate_not_with_build(chain, tmp_path, goldens):
+def test_ledger_sides_with_the_gate_not_with_build(chain, past, goldens):
     """The cold review's probe: build, kept from the history, says GREEN; the gate says RED."""
     ordinary = {g for g, golden in goldens.items() if golden["kind"] == "ordinary"}
-    past_path, _, _ = chain(right=ordinary)
-    past = json.loads(past_path.read_text(encoding="utf-8"))
-    envelope_path, _, _ = chain()  # overwrites: now everything fails, built with no history
+    history_dir = past(right=ordinary, agent=True)
+    envelope_path, _, _ = chain(agent=True)  # now everything fails, built with no history
     assert json.loads(envelope_path.read_text(encoding="utf-8"))["verdict"] == "GREEN"
-    (envelope_path.parent / f"{'b' * 40}.json").write_text(json.dumps({**past, "commit": "b" * 40}), encoding="utf-8")
 
-    cell = gate.measured_at(envelope_path, envelope_path.parent)
+    cell = gate.measured_at(envelope_path, history_dir)
     assert "; RED; " in cell and "; GREEN; " not in cell
     green_cell = cell.replace("; RED; ", "; GREEN; ")
-    assert "differs from the envelope" in ledger.check_measured(row(green_cell, "GREEN"), envelope_path.parent)
+    # the cell cites the envelope by commit; put the envelope where the ledger looks
+    (history_dir / envelope_path.name).write_text(envelope_path.read_text(encoding="utf-8"), encoding="utf-8")
+    assert "differs from the envelope" in ledger.check_measured(row(green_cell, "GREEN"), history_dir)

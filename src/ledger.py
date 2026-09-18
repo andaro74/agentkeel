@@ -1,7 +1,7 @@
 """`make ledger`: print the ledger and hold its Measured cells to the envelopes.
 
-    python -m src.ledger            print; exit 1 if a Measured cell differs from its envelope
-    python -m src.ledger --plain    also write docs/milestones/README.md
+    python -m src.ledger            make ledger: print; exit 1 if a Measured cell differs from its envelope
+    python -m src.ledger --plain    make ledger-plain: also write docs/milestones/README.md
 
 A Measured cell is written by Product in the close PR, copied from the
 CI-written envelope (ruling on report 4.2). This does not write the cell.
@@ -72,7 +72,7 @@ def plain(ledger_rows: list[dict[str, str]]) -> str:
     out = [
         "# Milestones",
         "",
-        "Generated from `milestones/README.md` by `make ledger -- --plain`. Do not edit.",
+        "Generated from `milestones/README.md` by `make ledger-plain`. Do not edit.",
         "",
         "| Milestone | In plain words | Result | Video |",
         "|---|---|---|---|",

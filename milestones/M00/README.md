@@ -40,9 +40,9 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
 |---|---|
 | Claim | Every later number is a delta against a frozen naive baseline |
 | Falsifiers | F0.2 an envelope validates without a baseline ref. F0.3 a PR merges without a ruling file after PR 2. |
-| Finding, not a falsifier | F0.1 baseline passes a trap (record, do not tighten in this milestone; ADR-0003). Recorded at open: `g-012` on the plant. |
+| Finding, not a falsifier | F0.1 baseline passes a trap (record, do not tighten in this milestone; ADR-0003). Recorded at open: `g-012` on the plant. F0.4 the control is non-deterministic at temperature 0 (ADR-0004, PR 2; feasibility.md §6.5). |
 | Seeded commit | `22b5499` on `m00-pr1`: the plant. Goldens `g-001` to `g-015`, `data/` and the baseline code are from `8a31e8d`; the baseline prompt is as revised once in `22b5499`. |
-| Expected gate output | Baseline card written; `score` and `cites` recorded per golden; traps expected 1/3 on the plant, F0.1 recorded as a finding. A 0/3 or 2/3 in PR 2's CI run is a non-determinism finding to record. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0` under the plant rule. A run without a baseline card is rejected by `verdict.build`. |
+| Expected gate output | Baseline card written; `score` and `cites` recorded per golden; traps expected 1/3 on the plant, F0.1 recorded as a finding. A 0/3 or 2/3 in PR 2's CI run is a non-determinism finding to record. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0` under the plant rule. A run without a baseline card is rejected by `verdict.build`. From ADR-0004 (PR 2): every result is `scope: control`, so `regressed` is 0 by construction and `checks.F0_2`, `checks.F0_3` decide the verdict. |
 | Measured | — (filled at close) |
 | PRs used / cap | 2 / 4 |
 | State | OPEN |
@@ -101,6 +101,13 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
 - The rulings that bound this PR are in feasibility.md §2, third round.
   The file formats are in §8. What was found on the way is in §9; the
   first item there decides `checks.F0_3`.
+- The seats then ruled on what PR 2 found (feasibility.md §2, fourth
+  round; ADR-0004). The baseline is the control and is never gated:
+  every result carries `scope`, and at M00 all fifteen are `control`.
+  The first envelope, for `8fb4b80`, was written before `scope` existed;
+  it is kept under `evals/history/pre-scope/` and the gate does not read
+  it. The CI role now allows the baseline's profile only, to `evals.yml`
+  only (Finding S-1).
 - The measurement is the CI-written envelope under `evals/history/`.
   Nothing here states it. Read the envelope, or run `make ledger`.
 

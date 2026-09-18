@@ -1,12 +1,14 @@
 # Engineering. All five targets exist from M00 PR 1 and run from M00 PR 2
-# (SPEC/00 §8 M00).
+# (SPEC/00 §8 M00). `ledger-plain` is the sixth, from M00 PR 2: GNU make
+# takes `--plain` for an option of its own, so `make ledger --plain` could
+# never run (ADR-0004).
 #
 # The chain is the same in CI and locally (P5): the runner writes raw
 # observations, cost-cap reads the spend, verdict.build writes the card and
 # the envelope, verdict.gate rules on the envelope. A recipe that fails
 # exits 1 (gate: 1 RED, 2 REJECTED; build: 3 REFUSED); GNU make then exits 2.
 
-.PHONY: evals evals-local validate plants ledger --plain
+.PHONY: evals evals-local validate plants ledger ledger-plain
 
 COMMIT := $(shell git rev-parse HEAD)
 HISTORY := evals/history
@@ -50,10 +52,9 @@ validate:
 plants:
 	@uv run python -m src.verdict.gate --plants
 
-# GNU make takes `--plain` for an option of its own and stops. Write
-# `make ledger -- --plain` or `make ledger PLAIN=1`.
 ledger:
-	@uv run python -m src.ledger $(if $(or $(PLAIN),$(filter --plain,$(MAKECMDGOALS))),--plain)
+	@uv run python -m src.ledger
 
---plain:
-	@:
+# Writes docs/milestones/README.md from the ledger. Never hand-edit that file.
+ledger-plain:
+	@uv run python -m src.ledger --plain

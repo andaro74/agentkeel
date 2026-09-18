@@ -363,7 +363,10 @@ The envelope gains `checks`, keyed by falsifier id, each with `pass` or
 `fail` and the CI URL. At M00: `checks.F0_2` from the pytest above;
 `checks.F0_3` from a deliberate PR opened without a ruling file, left
 unmerged and closed, whose failed check run is the evidence.
-`plants_expected = 0` at M00 under the plant rule.
+`plants_expected = 0` at M00 under the plant rule (ADR-0001 amendment 1,
+item 6, in the list "Rulings on what neither file specified"). The
+ruling as given cited "B1.6", an id nothing in the tree carries; Product
+ruled the citation (C, fourth round).
 
 **R3-4. The measured cell (report 4.2). Product.** Written in the close
 PR by Product, copied from the CI-written envelope, citing its commit
@@ -373,6 +376,79 @@ and run URL. `make ledger` fails if the cell differs from the envelope.
 M00: 20,000 tokens per run. SPEC/00 §5 says the cap is "in `evals.yml`"
 and §8 lists `cost-cap` under M03; this ruling is earlier and names a
 different file. SPEC/00 has not been amended to match.
+
+### Fourth round: rulings on what PR 2 found (2026-09-18, after the first CI measurement)
+
+PR 2 measured at `8fb4b80`, GREEN, and listed twelve items as Unsure.
+The seats ruled six. They are applied in one commit on `m00-pr2`.
+
+**A. Scope. Threshold Owner, Data Owner.** The regression bar applies to
+the agent under test; the baseline is the control and is never gated.
+`scope` is on each per-golden result in the envelope, and once on the
+baseline card (`scope: control`). Enum: `control`, `agent`; no third
+value until a milestone needs one. `gate.py` reads `scope: agent`
+results for regression; control results are reported in the envelope
+and in the gate's one-line reading, never blocked on. `replay_history`
+keys on (scope, golden id); control history is kept for the M04 A-vs-A
+comparison, not for gating. At M00 every result is `control`, so
+`regressed` is 0 by construction and `checks.F0_2` and `checks.F0_3`
+decide the verdict. **Finding F0.4 (Product):** the control is
+non-deterministic at temperature 0. Recorded in §6.5, named as the seed
+for SPEC/04's A-vs-A design, and the place where any trap count other
+than 1/3 on a re-measure is recorded.
+
+How it was built, where the ruling left room: `verdict.build` works
+`scope` out (a run is the control when its raw observations are the ones
+the card was scored from) and takes no flag for it. The gate rejects a
+`control` result that differs from the card's, so an agent cannot call
+itself the control. Plants are counted on `agent` results only: the
+baseline has no guardrail and never will. A control golden that passed
+before and fails now is in neither `regressed` nor `never_passed`; the
+gate prints it as a note.
+
+**B. SPEC/00 departures. Product.** ADR-0004, "measurement fields":
+`checks` on the envelope, `scope` per A, cost-cap in `thresholds.yaml`,
+and the control-never-gated rule. SPEC/00 §5, §6 and §8 M00 amended.
+ADR-0002 stays reserved for the baseline freeze at the close.
+
+**C. "B1.6". Product.** Cite "ADR-0001 amendment 1, item 6" wherever the
+id appears. It appeared in the ruling as given and in the PR body;
+R3-3 above and the comment in `src/verdict/plants.py` now carry the
+citation.
+
+**D. `make ledger --plain`. Engineering.** A separate target,
+`make ledger-plain`. CLAUDE.md and SPEC/00 updated. SPEC/00 named the
+old form in §10.3, §10.4 and §15; all three changed.
+
+**E. CI role scope. Security. Finding S-1.** The role policy lists only
+the baseline profile; each milestone's PR 1 adds the ARNs that milestone
+calls. The trust policy also matches `job_workflow_ref` to `evals.yml`
+on this repo. Spend enforced outside the runner (a Budgets alarm per
+inference profile that disables the role) is M01's bootstrap stack;
+carried to SPEC/01 (§7). **One part could not be done:** the ruling set
+`MaxSessionDuration` to 900. IAM's floor is 3600 and CDK refuses less at
+synth (`must be >= 3600sec`). It stays 3600, the minimum. See §9.6.
+
+**F. Repairs before measuring. Accepted;** the isolation in `4aac268` is
+correct. The cold review of PR 2 found two BLOCKs and both were cured
+inside PR 2, so PR 3 is the close: skills, ADR-0002, measured cell,
+explainer, attestations, tag `m00`.
+
+**Schema compatibility. Engineering, Product.** `scope` is required from
+this commit. The pre-scope envelope for `8fb4b80` moves to
+`evals/history/pre-scope/`, outside the folder `replay_history` reads,
+and stays cited in `rulings/pr2.md` as the gate before scope existed.
+`replay_history` refuses unvalidated files, as built; no tolerance flag.
+Its card and raw file stay where CI wrote them, so its
+`baseline_card_ref` still resolves and its hash still matches. The move
+is a human commit under `evals/history/`, a two-key change under
+ADR-0003; the keys are these two seats.
+
+Still unruled from PR 2's list: what counts as "the plant went RED"
+(report 4.1); whether `tests/fixtures/` is exempt from "never write an
+envelope by hand"; which card a later envelope points at (report 1.4);
+the schema's file name (report 8.4); who owns a price table for
+`cost_usd`; whether `replay_history` is a reader under P5.
 
 ## 3. The false state
 
@@ -718,6 +794,54 @@ discriminate on that field, and two booleans are not enough to carry it.
 `[non_exclusive]`, which the baseline returned zero times as a whole
 list in either run.
 
+## 6.5 Finding F0.4 — the control is not deterministic at temperature 0
+
+Not a falsifier (ADR-0004). Same model, region, parameters and prompt
+hash in every run; nothing under `src/baseline/` changed between them.
+Each cell is the parsed reply as `available/exclusive/[constraints]`;
+bold is a pass on `score`; † marks a golden whose parsed reply differed
+in at least one run. Runs 2 and 3 are local and are not evidence; they
+are here because the diff is the finding. Run 1 (§6.1) used the first
+prompt and is not comparable.
+
+| | Run 2, the plant | Run 3 | Run 4 |
+|---|---|---|---|
+| Commit | `22b5499` | `e12ab7d` | `8fb4b80` |
+| Where | local | local | CI |
+| Prompt sha256 | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` |
+| `g-001` ordinary † | **T/T/[]** | T/F/[window_closed] | F/F/[window_closed, holdback] |
+| `g-002` ordinary † | no JSON | T/F/[window_not_open, holdback] | T/F/[window_not_open] |
+| `g-003` ordinary † | T/T/[] | T/T/[window_not_open, holdback] | T/F/[] |
+| `g-004` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] |
+| `g-005` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] |
+| `g-006` ordinary † | T/T/[] | T/T/[] | **T/F/[non_exclusive]** |
+| `g-007` ordinary † | T/F/[window_not_open] | T/F/[] | F/F/[window_closed, holdback] |
+| `g-008` ordinary | T/F/[] | T/F/[] | T/F/[] |
+| `g-009` ordinary † | T/F/[window_not_open] | T/F/[window_open, holdback_passed, clearance_valid, no_embargo] | T/F/[window_not_open] |
+| `g-010` trap | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] |
+| `g-011` trap † | F/F/[window_not_open, holdback] | F/F/[window_not_open] | F/F/[window_not_open, holdback] |
+| `g-012` trap | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** |
+| `g-013` guardrail | T/F/[] | T/F/[] | T/F/[] |
+| `g-014` guardrail † | T/F/[] | T/F/[] | T/F/[window_not_open] |
+| `g-015` guardrail | no JSON | no JSON | no JSON |
+| trap passing | `g-012` | `g-012` | `g-012` |
+| ordinary passing | `g-001` | none | `g-006` |
+
+10 of 15 goldens got a different parsed reply in at least one run (†). The three traps have not moved: `g-012` passed every time,
+`g-010` gave the same wrong answer every time, and `g-011` kept its two
+booleans and changed only its constraint list. The ordinary goldens are
+where the control moves: which one it gets right was `g-001`, then none,
+then `g-006`. A control that scores 1/9, 0/9, 1/9 on different questions
+is a base that moves under every delta read against it.
+
+What it seeds: SPEC/04's A-vs-A control assumes a model compared with
+itself shows zero diff (F4.3, "the suite is flaky; milestone stops").
+For Nova Micro through a cross-region profile that is already false at
+M00. SPEC/04 has to say what "zero diff" means for a control like this
+one before M04 opens: how many runs, which goldens, what spread. A trap
+count other than 1/3 on any later measurement is recorded here too, as a
+new column, and is not a failure.
+
 ## 7. First items for M01 open
 
 1. **`g-012`. Data Owner, at M01 PR 1.** The Data Owner may retire
@@ -734,6 +858,18 @@ list in either run.
    On the plant it is right on 2 of 12 and 5 of 12 replies are one
    self-contradictory object. Once refagent has numbers, the Threshold
    Owner rules whether a delta against this control says enough.
+
+3. **Spend enforced outside the runner. Security, SPEC/01 (Finding
+   S-1).** `cost-cap` reads what the PR's own runner wrote down, after
+   the spend. M01's bootstrap stack adds a Budgets alarm per inference
+   profile that disables the eval role, and absorbs the role. M01 PR 1
+   also adds refagent's profile ARN to `infra/eval-role/app.py`, with a
+   Security ruling; the role allows only the baseline's until then.
+4. **One envelope per commit, two subjects. Engineering, M01 PR 1.**
+   From M01 a run has the control and refagent. The schema allows both
+   scopes in one envelope; nothing builds that yet. Which card a later
+   envelope points at (report 1.4) is the Threshold Owner's to rule
+   first.
 
 ## 8. Formats and paths named at PR 2 (Engineering; report 1.2, 8.3, 8.4)
 
@@ -775,9 +911,9 @@ One CI run writes three files, all named for the commit that ran:
    workflow's token and has the `bypass_actors` field P9 names; classic
    branch protection may not be readable by it.
 2. **`make ledger --plain` cannot run as written.** GNU make takes
-   `--plain` for one of its own options and exits 2. `make ledger --
-   --plain` and `make ledger PLAIN=1` work. SPEC/00 and CLAUDE.md write
-   the first form. Product.
+   `--plain` for one of its own options and exits 2. Ruled (D, fourth
+   round): a separate target, `make ledger-plain`. SPEC/00 and CLAUDE.md
+   now name it.
 3. **Temperature 0 is not deterministic here.** A local run at
    `e12ab7d` (not evidence) read traps 1/3 (`g-012`), ordinary 0/9. Six
    of fifteen parsed replies differ from the PR 1 plant run with the
@@ -798,4 +934,17 @@ One CI run writes three files, all named for the commit that ran:
    re-created repo. Security redeploys. Nobody reviewed the claim format
    before the first deploy; the `security-reviewer` checked the audience
    and not the subject.
+6. **Finding S-1: the CI role was wider than M00 needs.** Security. As
+   first deployed it allowed all six pinned models, to any workflow file,
+   from any PR branch, for up to an hour; `cost-cap` reads only what the
+   PR's own runner wrote down. M00 calls one model. Fixed at PR 2: the
+   policy lists the baseline's profile only, and the trust policy matches
+   `job_workflow_ref` to `.github/workflows/evals.yml` on this repo.
+   Each milestone's PR 1 adds the ARNs it calls. Not fixed: on
+   `pull_request` the workflow is the PR's own copy, so a PR that edits
+   `evals.yml` still matches (nothing gates that until M02);
+   `MaxSessionDuration` stays 3600 because IAM allows no less; spend
+   outside the runner is M01 (§7 item 3). Security redeploys the stack
+   for the change to take effect; until then the role as deployed at
+   `8fb4b80` is the one CI assumes.
 

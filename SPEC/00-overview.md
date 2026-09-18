@@ -4,7 +4,9 @@ Status: DRAFT · Owner: Product seat · Rulings R1–R11 recorded at open ·
 N (detection bar) = 10 minutes (R10) · Adopted by ADR-0001, which carries
 amendment 1 (the rulings applied at adoption) and amendment 2 (seats for
 paths §5 did not list; the cold reviewer drafts, M00 PR 1) · Amended by
-ADR-0003 (remaining path ownership; F0.1 is a finding, M00 PR 1)
+ADR-0003 (remaining path ownership; F0.1 is a finding, M00 PR 1) and
+ADR-0004 (measurement fields: `checks`, `scope`, cost-cap in
+`thresholds.yaml`; the control is never gated; M00 PR 2)
 
 ## 1. What this is
 
@@ -129,13 +131,16 @@ approval. The mechanical gates are, exhaustively:
   changes retention, or is a human commit touching `evals/history/**`
   cites rulings from two distinct seats;
 - `regression` — the eval gate: RED on any regressed golden or any
-  silent plant (`plants_expected ≠ plants_fired`). **Plant rule:** a
+  silent plant (`plants_expected ≠ plants_fired`), read on
+  `scope: agent` results only. The baseline is the control
+  (`scope: control`): reported, never gated (ADR-0004). **Plant rule:** a
   plant is a plant only when its enforcing control exists in the repo;
   until then it is a golden that has never passed. `plants_expected`
   counts only plants whose control exists, so before M03 the
   `kind: guardrail` goldens grade `never_passed` and
   `plants_expected = 0`;
-- `cost-cap` — per-PR eval spend under the cap in `evals.yml`;
+- `cost-cap` — eval spend per run, in tokens, under the cap in
+  `thresholds.yaml` (Threshold Owner), from M00 PR 2 (ADR-0004);
 - `docs-current` — §10.4;
 - `cold-review-ruling` — a ruling file naming the PR exists on `main`
   before merge. The ruling file is written for every PR; **the required
@@ -211,10 +216,12 @@ by hand; M00 itself opens and closes without them.
   digest.
 - **Envelope** (`verdict.schema.json`, `additionalProperties: false`):
   commit, tag, model id, guardrail version, judge model id, corpus
-  fingerprint, cache state, baseline card ref, per-golden score/pass,
+  fingerprint, cache state, baseline card ref, per-golden
+  kind/scope/score/cites/pass (`scope` ∈ {control, agent}, ADR-0004),
   regressed[], fragile[], never_passed[], plants_expected, plants_fired,
   guardrail_hits, p95_ms, tokens_out, cost_usd, rejected_over_ceiling,
-  alarm_latency_s, verdict ∈ {GREEN, RED, UNMEASURED}.
+  alarm_latency_s, checks (keyed by falsifier id: pass or fail, and the
+  URL of the CI evidence; ADR-0004), verdict ∈ {GREEN, RED, UNMEASURED}.
 - **Golden** — one file `evals/goldens/v1/g-NNN.yaml` with fields:
   `id` (immutable, R11), `kind` ∈ `ordinary|trap|guardrail|redteam`,
   `question`, `expected` (ordinary and trap: `table_row`, `clause_id`,
@@ -301,14 +308,20 @@ Expected on the baseline: the baseline card is written, with `score`
 (answer fields match) and `cites` (row and clause present and existing)
 recorded per golden; traps 1/3 on the plant as opened (Finding F0.1);
 the three guardrail plants fail (no guardrail exists yet) and land in
-`never_passed`, with `plants_expected = 0` under the plant rule (§5). A
-different trap count in CI is a non-determinism finding to record; it
-becomes the A-vs-A control at M04.
+`never_passed`, with `plants_expected = 0` under the plant rule (§5).
+Every result is `scope: control`, so `regressed` is 0 by construction
+and `checks.F0_2` and `checks.F0_3` decide the verdict (ADR-0004). A
+different trap count in CI is recorded under Finding F0.4; it becomes
+the A-vs-A control at M04.
 Falsifiers: F0.2 an envelope validates without a baseline ref. F0.3 a PR
 merges without a ruling file after PR 2.
 Finding F0.1 (not a falsifier, ADR-0003): the baseline passes a trap.
 That is a fact about the trap, not about claim 0 — record, do not
 tighten in this milestone.
+Finding F0.4 (not a falsifier, ADR-0004): the control is
+non-deterministic at temperature 0. Recorded run by run in
+`milestones/M00/feasibility.md` §6.5; the seed for SPEC/04's A-vs-A
+design.
 Done when: `make evals` writes an envelope with the baseline card and the
 row 0 measured value in `milestones/README.md`.
 
@@ -629,7 +642,7 @@ finding on camera is the point.
 Plus two framing pages:
 - `docs/milestones/README.md` — the plain-language index: milestone,
   plain sentence, GREEN/RED, video link. Generated from the ledger
-  (`milestones/README.md`) by `make ledger --plain`, never hand-edited.
+  (`milestones/README.md`) by `make ledger-plain`, never hand-edited.
   This is the page the compliance map and the blog post link to.
 - `docs/story.md` — how the platform was built, in order, with what went
   RED and why; the honest version, one page, written last.
@@ -640,7 +653,7 @@ envelope field, or seat named in `docs/` does not exist in the current
 schemas, or if a control listed in `controls.md` has no seeded case in
 the repo, or if a milestone with a measured value in
 `milestones/README.md` has no `docs/milestones/MNN.md`, or if
-`docs/milestones/README.md` differs from `make ledger --plain` output. Prose that drifts from the code is the failure
+`docs/milestones/README.md` differs from `make ledger-plain` output. Prose that drifts from the code is the failure
 beaconpave kept recording; this is the cheapest guard against it. It does
 not check recordings.
 
@@ -731,7 +744,7 @@ are GREEN, every RED and UNSCHEDULED row carries a ruling file under
 `milestones/MNN/rulings/`, every PR since M00 PR 1 has one, the
 compliance page links to evidence for every control it names,
 `docs-current` is green, `docs/milestones/README.md` matches
-`make ledger --plain`, Acts 1–6 are committed with their tags,
+`make ledger-plain`, Acts 1–6 are committed with their tags,
 `quickstart.md` carries a measured time under one day,
 `docs/milestones/` holds nine explainers and nine videos, `docs/story.md`
 exists, and `git tag m08` exists on `main`.

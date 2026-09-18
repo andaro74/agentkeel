@@ -9,9 +9,12 @@ a hand-written envelope gets no pass for being hand-written (F0.2). Then it
 works the lists out again from `goldens` and history and goes RED where the
 envelope disagrees with itself or with the gate.
 
-What it rules on (SPEC/00 §5 `regression`, P7, R2): RED on a golden that
-has ever passed and now fails, on plants_expected != plants_fired, or on a
-failed check. A golden that has never passed reports and does not gate.
+What it rules on (SPEC/00 §5 `regression`, P7, R2, ADR-0004): RED on an
+`agent` result that has ever passed and now fails, on a silent plant among
+the `agent` results, or on a failed check. A golden that has never passed
+reports and does not gate. A `control` result is the baseline's: it is
+reported, its drift is printed as a note, and it never blocks. At M00 every
+result is the control's, so the checks decide the verdict.
 
 What it cannot see: a hand-written envelope that validates, points at a
 real card and agrees with itself. Nothing signs an envelope yet.
@@ -35,7 +38,7 @@ from src.verdict import (
     schema_errors,
 )
 
-__all__ = ["Rejected", "judge", "measured", "measured_at", "read", "rule", "schema_errors"]
+__all__ = ["Rejected", "control_drift", "judge", "measured", "measured_at", "read", "rule", "schema_errors"]
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -63,10 +66,16 @@ def read(path: Path, root: Path = ROOT) -> dict[str, Any]:
         raise Rejected(f"{path}: baseline card {ref['path']} is not the one the envelope names")
     if card.get("commit") != envelope["commit"]:
         raise Rejected(f"{path}: baseline card is for {card.get('commit')}, not {envelope['commit']}")
-    # When the run is the baseline itself (M00), the envelope and its card
-    # scored the same replies and must say the same thing.
-    if card.get("model_id") == envelope["model_id"] and card.get("goldens") != envelope["goldens"]:
-        raise Rejected(f"{path}: per-golden results differ from the baseline card for the same run")
+    if card.get("scope") != "control":
+        raise Rejected(f"{path}: baseline card {ref['path']} does not say scope: control")
+    # `control` is not a label an envelope can give itself to get out from
+    # under the bar. A control result is the card's result, or it is rejected.
+    for golden_id, result in envelope["goldens"].items():
+        if result["scope"] != "control":
+            continue
+        unscoped = {name: value for name, value in result.items() if name != "scope"}
+        if unscoped != card.get("goldens", {}).get(golden_id):
+            raise Rejected(f"{path}: {golden_id} says scope control and differs from the baseline card")
     return envelope
 
 
@@ -84,10 +93,13 @@ def judge(
         reasons.append("the envelope's goldens are not the goldens in the tree")
     reasons += [f"{g}: pass is not score" for g, r in results.items() if r["pass"] != r["score"]]
 
+    # Only `agent` results are gated: the bar, and the plants (ADR-0004).
     failing = [g for g in sorted(results) if not results[g]["pass"]]
-    regressed = [g for g in failing if replay_history.ever_passed(history, g)]
-    never_passed = [g for g in failing if g not in regressed]
-    fired = sum(results[g]["pass"] for g in plant_ids if g in results)
+    passed_before = {g for g in failing if replay_history.ever_passed(history, results[g]["scope"], g)}
+    regressed = [g for g in failing if results[g]["scope"] == "agent" and g in passed_before]
+    never_passed = [g for g in failing if g not in passed_before]
+    plant_ids = [g for g in plant_ids if results.get(g, {}).get("scope") == "agent"]
+    fired = sum(results[g]["pass"] for g in plant_ids)
 
     for name, mine in (("regressed", regressed), ("never_passed", never_passed)):
         if sorted(envelope[name]) != mine:
@@ -117,19 +129,35 @@ def judge(
     return verdict, reasons
 
 
+def control_drift(envelope: dict[str, Any], history: replay_history.History) -> list[str]:
+    """Control goldens that passed in a past run and fail in this one. A note, never a reason (F0.4)."""
+    return sorted(
+        g
+        for g, r in envelope["goldens"].items()
+        if r["scope"] == "control" and not r["pass"] and replay_history.ever_passed(history, "control", g)
+    )
+
+
 def measured(envelope: dict[str, Any], verdict: str) -> str:
     """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's."""
     results = envelope["goldens"]
 
-    def tally(kind: str) -> str:
-        of_kind = [r for r in results.values() if r["kind"] == kind]
-        return f"{sum(r['pass'] for r in of_kind)}/{len(of_kind)}"
+    def tallies(scope: str) -> str:
+        def tally(kind: str) -> str:
+            of_kind = [r for r in results.values() if r["scope"] == scope and r["kind"] == kind]
+            return f"{sum(r['pass'] for r in of_kind)}/{len(of_kind)}"
 
-    traps = sorted(g for g, r in results.items() if r["kind"] == "trap" and r["pass"])
+        traps = sorted(
+            g for g, r in results.items() if r["scope"] == scope and r["kind"] == "trap" and r["pass"]
+        )
+        return (
+            f"{scope}: traps {tally('trap')}" + (f" ({', '.join(traps)})" if traps else "")
+            + f"; ordinary {tally('ordinary')}; guardrail {tally('guardrail')}"
+        )
+
+    scopes = [s for s in ("control", "agent") if any(r["scope"] == s for r in results.values())]
     parts = [
-        f"traps {tally('trap')}" + (f" ({', '.join(traps)})" if traps else ""),
-        f"ordinary {tally('ordinary')}",
-        f"guardrail {tally('guardrail')}",
+        *(tallies(scope) for scope in scopes),
         f"never_passed {len(envelope['never_passed'])}",
         f"regressed {len(envelope['regressed'])}",
         f"plants {envelope['plants_fired']}/{envelope['plants_expected']}",
@@ -204,6 +232,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{verdict} {args.envelope}")
     for reason in reasons:
         print(f"  {reason}")
+    envelope = read(args.envelope)
+    history = replay_history.load(args.history_dir, exclude_commit=envelope["commit"])
+    for golden_id in control_drift(envelope, history):
+        print(f"  note: control {golden_id} has passed before and fails now; not gated (Finding F0.4)")
     return 0 if verdict == "GREEN" else 1
 
 

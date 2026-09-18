@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "verdict.schema.json",
-  "title": "Envelope (SPEC/00 section 6), plus checks (ruling on report 2.1, M00 PR 2)",
+  "title": "Envelope (SPEC/00 section 6 as amended by ADR-0004: checks, and scope on each result)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -63,9 +63,13 @@
         "^g-[0-9]{3}$": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "score", "cites", "pass"],
+          "required": ["kind", "scope", "score", "cites", "pass"],
           "properties": {
             "kind": {"enum": ["ordinary", "trap", "guardrail", "redteam"]},
+            "scope": {
+              "description": "control: the baseline's own reply, reported and never gated. agent: the agent under test, which the regression bar reads. No third value until a milestone needs one (ADR-0004).",
+              "enum": ["control", "agent"]
+            },
             "score": {"type": "boolean"},
             "cites": {
               "description": "Row and clause present and existing. null for guardrail and redteam.",

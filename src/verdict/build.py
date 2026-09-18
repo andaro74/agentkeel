@@ -4,6 +4,10 @@ Reads the raw observations a runner wrote and each golden's `expected`.
 Computes `score` and `cites` per golden (Data Owner, feasibility.md §2
 ruling 1). Believes nothing a runner says about itself.
 
+Scope (ADR-0004) is worked out, not passed in: a run is `control` when its
+raw observations are the ones the baseline card was scored from, and `agent`
+otherwise. There is no flag that marks an agent as the control.
+
     python -m src.verdict.build card --raw RAW --out CARD
     python -m src.verdict.build envelope --raw RAW --baseline-card CARD --out ENVELOPE
 
@@ -134,6 +138,7 @@ def compose_card(raw: dict[str, Any], results: dict[str, dict[str, Any]]) -> dic
     usage = [o.get("usage", {}) for o in raw["observations"]]
     return {
         "what": CARD_WHAT,
+        "scope": "control",  # once, here: the card is the control (ADR-0004)
         "commit": raw["commit"],
         "model_id": raw["model_id"],
         "region": raw["region"],
@@ -157,6 +162,8 @@ def load_card(path: Path | None, commit: str) -> dict[str, Any]:
     card = load_json(path)
     if not isinstance(card, dict) or card.get("what") != CARD_WHAT:
         raise Refused(f"{path} is not a baseline card")
+    if card.get("scope") != "control":
+        raise Refused(f"{path} does not say scope: control")
     if card.get("commit") != commit:
         raise Refused(
             f"baseline card is for {card.get('commit')}, the run is for {commit}: "
@@ -203,9 +210,14 @@ def p95(latencies: list[int]) -> int | None:
     return sorted(latencies)[math.ceil(0.95 * len(latencies)) - 1]
 
 
+def scope_of(raw: dict[str, Any], card: dict[str, Any]) -> str:
+    return "control" if canonical_sha256(raw) == card.get("raw_sha256") else "agent"
+
+
 def compose_envelope(
     raw: dict[str, Any],
     results: dict[str, dict[str, Any]],
+    scope: str,
     card_ref: dict[str, str],
     history: replay_history.History,
     plant_ids: list[str],
@@ -217,10 +229,20 @@ def compose_envelope(
     if sum(u.get("cacheReadInputTokens", 0) for u in usage):
         raise Refused("a reply was read from a prompt cache; cache_state would be a lie")
 
+    # The regression bar and the plant count read the agent under test. The
+    # control is reported and never gated (ADR-0004), so at M00, where every
+    # result is the control's, `regressed` is empty by construction.
+    gated = scope == "agent"
+    plant_ids = plant_ids if gated else []
     failing = [g for g, r in results.items() if not r["pass"]]
-    regressed = [g for g in failing if replay_history.ever_passed(history, g)]
-    never_passed = [g for g in failing if g not in regressed]
+    passed_before = {g for g in failing if replay_history.ever_passed(history, scope, g)}
+    regressed = [g for g in failing if gated and g in passed_before]
+    never_passed = [g for g in failing if g not in passed_before]
     plants_fired = sum(results[g]["pass"] for g in plant_ids)
+    results = {
+        g: {"kind": r["kind"], "scope": scope, "score": r["score"], "cites": r["cites"], "pass": r["pass"]}
+        for g, r in results.items()
+    }
 
     if any("error" in o for o in observations):
         verdict = "UNMEASURED"
@@ -324,6 +346,7 @@ def main(argv: list[str] | None = None) -> int:
             envelope = compose_envelope(
                 raw,
                 results,
+                scope_of(raw, card),
                 {"path": ref_path(args.baseline_card), "sha256": canonical_sha256(card)},
                 replay_history.load(args.history_dir, exclude_commit=raw["commit"]),
                 plants.plant_ids(kinds, ROOT),

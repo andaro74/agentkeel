@@ -95,7 +95,7 @@ def test_refuses_a_reply_read_from_a_cache(goldens):
     raw["observations"][0]["usage"]["cacheReadInputTokens"] = 40
     results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
     with pytest.raises(build.Refused, match="cache"):
-        build.compose_envelope(raw, results, {"path": "x", "sha256": "0" * 64}, {}, [], {}, None)
+        build.compose_envelope(raw, results, "control", {"path": "x", "sha256": "0" * 64}, {}, [], {}, None)
 
 
 def test_history_is_ci_written_only(chain, monkeypatch, tmp_path):
@@ -117,8 +117,27 @@ def test_a_failed_call_is_unmeasured_not_green(goldens):
     raw = make_raw(goldens)
     raw["observations"][3] = {"id": "g-004", "kind": "ordinary", "question": "q", "error": "ThrottlingException"}
     results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
-    envelope = build.compose_envelope(raw, results, {"path": "x", "sha256": "0" * 64}, {}, [], {}, None)
+    envelope = build.compose_envelope(raw, results, "control", {"path": "x", "sha256": "0" * 64}, {}, [], {}, None)
     assert envelope["verdict"] == "UNMEASURED"
+
+
+def test_scope_is_worked_out_from_the_card_not_passed_in(chain, goldens):
+    _, card_path, raw_path = chain()
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    assert card["scope"] == "control" and not any("scope" in r for r in card["goldens"].values())
+    raw = json.loads(raw_path.read_text(encoding="utf-8"))
+    assert build.scope_of(raw, card) == "control"  # the card was scored from these replies
+    assert build.scope_of({**raw, "model_id": "agent-under-test"}, card) == "agent"  # any other run
+
+
+def test_a_card_with_no_scope_is_refused(tmp_path, chain):
+    _, card_path, raw_path = chain()
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    del card["scope"]
+    card_path.write_text(json.dumps(card), encoding="utf-8")
+    out = tmp_path / "out.json"
+    assert build.main(["envelope", "--raw", str(raw_path), "--baseline-card", str(card_path), "--out", str(out)]) == 3
+    assert not out.exists()
 
 
 JUNIT = """<testsuites><testsuite>

@@ -7,6 +7,7 @@ seat:
   - Engineering
   - Security
   - Threshold Owner
+  - Data Owner
   - Product
 authorises:
   # Engineering
@@ -18,14 +19,20 @@ authorises:
   - src/ledger.py
   - src/verdict/**
   - tests/**
-  # Engineering, CI-written only (ADR-0003): commit 42ed278, by github-actions[bot]
+  # Engineering, CI-written only (ADR-0003): commit 42ed278, by github-actions[bot].
+  # One human commit moved the pre-scope envelope to evals/history/pre-scope/:
+  # a two-key change, ruled by Engineering and Product (ADR-0004).
   - evals/history/**
   # Security (ruling R3-1, feasibility.md §2 third round)
   - .github/workflows/evals.yml
   - infra/eval-role/**
   # Threshold Owner (ruling R3-5): one bar, 20,000 tokens per run
   - thresholds.yaml
-  # Product
+  # Product. ADR-0004 also names Threshold Owner, Data Owner and Engineering
+  # as the seats whose rules it changes (ruling A, fourth round).
+  - SPEC/00-overview.md
+  - CLAUDE.md
+  - docs/adr/ADR-0004-measurement-fields.md
   - milestones/README.md
   - milestones/M00/README.md
   - milestones/M00/feasibility.md
@@ -35,12 +42,17 @@ authorises:
 evidence:
   # the measurement: the CI run, and the envelope its `record` job committed
   - https://github.com/andaro74/agentkeel/actions/runs/35404446711
-  - evals/history/8fb4b809abcdc00919012e7db65baa495779d3c8.json
+  # secondary: the gate before scope existed. Moved, not edited; not read by the gate.
+  - evals/history/pre-scope/8fb4b809abcdc00919012e7db65baa495779d3c8.json
   - evals/history/8fb4b809abcdc00919012e7db65baa495779d3c8.baseline-card.json
   - evals/history/8fb4b809abcdc00919012e7db65baa495779d3c8.baseline-raw.json
   - SPEC/00-overview.md#8-M00
-  # third round: R3-1 to R3-5, the rulings that bound this PR
+  # third round: R3-1 to R3-5, the rulings that bound this PR;
+  # fourth round: A to F, the rulings on what it found
   - milestones/M00/feasibility.md#2
+  - docs/adr/ADR-0004-measurement-fields.md
+  # Finding F0.4, run by run
+  - milestones/M00/feasibility.md#6.5
   # the second seed and the tests that read it; `f9f1342` holds them with no reader
   - tests/fixtures/hand_written_envelope_no_baseline_card_ref.json
   - tests/test_f0_2.py
@@ -57,6 +69,25 @@ Cites `SPEC/00-overview.md#8-M00` for `src/verdict/`, `replay_history`,
 the `Makefile` targets and the tests. §8 M00 does not list `evals.yml`,
 `infra/eval-role/` or `thresholds.yaml`; those three are authorised here
 by the Security and Threshold Owner seats under R3-1 and R3-5.
+
+## Rulings on what this PR found (fourth round)
+
+The seats ruled six of the twelve items this PR listed as Unsure. They
+are in feasibility.md §2, fourth round, and ADR-0004, and applied in one
+commit. **A:** every result carries `scope`; the baseline is the control
+and is never gated; `replay_history` keys on (scope, golden id); Finding
+F0.4. **B:** ADR-0004 and the SPEC/00 amendments. **C:** "B1.6" is
+ADR-0001 amendment 1, item 6. **D:** `make ledger-plain`. **E:** Finding
+S-1; the CI role allows the baseline's profile only, to `evals.yml`
+only. **F:** the repairs before measuring are accepted and PR 3 is the
+close.
+
+One part of E could not be done: `MaxSessionDuration` 900. IAM's floor
+is 3600. It stays at the floor.
+
+Ruling A changes a measured path, so `evals` measures again. The first
+envelope, for `8fb4b80`, stays as evidence of the gate before scope
+existed, under `evals/history/pre-scope/`.
 
 ## Where this stands
 
@@ -131,13 +162,13 @@ measurement is marked; the rest stands for the seats.
 | 3 | Build and the gate share `plants.plant_ids` and `replay_history`, so cannot disagree on either RED condition by logic | Open. The docstring now says what is shared. Whether to split is Engineering's ruling |
 | 4 | UNMEASURED could not be reached from `make evals`: the runner's exit 1 stopped make | Repaired: the chain goes on and build writes UNMEASURED |
 | 5 | A list in `table_row` crashed build with a TypeError | Repaired: not a string is not a citation |
-| 6 | The regression bar goes RED on noise from the control (temperature 0 is not deterministic; FRAGILE is M03) | **Open. Threshold Owner with Data Owner.** After the first CI envelope, a re-measure where `g-012` fails is RED with no code change. Row 0 says record it; the gate as built blocks on it. `.claude/` is now outside the re-measure diff, so the close PR's skills do not re-measure |
+| 6 | The regression bar goes RED on noise from the control (temperature 0 is not deterministic; FRAGILE is M03) | **Ruled (A) and repaired.** The control is never gated; `test_the_control_is_never_gated` fails if the gate reads control results for `regressed`. The noise is Finding F0.4, recorded run by run in feasibility.md §6.5 |
 | 7 | The skip key ignores measured inputs that are not in the tree (`checks.F0_3` is read from GitHub) | Open. The workflow header now says so, and that a change to `milestones/M00/runs/f0_3.yaml` measures again |
 | 8 | Seat-owned paths cited rulings that were not ruling files | This file. Security and Threshold Owner rule their lines above or they come out of `authorises` |
-| 9 | `checks` on the envelope and `cost-cap` at M00 from `thresholds.yaml` depart from SPEC/00 §5, §6, §8 with no ADR | **Open. Product.** ADR-0001 has used both amendments; this needs a new ADR |
+| 9 | `checks` on the envelope and `cost-cap` at M00 from `thresholds.yaml` depart from SPEC/00 §5, §6, §8 with no ADR | **Ruled (B).** ADR-0004; SPEC/00 §5, §6, §8 M00 amended. §8 M03 and §14 still say what they said about `cost-cap`; ADR-0004 says so |
 | 10 | "CI-written" is `GITHUB_ACTIONS == "true"` | Open until `two-key` (M02). The docstrings and Makefile now say "an environment variable", not "outside CI" |
 | 11 | `cost-cap` passed on observations with no usage | Repaired: a reply with no usage fails the cap |
-| 12 | The generated page named `make ledger --plain`, which exits 2 under GNU make | Generated page repaired. SPEC/00, CLAUDE.md and the ledger header still say it. Product |
+| 12 | The generated page named `make ledger --plain`, which exits 2 under GNU make | **Ruled (D) and repaired.** `make ledger-plain`; SPEC/00, CLAUDE.md and the ledger header name it |
 
 ### NOTE
 
@@ -161,11 +192,12 @@ The `security-reviewer` (0 BLOCK, 6 FINDING, 12 NOTE) and
 `threshold-owner` (0 BLOCK, 7 FINDING, 13 NOTE) reports are pasted in
 the PR body, verbatim. What they leave for the seats:
 
-- Security: six models on a role any PR branch can assume for an hour,
-  with `cost-cap` reading only what the PR's own runner wrote (R3-1
-  names six; M00 calls one). A ruleset on `main`: require a PR, require
-  `cold-review-ruling`, `bypass_actors: []`. The F0.3 observer cannot
-  read `bypass_actors`. The five action SHAs were resolved from each
+- Security: ~~six models on a role any PR branch can assume~~ ruled (E,
+  Finding S-1): one profile, one workflow file; the hour stays, because
+  IAM allows no less; spend outside the runner is M01. **Security must
+  redeploy `infra/eval-role/` for S-1 to take effect.** The ruleset on
+  `main` is in place (require a PR, require `cold-review-ruling`). The
+  F0.3 observer cannot read `bypass_actors`. The five action SHAs were resolved from each
   repo's latest release through the API, not checked with `ls-remote`.
 - Threshold Owner: whether an over-cap run is a recorded RED or no
   record; which card an envelope points at (report 1.4: the code builds
@@ -177,13 +209,19 @@ the PR body, verbatim. What they leave for the seats:
 - `uv run python -m src.verdict.gate tests/fixtures/hand_written_envelope_no_baseline_card_ref.json`
   prints REJECTED and exits 2. Add a `baseline_card_ref` to a copy and it
   is rejected for the card instead, not accepted.
-- `uv run pytest -q`: 66 pass. Delete `"baseline_card_ref",` from
+- `uv run pytest -q`: 75 pass. Delete `"baseline_card_ref",` from
   `required` in `src/verdict/schema.json`: four tests in
   `tests/test_f0_2.py` fail.
 - `git show f9f1342 --stat`: the seed and its test, no `src/verdict/`.
 - `make evals` on a laptop exits before spending. `make plants` prints
-  `plants_expected = 0`. `make ledger --plain` exits 2; `make ledger --
-  --plain` rewrites `docs/milestones/README.md` byte for byte.
+  `plants_expected = 0`. `make ledger-plain` rewrites
+  `docs/milestones/README.md` byte for byte.
+- Scope: in `src/verdict/gate.py`, drop `results[g]["scope"] == "agent"
+  and` from the `regressed` line. `test_the_control_is_never_gated`
+  fails. Copy `evals/history/pre-scope/8fb4b80….json` into
+  `evals/history/`: the gate refuses to replay it (`'scope' is a required
+  property`), and `test_the_pre_scope_envelope_is_kept_and_is_not_read`
+  says the same.
 - `cd infra/eval-role && npx cdk synth`: one role, two statements, no
   wildcard; `cdk.out/AwsSolutions-*-NagReport.csv` has no
   `Non-Compliant` row and `app.py` has no suppression.

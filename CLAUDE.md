@@ -60,7 +60,7 @@ the diff; you do not merge.
   authorises it. Propose the diff; the seat's PR carries it.
 - Never rename a golden id. Retire it.
 - Never treat a local run (`evals/local/`) as evidence.
-- Never hand-edit `docs/milestones/README.md`; `make ledger --plain`
+- Never hand-edit `docs/milestones/README.md`; `make ledger-plain`
   writes it from the ledger.
 - Never write "governed", "secure" or "proven" in prose about a control
   that has not fired on its seeded case.
@@ -139,8 +139,9 @@ make validate         grows by milestone; the ledger header says what it
                       checked at each tag. M00: golden and ruling front
                       matter. M01+: schema, seats, edges, semver, cdk-nag
 make plants           list plants and whether each fired on last run
-make ledger           print the ledger with measured values; --plain writes
-                      docs/milestones/README.md
+make ledger           print the ledger with measured values; exits 1 if a
+                      Measured cell differs from its envelope
+make ledger-plain     the same, and writes docs/milestones/README.md
 ```
 
 Until M00 PR 2, `evals`, `plants` and `ledger` exit 1 with

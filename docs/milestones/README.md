@@ -1,6 +1,6 @@
 # Milestones
 
-Generated from `milestones/README.md` by `make ledger -- --plain`. Do not edit.
+Generated from `milestones/README.md` by `make ledger-plain`. Do not edit.
 
 | Milestone | In plain words | Result | Video |
 |---|---|---|---|
