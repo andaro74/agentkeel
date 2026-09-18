@@ -1,7 +1,7 @@
 ---
-# DRAFT until the CI-written envelope is in evidence (BLOCK 1 below). The
-# Engineering seat changes this line; the cold reviewer and the session
-# that wrote the diff do not rule.
+# The CI-written envelope is in evidence (BLOCK 1 below is cured). This line
+# is still DRAFT because the Engineering seat changes it; the cold reviewer
+# and the session that wrote the diff do not rule.
 ruling: DRAFT
 seat:
   - Engineering
@@ -18,6 +18,8 @@ authorises:
   - src/ledger.py
   - src/verdict/**
   - tests/**
+  # Engineering, CI-written only (ADR-0003): commit 42ed278, by github-actions[bot]
+  - evals/history/**
   # Security (ruling R3-1, feasibility.md §2 third round)
   - .github/workflows/evals.yml
   - infra/eval-role/**
@@ -31,6 +33,11 @@ authorises:
   - milestones/M00/rulings/pr2.md
   - docs/milestones/README.md
 evidence:
+  # the measurement: the CI run, and the envelope its `record` job committed
+  - https://github.com/andaro74/agentkeel/actions/runs/35404446711
+  - evals/history/8fb4b809abcdc00919012e7db65baa495779d3c8.json
+  - evals/history/8fb4b809abcdc00919012e7db65baa495779d3c8.baseline-card.json
+  - evals/history/8fb4b809abcdc00919012e7db65baa495779d3c8.baseline-raw.json
   - SPEC/00-overview.md#8-M00
   # third round: R3-1 to R3-5, the rulings that bound this PR
   - milestones/M00/feasibility.md#2
@@ -41,8 +48,6 @@ evidence:
   # the F0.3 seeded case: no ruling file, cold-review-ruling failed, closed unmerged
   - https://github.com/andaro74/agentkeel/pull/4
   - https://github.com/andaro74/agentkeel/actions/runs/35401176820/job/105781176255
-  # Owed: the CI run URL and evals/history/<commit>.json. Neither exists
-  # until Security deploys infra/eval-role/. See BLOCK 1.
 pr: 3
 ---
 
@@ -61,12 +66,36 @@ by the Security and Threshold Owner seats under R3-1 and R3-5.
   write nothing. Six tests in `tests/test_f0_2.py` hold that; removing
   `baseline_card_ref` from the schema's `required` list fails four of
   them. None of this is evidence of row 0 (P11).
-- **No CI-written envelope exists.** `evals.yml` needs the role in
-  `infra/eval-role/`, which Security has not deployed. Until it runs,
-  this PR has not measured, and it should not merge.
-- **`checks.F0_3` will read `fail` when it does run**, unless Security
-  first makes `cold-review-ruling` a required check on `main`. On
-  2026-09-18 the API reported no branch protection and no rulesets.
+- **Measured in CI, 2026-09-18.** [Run 35404446711](https://github.com/andaro74/agentkeel/actions/runs/35404446711) at
+  `8fb4b80` assumed the role, ran `make evals`, and its `record` job
+  committed `evals/history/8fb4b809abcdc00919012e7db65baa495779d3c8.*` as `github-actions[bot]` (`42ed278`).
+  What the gate reads in that envelope:
+
+  > traps 1/3 (g-012); ordinary 1/9; guardrail 0/3; never_passed 13;
+  > regressed 0; plants 0/0; F0_2 pass; F0_3 pass; GREEN
+
+  5,623 tokens against a cap of 20,000. The tree was clean, no call
+  failed, and the prompt hash is the plant's (`2c3d9b75`). `make ledger`
+  prints the full cell, with both URLs; Product copies it at close.
+- **Traps 1/3 on `g-012` is what row 0 expected**, so there is no
+  trap-count finding to record. **The ordinary pass moved.** It is
+  `g-006` here. It was `g-001` on the PR 1 plant and none on the local
+  run at `e12ab7d`. Same prompt, temperature 0, three runs, three
+  different answers to which ordinary question the control gets right.
+  That is non-determinism in CI evidence now, not only locally, and it
+  is what FINDING 6 below is about: `g-006` and `g-012` have now passed
+  once, so the next measurement where either fails is RED.
+- **GREEN means nothing regressed.** The history was empty. It does not
+  mean 2 of 15 is good.
+- **`checks.F0_3` is `pass`** because Security put a ruleset on `main`
+  between the first run and this one: require a PR, require
+  `cold-review-ruling`. The observer cannot read `bypass_actors`
+  (Security finding 6), so `pass` does not say the owner cannot bypass.
+- **It took three runs.** Attempt 1 had no role. Attempt 2 was refused:
+  the role trusted `repo:andaro74/agentkeel:pull_request` and this repo
+  issues the immutable subject, `repo:andaro74@3157440/agentkeel@1376369685:…`
+  (feasibility.md §9.5). It failed closed. `8fb4b80` fixed the trust
+  policy and Security redeployed.
 
 ## Cold review
 
@@ -78,10 +107,10 @@ measurement is marked; the rest stands for the seats.
 
 1. **The repo holds no measurement.** `evals/history/` is empty; "the
    gate went RED on the plant" is recorded only in tests, prose and a
-   local run. Merging now would leave the row to a later PR. *Open.*
-   Cure: Security deploys the role, the workflow runs on this PR, the
-   `record` job pushes the three files, and the ruling is made on that
-   envelope. The reviewer also asks which counts as "went RED": the
+   local run. Merging now would leave the row to a later PR. *Cured:*
+   Security deployed the role, the workflow ran on this PR, and the
+   `record` job pushed the three files (`42ed278`). The evidence is at
+   the top of this file. The reviewer also asks which counts as "went RED": the
    gate's REJECTED (exit 2) on the seed, or `checks.F0_2` in the
    envelope. Product.
 2. **A prose-only push turned `evals` green over a RED, REJECTED or
