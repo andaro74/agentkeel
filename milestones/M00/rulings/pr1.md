@@ -121,6 +121,11 @@ Recorded in full in `milestones/M00/feasibility.md` §2.
 
 ## What this ruling does not settle
 
+- **F0.1 fired on the second local run**: `g-012` passed on `score` at
+  `22b5499` (feasibility.md §6.4). Ruling 4 said to record it and stop.
+  Whether run 2 is the plant with F0.1 on the record, or run 1's prompt
+  is restored, is for the Threshold Owner and Product. This file does
+  not rule it and the PR is not opened until they do.
 - `README.md` and `LICENSE` at the root, `tests/**`, `evals/history/**`
   and `evals/local/**` still have no seat in §5. PR 2 writes `tests/**`
   and `evals/history/**`. Product.

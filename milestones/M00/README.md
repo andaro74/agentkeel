@@ -66,11 +66,15 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
   them before tag `m00`; after the tag they are frozen with the code.
 - The prompt was revised once in this PR, by ruling of the Threshold
   Owner and Product: the first prompt made the baseline a near-constant
-  responder (0/15, nine identical replies). The revision asks the plain
+  responder (0/15, eight identical replies). The revision asks the plain
   question for three fields. No further revision is permitted; if it
   collapses again it is frozen as is.
 - PR 1 local runs (not evidence): both are in feasibility.md §6 with
   their commit hashes. Run 1 is the finding, run 2 is the plant.
+- **F0.1 fired on run 2**: the baseline passed trap `g-012` on `score`
+  at `22b5499` (traps 1/3, ordinary 1/9). Recorded in feasibility.md
+  §6.4. The trap and the prompt were not edited. Work stopped there for
+  the seats to rule; the PR was not opened.
 - The reader lands in PR 2: `src/verdict/` (`verdict.schema.json`,
   `build.py`, `gate.py`), the P5 disagreement test, `make evals`,
   `make plants`, `make ledger`.

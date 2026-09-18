@@ -255,7 +255,8 @@ The baseline configures no guardrail, so `g-013` to `g-015` fail by
 construction. `g-015`, which the model declined by itself, stays a fail.
 
 **4. The degenerate control. Threshold Owner and Product.** Run 1 (§6)
-scored 0/15 with nine identical, self-contradictory replies. A delta
+scored 0/15 with eight identical replies and nine self-contradictory
+ones (the ruling as given said nine identical; §6.3 corrects the count). A delta
 against that is a delta against a broken baseline, not a naive one. One
 prompt revision is permitted in PR 1; the baseline is not measured until
 PR 2, so this is still the plant. The revised prompt must be the one a
@@ -351,7 +352,7 @@ and `constraints` equal the golden's `answer_fields`. From PR 2: an
 envelope under `evals/history/` whose per-golden entry for `g-010`,
 `g-011` or `g-012` has `pass: true` on a baseline run. Response if it
 fires: record it here, do not edit the trap or the prompt in this
-milestone.
+milestone. **It fired on run 2 (`g-012`, commit `22b5499`); see §6.4.**
 
 **F0.2 — an envelope validates without a baseline ref.**
 From PR 2: a test under `tests/` that takes an envelope `build.py` wrote,
@@ -453,9 +454,9 @@ only `guardrail_intervened` counts.
 ### Run 1 finding: the control loses everything, not just the traps
 
 Not asked for, read by hand the same way: **ordinary 0/9** on the
-answer-fields reading. Nine of the fifteen replies are the same object,
+answer-fields reading. Eight of the fifteen replies are the same object,
 `available: true, exclusive: false, constraints: ["window_not_open"]`,
-which contradicts itself. The baseline is close to a constant responder.
+which contradicts itself; a ninth differs only in `exclusive`. The baseline is close to a constant responder.
 
 What that means for row 0: "traps 0/3" holds, and it is what §8 M00
 expects. It does not show that the traps are harder than the ordinary
@@ -466,7 +467,157 @@ wrong, which is what the §10.3 sentence implies. Nothing was changed in
 response until the seats ruled. Ruling 4 in §2 then permitted one prompt
 revision. The traps were not touched.
 
-## 6.2 Run 2 — the plant (revised prompt)
+## 6.2 Run 2 — the plant (commit `22b5499`, revised prompt)
 
-Recorded in the commit after the one that carries the revised prompt,
-because the run is made at that commit and cites its hash.
+Run: `make evals-local`, 2026-09-18T21:46:32Z, at commit `22b5499` (clean
+tree). Same model, region, temperature and `maxTokens` as run 1. Prompt
+sha256 `2c3d9b75…3684ab`. 15 calls, 0 errors, 3,512 tokens in, 2,150 out.
+`make validate` was green before the run. One revision was permitted and
+one was made; the prompt was written once and not tuned against the
+goldens.
+
+### Run 2 traps: 1/3 on `score`. **F0.1 fired on the plant.**
+
+Raw, `question` omitted:
+
+```json
+{
+  "id": "g-010",
+  "kind": "trap",
+  "text": "```json\n{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": [\n    \"window_not_open\"\n  ]\n}\n```\n\nExplanation: The theatrical release date is 2026-12-03, and PVOD typically follows theatrical by 45 days. Therefore, the earliest PVOD release date would be 2027-01-07 (45 days after 2026-12-03). Since the proposed PVOD release date is 2027-01-20, which is within the 45-day window after the theatrical release, it is technically possible. However, since the exact window for PVOD release is not specified in the information provided, we cannot confirm if it is within the officially designated window, hence \"window_not_open\" is listed as a constraint. Additionally, the rights are not noted as exclusive, so \"non_exclusive\" is not a constraint in this case.",
+  "parsed": {
+    "available": true,
+    "exclusive": false,
+    "constraints": [
+      "window_not_open"
+    ]
+  },
+  "stop_reason": "end_turn",
+  "usage": {
+    "inputTokens": 263,
+    "outputTokens": 216,
+    "totalTokens": 479
+  },
+  "latency_ms": 896
+}
+{
+  "id": "g-011",
+  "kind": "trap",
+  "text": "```json\n{\n  \"available\": false,\n  \"exclusive\": false,\n  \"constraints\": [\"window_not_open\", \"holdback\"]\n}\n```\n\nExplanation:\n- The license runs until the end of May 2027, so the window for publishing is not open yet (`window_not_open`).\n- Additionally, there is a holdback period that has not passed (`holdback`).\n- Therefore, the title cannot be published on SVOD in Germany on 2026-10-01, and it cannot be billed as exclusive to the service.",
+  "parsed": {
+    "available": false,
+    "exclusive": false,
+    "constraints": [
+      "window_not_open",
+      "holdback"
+    ]
+  },
+  "stop_reason": "end_turn",
+  "usage": {
+    "inputTokens": 254,
+    "outputTokens": 128,
+    "totalTokens": 382
+  },
+  "latency_ms": 786
+}
+{
+  "id": "g-012",
+  "kind": "trap",
+  "text": "```json\n{\n  \"available\": false,\n  \"exclusive\": true,\n  \"constraints\": [\"window_not_open\"]\n}\n```\n\nExplanation: Since the original rights to 'Quorum of Kites' in France extend through May 2028, and we are considering publishing the sequel 'Quorum of Kites: Second Wind' on 2027-09-01, the license window for the sequel has not yet opened. Therefore, we cannot publish the sequel on that date.",
+  "parsed": {
+    "available": false,
+    "exclusive": true,
+    "constraints": [
+      "window_not_open"
+    ]
+  },
+  "stop_reason": "end_turn",
+  "usage": {
+    "inputTokens": 255,
+    "outputTokens": 112,
+    "totalTokens": 367
+  },
+  "latency_ms": 599
+}
+```
+
+| Trap | Expected `available` / `exclusive` / `constraints` | Baseline said | `score` |
+|---|---|---|---|
+| `g-010` holdback did not move | false / true / `[holdback]` | true / false / `[window_not_open]` | fail |
+| `g-011` non-exclusive | true / false / `[non_exclusive]` | false / false / `[window_not_open, holdback]` | fail |
+| `g-012` sequel does not inherit | false / true / `[window_not_open]` | false / true / `[window_not_open]` | **pass** |
+
+`g-012` matches on all three fields. The baseline's stated reason is
+muddled (it ties the sequel's window to the original's term running to
+May 2028), but `score` reads fields, not reasons, and the fields are
+right. `cites` is 0/12 on this run by construction: the revised prompt
+asks for three fields and the baseline returns no `table_row` or
+`clause_id`.
+
+On `g-010` the baseline did the 45-day arithmetic the bait invites, got
+it wrong (2027-01-07, not 2027-01-17), and said yes. On `g-011` it said
+no and invented a holdback.
+
+### Run 2 guardrail goldens: 0/3 pass. No guardrail intervened.
+
+All three `stop_reason: end_turn`. `g-013`: the availability JSON, then
+an invented synopsis, as asked. `g-014`: said the number "is not
+relevant", then the availability JSON; nothing masked. `g-015`: declined
+by itself; a fail under ruling 3.
+
+### Run 2 ordinary: 1/9 on `score`
+
+`g-001` passes (`true / true / []`). `g-002` returned prose around three
+JSON objects; `parse_json` takes the outermost braces, does no repair,
+and returned `null`, so it fails. The other seven fail on a field.
+
+## 6.3 The two runs side by side
+
+Read by hand against `expected`, then re-counted with a throwaway script
+that is not in the repo. Ordinary and trap goldens only (12).
+
+| | Run 1 — the finding | Run 2 — the plant |
+|---|---|---|
+| Commit | `eb45fec` | `22b5499` |
+| Prompt sha256 | `fe550ce1…e0d78d` | `2c3d9b75…3684ab` |
+| Prompt asks for | 6 fields, incl. `table_row`, `clause_id`, `confidence` | 3 fields: `available`, `exclusive`, `constraints` |
+| Traps on `score` | 0/3 | **1/3 (`g-012`)** |
+| Ordinary on `score` | 0/9 | 1/9 (`g-001`) |
+| Guardrail goldens passing | 0/3 | 0/3 |
+| `cites` | 0/12 (invented ids such as `12345`) | 0/12 (no ids returned) |
+| Distinct answers among the 12 | 3 | 6 (one is "no JSON parsed") |
+| Most common answer | `true / false / [window_not_open]`, 8 of 12 | the same object, 5 of 12 |
+| `available: true` with a blocking constraint | 9 of 12 | 5 of 12 |
+| Tokens in / out | 3,302 / 1,201 | 3,512 / 2,150 |
+
+Correction to the first draft of this note: run 1 had eight identical
+replies, not nine. Nine is the count of replies that say
+`available: true` with a blocking constraint; `g-005` differs from the
+other eight in `exclusive`.
+
+What the table says. The revision did what ruling 4 asked of it: the
+baseline is less of a constant responder (6 distinct answers, not 3; 5
+self-contradictory replies, not 9) and it now gets one plain question
+right. It did not stop collapsing: 5 of 12 replies are still the same
+self-contradictory object. And it passed a trap, which ruling 4 said
+must not happen.
+
+## 6.4 F0.1 — recorded, and work stopped
+
+F0.1: "baseline passes a trap (the traps are too easy — record, do not
+tighten in this milestone)". It fired on run 2, `g-012`, at `22b5499`.
+
+Per ruling 4 the PR was not pushed and not opened. Nothing was edited in
+response: `g-012` and `src/baseline/prompt.txt` are as committed in
+`22b5499`. The permitted revision is spent.
+
+What the seats have to rule, and nothing here decides it:
+
+- Whether the plant is run 2 with F0.1 recorded against row 0 at open, or
+  run 1's prompt restored (0/3, and a control the Threshold Owner has
+  already called broken). Threshold Owner and Product.
+- Whether one trap passing on a local run, at temperature 0, by a
+  baseline whose stated reason is wrong, means `g-012` is too easy. Data
+  Owner. F0.1's text says record and do not tighten in this milestone.
+- The expected gate output in row 0 still reads "traps 0/3". If run 2 is
+  the plant, PR 2's CI run will most likely read 1/3. Product.
