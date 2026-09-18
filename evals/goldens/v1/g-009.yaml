@@ -1,0 +1,15 @@
+# Availability, plain no: the window has not opened yet.
+id: g-009
+kind: ordinary
+question: >-
+  Can we publish 'Turnstile Saints' on SVOD in Germany on 2026-12-01, and under what constraints?
+expected:
+  table_row: r-035
+  clause_id: ML-3.1
+  answer_fields:
+    available: false
+    exclusive: true
+    constraints: [window_not_open]
+seat: Data Owner
+added: "2026-09-18"
+retired: null

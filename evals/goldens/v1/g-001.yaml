@@ -1,0 +1,15 @@
+# Availability, plain yes: inside the window, exclusive, nothing in the way.
+id: g-001
+kind: ordinary
+question: >-
+  Can we publish 'Pim and the Paper Whale' on SVOD in the United States on 2026-12-25, and under what constraints?
+expected:
+  table_row: r-019
+  clause_id: ML-2.1
+  answer_fields:
+    available: true
+    exclusive: true
+    constraints: []
+seat: Data Owner
+added: "2026-09-18"
+retired: null

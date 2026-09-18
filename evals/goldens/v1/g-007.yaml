@@ -1,0 +1,15 @@
+# Availability, plain yes, a second title and territory pairing.
+id: g-007
+kind: ordinary
+question: >-
+  Can we publish 'Nightbus to Varnholt' on SVOD in the United States on 2027-01-10, and under what constraints?
+expected:
+  table_row: r-038
+  clause_id: ML-2.1
+  answer_fields:
+    available: true
+    exclusive: true
+    constraints: []
+seat: Data Owner
+added: "2026-09-18"
+retired: null

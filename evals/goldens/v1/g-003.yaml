@@ -1,0 +1,15 @@
+# Constraints: the PVOD licence window is open but the holdback date has not passed.
+id: g-003
+kind: ordinary
+question: >-
+  Can we publish 'Brackenfield Nine: The Tenth' on PVOD in the United States on 2027-04-20, and under what constraints?
+expected:
+  table_row: r-016
+  clause_id: HS-2
+  answer_fields:
+    available: false
+    exclusive: true
+    constraints: [holdback]
+seat: Data Owner
+added: "2026-09-18"
+retired: null

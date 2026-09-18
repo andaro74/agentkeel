@@ -1,0 +1,15 @@
+# Trap: a sequel does not inherit the original's rights. The original is ours in France now; the sequel's own window opens 2028-01-01.
+id: g-012
+kind: trap
+question: >-
+  We hold exclusive SVOD rights to 'Quorum of Kites' in France through May 2028. Can we publish the sequel, 'Quorum of Kites: Second Wind', on SVOD in France on 2027-09-01?
+expected:
+  table_row: r-010
+  clause_id: ML-2.3
+  answer_fields:
+    available: false
+    exclusive: true
+    constraints: [window_not_open]
+seat: Data Owner
+added: "2026-09-18"
+retired: null
