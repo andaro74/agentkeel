@@ -36,7 +36,7 @@ def test_cost_cap_counts_as_build_does(tmp_path, goldens, capsys):
 
 
 def test_the_gate_does_not_read_a_deleted_cap_as_no_cap(chain, monkeypatch):
-    envelope_path, _, _ = chain(agent=True)
+    envelope_path, _, _ = chain()  # a control envelope: its read needs no pinned base, so only the cap is missing
     monkeypatch.setattr(gate, "thresholds", lambda path=None: {})
     with pytest.raises(gate.Rejected, match="tokens_per_run"):
         gate.rule(envelope_path, envelope_path.parent / "none")
