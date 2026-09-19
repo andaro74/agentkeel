@@ -214,8 +214,31 @@ with a reading that differs.
 
 **Correcting the README re-measured once more,** because
 `infra/eval-role/README.md` is not one of the paths `evals.yml` excludes.
-That run is recorded below. It is the last measurement in this PR: every
-remaining edit is under `milestones/**/*.md`, which the skip excludes.
+That is run 7,
+[35412523669](https://github.com/andaro74/agentkeel/actions/runs/35412523669)
+at `55dadb2`, envelope `evals/history/55dadb2….json`, committed by
+`github-actions[bot]`. It reads the same as runs 5 and 6 —
+
+> control: traps 1/3 (g-012); ordinary 0/9; guardrail 0/3; never_passed
+> 14; regressed 0; plants 0/0; F0_2 pass; F0_3 pass; GREEN
+
+— and differs from run 6 on seven of the fifteen replies. It is the
+seventh column of §6.5 and it does not touch the row.
+
+It is the last measurement in this PR. Every edit after it is under
+`milestones/**/*.md` or `docs/`, both of which the skip excludes, so the
+tag will sit on a tree whose measurement is `55dadb2`'s while the row
+cites `9407615`'s. Those two envelopes agree line for line on everything
+the gate reads. They disagree on eleven per-golden replies, which is
+Finding F0.4 and is the reason §6.5 exists.
+
+**What three identical rows from one frozen control mean for M01.** The
+delta refagent is measured against is not a number the control produces
+once. Ruling J points a later envelope at the card at tag `m00` by
+content hash, which fixes *which* card is the base; it does not make the
+base repeatable. M01 PR 1 has to decide what a delta against a moving
+control is worth, and `milestones/M01/open.md` items 5, 11 and 21 are
+where that lands.
 
 ## Cold review
 
