@@ -43,9 +43,9 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
 | Finding, not a falsifier | F0.1 baseline passes a trap (record, do not tighten in this milestone; ADR-0003). Recorded at open: `g-012` on the plant. F0.4 the control is non-deterministic at temperature 0 (ADR-0004, PR 2; feasibility.md §6.5). |
 | Seeded commit | `22b5499` on `m00-pr1`: the plant. Goldens `g-001` to `g-015`, `data/` and the baseline code are from `8a31e8d`; the baseline prompt is as revised once in `22b5499`. |
 | Expected gate output | Baseline card written; `score` and `cites` recorded per golden; traps expected 1/3 on the plant, F0.1 recorded as a finding. A 0/3 or 2/3 in PR 2's CI run is a non-determinism finding to record. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0` under the plant rule. A run without a baseline card is rejected by `verdict.build`. From ADR-0004 (PR 2): every result is `scope: control`, so `regressed` is 0 by construction and `checks.F0_2`, `checks.F0_3` decide the verdict. |
-| Measured | — (filled at close) |
-| PRs used / cap | 2 / 4 |
-| State | OPEN |
+| Measured | control: traps 1/3 (g-012); ordinary 0/9; guardrail 0/3; never_passed 14; regressed 0; plants 0/0; F0_2 pass; F0_3 pass; GREEN; envelope `9407615dcde09308490f6699c21a18100bfedcd2`. Both check URLs are in the cell in `milestones/README.md`, which is the one `make ledger` reads. |
+| PRs used / cap | 3 / 4 |
+| State | GREEN |
 
 ### Open detail (PR 1, 2026-09-18)
 
@@ -111,6 +111,97 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
 - The measurement is the CI-written envelope under `evals/history/`.
   Nothing here states it. Read the envelope, or run `make ledger`.
 
-### Close detail
+### Close detail (PR 3, the close, 2026-09-18)
 
-Written at the close PR.
+The milestone closes in three PRs, not four. Ruling F (feasibility.md §2,
+fourth round): the cold review of PR 2 found two BLOCKs and both were
+cured inside PR 2, so there is no repair PR and PR 3 is the close. The
+cap was four and three were used.
+
+**The measurement.** Row 0 is GREEN on the envelope for
+`9407615dcde09308490f6699c21a18100bfedcd2`, written by the `record` job
+of [run 35406351135](https://github.com/andaro74/agentkeel/actions/runs/35406351135)
+as `github-actions[bot]` (`76fa683`). The Measured cell above is copied
+from it; `make ledger` reads the cell, asks `verdict.gate` to rule on the
+envelope it names, and exits 1 if the two differ. It exits 0.
+
+The same envelope was ruled on again after the merge, with no tokens
+spent: the `push` run on `0c39568`
+([35408681217](https://github.com/andaro74/agentkeel/actions/runs/35408681217))
+found nothing measured had changed since `9407615` and ran the gate on
+that envelope. The measurement is the one on `main`, not only the one on
+the branch.
+
+**This PR measures again, and the row does not move.** The close PR adds
+`tests/test_baseline_frozen.py` and edits `infra/eval-role/README.md`.
+Neither is prose to `evals.yml`'s "already measured" step, which excludes
+`docs/`, `SPEC/`, `.claude/` and `milestones/**/*.md` and nothing else,
+so this PR spends tokens and writes its own envelope. That is wanted:
+it is also the first run to assume the eval role as redeployed for S-1.
+
+Row 0 stays on `9407615`, by ruling. That envelope is the measurement
+PR 2 took of the tree that reads the plant; adding a test that reads
+`src/baseline/` does not re-open the claim. The close PR's own run is
+recorded in `feasibility.md` §6.5 as another reading of the control
+(Finding F0.4), and in `rulings/pr3.md` with its id. If its trap count is
+anything other than 1/3, that is an F0.4 entry, not a change to the row —
+and if a check fails, this PR is RED and the row is rewritten before the
+tag.
+
+**What "the plant went RED" means.** Product, at this close. Two
+sentences, in this order:
+
+1. The gate's REJECTED on the seed. `verdict.gate` on
+   `tests/fixtures/hand_written_envelope_no_baseline_card_ref.json`
+   exits 2, REJECTED, `'baseline_card_ref' is a required property`. That
+   is the plant firing. The seed is `f9f1342`, committed before
+   `src/verdict/` existed.
+2. `checks.F0_2: pass` in the envelope is the measurement that the
+   rejection holds in CI. The six tests in `tests/test_f0_2.py` ran in
+   run 35406351135 and their junit result is that field.
+
+The first is the control firing; the second is the evidence that it fired
+where it counts. This settles report 4.1, one of the six items PR 2 left
+unruled.
+
+**Baseline parameters: confirmed before tag `m00`.** Threshold Owner.
+`us.amazon.nova-micro-v1:0`, us-west-2, Converse, temperature 0,
+`maxTokens` 512, one system prompt with sha256 `2c3d9b75…` as in the
+baseline card at `9407615`, no tools, no guardrail, no retrieval.
+Confirmed as measured, not changed. They are frozen with the code by
+ADR-0002 from the tag, and `tests/test_baseline_frozen.py` fails on any
+diff to `src/baseline/` or to the prompt hash.
+
+**Merge commits, not rebase.** Product, ADR-0004 amendment 1. Envelopes
+are keyed to the commit they measured and the bot's authorship under
+`evals/history/` is part of the evidence; a rebase or a squash breaks
+both. The ruleset on `main` allows `merge` and has no linear-history
+rule.
+
+**What this PR carries.** ADR-0002 and its test; ADR-0004 amendment 1;
+the Measured cell and this detail; `docs/milestones/M00.md` "What
+happened"; the three skills (`/open-milestone`, `/close-milestone`,
+`/cold-review`), written from PRs 1 to 3 by hand; `attestations.md`;
+`milestones/M01/open.md`; `rulings/pr3.md`.
+
+**What this PR does not carry.** The video. `docs/video/milestones/M00.mp4`
+is recorded at the tag, after the merge; the explainer's Watch line says
+"pending, tag `m00`". SPEC/00 §10.5 says a close is not ruled ready
+without the page and the video, so this is a departure, ruled by Product
+at this close and written down rather than quietly taken. The tag is the
+human's, after the merge.
+
+**Findings, and where each one lives now.**
+
+| Finding | Home |
+|---|---|
+| F0.1 — the baseline passes trap `g-012` | ADR-0003; feasibility.md §6.4. Carried to the Data Owner at M01 PR 1 (`milestones/M01/open.md`) |
+| F0.4 — the control is not deterministic at temperature 0 | ADR-0004; feasibility.md §6.5, run by run. Seeds SPEC/04's A-vs-A design at M04 open |
+| S-1 — the CI eval role was wider than M00 needs | `infra/eval-role/README.md`. Fixed in `app.py` at PR 2, redeployed 2026-09-19T00:20:25Z; the run that assumes the narrowed role is recorded in `rulings/pr3.md` |
+| Profile status is not model status | Findings, above. Carried to SPEC/04 at M04 open |
+
+**What a reader should not take from GREEN.** The control scored 2 of 15,
+and 1 of those 2 is a trap it got right for the wrong reason (§6.4).
+GREEN says no check failed and nothing the gate reads regressed; at M00
+the gate reads no golden at all, because every result is `scope: control`
+and the control is never gated (ADR-0004).

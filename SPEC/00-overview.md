@@ -6,7 +6,9 @@ amendment 1 (the rulings applied at adoption) and amendment 2 (seats for
 paths §5 did not list; the cold reviewer drafts, M00 PR 1) · Amended by
 ADR-0003 (remaining path ownership; F0.1 is a finding, M00 PR 1) and
 ADR-0004 (measurement fields: `checks`, `scope`, cost-cap in
-`thresholds.yaml`; the control is never gated; M00 PR 2)
+`thresholds.yaml`; the control is never gated; M00 PR 2, with amendment 1:
+merge commits, and which card a later envelope points at; M00 PR 3) ·
+ADR-0002 (the baseline is frozen at tag `m00`; M00 PR 3)
 
 ## 1. What this is
 
@@ -279,7 +281,7 @@ twelve weeks at one milestone per ten days.
 ### M00 — Baseline and ledger
 Build: `src/baseline/` (Converse on the pinned baseline model, one
 prompt, no tools, no guardrail, no retrieval; reads nothing from `data/`;
-frozen by ADR-0002 at PR 4). Model ids for every role pinned by the
+frozen by ADR-0002 at the close PR). Model ids for every role pinned by the
 Threshold Owner at the top of `milestones/M00/README.md`.
 `scripts/seed_slate.py` writing `data/slate.json` and
 `data/rights_table.json` (§9); `data/clause_index.json` (Data Owner:
@@ -296,9 +298,12 @@ golden and ruling front matter only, §5) and `evals`, `plants`,
 `plants_expected = 0`. The seven seat subagents (§5.1),
 `product-spec-reviewer` first. `cold-review-ruling` as a required check
 from PR 2 (R9). This SPEC/00 and rulings R1–R11, recorded by ADR-0001.
-ADR-0002 (baseline frozen, with the diff-test) lands at PR 4 at tag
-`m00`, not before. Skills written at PR 4 from the by-hand open and
-close.
+ADR-0002 (baseline frozen, with the diff-test) lands at the close PR,
+at tag `m00`, not before. Skills written at the close PR from the by-hand
+open and close. M00 closed at PR 3, not PR 4: the cold review of PR 2
+found two BLOCKs and both were cured inside PR 2, so there was no repair
+PR (ruling F, `milestones/M00/feasibility.md` §2 fourth round; CLAUDE.md,
+"The PR shape").
 Rulings cited: PR 1 cites `SPEC/00-overview.md#8-M00` for
 `evals/goldens/`, `src/baseline/`, `scripts/` and `data/`, and names the
 seat per path in the PR body.

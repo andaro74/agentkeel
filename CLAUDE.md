@@ -37,6 +37,11 @@ SPEC/00 wins and this file gets a PR.
   close with the finding as the result. Do not propose a cap raise; write
   the finding.
 
+A PR lands on `main` as a merge commit, never a rebase or a squash
+(ADR-0004 amendment 1): envelopes are keyed to the commit they measured,
+and `github-actions[bot]` authorship under `evals/history/` is part of
+what makes them evidence.
+
 Every PR ends with a ruling file at `milestones/MNN/rulings/<slug>.md`
 (front matter: `ruling`, `seat`, `authorises`, `evidence`, `pr`), not
 with a merge. `cold-review-ruling` enforces this from M00 PR 2 and blocks
@@ -112,9 +117,12 @@ on, a milestone opens and closes only through them.
 SPEC/                 specs, SPEC/00 first
 docs/adr/             one ADR per rule change, max two amendments (Product)
 docs/milestones/      explainers MNN.md; README.md is generated, never hand-edited
+docs/video/           README.md carries each recording's commit and tag
+.claude/skills/       open-milestone, close-milestone, cold-review (Product)
 milestones/README.md  the ledger (one file; make ledger and docs-current read it)
 milestones/MNN/       README.md (row + open/close detail), feasibility.md,
-                      rulings/<slug>.md, attestations, runs/
+                      rulings/<slug>.md, attestations.md, open.md (carried
+                      into MNN at the last close), runs/
 src/baseline/         frozen control
 src/verdict/          schema.json, build.py, gate.py, replay_history
 agents/refagent/      the reference agent (title availability)

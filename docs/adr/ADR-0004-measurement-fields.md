@@ -5,11 +5,11 @@ status: Accepted
 date: 2026-09-18
 seat: Product
 authorises:
-  - Product          # §5 gate list, §6 envelope fields, §8 M00 expected output, §10.3 command name
+  - Product          # §5 gate list, §6 envelope fields, §8 M00 expected output, §10.3 command name; amendment 1: how a PR lands on main
   - Threshold Owner  # cost-cap lives in thresholds.yaml; the regression bar reads the agent under test
   - Data Owner       # scope on every per-golden result
   - Engineering      # the envelope schema, verdict.gate, replay_history, `make ledger-plain`
-amendments: 0
+amendments: 1
 ---
 
 # ADR-0004 — Measurement fields; the control is never gated
@@ -80,8 +80,59 @@ is no tolerance flag. The move is a human commit under `evals/history/`,
 which ADR-0003 makes a two-key change: the two keys are Engineering and
 Product, and `two-key` itself is not built until M02.
 
+## Amendment 1 (M00 PR 3, 2026-09-18)
+
+Two items, ruled at the close.
+
+**1. A PR lands on `main` as a merge commit. Product.** Not a rebase, not
+a squash.
+
+Envelopes are keyed to the commit they measured:
+`evals/history/<commit>.json`, and the `commit` field inside it. A rebase
+or a squash rewrites that commit, so the file names a sha that is on no
+branch, and `evals.yml`'s "is this tree already measured?" step
+(`git merge-base --is-ancestor`) stops finding it. The measurement would
+have to be taken again to say the same thing.
+
+The second reason is authorship. `evals/history/**` is CI-written
+(ADR-0003): the `record` job commits as `github-actions[bot]`, and who
+wrote the file is part of what makes it evidence. A squash puts the
+merging human's name on the bot's commit. A rebase re-signs it. Either
+way the tree stops showing that no human wrote the envelope.
+
+So:
+
+- The repository ruleset on `main` keeps `merge` in
+  `allowed_merge_methods` and does not add `required_linear_history`.
+  Security owns the ruleset; on 2026-09-18 it allows merge, squash and
+  rebase, and has no linear-history rule. Nothing to change today. It is
+  named here so that adding one later is a change to this ADR.
+- CLAUDE.md was to lose the words "linear history". The phrase is not in
+  CLAUDE.md, or anywhere else in the tree — `grep -rn linear` finds
+  nothing. There was nothing to remove, and this paragraph is the record
+  of having looked.
+- `git log --merges main` is what F0.3 is read on
+  (`milestones/M00/feasibility.md` §5). A squashed PR has no merge commit
+  for that grep to find, so the falsifier's own observer depends on this
+  rule.
+
+**2. Which card a later envelope points at (report 1.4). Engineering,
+for M01 PR 1.** ADR-0004 left this open under Consequences. A later
+envelope points at the baseline card **at tag `m00`**, by the content
+hash of that card, recorded once as `baseline_card_sha` in
+`thresholds.yaml`. A card whose hash differs is a build error, not a new
+base. That is the fixed reference the Consequences paragraph named as one
+of two options; the other, "the same run's card", is what PR 2 built and
+what M00's own measurement used.
+
+Not built here. It is noted in `milestones/M00/feasibility.md` §7 and
+built at M01 PR 1. `thresholds.yaml` is the Threshold Owner's file, so
+the line that lands in it carries the Threshold Owner's key as well as
+Engineering's.
+
 ## Consequences
 
+- Amendment 1 uses the first of this ADR's two amendments. One is left.
 - SPEC/00 §5 (`regression`, `cost-cap`), §6 (envelope fields), §8 M00
   (expected gate output, Finding F0.4) and §10.3, §10.4, §15 (the command
   name) are amended in the same commit.
@@ -89,8 +140,8 @@ Product, and `two-key` itself is not built until M02.
   The bar is per run today. What M03 adds to it is SPEC/03's to say.
 - A delta against the control now has a base that moves from run to run.
   Which card a later envelope points at (the same run's, or the `m00`
-  card as a fixed reference) is still the Threshold Owner's to rule,
-  before M01 PR 1.
+  card as a fixed reference) was left open here and is ruled in
+  amendment 1, item 2: the `m00` card, by content hash.
 - One envelope per commit holds one scope at M00. From M01 a run has two
   subjects, the control and refagent. Whether they share an envelope is
   M01 PR 1's to settle; the schema allows both scopes in one file.

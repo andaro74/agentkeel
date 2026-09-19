@@ -450,6 +450,55 @@ envelope by hand"; which card a later envelope points at (report 1.4);
 the schema's file name (report 8.4); who owns a price table for
 `cost_usd`; whether `replay_history` is a reader under P5.
 
+### Fifth round: rulings at the close (2026-09-18, M00 PR 3)
+
+Five rulings, taken before the close PR was written. Two of them close
+items from the list above; the other four are left in
+`milestones/M01/open.md` with a seat and a date.
+
+**G. Baseline parameters. Threshold Owner.** Confirmed as measured, not
+changed: `us.amazon.nova-micro-v1:0`, us-west-2, Converse, temperature 0,
+`maxTokens` 512, prompt sha256 as in the baseline card at `9407615`
+(`2c3d9b75…`). Recorded in `milestones/M00/README.md` as confirmed before
+tag `m00`, and frozen by ADR-0002 from the tag.
+
+**H. "The plant went RED" (report 4.1). Product.** It means the gate's
+REJECTED on the seed: `verdict.gate` on
+`tests/fixtures/hand_written_envelope_no_baseline_card_ref.json` exits 2
+with `'baseline_card_ref' is a required property`, at seed `f9f1342`.
+`checks.F0_2: pass` in the envelope is the measurement that the rejection
+holds in CI. Both, in that order, and the explainer says both in that
+order. This closes one of the six.
+
+**I. Merge commits, not rebase. Product.** From PR #3 onward a PR lands
+on `main` as a merge commit. Envelopes are keyed to the commit they
+measured, and `github-actions[bot]` authorship under `evals/history/` is
+part of what makes them evidence; a rebase or a squash breaks both.
+Recorded as ADR-0004 amendment 1. CLAUDE.md was to lose the words "linear
+history"; the phrase is not in CLAUDE.md or anywhere else in the tree, so
+there was nothing to remove and the amendment records having looked.
+
+**J. Which card a later envelope points at (report 1.4). Engineering,
+for M01 PR 1.** A later envelope points at the baseline card at tag
+`m00`, by the content hash of that card, recorded once in
+`thresholds.yaml` as `baseline_card_sha`. A card with a different hash is
+a build error. Not built at M00; noted in §7 below. This closes the
+second of the six. `thresholds.yaml` is the Threshold Owner's file, so
+the line that lands in it carries their key as well.
+
+**K. Finding S-1. Security.** The narrowed eval role was redeployed on
+2026-09-19T00:20:25Z (stack `AgentkeelM00EvalRole`, `UPDATE_COMPLETE`).
+No run had assumed it by the close: the runs after the `9407615`
+measurement took the "already measured" path and assumed no role.
+Recorded in `infra/eval-role/README.md` as deployed and not yet observed;
+the first run that assumes it is recorded in `rulings/pr3.md`, and
+Security signs S-1 on that observation at M01, not on the deploy.
+
+The four still unruled — `tests/fixtures/` and the hand-written envelope,
+the schema's file name, who owns a price table for `cost_usd`, and
+whether `replay_history` is a reader under P5 — are items 1 to 4 of
+`milestones/M01/open.md`, each with a seat and a date.
+
 ## 3. The false state
 
 Claim 0 is false if either of these is true:
@@ -871,9 +920,30 @@ new column, and is not a failure.
    Security ruling; the role allows only the baseline's until then.
 4. **One envelope per commit, two subjects. Engineering, M01 PR 1.**
    From M01 a run has the control and refagent. The schema allows both
-   scopes in one envelope; nothing builds that yet. Which card a later
-   envelope points at (report 1.4) is the Threshold Owner's to rule
-   first.
+   scopes in one envelope; nothing builds that yet.
+5. **Which card a later envelope points at. Engineering, M01 PR 1
+   (report 1.4; ruling J, §2 fifth round; ADR-0004 amendment 1).** A
+   later envelope points at the baseline card **at tag `m00`**, by the
+   content hash of that card, recorded once in `thresholds.yaml` as
+   `baseline_card_sha`. A card whose hash differs is a build error, not a
+   new base. This is what makes a delta a delta: the base is one file
+   with one hash, and it is the file the freeze in ADR-0002 covers.
+
+   Not built at M00, on purpose. M00's own envelope points at the card
+   from its own run, which is correct while the run under measurement is
+   the baseline itself. Build it at M01 PR 1, when the envelope is
+   refagent's and the card is the control's. `thresholds.yaml` is the
+   Threshold Owner's file, so the line carries their key as well as
+   Engineering's.
+
+   The card to hash is
+   `evals/history/9407615dcde09308490f6699c21a18100bfedcd2.baseline-card.json`,
+   whose ref hash is already in that run's envelope
+   (`baseline_card_ref.sha256`,
+   `b0219756cad63be67fb51aa4632dd015084840833341f15235fab4569adc3295`) —
+   unless the tag lands on a later commit that measures again, in which
+   case it is the card at the tag. M01 PR 1 reads the tag, not this
+   sentence.
 
 ## 8. Formats and paths named at PR 2 (Engineering; report 1.2, 8.3, 8.4)
 
