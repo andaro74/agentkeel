@@ -1,0 +1,2 @@
+docs/video/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+docs/video/milestones/M00.mp4 -filter -diff -merge

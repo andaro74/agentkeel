@@ -6,8 +6,12 @@ date: 2026-09-18
 seat: Product
 authorises:
   - Product      # §5 Product row, §8 M00 seeded, expected and falsifier lines
-  - Engineering  # §5 Engineering row; the `two-key` trigger on evals/history/**
-amendments: 0
+  - Engineering  # §5 Engineering row; the `two-key` trigger on evals/history/**; amendment 1: .gitattributes, agents/<name>/**
+  - Security     # amendment 1: infra/bootstrap/**, infra/construct/** as paths; seats -> groups in a manifest
+  - Rule Owner   # amendment 1: agents/*/rules/**, guardrail id and version in a manifest
+  - Tool Owner   # amendment 1: agents/*/tools/**, may_call and may_be_called_by in a manifest
+  - Threshold Owner  # amendment 1: model and judge ids in a manifest
+amendments: 1
 ---
 
 # ADR-0003 — Remaining path ownership; F0.1 is a finding
@@ -56,3 +60,40 @@ five without one.
 - Carried to M01 open: `g-012` passed on three guessable fields. The
   Data Owner may retire it there and add `g-016` (R11: retire, never
   rename). See feasibility.md §7.
+
+## Amendment 1 (M01 PR 1, 2026-09-19): paths M01 adds
+
+Product. M01 adds paths that §5 and CLAUDE.md's table do not name. Every
+file on `main` has a seat (§5), so each gets one here, before the file
+exists. Ruled for M01 PR 1 (`milestones/M01/rulings/pr1.md`).
+
+- **`.gitattributes`** → Engineering. Root config, beside `.gitignore`.
+  It holds two lines: `docs/video/**/*.mp4 filter=lfs diff=lfs merge=lfs -text`,
+  and `docs/video/milestones/M00.mp4 -filter -diff -merge`.
+  The line was first ruled as `docs/video/** …`; that made
+  `docs/video/README.md` an LFS pointer (commit `fa21d9d`), so Engineering
+  narrowed it to the recordings before the PR opened. The second line
+  takes the filter off M00.mp4, which is a plain blob: with the filter on
+  it, every fresh checkout reports it modified, and the PR's first `evals`
+  run refused as a dirty tree (run 35469006669).
+- **`agents/<name>/**`** → Engineering, except:
+  - `agents/*/rules/**` → Rule Owner;
+  - `agents/*/tools/**` → Tool Owner;
+  - `agents/*/manifest.yaml` → each field by its §6 owner: model, judge
+    and guardrail ids to the Threshold Owner and the Rule Owner as §5
+    already divides them; `may_call` and `may_be_called_by` to the Tool
+    Owner; seats → groups to Security. A diff to the file names the seat
+    of every field it changes.
+
+  §5's `rules/**` and `tools/**` mean these paths too: a rule or a tool
+  schema is the Rule Owner's or the Tool Owner's wherever it sits.
+- **Bundle layout:** `agents/<name>/{manifest.yaml, prompt.txt, tools/,
+  rules/}`. `prompt.txt` is Engineering's, as the rest of the agent's code
+  is. A change to it is a change to what ships, and from M01 PR 2 a
+  change to the bundle's digest.
+- **`infra/bootstrap/**` and `infra/construct/**`** → Security. §5 already
+  gives Security the bootstrap stack and the construct in words; this
+  names them as paths. `infra/**` was Security's already, so nothing
+  moves.
+
+This is ADR-0003's first amendment. One is left.

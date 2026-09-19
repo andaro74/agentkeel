@@ -81,13 +81,97 @@ def test_refuses_observations_that_do_not_cover_the_goldens(tmp_path, goldens, c
     assert "missing ['g-015']" in capsys.readouterr().err
 
 
+def envelope_args(raw_path, card_path, out, *extra):
+    return ["envelope", "--raw", str(raw_path), "--control-card", str(card_path), "--out", str(out),
+            "--history-dir", str(out.parent / "no-history"), "--run-url", URL, *extra]  # fmt: skip
+
+
 def test_refuses_a_card_for_another_commit(tmp_path, chain):
-    _, card_path, raw_path = chain()
+    _, card_path, raw_path = chain(agent=True)
     card = json.loads(card_path.read_text(encoding="utf-8"))
     card_path.write_text(json.dumps({**card, "commit": "c" * 40}), encoding="utf-8")
     out = tmp_path / "out.json"
-    assert build.main(["envelope", "--raw", str(raw_path), "--baseline-card", str(card_path), "--out", str(out)]) == 3
+    assert build.main(envelope_args(raw_path, card_path, out)) == 3
     assert not out.exists()
+
+
+def test_when_no_agent_ran_the_envelope_is_the_controls_in_m00s_form(chain):
+    """ADR-0004 amendment 2, ruling A: one subject, the control; its own card is the base."""
+    envelope_path, card_path, _ = chain(right={"g-012"})
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    assert {r["scope"] for r in envelope["goldens"].values()} == {"control"}
+    assert envelope["control_card_ref"] is None
+    assert envelope["baseline_card_ref"]["path"] == card_path.resolve().as_posix()
+    assert (envelope["tokens_in"], envelope["tokens_out"]) == (3000, 1500)  # the control's own, counted once
+    assert "F1_4" not in envelope["checks"]
+    assert envelope["verdict"] == "GREEN"
+
+
+def test_an_over_cap_control_run_is_a_recorded_red(tmp_path, chain):
+    """Ruling 22 and ruling A: whichever the subject, over the cap is written RED."""
+    _, card_path, raw_path = chain()
+    thresholds = tmp_path / "thresholds.yaml"
+    thresholds.write_text("cost_cap:\n  tokens_per_run: 4499\n", encoding="utf-8")  # no base needed: no agent ran
+    out = tmp_path / "over.json"
+    assert build.main(envelope_args(raw_path, card_path, out, "--thresholds", str(thresholds))) == 0
+    assert json.loads(out.read_text(encoding="utf-8"))["verdict"] == "RED"
+
+
+def test_the_base_is_the_card_thresholds_pins(tmp_path, chain, capsys):
+    envelope_path, card_path, raw_path = chain(agent=True)
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    assert envelope["baseline_card_ref"] == {
+        "path": "evals/history/9407615dcde09308490f6699c21a18100bfedcd2.baseline-card.json",
+        "sha256": "b0219756cad63be67fb51aa4632dd015084840833341f15235fab4569adc3295",
+    }
+    assert envelope["control_card_ref"]["path"] == card_path.resolve().as_posix()
+
+    thresholds = tmp_path / "thresholds.yaml"
+    out = tmp_path / "out.json"
+    for pinned, why in [
+        ("baseline_card:\n  path: " + envelope["baseline_card_ref"]["path"] + "\n  sha256: " + "f" * 64, "not the base"),
+        ("baseline_card:\n  path: evals/history/nothing.json\n  sha256: " + "f" * 64, "no baseline card"),
+        ("", "pins no baseline_card"),
+    ]:
+        thresholds.write_text("cost_cap:\n  tokens_per_run: 150000\n" + pinned + "\n", encoding="utf-8")
+        assert build.main(envelope_args(raw_path, card_path, out, "--thresholds", str(thresholds))) == 3
+        assert why in capsys.readouterr().err
+        assert not out.exists()
+
+
+def test_an_over_cap_run_is_a_recorded_red(tmp_path, chain):
+    """Threshold Owner, M01 item 22: the envelope is written, and it is RED."""
+    envelope_path, card_path, raw_path = chain(agent=True, right={"g-001"})
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    # the run's spend, both subjects: 15 agent replies and 15 control replies, each 200 in, 100 out
+    assert (envelope["tokens_in"], envelope["tokens_out"]) == (6000, 3000)
+    thresholds = tmp_path / "thresholds.yaml"
+    pinned = build.load_thresholds(build.THRESHOLDS)["baseline_card"]
+    thresholds.write_text(
+        f"cost_cap:\n  tokens_per_run: 8999\nbaseline_card:\n  path: {pinned['path']}\n  sha256: {pinned['sha256']}\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "over.json"
+    assert build.main(envelope_args(raw_path, card_path, out, "--thresholds", str(thresholds))) == 0
+    assert json.loads(out.read_text(encoding="utf-8"))["verdict"] == "RED"
+
+
+def test_f1_4_an_agent_answer_passes_only_if_it_cites(goldens):
+    """SPEC/01 §4. The control is scored as at m00: pass is score, citations or not."""
+    raw = make_raw(goldens, right={"g-001", "g-002"})
+    raw["observations"][1]["parsed"].pop("clause_id")  # g-002: right, and cites no clause
+    results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
+    assert results["g-002"] == {"kind": "ordinary", "score": True, "cites": False, "pass": True}  # the control's reading
+
+    envelope = build.compose_envelope(raw, results, "agent", {"path": "x", "sha256": "0" * 64}, {}, [], {}, None,
+                                      control_ref={"path": "y", "sha256": "1" * 64}, run_url=URL)  # fmt: skip
+    assert envelope["goldens"]["g-001"]["pass"] is True
+    assert envelope["goldens"]["g-002"] == {"kind": "ordinary", "scope": "agent", "score": True, "cites": False, "pass": False}
+    assert envelope["checks"]["F1_4"] == {"status": "fail", "url": URL}
+    assert envelope["verdict"] == "RED"
+
+    with pytest.raises(build.Refused, match="run URL"):
+        build.compose_envelope(raw, results, "agent", {"path": "x", "sha256": "0" * 64}, {}, [], {}, None)
 
 
 def test_refuses_a_reply_read_from_a_cache(goldens):
@@ -131,12 +215,12 @@ def test_scope_is_worked_out_from_the_card_not_passed_in(chain, goldens):
 
 
 def test_a_card_with_no_scope_is_refused(tmp_path, chain):
-    _, card_path, raw_path = chain()
+    _, card_path, raw_path = chain(agent=True)
     card = json.loads(card_path.read_text(encoding="utf-8"))
     del card["scope"]
     card_path.write_text(json.dumps(card), encoding="utf-8")
     out = tmp_path / "out.json"
-    assert build.main(["envelope", "--raw", str(raw_path), "--baseline-card", str(card_path), "--out", str(out)]) == 3
+    assert build.main(envelope_args(raw_path, card_path, out)) == 3
     assert not out.exists()
 
 

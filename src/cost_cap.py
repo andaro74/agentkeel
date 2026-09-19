@@ -1,12 +1,17 @@
 """cost-cap (SPEC/00 §5): the run's token spend against the cap in thresholds.yaml.
 
-    python -m src.cost_cap --raw RAW
+    python -m src.cost_cap --raw RAW [--raw RAW ...]
 
-Reads the runner's raw observations, not the envelope. Runs before
-verdict.build, so a run over the cap writes no envelope.
+Reads the runners' raw observations, not the envelope, and prints what the
+run spent against the cap. From M01 an over-cap run is a recorded RED, not
+a missing file (Threshold Owner, M01 item 22): this prints the spend and
+exits 0, and verdict.build writes the envelope RED, which verdict.gate works
+out again. A run always writes an envelope, the agent's or, when no agent
+ran, the control's. It exits 1 only when it cannot count: no cap, or a
+reply with no usage.
 
 It reads the spend after it is spent, and only the spend the runner wrote
-down. It stops this run reaching an envelope. It does not stop the next run.
+down. It does not stop this run or the next one.
 """
 
 from __future__ import annotations
@@ -29,13 +34,14 @@ def tokens_spent(raw: dict) -> int:
         usage = observation.get("usage")
         if not usage:
             raise ValueError(f"{observation.get('id')}: a reply with no usage cannot be counted")
-        spent += usage.get("totalTokens", usage.get("inputTokens", 0) + usage.get("outputTokens", 0))
+        # in plus out, as verdict.build counts it: one count in both readers
+        spent += usage.get("inputTokens", 0) + usage.get("outputTokens", 0)
     return spent
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--raw", required=True, type=Path)
+    parser.add_argument("--raw", required=True, type=Path, action="append")
     parser.add_argument("--thresholds", type=Path, default=ROOT / "thresholds.yaml")
     args = parser.parse_args(argv)
 
@@ -45,13 +51,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"FAIL cost-cap: tokens_per_run must be a positive integer, got {cap!r}")
         return 1
     try:
-        spent = tokens_spent(json.loads(args.raw.read_text(encoding="utf-8")))
+        spent = sum(tokens_spent(json.loads(raw.read_text(encoding="utf-8"))) for raw in args.raw)
     except ValueError as exc:
         print(f"FAIL cost-cap: {exc}")
         return 1
     over = spent > cap
-    print(f"{'FAIL' if over else 'ok  '} cost-cap: {spent:,} tokens this run, cap {cap:,}")
-    return 1 if over else 0
+    print(f"{'OVER' if over else 'ok  '} cost-cap: {spent:,} tokens this run, cap {cap:,}"
+          + ("; the envelope is RED (M01 item 22)" if over else ""))  # fmt: skip
+    return 0
 
 
 if __name__ == "__main__":

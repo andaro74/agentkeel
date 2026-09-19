@@ -1,0 +1,55 @@
+# refagent's manifest (SPEC/00 §6, §9). Bundle layout and seats by
+# ADR-0003 amendment 1: each field is owned by its §6 owner, named beside it.
+# Written at M01 PR 1 to carry the model ids, which move here from
+# milestones/M00/README.md (SPEC/00 §5 ownership note). That table stays as
+# the record at tag m00. The schema that validates this file, and every
+# other §6 field, land at M01 PR 2 (SPEC/01 §6); nothing reads it before.
+name: refagent
+
+# Threshold Owner: the agent model id + version + region (A-vs-A compares
+# the pair). Sonnet 5's id carries no version suffix. `version` stays null
+# until Bedrock returns a version for us.anthropic.claude-sonnet-5; the
+# Threshold Owner re-rules it at M01 PR 2, with the cap (ruling G).
+# modelLifecycle for anthropic.claude-sonnet-5 in us-west-2: ACTIVE on
+# 2026-09-19 (list-foundation-models).
+# Converse is called through the profile; the region is the request region,
+# the profile ARN's (M01 open item 23).
+model:
+  id: anthropic.claude-sonnet-5
+  version: null
+  profile: us.anthropic.claude-sonnet-5
+  region: us-west-2
+
+# Threshold Owner: the judge model id. Picked at M03 PR 1 from the
+# candidates below by scoring the graded-examples set (R6).
+judge_model_id: null
+
+# Rule Owner: the guardrail id and version. M03.
+guardrail: null
+
+# Threshold Owner: every other role's pinned id, resolved 2026-09-18 in
+# us-west-2 (milestones/M00/README.md, "Model ids"). Read by the milestone
+# that names each role; statuses and reasons stay in that table.
+pinned_roles:
+  baseline:  # the control, frozen at m00 (ADR-0002); not refagent's model
+    id: amazon.nova-micro-v1:0
+    profile: us.amazon.nova-micro-v1:0
+  m04_equivalent_swap:
+    id: anthropic.claude-sonnet-4-6
+    profile: us.anthropic.claude-sonnet-4-6
+  m04_cheaper_swap:
+    id: anthropic.claude-haiku-4-5-20251001-v1:0
+    profile: us.anthropic.claude-haiku-4-5-20251001-v1:0
+  m04_deprecation_plant:
+    id: anthropic.claude-sonnet-4-20250514-v1:0
+    profile: us.anthropic.claude-sonnet-4-20250514-v1:0
+  m04_breaking_swap:
+    id: meta.llama3-1-8b-instruct-v1:0
+    profile: us.meta.llama3-1-8b-instruct-v1:0
+  m03_judge_candidates:
+    - {id: meta.llama4-maverick-17b-instruct-v1:0, profile: us.meta.llama4-maverick-17b-instruct-v1:0}
+    - {id: meta.llama3-3-70b-instruct-v1:0, profile: us.meta.llama3-3-70b-instruct-v1:0}
+    - {id: mistral.mistral-large-2407-v1:0, profile: null}  # ON_DEMAND only
+    - {id: openai.gpt-oss-120b-1:0, profile: null}  # ON_DEMAND only
+    - {id: openai.gpt-6-astra, profile: us.openai.gpt-6-astra}
+    - {id: amazon.nova-pro-v1:0, profile: us.amazon.nova-pro-v1:0}

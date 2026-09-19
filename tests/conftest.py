@@ -21,12 +21,14 @@ def goldens() -> dict[str, dict[str, Any]]:
 
 
 def make_raw(goldens: dict[str, dict[str, Any]], right: set[str] = frozenset(), **top: Any) -> dict[str, Any]:
-    """Raw observations as a runner would write them. Goldens in `right` get the expected answer."""
+    """Raw observations as a runner would write them. Goldens in `right` get the expected answer, cited."""
     observations = []
     for golden_id, golden in goldens.items():
         if golden["kind"] in build.CITING_KINDS:
-            fields = golden["expected"]["answer_fields"]
-            parsed = dict(fields) if golden_id in right else {"available": None}
+            expected = golden["expected"]
+            fields = {**expected["answer_fields"], "table_row": expected["table_row"], "clause_id": expected["clause_id"]}
+            # A wrong answer still cites: F1.4 is its own test, not a side effect of every other one.
+            parsed = fields if golden_id in right else {"available": None, "table_row": fields["table_row"], "clause_id": fields["clause_id"]}
             stop = "end_turn"
         else:
             parsed, stop = None, "guardrail_intervened" if golden_id in right else "end_turn"
@@ -48,10 +50,12 @@ def make_raw(goldens: dict[str, dict[str, Any]], right: set[str] = frozenset(), 
 def chain(tmp_path: Path, goldens):
     """Run build end to end in tmp_path. Returns (envelope path, card path, raw path).
 
-    By default the run is the baseline itself, as at M00: one raw file, scored into
-    the card and into the envelope, so every result is scope `control`.
-    With agent=True the card comes from a baseline that gets everything wrong and the
-    envelope from a second runner, the agent under test, so every result is scope `agent`.
+    By default no agent ran: one raw file, the control's, scored into the card and
+    into a control envelope in M00's form, so every result is scope `control`
+    (ADR-0004 amendment 2, ruling A). With agent=True the control card comes from a
+    baseline that gets everything wrong, and the envelope from a second runner, the
+    agent under test, so every result is scope `agent` and the envelope names the
+    control card and the base at tag m00. Both go through build's command line.
     """
 
     def run(right: set[str] = frozenset(), history_dir: Path | None = None, agent: bool = False, **top: Any):
@@ -60,12 +64,12 @@ def chain(tmp_path: Path, goldens):
         envelope_path = tmp_path / f"{COMMIT}.json"
         raw_path.write_text(json.dumps(make_raw(goldens, () if agent else right, **top)), encoding="utf-8")
         assert build.main(["card", "--raw", str(raw_path), "--out", str(card_path)]) == 0
+        history = history_dir or tmp_path / "no-history"
         if agent:
             raw_path = tmp_path / f"{COMMIT}.agent-raw.json"
             raw_path.write_text(json.dumps(make_raw(goldens, right, model_id="agent-under-test", **top)), encoding="utf-8")
-        history = ["--history-dir", str(history_dir or tmp_path / "no-history")]
-        assert build.main(["envelope", "--raw", str(raw_path), "--baseline-card", str(card_path),
-                           "--out", str(envelope_path), *history]) == 0  # fmt: skip
+        assert build.main(["envelope", "--raw", str(raw_path), "--control-card", str(card_path),
+                           "--out", str(envelope_path), "--history-dir", str(history), "--run-url", URL]) == 0  # fmt: skip
         return envelope_path, card_path, raw_path
 
     return run

@@ -23,6 +23,24 @@ merged, and committed in M00 PR 4 (ADR-0005). The live `make evals-local`
 in it is a laptop run and is not evidence; its counts may differ from the
 recorded envelope's, which is Finding F0.4.
 
+From M01, a milestone's video is committed in the **next** milestone's
+PR 1, never in a PR of its own milestone (ADR-0005 amendment 1). M00 PR 4
+was the one exception, and it spent M00's cap.
+
+## Storage and size
+
+M00.mp4 is a plain blob (84.4 MiB); recordings from M01 are LFS objects
+under .gitattributes, whose second line keeps the filter off M00.mp4. It is not migrated: a migration would rewrite
+`cfbd8ba` and `8252763` and move tag `m00`, and envelopes are keyed to
+commits (ADR-0004). CI checks out with `lfs: false` and reads no video
+bytes; `make ledger-plain` links a recording when its path exists, which a
+pointer file satisfies.
+
+Ceilings, per recording (Product): **40 MiB per milestone video, 64 MiB
+per act.** At M00's bitrate the fifteen recordings would come to about
+1.6 GB, over GitHub's 1 GiB of free LFS storage. Recording settings are
+chosen to fit; they are not edits.
+
 ## Acts (`docs/video/actN-*.mp4`, ≤ 8 minutes)
 
 None recorded. The six acts are scheduled at M06 to M08 (SPEC/00 §10.2);

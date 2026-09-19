@@ -1,0 +1,23 @@
+# Seed S4 (SPEC/01 §5, F1.1): a deploy of refagent's stack from a laptop.
+# "A laptop" is SPEC/01 §1's: the developer role the bootstrap stack
+# creates, boundary on, used from any machine. Not the admin who deploys
+# the bootstrap stack; that is break-glass and landing-zone work.
+#
+# Planted at M01 PR 1 as the attempt to make. It is made on the first main
+# run after M01 PR 2 merges, once the bootstrap stack exists, and
+# `observed` is filled from what AWS returned, with the request id of each
+# call. Nothing reads this file until then.
+seed: S4
+falsifier: F1.1
+principal: the developer role (bootstrap stack, boundary on), assumed from a laptop
+attempts:
+  - what: assume the deploy role from the developer session
+    command: aws sts assume-role --role-arn <deploy role ARN> --role-session-name seed-s4
+    refused_when: AccessDenied
+  - what: assume a CDK bootstrap role from the developer session
+    command: aws sts assume-role --role-arn <cdk deploy role ARN> --role-session-name seed-s4
+    refused_when: AccessDenied
+  - what: deploy refagent's stack with the developer session
+    command: npx cdk deploy <refagent stack>
+    refused_when: AccessDenied, and no stack event for the attempt
+observed: null

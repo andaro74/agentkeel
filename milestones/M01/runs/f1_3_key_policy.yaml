@@ -1,0 +1,17 @@
+# Seed S6 (SPEC/01 §5, F1.3): the agent's role reads its own KMS key
+# policy. For the attempt, the role's own policy is given
+# `kms:GetKeyPolicy` on the key, so a refusal can only come from the key
+# policy. A refusal that names the role's own policy does not count.
+#
+# Planted at M01 PR 1 as the attempt to make. It is made on the first main
+# run after M01 PR 2 merges, once refagent's key exists, and `observed` is
+# filled from what AWS returned, with the request id. Nothing reads this
+# file until then.
+seed: S6
+falsifier: F1.3
+principal: refagent's runtime role, with kms:GetKeyPolicy on its key in its own policy for the attempt
+attempts:
+  - what: read the key policy of refagent's KMS key
+    command: aws kms get-key-policy --key-id <refagent key ARN> --policy-name default
+    refused_when: AccessDenied with an explicit deny in a resource-based policy
+observed: null

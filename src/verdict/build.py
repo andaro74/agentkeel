@@ -5,14 +5,31 @@ Computes `score` and `cites` per golden (Data Owner, feasibility.md §2
 ruling 1). Believes nothing a runner says about itself.
 
 Scope (ADR-0004) is worked out, not passed in: a run is `control` when its
-raw observations are the ones the baseline card was scored from, and `agent`
+raw observations are the ones the control card was scored from, and `agent`
 otherwise. There is no flag that marks an agent as the control.
 
+From M01 (ADR-0004 amendment 2) an envelope has one subject: the agent
+when one ran, otherwise the control. The control is re-run every time (P6)
+and its card is written first. An agent envelope names two cards:
+`control_card_ref`, this run's, and `baseline_card_ref`, the card at tag
+`m00` whose hash `thresholds.yaml` pins. A control envelope is in M00's
+form: `control` results, `control_card_ref: null`, and `baseline_card_ref`
+naming this run's own card. For the agent, an ordinary or trap answer
+passes only if it cites a row and a clause that exist, and `checks.F1_4`
+fails when any ordinary answer does not (SPEC/01 §4). A run over
+`thresholds.yaml`'s token cap is written RED, whichever the subject
+(Threshold Owner, M01 item 22). A run always writes an envelope.
+
     python -m src.verdict.build card --raw RAW --out CARD
-    python -m src.verdict.build envelope --raw RAW --baseline-card CARD --out ENVELOPE
+    python -m src.verdict.build envelope --raw RAW --control-card CARD --out ENVELOPE [--run-url URL]
+
+`--raw` is the agent's replies when an agent ran, and the control's own
+otherwise; which one it is, is worked out from the card, not passed in.
 
 It refuses, and writes nothing, when:
-- no baseline card is given, or the card is for another commit (seed 2, F0.2);
+- no control card is given, or the card is for another commit (seed 2, F0.2);
+- an agent ran and the card `thresholds.yaml` pins as the base is missing
+  or has another hash;
 - the raw observations do not cover the goldens one to one;
 - the tree was dirty when the runner ran (unless --allow-dirty, local only);
 - a reply was read from a prompt cache;
@@ -41,6 +58,7 @@ from src.verdict import ROOT, canonical_sha256, plants, replay_history, schema_e
 CARD_WHAT = "baseline card: the naive baseline scored against the goldens; not an envelope"
 CITING_KINDS = {"ordinary", "trap"}
 HISTORY = ROOT / "evals" / "history"
+THRESHOLDS = ROOT / "thresholds.yaml"
 
 
 class Refused(Exception):
@@ -60,6 +78,19 @@ def load_goldens(goldens_dir: Path) -> dict[str, dict[str, Any]]:
         golden = yaml.safe_load(path.read_text(encoding="utf-8"))
         goldens[golden["id"]] = golden
     return goldens
+
+
+def load_thresholds(path: Path) -> dict[str, Any]:
+    thresholds = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return thresholds if isinstance(thresholds, dict) else {}
+
+
+def token_cap(thresholds: dict[str, Any]) -> int:
+    """cost_cap.tokens_per_run. No cap is a refusal, not a pass."""
+    cap = (thresholds.get("cost_cap") or {}).get("tokens_per_run")
+    if not isinstance(cap, int) or isinstance(cap, bool) or cap <= 0:
+        raise Refused(f"thresholds.yaml cost_cap.tokens_per_run must be a positive integer, got {cap!r}")
+    return cap
 
 
 def load_citables(root: Path) -> tuple[set[str], set[str]]:
@@ -154,22 +185,43 @@ def compose_card(raw: dict[str, Any], results: dict[str, dict[str, Any]]) -> dic
     }
 
 
-def load_card(path: Path | None, commit: str) -> dict[str, Any]:
-    if path is None:
-        raise Refused("no baseline card: a number without the baseline is not a delta (F0.2)")
+def read_card(path: Path, name: str) -> dict[str, Any]:
     if not path.is_file():
-        raise Refused(f"no baseline card at {path}")
+        raise Refused(f"no {name} at {path}")
     card = load_json(path)
     if not isinstance(card, dict) or card.get("what") != CARD_WHAT:
         raise Refused(f"{path} is not a baseline card")
     if card.get("scope") != "control":
         raise Refused(f"{path} does not say scope: control")
+    return card
+
+
+def load_card(path: Path | None, commit: str) -> dict[str, Any]:
+    """This run's control card (P6). The envelope names it in control_card_ref from M01."""
+    if path is None:
+        raise Refused("no control card: a number without the baseline is not a delta (F0.2)")
+    card = read_card(path, "control card")
     if card.get("commit") != commit:
         raise Refused(
-            f"baseline card is for {card.get('commit')}, the run is for {commit}: "
+            f"control card is for {card.get('commit')}, the run is for {commit}: "
             "the control is re-run on every scorecard run (P6)"
         )
     return card
+
+
+def load_base(thresholds: dict[str, Any], root: Path = ROOT) -> dict[str, str]:
+    """The card at tag m00, by the hash thresholds.yaml pins (ADR-0004 amendment 2). Returns its ref."""
+    pinned = thresholds.get("baseline_card") or {}
+    path, sha = pinned.get("path"), pinned.get("sha256")
+    if not path or not sha:
+        raise Refused("thresholds.yaml pins no baseline_card: a number without the base is not a delta (F0.2)")
+    card = read_card(root / path, "baseline card")
+    if canonical_sha256(card) != sha:
+        raise Refused(
+            f"the card at {path} is not the base thresholds.yaml pins (sha256 {sha[:8]}): "
+            "a new base is ruled, not built"
+        )
+    return {"path": path, "sha256": sha}
 
 
 # --- checks -----------------------------------------------------------------
@@ -214,6 +266,11 @@ def scope_of(raw: dict[str, Any], card: dict[str, Any]) -> str:
     return "control" if canonical_sha256(raw) == card.get("raw_sha256") else "agent"
 
 
+def f1_4(results: dict[str, dict[str, Any]]) -> str:
+    """fail when any ordinary answer does not cite a row and a clause that exist (SPEC/01 §4)."""
+    return "fail" if any(r["kind"] == "ordinary" and not r["cites"] for r in results.values()) else "pass"
+
+
 def compose_envelope(
     raw: dict[str, Any],
     results: dict[str, dict[str, Any]],
@@ -223,6 +280,11 @@ def compose_envelope(
     plant_ids: list[str],
     checks: dict[str, dict[str, str]],
     tag: str | None,
+    *,
+    control_ref: dict[str, str] | None = None,
+    control_tokens: tuple[int, int] = (0, 0),
+    cap: int | None = None,
+    run_url: str | None = None,
 ) -> dict[str, Any]:
     observations = raw["observations"]
     usage = [o.get("usage", {}) for o in observations]
@@ -233,6 +295,14 @@ def compose_envelope(
     # control is reported and never gated (ADR-0004), so at M00, where every
     # result is the control's, `regressed` is empty by construction.
     gated = scope == "agent"
+    if gated:
+        # F1.4 (SPEC/01 §4): an agent's answer is not a pass unless it cites.
+        # The control is scored as at m00; its card is the base.
+        results = {g: {**r, "pass": r["pass"] and bool(r["cites"])} if r["kind"] in CITING_KINDS else r
+                   for g, r in results.items()}  # fmt: skip
+        if not run_url:
+            raise Refused("checks.F1_4 needs the CI run URL (--run-url)")
+        checks = {**checks, "F1_4": {"status": f1_4(results), "url": run_url}}
     plant_ids = plant_ids if gated else []
     failing = [g for g, r in results.items() if not r["pass"]]
     passed_before = {g for g in failing if replay_history.ever_passed(history, scope, g)}
@@ -244,7 +314,13 @@ def compose_envelope(
         for g, r in results.items()
     }
 
-    if any("error" in o for o in observations):
+    # The run's spend, both subjects: the agent's replies and the control card's
+    # (Threshold Owner, M01 item 22: the cap is for two subjects).
+    tokens_in = sum(u.get("inputTokens", 0) for u in usage) + control_tokens[0]
+    tokens_out = sum(u.get("outputTokens", 0) for u in usage) + control_tokens[1]
+    if cap is not None and tokens_in + tokens_out > cap:
+        verdict = "RED"  # an over-cap run is a recorded RED (Threshold Owner, M01 item 22)
+    elif any("error" in o for o in observations):
         verdict = "UNMEASURED"
     elif (
         regressed
@@ -256,6 +332,7 @@ def compose_envelope(
         # GREEN is the regression bar (P7, R2): nothing got worse. It is not a score.
         verdict = "GREEN"
 
+    one_subject = {"control_card_ref": control_ref, "tokens_in": tokens_in}
     return {
         "commit": raw["commit"],
         "tag": tag,
@@ -265,6 +342,7 @@ def compose_envelope(
         "corpus_fingerprint": None,
         "cache_state": "disabled",
         "baseline_card_ref": card_ref,
+        **one_subject,
         "goldens": results,
         "regressed": regressed,
         "fragile": [],
@@ -273,7 +351,7 @@ def compose_envelope(
         "plants_fired": plants_fired,
         "guardrail_hits": sum(o.get("stop_reason") == "guardrail_intervened" for o in observations),
         "p95_ms": p95([o["latency_ms"] for o in observations if "latency_ms" in o]),
-        "tokens_out": sum(u.get("outputTokens", 0) for u in usage),
+        "tokens_out": tokens_out,
         "cost_usd": None,
         "rejected_over_ceiling": None,
         "alarm_latency_s": None,
@@ -318,7 +396,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("what", choices=["card", "envelope"])
     parser.add_argument("--raw", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--baseline-card", type=Path)  # not `required`: refusing is build's job
+    parser.add_argument("--control-card", type=Path)  # not `required`: refusing is build's job
+    parser.add_argument("--thresholds", type=Path, default=THRESHOLDS)
     parser.add_argument("--goldens", type=Path, default=ROOT / "evals" / "goldens" / "v1")
     parser.add_argument("--history-dir", type=Path, default=HISTORY)
     parser.add_argument("--check-junit", nargs=3, action="append", default=[],
@@ -339,20 +418,36 @@ def main(argv: list[str] | None = None) -> int:
         if args.what == "card":
             emit(compose_card(raw, results), args.out, envelope=False)
         else:
-            card = load_card(args.baseline_card, raw["commit"])
+            control = load_card(args.control_card, raw["commit"])
+            control_ref = {"path": ref_path(args.control_card), "sha256": canonical_sha256(control)}
+            thresholds = load_thresholds(args.thresholds)
+            cap = token_cap(thresholds)
             checks = {i: check_from_junit(Path(p), m, args.run_url) for i, m, p in args.check_junit}
             checks |= {i: check_from_pr(Path(p)) for i, p in args.check_pr}
             kinds = {g: golden["kind"] for g, golden in goldens.items()}
-            envelope = compose_envelope(
-                raw,
-                results,
-                scope_of(raw, card),
-                {"path": ref_path(args.baseline_card), "sha256": canonical_sha256(card)},
-                replay_history.load(args.history_dir, exclude_commit=raw["commit"]),
-                plants.plant_ids(kinds, ROOT),
-                checks,
-                git_tag(raw["commit"]),
-            )
+            history = replay_history.load(args.history_dir, exclude_commit=raw["commit"])
+            if scope_of(raw, control) == "control":
+                # No agent ran: the control is the subject, in M00's form (ADR-0004
+                # amendment 2, ruling A). Its own card is the base; no control_card_ref.
+                envelope = compose_envelope(
+                    raw, results, "control", control_ref, history, plants.plant_ids(kinds, ROOT),
+                    checks, git_tag(raw["commit"]), cap=cap,
+                )  # fmt: skip
+            else:
+                envelope = compose_envelope(
+                    raw,
+                    results,
+                    "agent",
+                    load_base(thresholds),
+                    history,
+                    plants.plant_ids(kinds, ROOT),
+                    checks,
+                    git_tag(raw["commit"]),
+                    control_ref=control_ref,
+                    control_tokens=(control.get("tokens_in", 0), control.get("tokens_out", 0)),
+                    cap=cap,
+                    run_url=args.run_url,
+                )
             emit(envelope, args.out, envelope=True)
     except Refused as refusal:
         print(f"REFUSED: {refusal}", file=sys.stderr)

@@ -1,13 +1,15 @@
-"""The M00 PR 1 checks (SPEC/00 §5 `validate`, ADR-0001 amendment 1 item 22).
+"""`make validate` (SPEC/00 §5). Each check returns a list of error strings; empty means it passed.
 
-Golden front matter, ruling front matter, and that every ordinary and trap
-golden cites a rights-table row and a clause that exist. Each check returns
-a list of error strings; empty means it passed.
+M00 PR 1 (ADR-0001 amendment 1 item 22): golden front matter, ruling front
+matter, and that every ordinary and trap golden cites a rights-table row and
+a clause that exist. M01 PR 1 (Security, M01 open item 29): the workflow
+file hash.
 """
 
 from __future__ import annotations
 
 import glob
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -165,8 +167,51 @@ def check_rulings(root: Path) -> list[str]:
     return errors
 
 
+WORKFLOW_HASHES = "infra/workflows.sha256"
+HASH_LINE = re.compile(r"^([0-9a-f]{64})  (\.github/workflows/[^/]+)$")
+
+
+def file_sha256(path: Path) -> str:
+    """sha256 of the file with LF line endings: a CRLF working copy hashes as the repo does."""
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def check_workflow_hashes(root: Path) -> list[str]:
+    """Every workflow is listed in infra/workflows.sha256 with its hash, and nothing else is.
+
+    What this does not do until M02: a PR that edits a workflow can edit this
+    file too (infra/ruleset/README.md).
+    """
+    listing = root / WORKFLOW_HASHES
+    if not listing.is_file():
+        return [f"{WORKFLOW_HASHES}: missing"]
+    listed: dict[str, str] = {}
+    errors = []
+    for number, line in enumerate(listing.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        if not (match := HASH_LINE.match(line)):
+            errors.append(f"{WORKFLOW_HASHES}:{number}: not '<sha256>  .github/workflows/<file>'")
+            continue
+        listed[match[2]] = match[1]
+    present = {
+        p.relative_to(root).as_posix()
+        for p in (root / ".github" / "workflows").glob("*")
+        if p.is_file()
+    }
+    errors += [f"{rel}: a workflow file not listed in {WORKFLOW_HASHES}" for rel in sorted(present - set(listed))]
+    errors += [f"{rel}: listed in {WORKFLOW_HASHES} and not in the tree" for rel in sorted(set(listed) - present)]
+    errors += [
+        f"{rel}: sha256 {file_sha256(root / rel)[:12]} is not the {listed[rel][:12]} listed in {WORKFLOW_HASHES}"
+        for rel in sorted(present & set(listed))
+        if file_sha256(root / rel) != listed[rel]
+    ]
+    return errors
+
+
 CHECKS = {
     "golden front matter": check_goldens,
     "golden citations exist in data/": check_golden_citations,
     "ruling front matter": check_rulings,
+    "workflow-hash": check_workflow_hashes,
 }

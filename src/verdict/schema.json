@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "verdict.schema.json",
-  "title": "Envelope (SPEC/00 section 6 as amended by ADR-0004: checks, and scope on each result)",
+  "title": "Envelope (SPEC/00 section 6 as amended by ADR-0004: checks, and scope on each result; amendment 2: control_card_ref, tokens_in)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -29,31 +29,62 @@
     "verdict"
   ],
   "properties": {
-    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-    "tag": {"type": ["string", "null"]},
-    "model_id": {"type": "string", "minLength": 1},
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "tag": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "guardrail_version": {
       "description": "null until a guardrail exists (M03).",
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "judge_model_id": {
       "description": "null until the judge is picked (M03).",
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "corpus_fingerprint": {
       "description": "null until the corpus exists (M01). M03 makes null a failure (F3.4).",
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
-    "cache_state": {"enum": ["bypass", "disabled", "uncacheable"]},
+    "cache_state": {
+      "enum": [
+        "bypass",
+        "disabled",
+        "uncacheable"
+      ]
+    },
     "baseline_card_ref": {
-      "description": "The baseline card this run is a delta against. Required: F0.2.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "sha256"],
-      "properties": {
-        "path": {"type": "string", "minLength": 1},
-        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
-      }
+      "description": "The base this run is a delta against. Required: F0.2. From M01 (ADR-0004 amendment 2), on an agent envelope, the card at tag m00 whose hash is thresholds.yaml baseline_card.sha256.",
+      "$ref": "#/$defs/card_ref"
+    },
+    "control_card_ref": {
+      "description": "This run's control card, <commit>.baseline-card.json (P6). From M01 (ADR-0004 amendment 2). Not required, so M00's envelopes still validate; verdict.gate rejects an agent envelope without it.",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/card_ref"
+        }
+      ]
     },
     "goldens": {
       "type": "object",
@@ -63,44 +94,105 @@
         "^g-[0-9]{3}$": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "scope", "score", "cites", "pass"],
+          "required": [
+            "kind",
+            "scope",
+            "score",
+            "cites",
+            "pass"
+          ],
           "properties": {
-            "kind": {"enum": ["ordinary", "trap", "guardrail", "redteam"]},
+            "kind": {
+              "enum": [
+                "ordinary",
+                "trap",
+                "guardrail",
+                "redteam"
+              ]
+            },
             "scope": {
               "description": "control: the baseline's own reply, reported and never gated. agent: the agent under test, which the regression bar reads. No third value until a milestone needs one (ADR-0004).",
-              "enum": ["control", "agent"]
+              "enum": [
+                "control",
+                "agent"
+              ]
             },
-            "score": {"type": "boolean"},
+            "score": {
+              "type": "boolean"
+            },
             "cites": {
               "description": "Row and clause present and existing. null for guardrail and redteam.",
-              "type": ["boolean", "null"]
+              "type": [
+                "boolean",
+                "null"
+              ]
             },
-            "pass": {"type": "boolean"}
+            "pass": {
+              "type": "boolean"
+            }
           }
         }
       }
     },
-    "regressed": {"$ref": "#/$defs/golden_ids"},
-    "fragile": {"$ref": "#/$defs/golden_ids"},
-    "never_passed": {"$ref": "#/$defs/golden_ids"},
-    "plants_expected": {"type": "integer", "minimum": 0},
-    "plants_fired": {"type": "integer", "minimum": 0},
-    "guardrail_hits": {"type": "integer", "minimum": 0},
-    "p95_ms": {"type": ["integer", "null"], "minimum": 0},
-    "tokens_out": {"type": "integer", "minimum": 0},
+    "regressed": {
+      "$ref": "#/$defs/golden_ids"
+    },
+    "fragile": {
+      "$ref": "#/$defs/golden_ids"
+    },
+    "never_passed": {
+      "$ref": "#/$defs/golden_ids"
+    },
+    "plants_expected": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "plants_fired": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "guardrail_hits": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "p95_ms": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "tokens_in": {
+      "description": "From M01 (ADR-0004 amendment 2). tokens_in + tokens_out over thresholds.yaml cost_cap.tokens_per_run is RED. Not required, so M00's envelopes still validate; verdict.gate rejects an agent envelope without it.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "tokens_out": {
+      "type": "integer",
+      "minimum": 0
+    },
     "cost_usd": {
       "description": "null at M00: no seat owns a price table yet. The cap is in tokens.",
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0
     },
     "rejected_over_ceiling": {
       "description": "null until ceilings exist (M01).",
-      "type": ["integer", "null"],
+      "type": [
+        "integer",
+        "null"
+      ],
       "minimum": 0
     },
     "alarm_latency_s": {
       "description": "null until the security account exists (M05).",
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0
     },
     "checks": {
@@ -111,21 +203,59 @@
         "^F[0-9]+_[0-9]+$": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["status", "url"],
+          "required": [
+            "status",
+            "url"
+          ],
           "properties": {
-            "status": {"enum": ["pass", "fail"]},
-            "url": {"type": "string", "pattern": "^https://"}
+            "status": {
+              "enum": [
+                "pass",
+                "fail"
+              ]
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https://"
+            }
           }
         }
       }
     },
-    "verdict": {"enum": ["GREEN", "RED", "UNMEASURED"]}
+    "verdict": {
+      "enum": [
+        "GREEN",
+        "RED",
+        "UNMEASURED"
+      ]
+    }
   },
   "$defs": {
+    "card_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
     "golden_ids": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"type": "string", "pattern": "^g-[0-9]{3}$"}
+      "items": {
+        "type": "string",
+        "pattern": "^g-[0-9]{3}$"
+      }
     }
   }
 }

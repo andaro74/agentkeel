@@ -4,12 +4,16 @@ Status: DRAFT · Owner: Product seat · Rulings R1–R11 recorded at open ·
 N (detection bar) = 10 minutes (R10) · Adopted by ADR-0001, which carries
 amendment 1 (the rulings applied at adoption) and amendment 2 (seats for
 paths §5 did not list; the cold reviewer drafts, M00 PR 1) · Amended by
-ADR-0003 (remaining path ownership; F0.1 is a finding, M00 PR 1) and
+ADR-0003 (remaining path ownership; F0.1 is a finding, M00 PR 1; with
+amendment 1: the paths M01 adds, M01 PR 1) and
 ADR-0004 (measurement fields: `checks`, `scope`, cost-cap in
 `thresholds.yaml`; the control is never gated; M00 PR 2, with amendment 1:
-merge commits, and which card a later envelope points at; M00 PR 3) ·
+merge commits, and which card a later envelope points at; M00 PR 3; and
+amendment 2: one subject per envelope, `control_card_ref`, `tokens_in`,
+F1.4, over the cap is RED; M01 PR 1) ·
 ADR-0002 (the baseline is frozen at tag `m00`; M00 PR 3) · ADR-0005
-(the milestone video is recorded at the tag; M00 PR 3)
+(the milestone video is recorded at the tag; M00 PR 3; with amendment 1:
+it is committed in the next milestone's PR 1; M01 PR 1)
 
 ## 1. What this is
 
@@ -92,12 +96,12 @@ P11. **Only CI-written envelopes are evidence.** A local run
 | Seat | Owns the truth about | Owned paths | May not |
 |---|---|---|---|
 | Product | what to build, when it's acceptable | `SPEC/**`, `milestones/**`, `CLAUDE.md`, `.claude/skills/**`, `docs/**`, `README.md`, `LICENSE` | define correctness; merge code |
-| Rule Owner | what the agent may say and do | `rules/**`, guardrail id/version in manifest | edit goldens; write product code |
+| Rule Owner | what the agent may say and do | `rules/**` and `agents/*/rules/**`, guardrail id/version in manifest | edit goldens; write product code |
 | Data Owner | what CORRECT means | `evals/goldens/**`, `data/**` (slate, rights table, clause index, corpus), rulings on FRAGILE, corpus admission | weaken a golden to green a build |
-| Tool Owner | tool and edge contracts | `tools/**` schemas, `may_call`, `may_be_called_by` | change a schema without a major bump |
+| Tool Owner | tool and edge contracts | `tools/**` and `agents/*/tools/**` schemas, `may_call`, `may_be_called_by` | change a schema without a major bump |
 | Threshold Owner | the bars, and which models are measured | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region (A-vs-A compares the pair) | move a bar without two keys |
-| Security | what tooling and infra MAY DO | platform repo: workflows, construct, bootstrap stack, KMS key policy, cosign identity, security account | define scope |
-| Engineering | that it works | `src/**`, `scripts/**`, `Makefile`, root config (`pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`), `tests/**`, `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | self-approve any of the above |
+| Security | what tooling and infra MAY DO | platform repo: workflows, construct (`infra/construct/**`), bootstrap stack (`infra/bootstrap/**`), the rest of `infra/**`, KMS key policy, cosign identity, security account; seats → groups in a manifest | define scope |
+| Engineering | that it works | `src/**`, `scripts/**`, `Makefile`, root config (`pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`, `.gitattributes`), `tests/**`, `agents/<name>/**` but for the fields and folders other seats own (ADR-0003 amendment 1), `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | self-approve any of the above |
 | (the seat named in its front matter) | its own routing | `.claude/agents/<name>.md` | rule; write to any seat-owned path |
 
 Ownership notes:
@@ -107,7 +111,10 @@ Ownership notes:
 - Model ids for every role (baseline, model under test, swap candidates,
   deprecation plant, judge candidates) are pinned by the Threshold Owner
   at the top of `milestones/M00/README.md` until the manifest exists at
-  M01, then in the manifest.
+  M01, then in the manifest: `agents/refagent/manifest.yaml`, from M01
+  PR 1. The M00 table stays as the record at tag `m00`.
+- A manifest has several owners, one per field (§6). A diff to it names
+  the seat of every field it changes (ADR-0003 amendment 1).
 - Every file on `main` has a seat. A file no seat owns is deleted, not
   adopted; an unowned file is a path with no seat.
 - `seat:` is the front matter field that names the owning seat, in
@@ -217,9 +224,13 @@ by hand; M00 itself opens and closes without them.
 - **Bundle**: manifest + prompt + tools + rules, built and cosign-signed in
   CI (keyless, GitHub OIDC). Runtime refuses an unsigned or mismatched
   digest.
-- **Envelope** (`verdict.schema.json`, `additionalProperties: false`):
+- **Envelope** (`verdict.schema.json` — the schema's `$id`; the file is
+  `src/verdict/schema.json`; `additionalProperties: false`):
   commit, tag, model id, guardrail version, judge model id, corpus
-  fingerprint, cache state, baseline card ref, per-golden
+  fingerprint, cache state, baseline card ref, control card ref and
+  tokens in (from M01, ADR-0004 amendment 2: one subject per envelope,
+  the agent; the control is its card; the base is the card at tag `m00`),
+  per-golden
   kind/scope/score/cites/pass (`scope` ∈ {control, agent}, ADR-0004),
   regressed[], fragile[], never_passed[], plants_expected, plants_fired,
   guardrail_hits, p95_ms, tokens_out, cost_usd, rejected_over_ceiling,
@@ -676,8 +687,12 @@ not check recordings.
   after the merge and after `git tag mNN`, and committed with that tag in
   its `docs/video/README.md` entry; until then the page's Watch line
   reads "pending, tag `mNN`" and the outstanding video is carried into
-  the next milestone's `open.md` with a seat and a date (ADR-0005). A
-  milestone is not finished until its video is committed.
+  the next milestone's `open.md` with a seat and a date (ADR-0005). From
+  M01 the video is committed in the next milestone's PR 1, never in a PR
+  of its own milestone; M00 PR 4 was the one exception and spent M00's
+  cap (ADR-0005 amendment 1). M08, which has no next milestone, rules its
+  own at M08 open. A milestone is not finished until its video is
+  committed.
 
 ## 11. Rulings recorded in this SPEC
 

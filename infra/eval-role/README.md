@@ -1,7 +1,9 @@
 # infra/eval-role
 
 Security seat. Ruling on report 2.3 (M00 PR 2): the CI credential path
-for `make evals` at M00.
+for `make evals` at M00. Changed at M01 PR 1 (`milestones/M01/rulings/pr1.md`,
+open items 12, 14, 18, 20, 28, 32, 33, 34, 35). M01 PR 2's bootstrap stack
+absorbs this role under a new name; this stack is deleted after PR 2 merges.
 
 One IAM role, `agentkeel-m00-evals`.
 
@@ -20,8 +22,10 @@ One IAM role, `agentkeel-m00-evals`.
   changed back. It fails closed both ways.
 - **Which workflow:** the trust policy requires `job_workflow_ref` to be
   `andaro74/agentkeel/.github/workflows/evals.yml` at
-  `refs/pull/<n>/merge` or `refs/heads/main` (`StringLike`; the `*` is
-  the PR number). It is aimed at a second workflow file reusing the role.
+  `refs/pull/*/merge` or `refs/heads/main` (`StringLike`). `*` matches the
+  PR number and anything else, including `/`; the pattern is bounded by
+  what GitHub issues, not by the pattern. It is aimed at a second workflow
+  file reusing the role.
   A PR that edits `evals.yml` itself still matches: on `pull_request`
   the workflow is the PR's own copy. **Observed on 2026-09-19**, in the
   M00 close PR's own run
@@ -33,19 +37,35 @@ One IAM role, `agentkeel-m00-evals`.
   and the assume succeeded. So the claim is issued in the classic form
   for `job_workflow_ref` while `sub` is the immutable one, the pinned
   pattern matches it, and STS evaluates it. **Still not observed:** a
-  second workflow file being refused. If the claim is ever absent or
-  differs, every assume is refused: it fails closed.
+  second workflow file being refused. Carried to M01 PR 2, Security. If
+  the claim is ever absent or differs, every assume is refused: it fails
+  closed.
 - **What it can do:** `bedrock:InvokeModel` and
   `bedrock:InvokeModelWithResponseStream` on the inference profiles the
   current milestone calls, and on the foundation models those profiles
   route to (us-east-1, us-east-2, us-west-2) only when the call comes
-  through one of those profiles. **At M00 that is one profile:
-  `us.amazon.nova-micro-v1:0`.** Each milestone's PR 1 adds the ARNs that
-  milestone calls, to `MODELS` in `app.py`, with a Security ruling.
+  through one of those profiles. **At M01 that is two profiles:
+  `us.amazon.nova-micro-v1:0` (the control) and
+  `us.anthropic.claude-sonnet-5` (refagent, item 14).** Both route to the
+  same three regions (`aws bedrock get-inference-profile`, 2026-09-18 and
+  2026-09-19). Each milestone's PR 1 adds the ARNs that milestone calls,
+  to `MODELS` in `app.py`, with a Security ruling. **The human redeploys
+  with admin after M01 PR 1 opens and before PR 2's first run**; until
+  then the deployed role allows Nova Micro only.
 - **What it cannot do:** anything else. No S3, no IAM, no logs, no
-  `sts:AssumeRole`.
+  `sts:AssumeRole`. From M01 PR 1 that is also an explicit `Deny`
+  statement, `DenyEscalationAndEvidenceDeletion`, on five actions:
+  `iam:*`, `sts:AssumeRole`, `logs:Delete*`, `bedrock:*Guardrail*` and
+  `s3:PutBucketPolicy`, resource `*` (item 33; the fifth by Security
+  ruling D at M01 PR 1). It is meant to hold if a later change attaches a policy
+  that allows one of them, which matters because the role has no
+  permission boundary until M01 PR 2. **Written, not deployed, not
+  observed** at M01 PR 1: it deploys with item 14's redeploy, and no
+  refused call on a denied action has been recorded.
 
 ## Finding S-1 (Security, M00 PR 2)
+
+Signed: Security, 2026-09-19, on run 35412277571
 
 The first deploy allowed all six pinned models, to any workflow, from
 any PR branch, for up to an hour, with `cost-cap` reading only what the
@@ -76,18 +96,22 @@ Between the `9407615` measurement and the redeploy no run assumed
 anything: the two `evals` runs in that window took the "already
 measured" path. So the narrowed role has exactly one run behind it, and
 that run is the whole of the evidence that STS enforces it. The record
-is in `milestones/M00/rulings/pr3.md`. Security signs S-1 at M01, on
-that observation, not on the deploy (`milestones/M01/open.md`, item 12).
+is in `milestones/M00/rulings/pr3.md`. Security signed S-1 at M01 PR 1, on
+that observation, not on the deploy (`milestones/M01/open.md`, item 12;
+`milestones/M01/rulings/pr1.md`).
 
 Not fixed here:
 
 - **`MaxSessionDuration` stays 3600.** The ruling asked for 900. IAM's
   floor is one hour and CDK refuses less at synth (`must be >= 3600sec`).
   `evals.yml` asks for 900 seconds; a step that mints its own token can
-  ask for 3600.
-- **Spend is not enforced outside the runner.** A Budgets alarm per
-  inference profile that disables the role is M01's bootstrap stack.
-  Carried to SPEC/01.
+  ask for 3600. Closed at M01 (item 19): 3600 stands, and the Budgets
+  action of item 13 compensates. No step assumes the role with a token of
+  its own; the diagnostic step requests one and prints its claims (Security
+  ruling C, M01 PR 1). The step stays.
+- **Spend is not enforced outside the runner.** A Budgets action on this
+  role at `daily_usd: 10` (the Threshold Owner's number) is M01 PR 2's
+  bootstrap stack (SPEC/01 §6).
 
 ## Deploy (with admin; again whenever `app.py` changes)
 
@@ -109,22 +133,31 @@ gh variable set AWS_EVAL_ROLE_ARN --body "$(aws cloudformation describe-stacks \
 
 ## What is not here
 
-- No permission boundary. The boundary is M01's bootstrap stack, which
-  absorbs this role. Delete this stack then.
-- A pull request from any branch of this repo can assume the role and
-  spend tokens. `cost-cap` (`thresholds.yaml`) reads the spend after the
-  run, and only the spend the PR's own runner wrote down. `make evals` as
-  written makes 15 calls at 512 output tokens each, on Nova Micro. That
-  is not the worst case. Any step of `evals.yml` that runs PR code can
-  mint its own OIDC token, assume the role for up to one hour, and invoke
-  Nova Micro at the account's quota. A Budgets alarm on Bedrock would be
-  the observation; there is none until M01.
+- No permission boundary (item 28). The boundary is M01 PR 2's bootstrap
+  stack, which absorbs this role. Until then the Deny statement above is
+  the only thing that holds against a later attach.
+- **Spend: unbounded at the account quota until PR 2** (item 34). That is
+  the worst-case figure, and it has no smaller number until the Budgets
+  action exists. A pull request from any branch of this repo can assume
+  the role and spend tokens. `cost-cap` (`thresholds.yaml`) reads the
+  spend after the run, and only the spend the PR's own runner wrote down;
+  from M01 an over-cap run is a recorded RED, not a missing file. Any
+  step of `evals.yml` that runs PR code can mint its own OIDC token,
+  assume the role for up to one hour, and invoke either pinned profile at
+  the account's quota. The Budgets action of M01 PR 2 is the first thing
+  that bounds it, and Budgets data lags by hours.
 - Not observed yet: a direct call to a foundation model, and a call
-  through an unpinned profile, both being denied. Two `AccessDenied`
-  results from the deployed role would show it.
-- `agentkeel-m00-evals` is a fixed name. An M01 stack that reuses it will
-  collide until this stack is deleted.
-- cdk-nag (`AwsSolutionsChecks`) runs on synth. Zero findings, zero
-  suppressions on 2026-09-18, cdk-nag 2.38.2. cdk-nag 3.0.2 fails to
-  load as a Python aspect (`aspect.visit is not a function`), so the
-  group pins `<3`.
+  through an unpinned profile, both being denied (item 18). Two
+  `AccessDenied` results from the deployed role would show it. A step in
+  `evals.yml` at M01 PR 2.
+- `agentkeel-m00-evals` is a fixed name (item 20). M01 PR 2's bootstrap
+  stack makes the eval role under a new name, `AWS_EVAL_ROLE_ARN` is
+  pointed at it, and this stack is deleted after PR 2 merges (human).
+- cdk-nag (`AwsSolutionsChecks`) runs on synth. **Zero findings, zero
+  suppressions on 2026-09-19**, cdk-nag 2.38.2, aws-cdk-lib 2.270.0, on
+  `app.py` as of M01 PR 1 (two profiles, the five-action Deny statement). The report
+  that synth wrote is committed beside this file,
+  `AwsSolutions--AgentkeelM00EvalRole-NagReport.csv` (item 32). Nothing
+  in CI re-runs it until cdk-nag joins `validate` at M01 PR 2, which needs
+  node and the CDK CLI in CI. cdk-nag 3.0.2 fails to load as a Python
+  aspect (`aspect.visit is not a function`), so the group pins `<3`.

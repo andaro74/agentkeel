@@ -2,8 +2,10 @@
 
 One IAM role that GitHub Actions in andaro74/agentkeel assumes over OIDC to
 run `make evals`. It may invoke the models the current milestone calls,
-through their inference profiles, and nothing else. At M00 that is one: the
-baseline. It has no S3, no IAM, no logs.
+through their inference profiles, and nothing else. At M00 that was one: the
+baseline. M01 PR 1 adds refagent's (Security, M01 open item 14). It has no
+S3, no IAM, no logs, and from M01 PR 1 an explicit Deny on escalation and on
+evidence deletion (item 33).
 
 Finding S-1 (Security, M00 PR 2): the first version allowed all six pinned
 models to any workflow on any PR branch. Each milestone's PR 1 now adds the
@@ -40,25 +42,33 @@ ROLE_NAME = "agentkeel-m00-evals"
 # Security ruling: M01 adds refagent's, M04 the swap candidates'.
 MODELS = [
     "amazon.nova-micro-v1:0",  # baseline (M00)
+    "anthropic.claude-sonnet-5",  # refagent, model under test (M01 PR 1, item 14)
 ]
-# Where the `us.` profile routes, from `aws bedrock get-inference-profile`
-# in us-west-2 on 2026-09-18. A profile call is authorised on the profile and
-# on the foundation model in whichever of these serves it.
+# Where the `us.` profiles route, from `aws bedrock get-inference-profile`
+# in us-west-2: Nova Micro on 2026-09-18, Sonnet 5 on 2026-09-19, the same
+# three regions for both. A profile call is authorised on the profile and on
+# the foundation model in whichever of these serves it.
 PROFILE_REGIONS = ["us-east-1", "us-east-2", "us-west-2"]
 
 # The one workflow the trust policy names (Finding S-1), at the two refs it
 # runs from: a PR's merge ref, and main. The ref is spelled out so that a file
 # called `evals.yml@x.yml`, or a reusable call to another branch's evals.yml,
-# does not match; `*` stands only for the PR number. This is aimed at a second
-# workflow file reusing the role. It does not stop a PR that edits evals.yml:
-# on `pull_request` the workflow is the PR's own copy, and nothing gates that
-# edit until M02. Not observed yet: see the README.
+# does not match. `*` matches the PR number and anything else, including `/`;
+# the pattern is bounded by what GitHub issues, not by the pattern. This is
+# aimed at a second workflow file reusing the role. It does not stop a PR that
+# edits evals.yml: on `pull_request` the workflow is the PR's own copy, and
+# nothing gates that edit until M02. A second workflow being refused is not
+# observed yet: see the README.
 WORKFLOWS = [
     f"{REPO}/.github/workflows/evals.yml@refs/pull/*/merge",
     f"{REPO}/.github/workflows/evals.yml@refs/heads/main",
 ]
 
 INVOKE = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+# Item 33 (Security, M01 PR 1; s3:PutBucketPolicy added by ruling D). The role's own policy grants none of these;
+# the Deny holds if a later change attaches something that does, until the
+# bootstrap stack's permission boundary lands (M01 PR 2).
+DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy"]
 
 
 class EvalRoleStack(cdk.Stack):
@@ -120,6 +130,15 @@ class EvalRoleStack(cdk.Stack):
                     for region in PROFILE_REGIONS
                 ],
                 conditions={"StringEquals": {"bedrock:InferenceProfileArn": profiles}},
+            )
+        )
+
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="DenyEscalationAndEvidenceDeletion",
+                effect=iam.Effect.DENY,
+                actions=DENY,
+                resources=["*"],
             )
         )
 

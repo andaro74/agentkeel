@@ -2,11 +2,32 @@
 # Each bar says which direction relaxes it.
 # Opened at M00 PR 2 by ruling of the Threshold Owner: R3-5 in
 # milestones/M00/feasibility.md §2, carried by milestones/M00/rulings/pr2.md.
-# It holds one bar.
+# Changed at M01 PR 1 with two keys: Threshold Owner in
+# milestones/M01/rulings/pr1-threshold-owner.md, Engineering in
+# milestones/M01/rulings/pr1.md (ruling B; M01 open items 5, 22, 23).
 
 # cost-cap: total tokens, in plus out, for one `make evals` run.
 # A budget, not a quality bar. Relaxes upward: a higher number needs two keys.
-# The PR 1 plant run spent 5,662. The worst case at M00 is about 11,500:
-# 15 calls, 512 output tokens each, about 3,600 tokens in.
+# At M00 it was 20000 for one subject: the PR 1 plant run spent 5,662, the
+# worst case about 11,500. From M01 a run has two subjects. The control is
+# about 6,000. refagent on Sonnet 5, with retrieval and one tool, is not
+# measured yet; PR 2's run writes the number, and the Threshold Owner rules
+# the cap again against it. The envelope's tokens_in and tokens_out are the
+# run's: both subjects when an agent ran, the control's when none did. An
+# envelope over the cap is written RED by verdict.build and read RED by
+# verdict.gate (item 22), whichever its subject.
 cost_cap:
-  tokens_per_run: 20000
+  tokens_per_run: 150000
+
+# The base every later number is a delta against: the baseline card at tag
+# m00, the one row 0 cites (evals/history/9407615….json), not the last card
+# on the tagged tree (55dadb2). verdict.build refuses a card with another
+# hash, and verdict.gate rejects an envelope that names one (ADR-0004
+# amendment 2). The hash is of the card's content (canonical_sha256).
+#
+# The card's `region` is the request region: the inference profile ARN's,
+# us-west-2. Converse does not return the region that served the call, and
+# it is not recorded (Threshold Owner with Security, item 23).
+baseline_card:
+  path: evals/history/9407615dcde09308490f6699c21a18100bfedcd2.baseline-card.json
+  sha256: b0219756cad63be67fb51aa4632dd015084840833341f15235fab4569adc3295

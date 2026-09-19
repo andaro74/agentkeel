@@ -76,12 +76,97 @@ def test_an_agent_cannot_call_itself_the_control(chain):
     """Relabel a regressed agent result as control to get out from under the bar: rejected."""
     envelope_path, _, _ = chain(right={"g-001"}, agent=True)
     envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
-    assert envelope["goldens"]["g-001"] == {"kind": "ordinary", "scope": "agent", "score": True, "cites": False, "pass": True}
+    assert envelope["goldens"]["g-001"] == {"kind": "ordinary", "scope": "agent", "score": True, "cites": True, "pass": True}
     for result in envelope["goldens"].values():
         result["scope"] = "control"
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
-    with pytest.raises(gate.Rejected, match="g-001 says scope control and differs from the baseline card"):
+    with pytest.raises(gate.Rejected, match="a control envelope's base is its own card"):
         gate.read(envelope_path)
+    # and without the M01 fields, it is an M00 envelope whose base is another commit's card
+    for field in ("control_card_ref", "tokens_in"):
+        del envelope[field]
+    envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(gate.Rejected, match="claim 1 is read on an agent envelope only"):
+        gate.read(envelope_path)
+    del envelope["checks"]["F1_4"]  # and without its claim-1 check, its base is another commit's card
+    envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(gate.Rejected, match="baseline card is for 9407615"):
+        gate.read(envelope_path)
+
+
+def test_a_control_envelope_carries_no_claim_1_check(chain):
+    """Cold review F4: with no agent under test, an envelope says nothing about claim 1."""
+    envelope_path, _, _ = chain()
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    envelope["checks"]["F1_1"] = {"status": "pass", "url": URL}
+    envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(gate.Rejected, match="claim 1 is read on an agent envelope only"):
+        gate.read(envelope_path)
+
+
+def test_one_subject_per_envelope(chain):
+    envelope_path, _, _ = chain(agent=True)
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    envelope["goldens"]["g-001"]["scope"] = "control"
+    envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(gate.Rejected, match="one subject"):
+        gate.read(envelope_path)
+
+
+@pytest.mark.parametrize("field", ["control_card_ref", "tokens_in"])
+def test_an_agent_envelope_needs_both_m01_fields(chain, field):
+    """Not required by the schema, so M00's envelopes validate; required of an agent envelope by the gate."""
+    envelope_path, _, _ = chain(agent=True)
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    del envelope[field]
+    assert gate.schema_errors(envelope) == []
+    envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(gate.Rejected, match=f"without {field}"):
+        gate.read(envelope_path)
+
+
+def test_an_agent_envelope_on_another_base_is_rejected(chain):
+    envelope_path, card_path, _ = chain(agent=True)
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    envelope["baseline_card_ref"] = envelope["control_card_ref"]  # this run's card as the base: the base moves
+    envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(gate.Rejected, match="not the card at tag m00"):
+        gate.read(envelope_path)
+
+
+def test_an_altered_control_card_is_rejected(chain):
+    envelope_path, card_path, _ = chain(agent=True)
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    card_path.write_text(json.dumps({**card, "tokens_out": 1}), encoding="utf-8")
+    with pytest.raises(gate.Rejected, match="control_card_ref .* is not the one the envelope names"):
+        gate.read(envelope_path)
+
+
+def test_the_gate_reads_f1_4_for_itself(chain):
+    """P5: build wrote pass and checks.F1_4; the gate works both out again from score and cites."""
+    envelope_path, _, _ = chain(right={"g-001"}, agent=True)
+    assert gate.rule(envelope_path, envelope_path.parent / "none")[0] == "GREEN"
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    assert envelope["checks"]["F1_4"]["status"] == "pass"
+
+    envelope["goldens"]["g-001"]["cites"] = False  # an uncited answer that build called a pass
+    verdict, reasons = gate.judge(envelope, KINDS, {}, [])
+    assert verdict == "RED"
+    assert "g-001: pass is not score and cites (F1.4)" in reasons
+    assert "envelope says F1_4 is pass, the gate reads fail" in reasons
+
+    del envelope["checks"]["F1_4"]
+    assert "checks.F1_4 is missing from an agent envelope" in gate.judge(envelope, KINDS, {}, [])[1]
+
+
+def test_over_the_cap_is_red_in_the_gate_too(chain):
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    assert gate.judge(envelope, KINDS, {}, [], cap=9000) == ("GREEN", [])
+    verdict, reasons = gate.judge(envelope, KINDS, {}, [], cap=8999)
+    assert verdict == "RED"
+    assert "cost-cap: 9000 over 8999" in reasons
+    assert "build said GREEN, the gate says RED" in reasons
 
 
 def test_a_card_that_is_not_the_control_is_rejected(chain):
@@ -165,8 +250,9 @@ def test_measured_is_what_the_ledger_cell_must_say(chain):
         f"plants 0/0; GREEN; envelope `{'a' * 40}`"
     )
     envelope_path, _, _ = chain(right={"g-001"}, agent=True)
-    assert gate.measured_at(envelope_path, envelope_path.parent).startswith(
-        "agent: traps 0/3; ordinary 1/9; guardrail 0/3; never_passed 14; "
+    assert gate.measured_at(envelope_path, envelope_path.parent) == (
+        "agent: traps 0/3; ordinary 1/9; guardrail 0/3; control: traps 0/3; ordinary 0/9; guardrail 0/3; "
+        f"never_passed 14; regressed 0; plants 0/0; F1_4 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
     )
 
 

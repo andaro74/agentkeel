@@ -77,7 +77,7 @@ in its front matter, so this file is what lets the PR merge.
 ```yaml
 ---
 ruling: <slug>
-seat: [<every seat whose paths are in authorises>]
+seat: <one seat (from M01 PR 1); name the seat per path in the body>
 authorises:
   - <every path this PR changes, grouped by seat, with the ruling per group>
 evidence:
@@ -86,6 +86,14 @@ evidence:
 pr: <number>
 ---
 ```
+
+**Two keys, two files** (Product with the Threshold Owner, M01 PR 1). A
+ruling file has one seat in `seat:`. A two-key change cites two ruling
+files, each with one seat, both with the same `pr:`. The file of the seat
+that owns the path authorises it; the other file names the path in its
+body and says its key is given there. Name them
+`<slug>.md` and `<slug>-<seat>.md` (e.g. `pr1.md` and
+`pr1-threshold-owner.md`). M00's multi-seat ruling files stand as written.
 
 Then the body: what the cold review found, what was repaired, what stands
 for the seats, and what a reader can run to falsify the PR's own claims.

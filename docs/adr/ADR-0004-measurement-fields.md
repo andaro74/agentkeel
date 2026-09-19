@@ -5,11 +5,11 @@ status: Accepted
 date: 2026-09-18
 seat: Product
 authorises:
-  - Product          # §5 gate list, §6 envelope fields, §8 M00 expected output, §10.3 command name; amendment 1: how a PR lands on main
-  - Threshold Owner  # cost-cap lives in thresholds.yaml; the regression bar reads the agent under test
+  - Product          # §5 gate list, §6 envelope fields, §8 M00 expected output, §10.3 command name; amendment 1: how a PR lands on main; amendment 2: §6's $id sentence, checks.F1_4
+  - Threshold Owner  # cost-cap lives in thresholds.yaml; the regression bar reads the agent under test; amendment 2: the frozen base, the cap for two subjects, over-cap is RED
   - Data Owner       # scope on every per-golden result
-  - Engineering      # the envelope schema, verdict.gate, replay_history, `make ledger-plain`
-amendments: 1
+  - Engineering      # the envelope schema, verdict.gate, replay_history, `make ledger-plain`; amendment 2: one subject per envelope, control_card_ref, tokens_in, F1.4 in build and gate
+amendments: 2
 ---
 
 # ADR-0004 — Measurement fields; the control is never gated
@@ -130,9 +130,105 @@ built at M01 PR 1. `thresholds.yaml` is the Threshold Owner's file, so
 the line that lands in it carries the Threshold Owner's key as well as
 Engineering's.
 
+## Amendment 2 (M01 PR 1, 2026-09-19)
+
+The last amendment this ADR can take. The next change to these fields is
+a new ADR. Ruled for M01 PR 1 (`milestones/M01/rulings/pr1.md`; M01 open
+items 2, 5, 11 and 22, and the ruling on `product-spec-reviewer` BLOCK 3,
+`milestones/M01/feasibility.md` §2).
+
+**1. The base is the card at tag `m00`, by hash, in `thresholds.yaml`.**
+Engineering with the Threshold Owner, two keys. Amendment 1 named the
+field `baseline_card_sha`; it lands as
+
+```yaml
+baseline_card:
+  path: evals/history/9407615dcde09308490f6699c21a18100bfedcd2.baseline-card.json
+  sha256: b0219756cad63be67fb51aa4632dd015084840833341f15235fab4569adc3295
+```
+
+"At tag `m00`" means the card row 0 cites, not the last card on the
+tagged tree (`55dadb2`). The hash is of the card's content
+(`canonical_sha256`), so line endings do not move it.
+
+**2. One envelope per commit, one subject: the agent when one ran,
+otherwise the control.** Engineering with the Threshold Owner. The control
+is still re-run on every `make evals` (P6), and `build card` writes
+`<commit>.baseline-card.json` as before.
+
+- **An agent ran.** The envelope's `goldens` hold `scope: agent` results
+  only. It names this run's control card in a new field,
+  `control_card_ref: {path, sha256}`. `baseline_card_ref` names the
+  frozen card of item 1, and `build` refuses (exit 3) unless its hash
+  equals `thresholds.yaml` `baseline_card.sha256`. The check that a card
+  is for the run's own commit moves to `control_card_ref`.
+- **No agent ran.** The envelope is the control's, in M00's form:
+  `goldens` hold `scope: control` results, `control_card_ref` is null,
+  and `baseline_card_ref` names this run's own card, commit-matched, as at
+  M00. M01 PR 1's run is this case: refagent's runner is M01 PR 2.
+
+A run always writes an envelope (ruling A on the M01 PR 1 Unsure items,
+which replaces the earlier ruling that such a run writes the card only).
+
+**3. Schema.** Engineering. `control_card_ref` (object or null) and
+`tokens_in` (integer ≥ 0) join the schema and are **not** in `required`,
+so M00's three envelopes still validate and replay. `verdict.gate`
+rejects an envelope that has any `scope: agent` result and:
+
+- also has a `scope: control` result;
+- lacks `control_card_ref` or `tokens_in`;
+- names a `baseline_card_ref` whose hash is not `thresholds.yaml`'s;
+- names a `control_card_ref` that does not resolve, does not hash to the
+  ref, or is for another commit.
+
+An envelope with control results only is read by M00's rules, and is
+rejected if it names a `control_card_ref`. The `thresholds.yaml`
+`baseline_card` hash is checked only when a result is `scope: agent`.
+
+**4. F1.4, read twice (SPEC/01 §4).** Engineering; Product for the check.
+For `scope: agent` results of kind `ordinary` and `trap`,
+`pass = score and cites`. `build` also writes `checks.F1_4`: `fail` when
+any `scope: agent` result of kind `ordinary` has `cites: false`, with the
+CI run URL. A failed check is RED whatever the history, so refagent
+answering without citing turns the row RED on its first run (ruling on
+BLOCK 3). `verdict.gate` works both out again from `score` and `cites`
+and goes RED where the envelope differs. The control is scored as it was:
+the card's composition does not change, because its hash is the base.
+
+**5. Over the cap is a recorded RED.** Threshold Owner (M01 item 22).
+`cost-cap` no longer exits before `build`: it prints the spend and exits
+0. `build` writes `tokens_in` and sets the verdict RED when
+`tokens_in + tokens_out` is over `cost_cap.tokens_per_run`. The gate
+works out the same from the envelope and `thresholds.yaml` and gives the
+reason `cost-cap: N over M`. Two readers, one rule, P5 holds. The cap for
+two subjects is 150,000 tokens, an upward move with two keys (Threshold
+Owner and Engineering). `tokens_in` and `tokens_out` on the envelope are
+the run's: on an agent envelope, the agent's replies plus the control
+card's totals, so the cap covers what the run spent; on a control envelope,
+the control's. An over-cap control-only run is a recorded RED like any
+other (ruling A).
+
+**6. Control drift (Finding F0.4).** The gate prints this run's control
+card counts beside the frozen card's, as a note. Not gated.
+
+**7. The Measured cell** for an agent envelope reads:
+`agent: traps a/3; ordinary a/9; guardrail a/3; control: <this run's
+control card tallies>; never_passed n; regressed n; plants f/e; checks…;
+VERDICT; envelope <commit>; base b0219756`. Row 0's cell, on an M00
+envelope, is unchanged, and `make ledger` still exits 0 on it.
+
+**8. Agent history starts empty at M01.** `replay_history` keys
+`(agent, id)` have no rows until refagent's first CI envelope.
+
+**9. SPEC/00 §6** (M01 item 2, Product) gains, after "Envelope
+(`verdict.schema.json`": "— the schema's `$id`; the file is
+`src/verdict/schema.json`". Both names were true, and a reader had to
+know that.
+
 ## Consequences
 
-- Amendment 1 uses the first of this ADR's two amendments. One is left.
+- Amendment 1 used the first of this ADR's two amendments. Amendment 2
+  uses the second. The next change to these fields is a new ADR.
 - SPEC/00 §5 (`regression`, `cost-cap`), §6 (envelope fields), §8 M00
   (expected gate output, Finding F0.4) and §10.3, §10.4, §15 (the command
   name) are amended in the same commit.
