@@ -98,3 +98,10 @@ def test_s7_an_answer_that_cites_nothing_is_not_a_pass(tmp_path, goldens):
     verdict, reasons = gate.rule(out, no_history)
     assert verdict == "RED"  # the gate works F1.4 out again from goldens, and agrees
     assert not any("pass is not" in reason or "F1_4 is" in reason for reason in reasons)
+
+
+@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S8: {PR2} (infra/construct/)")
+def test_s8_an_agent_outside_the_construct_is_refused_at_synth():
+    from infra.construct import synth_refusal  # type: ignore[import-not-found]
+
+    assert synth_refusal(FIXTURES / "construct" / "outside_construct.py") is not None
