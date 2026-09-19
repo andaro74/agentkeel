@@ -23,13 +23,18 @@ One IAM role, `agentkeel-m00-evals`.
   `refs/pull/<n>/merge` or `refs/heads/main` (`StringLike`; the `*` is
   the PR number). It is aimed at a second workflow file reusing the role.
   A PR that edits `evals.yml` itself still matches: on `pull_request`
-  the workflow is the PR's own copy. **Not observed yet**, either way:
-  no run has assumed the role under this condition, and no second
-  workflow has been refused. It is not known from the tree that STS
-  evaluates this claim, or that this repo issues it in this form; the
-  `OIDC claims the role trusts` step in `evals.yml` prints what is
-  issued. If the claim is absent or differs, every assume is refused:
-  it fails closed.
+  the workflow is the PR's own copy. **Observed on 2026-09-19**, in the
+  M00 close PR's own run
+  ([35412277571](https://github.com/andaro74/agentkeel/actions/runs/35412277571),
+  commit `c547f4f`), the first run to assume the redeployed role. The
+  `OIDC claims the role trusts` step printed
+  `job_workflow_ref = andaro74/agentkeel/.github/workflows/evals.yml@refs/pull/5/merge`
+  and `sub = repo:andaro74@3157440/agentkeel@1376369685:pull_request`,
+  and the assume succeeded. So the claim is issued in the classic form
+  for `job_workflow_ref` while `sub` is the immutable one, the pinned
+  pattern matches it, and STS evaluates it. **Still not observed:** a
+  second workflow file being refused. If the claim is ever absent or
+  differs, every assume is refused: it fails closed.
 - **What it can do:** `bedrock:InvokeModel` and
   `bedrock:InvokeModelWithResponseStream` on the inference profiles the
   current milestone calls, and on the foundation models those profiles
@@ -45,10 +50,36 @@ One IAM role, `agentkeel-m00-evals`.
 The first deploy allowed all six pinned models, to any workflow, from
 any PR branch, for up to an hour, with `cost-cap` reading only what the
 PR's own runner wrote down. M00 calls one model. Fixed in `app.py`: one
-profile, one workflow file. **Deployed: no.** Until Security redeploys,
-the role CI assumes is the wider one from `8fb4b80`. After the deploy,
-the check is a run of `evals.yml` that assumes the role; record its id
-here with the deploy date. Not fixed here:
+profile, one workflow file.
+
+**Deployed: yes, 2026-09-19T00:20:25Z.** Every run up to and including
+the M00 PR 2 measurement at `9407615` assumed the wider role as deployed
+at `8fb4b80`. The deploy is a console reading, not a file in this repo —
+`cdk.out/` is gitignored — so here is the command and what it returned,
+for anyone who wants to check it rather than believe it:
+
+```
+$ aws cloudformation describe-stacks --stack-name AgentkeelM00EvalRole \
+    --region us-west-2 \
+    --query 'Stacks[0].[StackStatus,LastUpdatedTime,CreationTime]' --output text
+UPDATE_COMPLETE  2026-09-19T00:20:25.359000+00:00  2026-09-18T22:57:54.082000+00:00
+```
+
+**Assumed by a run: yes, 2026-09-19, run 35412277571 at `c547f4f`** —
+the M00 close PR's own `evals` run, which measured again because that PR
+changes `tests/` and this file. It assumed the redeployed role, made the
+fifteen Bedrock calls through `us.amazon.nova-micro-v1:0`, and its
+envelope is `evals/history/c547f4f….json`. The claims it printed are in
+the "Which workflow" bullet above.
+
+Between the `9407615` measurement and the redeploy no run assumed
+anything: the two `evals` runs in that window took the "already
+measured" path. So the narrowed role has exactly one run behind it, and
+that run is the whole of the evidence that STS enforces it. The record
+is in `milestones/M00/rulings/pr3.md`. Security signs S-1 at M01, on
+that observation, not on the deploy (`milestones/M01/open.md`, item 12).
+
+Not fixed here:
 
 - **`MaxSessionDuration` stays 3600.** The ruling asked for 900. IAM's
   floor is one hour and CDK refuses less at synth (`must be >= 3600sec`).
