@@ -10,7 +10,7 @@ Written at M01 PR 1 open. The row in `milestones/README.md` is the one
 | Claim | An unsigned or tampered bundle never loads; refagent runs inside the construct |
 | Falsifiers | F1.1 an unsigned bundle, a bundle altered after signing, a stack with egress not in the manifest, a deploy from a laptop (the developer role), or an agent built outside the construct loads, deploys or synthesises. F1.2 the construct accepts a role without the boundary. F1.3 the agent role can read its own KMS key policy. F1.4 refagent answers an ordinary golden without a `table_row` and a `clause_id` that exist. |
 | Seeded commit | `a7b088e` (S1); `df7c735` (S2 content; its signature over S1's bytes is M01 PR 2's first commit, before `src/bundle/verify.py`); `48669ba` (S3); `1b4c2f6` (S4); `19131e9` (S5); `091cc45` (S6); `2f4cacb` (S7); `6b8b8cf` (S8), each its own commit (SPEC/01 §5) |
-| Expected gate output | PR 1: no agent under test, so the envelope is the control's, in M00's form (`control_card_ref` null), gated and recorded as at M00; it says nothing about claim 1. `make plants` lists S1–S8, S7's reader in the tree. On S7: 12 of 12 ordinary and trap results `score` true, `cites` false, `pass` false; `checks.F1_4` fail; build and gate RED. PR 2, on the PR: S1, S2 refused by `verify`, each with its planted reason; S3 (both forms), S5, S8 refused at synth; refagent's envelope has `checks.F1_1`, `F1_2`, `F1_4` pass. No count of refagent's passes is expected: agent history is empty (P7), so the checks decide the row. First `main` run after PR 2 merges: S4 and S6 refused and recorded; `checks.F1_3` from S6; refagent answers from inside the construct. |
+| Expected gate output | PR 1: no agent under test, so the envelope is the control's, in M00's form (`control_card_ref` null), gated and recorded as at M00; it says nothing about claim 1. `make plants` lists S1–S8, S7's reader in the tree. On S7: 12 of 12 ordinary and trap results `score` true, `cites` false, `pass` false; `checks.F1_4` fail; build and gate RED. PR 2, on the PR: S1, S2 refused by `verify`, each with its planted reason; S3 (both forms), S5, S8 refused at synth; refagent's envelope has `checks.F1_1`, `F1_2`, `F1_4` pass. No count of refagent's passes is expected: agent history is empty (P7), so the checks decide the row. During PR 2, before its first CI run, the human deploys the bootstrap stack and attempts S4 and S6; PR 2's CI run looks up each request id in CloudTrail (`scripts/observe_attempt.py`) and writes `checks.F1_1` and `checks.F1_3`. Refagent's first agent envelope is PR 2's. Nothing about claim 1 is first measured after PR 2 merges (P3). |
 | Measured | — |
 | PRs used / cap | 1 / 4 |
 | State | OPEN |
@@ -38,7 +38,9 @@ Written at M01 PR 1 open. The row in `milestones/README.md` is the one
   `feasibility.md` §3 has each commit's `pytest` result.
 - **Read in this PR:** S7 only, by `verdict.build` and `verdict.gate`
   (F1.4; ADR-0004 amendment 2). S7 goes RED. The seven others have no
-  reader until PR 2.
+  reader until PR 2. F1.4 has fired on a fixture only; its measurement is refagent's first agent envelope, at PR 2. (Engineering, ruling 1 before
+  PR #7 merged: `checks.F1_4`, the gate's own F1.4 reading and
+  `pass = score and cites` stay in this PR.)
 - **This PR's run** writes the control's envelope, in M00's form: there
   is no agent under test until PR 2 (ruling A, `feasibility.md` §2.5). It
   is gated and recorded as at M00 and does not measure claim 1.

@@ -92,9 +92,10 @@ composition must not change (ADR-0004 amendment 2).
 
 **Where each check comes from (PR 2).** Engineering names the runner at
 PR 2 open; the paths are fixed here. `F1_1`: the junit result of the S1,
-S2, S3 and S8 tests in `tests/test_m01_seeds.py`, and S4's observation
-file. `F1_2`: the junit result of the S5 test. `F1_3`: S6's observation
-file. `F1_4`: the envelope's own `goldens`. As with `F0_2`, a check read
+S2, S3 and S8 tests in `tests/test_m01_seeds.py`, and the CloudTrail
+lookup of S4's request ids. `F1_2`: the junit result of the S5 test.
+`F1_3`: the CloudTrail lookup of S6's request id. `F1_4`: the envelope's
+own `goldens`. A human-written observation file feeds no check by itself. As with `F0_2`, a check read
 from junit carries the CI run URL.
 
 **Domain rule (SPEC/00 §9).** The rights table is the truth; the corpus is
@@ -128,11 +129,11 @@ without somebody saying so. S4 and S6 are attempts against AWS; their
 tests read the observation files, which say `observed: null` until the
 attempt is made.
 
-**When each is measured (ruling on BLOCK 1).** PR 2's run on the PR
-measures S1, S2, S3, S5, S7 and S8, with the PR run's identity accepted
-for that measurement only. The deploy to the account happens on the first
-`main` run after PR 2 merges. S4, S6 and refagent running inside the
-construct are observed there, and the close PR records them.
+**When each is measured (ruling on BLOCK 1; ruling 4 before PR #7
+merged).** PR 2's run on the PR measures S1, S2, S3, S5, S7 and S8, with
+the PR run's identity accepted for that measurement only. The bootstrap stack is deployed to the agent account by the human with admin during PR 2, before PR 2's first CI run, as infra/eval-role was at M00. S4 and S6 are attempted by the human against that stack during PR 2; each attempt's request id, timestamp and AccessDenied text are written to milestones/M01/runs/f1_1_laptop.yaml and f1_3_key_policy.yaml, and a CloudTrail lookup in PR 2's CI run (scripts/observe_attempt.py, the F0.3 observer's pattern) confirms each request id was denied and writes checks.F1_1 and checks.F1_3. A human-written file feeds no check by itself; the check is the CI lookup of the request id. Refagent's first agent envelope is PR 2's. Nothing about claim 1 is first measured after PR 2 merges (P3).
+The deploy-from-`main` path is what PR 2's construct exercises for
+refagent; it is not where a falsifier is first read.
 
 These are seeded cases for claim 1, not plants under SPEC/00 §5's plant
 rule. They do not enter `plants_expected`, which counts golden plants.
@@ -181,9 +182,10 @@ None of it is in PR 1, except the F1.4 reading in `verdict.build` and
   - a Budgets action on the eval role at `daily_usd: 10` (Threshold
     Owner's number). Budgets data lags by hours; until PR 2 the spend is
     unbounded at the account quota.
-  - Order (Security, item 20): deploy the bootstrap stack, point
-    `AWS_EVAL_ROLE_ARN` at the new eval role, run, then delete
-    `AgentkeelM00EvalRole` after PR 2 merges.
+  - Order (Security, item 20; ruling 4): the human deploys the bootstrap
+    stack with admin during PR 2, before PR 2's first CI run, points
+    `AWS_EVAL_ROLE_ARN` at the new eval role, and PR 2's CI runs; then
+    `AgentkeelM00EvalRole` is deleted after PR 2 merges.
 - **`GovernedAgent`** (`infra/construct/`): AgentCore Runtime in VPC
   mode only, Gateway and Identity; the boundary on every role it makes,
   and required on any role it is given (imported roles refused); the
@@ -247,9 +249,11 @@ None of it is in PR 1, except the F1.4 reading in `verdict.build` and
   `pass`. No count of refagent's passes is expected: agent history is
   empty, so its first numbers are reported and do not gate (P7). The
   checks decide the row.
-- **The first `main` run after PR 2 merges.** S4 and S6 refused, and
-  recorded with the AWS request id; refagent answers from inside the
-  construct. `checks.F1_3` comes from S6.
+- **During PR 2, before its first CI run** (ruling 4). The human deploys
+  the bootstrap stack and attempts S4 and S6; PR 2's CI run looks up each
+  request id in CloudTrail and writes `checks.F1_1` and `checks.F1_3`.
+  Refagent's first agent envelope is PR 2's. Nothing about claim 1 is
+  first measured after PR 2 merges (P3).
 
 ## 9. Controls with no seeded case at M01
 

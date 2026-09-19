@@ -79,7 +79,36 @@ narrowed it before the PR opened (`8f4faa2`). A second line,
 `docs/video/milestones/M00.mp4 -filter -diff -merge`, keeps the filter off
 M00.mp4: with it on, every fresh checkout read M00.mp4 as modified and this
 PR's first `evals` run refused as a dirty tree (run 35469006669). M00.mp4's
-blob is unchanged, `5c5413c`.
+blob is unchanged, `5c5413c`. **Accepted as written** (Engineering, ruling
+2 before merge): the two lines are
+`docs/video/**/*.mp4 filter=lfs diff=lfs merge=lfs -text` and
+`docs/video/milestones/M00.mp4 -filter -diff -merge`; the ruled one-line
+text is superseded.
+
+## Rulings before merge (R1)
+
+1. **F1.4 stays in this PR** (Engineering). `checks.F1_4`, the gate's own
+   F1.4 reading and `pass = score and cites` stay. They have read a
+   fixture (`tests/fixtures/refagent_raw_uncited.json`), not refagent.
+   F1.4 has fired on a fixture only; its measurement is refagent's first agent envelope, at PR 2.
+2. **`.gitattributes`** (Engineering): the two lines above are accepted.
+3. **`evals` becomes a required status check** on ruleset 23685206
+   (Security; the human does the PUT). `infra/ruleset/main.json` is then
+   re-exported to show both contexts, with its README's date.
+4. **When S4 and S6 are measured** (Product with Security), replacing the
+   draft in `feasibility.md` §2.2 BLOCK 1: The bootstrap stack is deployed to the agent account by the human with admin during PR 2, before PR 2's first CI run, as infra/eval-role was at M00. S4 and S6 are attempted by the human against that stack during PR 2; each attempt's request id, timestamp and AccessDenied text are written to milestones/M01/runs/f1_1_laptop.yaml and f1_3_key_policy.yaml, and a CloudTrail lookup in PR 2's CI run (scripts/observe_attempt.py, the F0.3 observer's pattern) confirms each request id was denied and writes checks.F1_1 and checks.F1_3. A human-written file feeds no check by itself; the check is the CI lookup of the request id. Refagent's first agent envelope is PR 2's. Nothing about claim 1 is first measured after PR 2 merges (P3). The
+   deploy-from-`main` path is what PR 2's construct exercises for
+   refagent; it is not where a falsifier is first read.
+5. **Commit `2515d19`** (Engineering) is recorded as is: it went in with
+   `test_the_gate_does_not_read_a_deleted_cap_as_no_cap` failing, because
+   the test emptied `thresholds.yaml` and so removed the pinned base too.
+   The fix is `188c357`. No history is rewritten.
+
+Still in a measured path and not changed by this prose commit:
+`milestones/M01/runs/f1_1_laptop.yaml`, `f1_3_key_policy.yaml` and
+`tests/fixtures/README.md` still say the S4 and S6 attempts are made "on
+the first `main` run after M01 PR 2 merges". Ruling 4 supersedes that;
+PR 2, which fills those files, corrects the sentence.
 
 ## Item 12, Security
 
@@ -241,7 +270,7 @@ body.
 |---|---|
 | B1 | Repaired in `5359229`: row 1's Seeded cell records S2 as a two-part seed, its content at `df7c735` and its signature over S1's bytes as M01 PR 2's first commit, before `src/bundle/verify.py` (the seats' ruling on BLOCK 1; a keyless signature can only be made by CI). |
 | B2 | Repaired: this file and `rulings/pr1-threshold-owner.md`, both `pr: 7`, one seat each (ruling B). |
-| F1 | Stands, ruled. The F1.4 reader is in PR 1 by the seats' rulings 5/11(d) and BLOCK 3 (`checks.F1_4` with rule (d)). S7's RED in this PR is recorded as the junit result of `tests/test_m01_seeds.py::test_s7_an_answer_that_cites_nothing_is_not_a_pass` under this PR's `evals` run URL, not as an envelope; no agent ran. Whether ruling F admits the `checks.F1_4` half and the gate's reading is Unsure: Engineering with Product, before merge. |
+| F1 | Stands, ruled. The F1.4 reader is in PR 1 by the seats' rulings 5/11(d) and BLOCK 3 (`checks.F1_4` with rule (d)), confirmed by ruling 1 before merge. S7's RED in this PR is recorded as the junit result of `tests/test_m01_seeds.py::test_s7_an_answer_that_cites_nothing_is_not_a_pass` under this PR's `evals` run URL, not as an envelope; no agent ran. F1.4 has fired on a fixture only; its measurement is refagent's first agent envelope, at PR 2. |
 | F2 | Stands, recorded. `milestones/M01/feasibility.md` §3 already names S7's failure at `2f4cacb` as `SystemExit: 2` from build's argument parser. The seed commit is not rewritten. |
 | F3 | Repaired in `4733a9a`: every listed attempt must be made, each with a request id. |
 | F4 | Repaired in `4733a9a`: `verdict.gate` rejects a control envelope that carries an `F1_*` check. |
