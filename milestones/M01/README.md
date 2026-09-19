@@ -57,7 +57,24 @@ Written at M01 PR 1 open. The row in `milestones/README.md` is the one
 - Before PR 2's first run: the human redeploys `infra/eval-role` with
   admin (Sonnet 5's profile, item 14; the Deny statement, item 33).
 
+### Scope taken at open (PR 2 rulings, `feasibility.md` §2.6)
+
+Three of SPEC/01 §10's five cuts are taken now, at PR 2 open, not held
+against the cap: `ratings-helper` → M02; the knowledge base over
+`data/corpus/` → M03; the HITL branch → M07. Cut 2 (log and audit
+delivery to the security account) stands as a cut if the cap is
+threatened; cut 5 is not taken, so the per-agent inference profile stays.
+Gateway and Identity are not never-cut: the construct declares both as
+props and wires neither. refagent at M01 is Sonnet 5 through
+`us.anthropic.claude-sonnet-5`, the rights table in DynamoDB, and the
+`check_availability` tool, inside `GovernedAgent`; F1.4 reads the table
+and the tool.
+
 ### For Security, at M01 PR 2 open
+
+**All of the following are ruled in `feasibility.md` §2.6** (a to k for
+Security, l to n for Engineering, o and p for the Threshold Owner). The
+list below is what was asked; each item's answer is in that round.
 
 From the `platform-architect` report, not settled in SPEC/01's text:
 

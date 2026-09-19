@@ -264,6 +264,55 @@ Added to the rulings above; they bind this PR.
 | F | S7: the PR body names its falsifier, its seed commit and the file that reads it here. If that reader is anything other than build.py's `pass = score and cites`, it moves out of this PR and S7 stays xfail strict. After the commits, the seed commit is checked out and `pytest` run; the failing tests and their reasons are pasted in §3. | Engineering |
 | G | The manifest's model `version` stays null until Bedrock returns a version for `us.anthropic.claude-sonnet-5`; re-ruled at PR 2 with the cap. | Threshold Owner |
 
+### 2.6 Rulings for M01 PR 2 open (2026-09-19, R1)
+
+Written before PR 2's first commit. They settle the lists under "For
+Security", "For Product" and the Threshold Owner's items in
+`milestones/M01/README.md`, and `product-spec-reviewer` findings 5, 9 and
+17. PR 2 is the measurement (P3).
+
+**SCOPE (Product).** Cuts 1, 3 and 4 of SPEC/01 §10 are taken **now**, at
+open, not when the cap is threatened: `ratings-helper` → M02; the
+knowledge base over `data/corpus/` → M03; the HITL branch → M07. Gateway
+and Identity are **not** never-cut at M01 (finding 17): the construct
+declares both as props and wires neither. Identity's claim is M05's
+(credentials only via Identity); Gateway's is M02's edge and M07's HITL
+tool. Never-cut stays as written in §10. refagent at M01 is Sonnet 5
+through `us.anthropic.claude-sonnet-5`, the rights table in DynamoDB, and
+the `check_availability` tool with its strict schema, inside
+`GovernedAgent`. F1.4 reads the table and the tool.
+
+**Security**
+
+| | Ruling |
+|---|---|
+| a | **Budgets action:** one budget, service = Amazon Bedrock, whole account, `daily_usd: 10`, action = attach a Deny on `bedrock:Invoke*` to the eval role. No per-agent filter at M01; the per-agent profile stays, and the filter is M05 with cost tagging. `infra/eval-role/README.md` (then `infra/bootstrap/`) states the lag as AWS gives it — Budgets data refreshes up to three times a day — and the worst case as "up to one refresh interval at the account quota". No invented figure. |
+| b | **Key policy:** agent roles are matched by path, `aws:PrincipalArn` `StringLike` `arn:aws:iam::<account>:role/agentkeel/agents/*`. Adding an agent is not a Security redeploy. Every role `GovernedAgent` makes is created under path `/agentkeel/agents/`. |
+| c | **Gateway targets and Identity providers with no security group:** deferred to M05, and listed in SPEC/01 §9 as a control with no seeded case at M01. They are not wired at M01 (SCOPE). |
+| d | **`endpoint_allowlist` at M01** holds AWS service names only, an enum in the manifest schema: `bedrock-runtime`, `dynamodb`, `kms`, `logs`, `s3`. Each maps to a VPC endpoint of the bootstrap VPC, and the agent security group's egress allows only those endpoints: interface endpoints by their security group, S3 and DynamoDB by gateway-endpoint prefix list. A hostname that is not one of the five is refused at synth. Arbitrary hostnames are M05. |
+| e | **S3 and DynamoDB are gateway endpoints**, with endpoint policies scoped to the account. SPEC/00 §8 M01's "interface endpoints only" is amended by **ADR-0006** (Security, one sentence: interface endpoints, plus gateway endpoints for S3 and DynamoDB), written in PR 2. |
+| f | **The new eval role** grants `bedrock-agentcore:InvokeAgentRuntime` on refagent's runtime ARN only, and keeps the two pinned profiles and the five-action Deny. Name: `agentkeel-evals`. Order: the human deploys `infra/bootstrap` with admin → points `AWS_EVAL_ROLE_ARN` at `agentkeel-evals` → attempts S4 and S6 → PR 2's first CI run → after PR 2 merges, the human runs `npx cdk destroy` in `infra/eval-role`. |
+| g | **cosign verify:** `--certificate-oidc-issuer https://token.actions.githubusercontent.com`, `--certificate-identity andaro74/agentkeel/.github/workflows/deploy.yml@refs/heads/main` for a deploy; and `verify` additionally reads the certificate's Source Repository Identifier extension (Fulcio OID `1.3.6.1.4.1.57264.1.15`) and refuses unless it is `1376369685`. On the PR run, `verify` accepts the PR run's identity for the measurement of S1 and S2 only, and says so in its output. |
+| h | **Where the signed digest lives** (finding 9, with Product): in the cosign bundle written beside the archive in CI (`agents/<name>/dist/`, not committed) and as a tag on the deployed runtime. The manifest carries no digest of itself. |
+| i | **Finding 5** is ruled in §2.5's ruling 4: the human attempts, CI looks the request id up in CloudTrail through `scripts/observe_attempt.py`, and that lookup writes `checks.F1_1` and `checks.F1_3`. |
+| j | **Redeploy record:** the `describe-stacks` line and the `simulate-principal-policy` table go in `infra/eval-role/README.md` under "Redeployed 2026-09-19 (items 14, 33)". One refused call on a denied action is the `evals.yml` probe step at PR 2 (item 18). |
+| k | **The re-export** of `infra/ruleset/main.json`, with `evals` as a required check, is PR 2's first Security commit. If the live ruleset still lists one check, stop and say so. (At the M01 PR 1 merge the live ruleset already listed both; the export in the tree is from before that change.) |
+
+**Engineering**
+
+| | Ruling |
+|---|---|
+| l | **The agent runner** is `src/agent/run.py`, as the Makefile expects. On a PR it runs refagent's code in the runner; on `main` after the deploy it calls the deployed runtime. It writes raw observations only; `build` and `gate` are unchanged in role (P5). |
+| m | **The envelope does not record the cap** — no schema change, and ADR-0004 has no amendment left. Instead `gate` reads `thresholds.yaml` as it stood at the envelope's commit (`git show <commit>:thresholds.yaml`), so a later cap change cannot re-read an old envelope. Written into `gate.py`'s docstring and into `tests/test_gate.py`. |
+| n | **S2's signature** is PR 2's first commit. A Security workflow `sign-fixture.yml`, run once on the PR, `cosign sign-blob` keyless over S1's archive bytes, writes the bundle into `tests/fixtures/bundles/altered/` and commits as `github-actions[bot]`, before `src/bundle/` exists. S1 stays unsigned. `infra/workflows.sha256` is updated in the same PR. |
+
+**Threshold Owner**
+
+| | Ruling |
+|---|---|
+| o | `cost_cap.tokens_per_run` stays 150,000 until PR 2's first agent envelope is recorded; re-ruled in `rulings/pr2-threshold-owner.md` against that envelope's `tokens_in + tokens_out`. |
+| p | refagent's model `version` stays null; re-ruled with (o). |
+
 ## 3. The false state
 
 SPEC/01 §3 names eight. This PR plants each as its own commit, first in

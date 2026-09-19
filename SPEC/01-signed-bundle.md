@@ -268,25 +268,33 @@ FINDING carried with a seat, not a claim.
 - the Budgets action;
 - the eval role refusing a direct foundation-model call, and a call
   through an unpinned profile (item 18, a step in `evals.yml` at PR 2);
-- log and audit delivery to the security account.
+- log and audit delivery to the security account;
+- Gateway targets and Identity credential providers calling out with no
+  security group over them (ruling c, `feasibility.md` §2.6). Neither is
+  wired at M01, and both are deferred to M05.
 
-## 10. Cut list, in order, if the cap is threatened
+## 10. Cut list
 
-1. `ratings-helper` stub → M02, with the two-sided edge check.
-2. Log and audit delivery to the security account → M05, with the audit
-   bucket. M01 then touches the agent account only.
-3. The knowledge base over `data/corpus/` → M03, with corpus admission.
-   refagent answers from the table and the tool alone; F1.4 does not read
-   the corpus.
-4. The HITL branch → M07, where it becomes a Gateway tool anyway.
-5. The application inference profile per agent → M05.
+Cuts 1, 3 and 4 are **taken at open** (ruling SCOPE, `feasibility.md`
+§2.6), not held against the cap. Cut 2 stands as a cut if the cap is
+threatened. Cut 5 is not taken: the per-agent inference profile stays,
+and only the Budgets filter that would use it is M05 (ruling a).
+
+| # | Item | State at M01 open | Milestone |
+|---|---|---|---|
+| 1 | `ratings-helper` stub, and the two-sided edge | cut now | M02 |
+| 2 | Log and audit delivery to the security account | cuttable, in order, if the cap is threatened; M01 then touches the agent account only | M05 |
+| 3 | The knowledge base over `data/corpus/` | cut now; refagent answers from the table and the tool alone, and F1.4 does not read the corpus | M03 |
+| 4 | The HITL branch | cut now; it becomes a Gateway tool there anyway | M07 |
+| 5 | The application inference profile per agent | not cut; it stays at M01 | — (its Budgets filter: M05) |
 
 Never cut: any seeded case; cosign sign and verify; the signature check
 at load; the permission boundary; the deploy role's and the execution
 role's policies; the KMS key policy; the egress refusal; refagent's tool
-and the rights table (F1.4 reads them). Whether Gateway and Identity are
-never-cut at M01 is Product's to rule at PR 2 open (`product-spec-reviewer`
-finding 17).
+and the rights table (F1.4 reads them). Gateway and Identity are **not**
+never-cut at M01 (`product-spec-reviewer` finding 17, ruled at PR 2
+open): the construct declares both as props and wires neither. Identity's
+claim is M05's, Gateway's is M02's and M07's.
 
 ## 11. Not in M01
 
