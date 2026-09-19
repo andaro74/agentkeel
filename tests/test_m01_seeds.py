@@ -41,3 +41,11 @@ def test_s2_a_bundle_changed_after_signing_is_refused():
 
     with pytest.raises(verify.Refused, match="digest"):
         verify.verify(FIXTURES / "bundles" / "altered")
+
+
+@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S3: {PR2} (infra/construct/)")
+def test_s3_egress_not_in_the_manifest_is_refused_at_synth():
+    from infra.construct import synth_refusal  # type: ignore[import-not-found]
+
+    assert synth_refusal(FIXTURES / "construct" / "extra_egress.py") is not None
+    assert synth_refusal(FIXTURES / "construct" / "extra_egress_standalone.py") is not None
