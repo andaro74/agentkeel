@@ -75,8 +75,11 @@ Threshold Owner's key is `rulings/pr1-threshold-owner.md`.
 `.gitattributes` holds `docs/video/**/*.mp4 filter=lfs diff=lfs merge=lfs
 -text`, not the ruled `docs/video/** …`: the ruled line made
 `docs/video/README.md` an LFS pointer in `fa21d9d`, and Engineering
-narrowed it before the PR opened (`8f4faa2`). M00.mp4's blob is
-unchanged, `5c5413c`.
+narrowed it before the PR opened (`8f4faa2`). A second line,
+`docs/video/milestones/M00.mp4 -filter -diff -merge`, keeps the filter off
+M00.mp4: with it on, every fresh checkout read M00.mp4 as modified and this
+PR's first `evals` run refused as a dirty tree (run 35469006669). M00.mp4's
+blob is unchanged, `5c5413c`.
 
 ## Item 12, Security
 
