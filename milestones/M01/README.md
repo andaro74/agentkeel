@@ -9,7 +9,7 @@ Written at M01 PR 1 open. The row in `milestones/README.md` is the one
 |---|---|
 | Claim | An unsigned or tampered bundle never loads; refagent runs inside the construct |
 | Falsifiers | F1.1 an unsigned bundle, a bundle altered after signing, a stack with egress not in the manifest, a deploy from a laptop (the developer role), or an agent built outside the construct loads, deploys or synthesises. F1.2 the construct accepts a role without the boundary. F1.3 the agent role can read its own KMS key policy. F1.4 refagent answers an ordinary golden without a `table_row` and a `clause_id` that exist. |
-| Seeded commit | `a7b088e` (S1); `df7c735` (S2); `48669ba` (S3); `1b4c2f6` (S4); `19131e9` (S5); `091cc45` (S6); `2f4cacb` (S7); `6b8b8cf` (S8), each its own commit (SPEC/01 §5) |
+| Seeded commit | `a7b088e` (S1); `df7c735` (S2 content; its signature over S1's bytes is M01 PR 2's first commit, before `src/bundle/verify.py`); `48669ba` (S3); `1b4c2f6` (S4); `19131e9` (S5); `091cc45` (S6); `2f4cacb` (S7); `6b8b8cf` (S8), each its own commit (SPEC/01 §5) |
 | Expected gate output | PR 1: no agent under test, so the envelope is the control's, in M00's form (`control_card_ref` null), gated and recorded as at M00; it says nothing about claim 1. `make plants` lists S1–S8, S7's reader in the tree. On S7: 12 of 12 ordinary and trap results `score` true, `cites` false, `pass` false; `checks.F1_4` fail; build and gate RED. PR 2, on the PR: S1, S2 refused by `verify`, each with its planted reason; S3 (both forms), S5, S8 refused at synth; refagent's envelope has `checks.F1_1`, `F1_2`, `F1_4` pass. No count of refagent's passes is expected: agent history is empty (P7), so the checks decide the row. First `main` run after PR 2 merges: S4 and S6 refused and recorded; `checks.F1_3` from S6; refagent answers from inside the construct. |
 | Measured | — |
 | PRs used / cap | 1 / 4 |
@@ -17,11 +17,15 @@ Written at M01 PR 1 open. The row in `milestones/README.md` is the one
 
 ### Open detail (PR 1, #7, 2026-09-19)
 
-- Opened through `/open-milestone`. SPEC/01 first, then
-  `product-spec-reviewer` on it (3 BLOCK, 14 FINDING, 4 NOTE), pasted
-  verbatim in `feasibility.md` §1. The seats ruled the three BLOCKs
-  before anything else was committed (§2.2); SPEC/01 was revised once on
-  them.
+- Opened through `/open-milestone`. SPEC/01 was written first and
+  `product-spec-reviewer` run on it (3 BLOCK, 14 FINDING, 4 NOTE), pasted
+  verbatim in `feasibility.md` §1; the seats ruled the three BLOCKs
+  (§2.2) and SPEC/01 was revised once on them. That order is of writing,
+  not of commits, and the repo cannot show it: by the seats' ruling on
+  commit order the seeds were committed first, one each (`a7b088e` to
+  `6b8b8cf`), then the carried-item work, then the ADRs, so SPEC/01 lands
+  in `9a4e750` and ADR-0004 amendment 2 in `28137f2`, after the reader it
+  describes (`f42a200`). The cold review's F5.
 - `platform-architect` (R8, seat Security) is written in this PR and was
   run once on SPEC/01's bootstrap and construct design: 4 BLOCK, 21
   FINDING, 4 NOTE. Report in the PR body. It was run as a general agent
