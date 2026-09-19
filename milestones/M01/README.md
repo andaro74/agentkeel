@@ -42,6 +42,14 @@ Written at M01 PR 1 open. The row in `milestones/README.md` is the one
 - **This PR's run** writes the control's envelope, in M00's form: there
   is no agent under test until PR 2 (ruling A, `feasibility.md` §2.5). It
   is gated and recorded as at M00 and does not measure claim 1.
+- **This PR's CI run.** The first `evals` run (35469006669, at `fe9f0ff`)
+  refused as a dirty tree: `.gitattributes` put M00.mp4, a plain blob,
+  under the LFS filter, so a fresh checkout read it as modified. `37fe249`
+  takes the filter off M00.mp4. The rerun,
+  [35470107425](https://github.com/andaro74/agentkeel/actions/runs/35470107425)
+  at `ab54da1`, wrote the control's envelope in M00's form: GREEN, 5,802
+  tokens, `F0_2` and `F0_3` pass, recorded by `github-actions[bot]` in
+  `d50e228`. It says nothing about claim 1.
 - The seats' rulings on all 35 items M00 carried in are in
   `feasibility.md` §6, item by item, and in `rulings/pr1.md`.
 - Before PR 2's first run: the human redeploys `infra/eval-role` with
