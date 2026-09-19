@@ -98,3 +98,10 @@ its seeded case. Numbers over adjectives. If the milestone is GREEN,
 write in the explainer what GREEN does **not** mean; at M00 that sentence
 was "GREEN means nothing regressed against an empty history; it does not
 mean 2 of 15 passing is good."
+
+Copy the shape of that sentence, not its number. Every number in the
+explainer is the envelope's, and the envelope for M00's measured run says
+one of fifteen; two of fifteen is the best any run did. If a sentence and
+the envelope disagree, the envelope is right and the sentence is rewritten
+— including a sentence a seat asked for word for word. Say in the ruling
+file which number you changed and why.

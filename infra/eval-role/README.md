@@ -47,19 +47,30 @@ any PR branch, for up to an hour, with `cost-cap` reading only what the
 PR's own runner wrote down. M00 calls one model. Fixed in `app.py`: one
 profile, one workflow file.
 
-**Deployed: yes, 2026-09-19T00:20:25Z** — stack `AgentkeelM00EvalRole`,
-`UPDATE_COMPLETE`, created 2026-09-18T22:57:54Z. Every run up to and
-including the M00 PR 2 measurement at `9407615` assumed the wider role as
-deployed at `8fb4b80`.
+**Deployed: yes, 2026-09-19T00:20:25Z.** Every run up to and including
+the M00 PR 2 measurement at `9407615` assumed the wider role as deployed
+at `8fb4b80`. The deploy is a console reading, not a file in this repo —
+`cdk.out/` is gitignored — so here is the command and what it returned,
+for anyone who wants to check it rather than believe it:
+
+```
+$ aws cloudformation describe-stacks --stack-name AgentkeelM00EvalRole \
+    --region us-west-2 \
+    --query 'Stacks[0].[StackStatus,LastUpdatedTime,CreationTime]' --output text
+UPDATE_COMPLETE  2026-09-19T00:20:25.359000+00:00  2026-09-18T22:57:54.082000+00:00
+```
 
 **Assumed by a run: not at the M00 close.** The two `evals` runs between
 that measurement and the redeploy took the "already measured" path and
 assumed no role at all, and no run had started after the redeploy. The
 deploy is observed; the enforcement is not. That STS evaluates the
 `job_workflow_ref` condition is still unobserved, exactly as the bullet
-above says. The first run that assumes the redeployed role is recorded in
-`milestones/M00/rulings/pr3.md` — a path a later commit can add a line to
-without re-measuring the tree, which this file is not. Security signs S-1
+above says. The first run that assumes the redeployed role is the close PR's own
+`evals` run, because that PR changes `tests/` and this file. It is
+recorded in `milestones/M00/rulings/pr3.md`, under "This PR's own
+measurement", when the run finishes and before the merge — that path a
+later commit can add a line to without re-measuring the tree, which this
+file is not. Security signs S-1
 on that observation, at M01, not on this deploy
 (`milestones/M01/open.md`, item 12).
 

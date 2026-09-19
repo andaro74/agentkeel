@@ -19,6 +19,7 @@ same as CI (the rule `canonical_sha256` follows for documents).
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -53,7 +54,12 @@ def text_sha256(path: Path) -> str:
 
 
 def test_the_folder_holds_the_frozen_files_and_nothing_else():
-    present = {p.name for p in BASELINE.iterdir() if p.is_file()}
+    """Recursive: a sub-package under src/baseline/ is a change to the control too."""
+    present = {
+        p.relative_to(BASELINE).as_posix()
+        for p in BASELINE.rglob("*")
+        if p.is_file() and "__pycache__" not in p.parts
+    }
     assert present == set(FROZEN), "a file was added to or removed from the control"
 
 
@@ -72,10 +78,11 @@ def test_the_parameters_are_the_ones_confirmed_before_the_tag():
 
 def test_the_prompt_the_measurement_used_is_the_prompt_that_is_frozen():
     """Every baseline card in evals/history/ names the frozen prompt."""
-    cards = sorted((ROOT / "evals" / "history").glob("*.baseline-card.json"))
+    cards = sorted((ROOT / "evals" / "history").rglob("*.baseline-card.json"))
     assert cards, "no baseline card in evals/history/"
     for card in cards:
-        assert FROZEN["prompt.txt"] in card.read_text(encoding="utf-8"), (
+        recorded = json.loads(card.read_text(encoding="utf-8"))["prompt_sha256"]
+        assert recorded == FROZEN["prompt.txt"], (
             f"{card.name} was measured on a prompt that is not the frozen one"
         )
 

@@ -42,7 +42,9 @@ the answers. What is frozen here is the thing under test, not its output.
 
 1. **`src/baseline/` is closed from tag `m00`.** Four files, no more and
    no fewer, with the content hashes below. Nothing is added to the
-   folder either: a new file in it is a change to the control.
+   folder either: a new file anywhere under it, including in a
+   sub-package, is a change to the control. The test walks the folder
+   recursively and ignores only `__pycache__`.
 
 2. **The frozen content.** sha256 of each file's text, read as text, so a
    CRLF checkout hashes the same as CI (the same rule as

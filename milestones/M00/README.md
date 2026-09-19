@@ -197,11 +197,13 @@ human's, after the merge.
 |---|---|
 | F0.1 — the baseline passes trap `g-012` | ADR-0003; feasibility.md §6.4. Carried to the Data Owner at M01 PR 1 (`milestones/M01/open.md`) |
 | F0.4 — the control is not deterministic at temperature 0 | ADR-0004; feasibility.md §6.5, run by run. Seeds SPEC/04's A-vs-A design at M04 open |
-| S-1 — the CI eval role was wider than M00 needs | `infra/eval-role/README.md`. Fixed in `app.py` at PR 2, redeployed 2026-09-19T00:20:25Z; the run that assumes the narrowed role is recorded in `rulings/pr3.md` |
+| S-1 — the CI eval role was wider than M00 needs | `infra/eval-role/README.md`. Fixed in `app.py` at PR 2, redeployed 2026-09-19T00:20:25Z, not yet assumed by any run at the time of writing; this PR's own run is the first, and is recorded in `rulings/pr3.md` when it finishes. Security signs S-1 on that observation, at M01 (`milestones/M01/open.md` item 12) |
 | Profile status is not model status | Findings, above. Carried to SPEC/04 at M04 open |
 
-**What a reader should not take from GREEN.** The control scored 2 of 15,
-and 1 of those 2 is a trap it got right for the wrong reason (§6.4).
+**What a reader should not take from GREEN.** The control scored 1 of 15
+on the measured run, and the one it got right is a trap it got right for
+the wrong reason (§6.4). Two of the fifteen have passed on some run; no
+run has passed two.
 GREEN says no check failed and nothing the gate reads regressed; at M00
 the gate reads no golden at all, because every result is `scope: control`
 and the control is never gated (ADR-0004).

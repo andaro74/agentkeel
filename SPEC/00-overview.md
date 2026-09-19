@@ -8,7 +8,8 @@ ADR-0003 (remaining path ownership; F0.1 is a finding, M00 PR 1) and
 ADR-0004 (measurement fields: `checks`, `scope`, cost-cap in
 `thresholds.yaml`; the control is never gated; M00 PR 2, with amendment 1:
 merge commits, and which card a later envelope points at; M00 PR 3) ·
-ADR-0002 (the baseline is frozen at tag `m00`; M00 PR 3)
+ADR-0002 (the baseline is frozen at tag `m00`; M00 PR 3) · ADR-0005
+(the milestone video is recorded at the tag; M00 PR 3)
 
 ## 1. What this is
 
@@ -669,9 +670,14 @@ not check recordings.
 - Recordings are evidence, not marketing: no cuts, no retakes of a failed
   step. A failure on camera is kept and explained in the act's README
   entry.
-- A milestone's close PR is not ruled ready without its explainer page
-  and video. The plant story and the plain sentence come from SPEC/NN at
-  open; only "What happened" is filled at close.
+- A milestone's close PR is not ruled ready without its explainer page.
+  The plant story and the plain sentence come from SPEC/NN at open; only
+  "What happened" is filled at close. The video is recorded on `main`
+  after the merge and after `git tag mNN`, and committed with that tag in
+  its `docs/video/README.md` entry; until then the page's Watch line
+  reads "pending, tag `mNN`" and the outstanding video is carried into
+  the next milestone's `open.md` with a seat and a date (ADR-0005). A
+  milestone is not finished until its video is committed.
 
 ## 11. Rulings recorded in this SPEC
 

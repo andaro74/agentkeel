@@ -38,6 +38,13 @@ diff is the problem.
 
    Do not invoke a specialist that is not in the tree (R8).
 
+   There is no subagent for Product's other paths — `milestones/**`,
+   `docs/**`, `CLAUDE.md`, `.claude/skills/**`. A close PR is almost
+   entirely those, and `engineering-cold-reviewer` reads them as part of
+   the diff. That is the arrangement, not an oversight; if a milestone
+   needs a Product reviewer beyond SPEC/NN, it is added at the milestone
+   that first needs it (R8), not assumed here.
+
 3. Paste every report into the PR body **verbatim**, with its counts.
    The `product-spec-reviewer` report goes into
    `milestones/MNN/feasibility.md` instead.

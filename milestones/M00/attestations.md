@@ -7,7 +7,13 @@ which one was wrong.
 
 Sign by writing your name and the date at the end of the line, in a
 commit on the close PR's branch or on `main` before the tag. An unsigned
-line is not a failed attestation; it is a milestone that has not closed.
+line is not a failed attestation; it is a milestone that is not tagged.
+
+The ledger row is not waiting on these. The row's State is the verdict in
+its Measured cell and `make ledger` holds it there, so row 0 reads GREEN
+from the commit that copied the cell from the envelope. What these three
+gate is `git tag m00`, and what they add to the row is a person's name
+against three sentences a file cannot check.
 
 ---
 
@@ -58,7 +64,8 @@ Signed: ______________________  Date: ____________
 ---
 
 Not attested here, and deliberately: that the narrowed eval role is
-enforced by STS. The stack was redeployed on 2026-09-19T00:20:25Z, and
-the first run that assumes the redeployed role is recorded in
-`milestones/M00/rulings/pr3.md`. Security signs that in M01, on an
-observation, not here on a deploy.
+enforced by STS. The stack was redeployed on 2026-09-19T00:20:25Z and no
+run had assumed it when these lines were written. The close PR's own
+`evals` run is the first, and `milestones/M00/rulings/pr3.md` records it
+when it finishes. Security signs that in M01, on the observation, not
+here on a deploy.
