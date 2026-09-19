@@ -27,6 +27,59 @@ judge_model_id: null
 # Rule Owner: the guardrail id and version. M03.
 guardrail: null
 
+# Security (ruling d): AWS service names only at M01, one VPC endpoint each.
+# The agent's security group egress allows these and nothing else; anything
+# outside the enum is refused at synth. Arbitrary hostnames are M05.
+# bedrock-runtime: Converse. dynamodb: the rights table. kms: the agent's
+# key. logs: its own log group. s3: the gateway endpoint, for nothing at M01
+# but the runtime's own image layers.
+endpoint_allowlist:
+  - bedrock-runtime
+  - dynamodb
+  - kms
+  - logs
+  - s3
+
+# Security: seat -> IdP group. No IdP groups exist yet; validate checks them
+# against real groups from M02 (SPEC/00 §5).
+seats:
+  product: null
+  rule-owner: null
+  data-owner: null
+  tool-owner: null
+  threshold-owner: null
+  security: null
+  engineering: null
+
+# Tool Owner: edges. Empty at M01. `ratings-helper` is cut to M02 with the
+# two-sided edge check (SPEC/01 §10, ruling SCOPE).
+may_call: []
+may_be_called_by: []
+
+# Tool Owner: ceilings (SPEC/00 §6). Read by validate from M02, when an edge
+# exists.
+ceilings:
+  concurrency: 2
+  rps_per_edge: 1
+  depth: 2
+  fan_out: 3
+
+# Threshold Owner. The eval role's Bedrock budget is Security's and is
+# separate (ruling a).
+max_tokens_per_session: 20000
+daily_usd: 10
+
+# Not wired at M01 (SPEC/01 §10, ruling SCOPE): no memory, no knowledge base
+# over data/corpus/ (M03), no HITL branch (M07). `data_class` is
+# informational in the PoC (SPEC/00 §12).
+memory: null
+data_class: internal
+deprecated_after: null
+rollout: all-at-once
+
+# The platform tag this bundle is built against.
+platform_version: m00
+
 # Threshold Owner: every other role's pinned id, resolved 2026-09-18 in
 # us-west-2 (milestones/M00/README.md, "Model ids"). Read by the milestone
 # that names each role; statuses and reasons stay in that table.

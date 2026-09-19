@@ -6,7 +6,8 @@ failure now, and a failure the first time it passes, so the marker has to
 come off in the commit that lands the reader. A seed cannot start passing
 without somebody saying so.
 
-S1-S6 and S8 are read at M01 PR 2. S7 is read by `verdict.build` and `verdict.gate`
+S1 and S2 are read by src/bundle/verify.py (M01 PR 2, their markers off).
+S3, S5, S8 and the S4, S6 observations are read later in PR 2. S7 is read by `verdict.build` and `verdict.gate`
 in M01 PR 1 (F1.4); its marker came off in the commit that landed that reading.
 """
 
@@ -27,17 +28,15 @@ RUNS = ROOT / "milestones" / "M01" / "runs"
 PR2 = "no reader until M01 PR 2"
 
 
-@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S1: {PR2} (src/bundle/verify.py)")
 def test_s1_an_unsigned_bundle_is_refused():
-    from src.bundle import verify  # type: ignore[import-not-found]
+    from src.bundle import verify
 
     with pytest.raises(verify.Refused, match="signature"):
         verify.verify(FIXTURES / "bundles" / "unsigned")
 
 
-@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S2: {PR2} (src/bundle/verify.py)")
 def test_s2_a_bundle_changed_after_signing_is_refused():
-    from src.bundle import verify  # type: ignore[import-not-found]
+    from src.bundle import verify
 
     with pytest.raises(verify.Refused, match="digest"):
         verify.verify(FIXTURES / "bundles" / "altered")

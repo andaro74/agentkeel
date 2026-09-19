@@ -10,7 +10,7 @@
 # It signs the bundle ARCHIVE of tests/fixtures/bundles/unsigned/ (S1). The
 # archive recipe is inline below and is the one src/bundle/pack.py implements
 # in the next commit: files only, sorted by path, ustar, mode 0644, mtime 0,
-# uid/gid 0, empty uname/gname. A test in PR 2 re-packs S1 and compares the
+# uid/gid 0, empty uname/gname, CRLF normalised to LF. A test in PR 2 re-packs S1 and compares the
 # digest with the one inside this signature; if the recipe drifts, that test
 # fails, not the seed.
 #
@@ -70,17 +70,17 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import hashlib, pathlib, tarfile
+          import hashlib, io, pathlib, tarfile
           root = pathlib.Path("tests/fixtures/bundles/unsigned")
           out = pathlib.Path("s1.tar")
           with tarfile.open(out, "w", format=tarfile.USTAR_FORMAT) as tar:
               for path in sorted(p for p in root.rglob("*") if p.is_file()):
+                  content = path.read_bytes().replace(b"\r\n", b"\n")  # the repo's line endings, not the checkout's
                   info = tarfile.TarInfo(path.relative_to(root).as_posix())
-                  info.size = path.stat().st_size
+                  info.size = len(content)
                   info.mode, info.mtime, info.uid, info.gid = 0o644, 0, 0, 0
                   info.uname = info.gname = ""
-                  with path.open("rb") as handle:
-                      tar.addfile(info, handle)
+                  tar.addfile(info, io.BytesIO(content))
           print("archive sha256", hashlib.sha256(out.read_bytes()).hexdigest())
           PY
 

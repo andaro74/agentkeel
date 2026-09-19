@@ -209,9 +209,29 @@ def check_workflow_hashes(root: Path) -> list[str]:
     return errors
 
 
+def check_manifests(root: Path) -> list[str]:
+    """Every agents/*/manifest.yaml validates against src/manifest/schema.json (M01 PR 2)."""
+    from src import manifest as manifest_module
+
+    paths = manifest_module.paths(root)
+    if not paths:
+        return ["agents/*/manifest.yaml: none found"]
+    errors = []
+    for path in paths:
+        rel = path.relative_to(root).as_posix()
+        try:
+            doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            errors.append(f"{rel}: not YAML: {exc}")
+            continue
+        errors += [f"{rel}: {error}" for error in manifest_module.schema_errors(doc)]
+    return errors
+
+
 CHECKS = {
     "golden front matter": check_goldens,
     "golden citations exist in data/": check_golden_citations,
     "ruling front matter": check_rulings,
     "workflow-hash": check_workflow_hashes,
+    "manifest schema": check_manifests,
 }
