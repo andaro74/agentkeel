@@ -30,6 +30,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from botocore.exceptions import BotoCoreError, ClientError
+
 BUNDLE = Path(__file__).parent
 ROOT = BUNDLE.parents[1]
 PROMPT = (BUNDLE / "prompt.txt").read_text(encoding="utf-8")
@@ -83,6 +85,15 @@ def check_availability(arguments: dict[str, Any], rows: list[dict[str, Any]], so
         and row["territory"] == arguments["territory"]
         and row["platform"] == arguments["platform"]
     ]  # fmt: skip
+    if len(match) > 1:
+        # The tool returns "the governing row". Two rows on one key means the
+        # table does not say which governs, and choosing quietly would make
+        # that the tool's decision. Nothing holds the key unique today.
+        raise ValueError(
+            f"check_availability: {len(match)} rows for "
+            f"{arguments['title_id']}/{arguments['territory']}/{arguments['platform']}: "
+            + ", ".join(row["table_row"] for row in match)
+        )
     if not match:
         # No row is an answer: a grant that is not scheduled does not exist.
         result = {"found": False, "row": None, "clause_candidates": ["ML-2.1"], "source": source}
@@ -136,14 +147,22 @@ def answer(client: Any, question: str, model_id: str, rows: list[dict[str, Any]]
     calls: list[dict[str, Any]] = []
     stop_reason = ""
 
+    failed = None
     for _ in range(MAX_TOOL_CALLS + 1):
-        response = client.converse(
-            modelId=model_id,
-            system=[{"text": PROMPT}],
-            messages=messages,
-            inferenceConfig=INFERENCE_CONFIG,
-            toolConfig=tool_config(),
-        )
+        try:
+            response = client.converse(
+                modelId=model_id,
+                system=[{"text": PROMPT}],
+                messages=messages,
+                inferenceConfig=INFERENCE_CONFIG,
+                toolConfig=tool_config(),
+            )
+        except (BotoCoreError, ClientError) as exc:
+            # A golden that spends and then fails has still spent. Raising here
+            # would throw away the usage of the calls before it, and the cap
+            # exists for exactly that run (Threshold Owner, M01 PR 2).
+            failed = f"{type(exc).__name__}: {exc}"
+            break
         for field in usage:
             usage[field] += response["usage"].get(field, 0)
         stop_reason = response["stopReason"]
@@ -165,7 +184,9 @@ def answer(client: Any, question: str, model_id: str, rows: list[dict[str, Any]]
         messages.append({"role": "user", "content": results})
 
     text = "".join(block.get("text", "") for block in messages[-1]["content"] if isinstance(block, dict))
+    observation = {"error": failed} if failed else {}
     return {
+        **observation,
         "text": text,
         "parsed": parse_json(text),
         "stop_reason": stop_reason,

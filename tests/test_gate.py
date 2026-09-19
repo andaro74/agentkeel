@@ -88,7 +88,8 @@ def test_an_agent_cannot_call_itself_the_control(chain):
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(gate.Rejected, match="claim 1 is read on an agent envelope only"):
         gate.read(envelope_path)
-    del envelope["checks"]["F1_4"]  # and without its claim-1 check, its base is another commit's card
+    for name in gate.CLAIM_1_CHECKS:  # and without them, its base is another commit's card
+        envelope["checks"].pop(name, None)
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(gate.Rejected, match="baseline card is for 9407615"):
         gate.read(envelope_path)
@@ -252,7 +253,8 @@ def test_measured_is_what_the_ledger_cell_must_say(chain):
     envelope_path, _, _ = chain(right={"g-001"}, agent=True)
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
         "agent: traps 0/3; ordinary 1/9; guardrail 0/3; control: traps 0/3; ordinary 0/9; guardrail 0/3; "
-        f"never_passed 14; regressed 0; plants 0/0; F1_4 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
+        f"never_passed 14; regressed 0; plants 0/0; F1_1 pass {URL}; F1_2 pass {URL}; F1_3 pass {URL}; "
+        f"F1_4 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
     )
 
 

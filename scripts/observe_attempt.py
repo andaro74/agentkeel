@@ -103,6 +103,10 @@ def main(argv: list[str] | None = None) -> int:
                 entry |= {"found": False, "error_code": None, "error_message": f"{type(exc).__name__}: {exc}"}
             # What the human wrote, beside what CloudTrail says. They must agree.
             entry["human_said"] = {"result": attempt.get("result"), "message": attempt.get("message")}
+            # What the run file says the denial must name. The check reads this
+            # against CloudTrail's own errorMessage, not the human's note.
+            if phrase := attempt.get("message_must_contain"):
+                entry["message_must_contain"] = phrase
             result["attempts"].append(entry)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

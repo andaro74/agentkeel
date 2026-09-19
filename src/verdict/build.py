@@ -270,10 +270,22 @@ def check_from_attempt(path: Path, run_url: str | None) -> dict[str, str]:
         raise Refused("a check needs the CI run URL (--run-url)")
     seen = load_json(path)
     attempts = seen.get("attempts") or []
-    refused = bool(attempts) and all(
-        attempt.get("found") is True and attempt.get("error_code") == "AccessDenied" for attempt in attempts
-    )
+    refused = bool(attempts) and all(_refused_by_the_right_thing(attempt) for attempt in attempts)
     return {"status": "pass" if refused else "fail", "url": run_url}
+
+
+def _refused_by_the_right_thing(attempt: dict[str, Any]) -> bool:
+    """AccessDenied, and where the run file says the denial must come from.
+
+    S6 grants the agent role `kms:GetKeyPolicy` in its own policy so that the
+    only thing left to refuse it is the key policy. A denial that named the
+    role's own policy would be the wrong control firing, and reading only the
+    error code could not tell the two apart.
+    """
+    if attempt.get("found") is not True or attempt.get("error_code") != "AccessDenied":
+        return False
+    wanted = attempt.get("message_must_contain")
+    return not wanted or wanted.lower() in (attempt.get("error_message") or "").lower()
 
 
 def both(checks: dict[str, dict[str, str]], falsifier: str, result: dict[str, str]) -> dict[str, dict[str, str]]:

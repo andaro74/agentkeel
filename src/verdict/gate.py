@@ -69,6 +69,12 @@ from src.verdict import (
 __all__ = ["Rejected", "cap_at", "control_drift", "judge", "measured", "measured_at", "read", "rule",
            "schema_errors", "thresholds_at"]
 
+# What an agent envelope must carry from M01 (SPEC/01 §4). A check that is
+# absent is not a check that passed: the Makefile builds the list from
+# variables CI passes, and a run that forgot one would otherwise be read as
+# a run that measured the claim.
+CLAIM_1_CHECKS = ("F1_1", "F1_2", "F1_3", "F1_4")
+
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
 THRESHOLDS = ROOT / "thresholds.yaml"
@@ -226,6 +232,12 @@ def judge(
             reasons.append("checks.F1_4 is missing from an agent envelope")
         elif said["status"] != mine_f1_4:
             reasons.append(f"envelope says F1_4 is {said['status']}, the gate reads {mine_f1_4}")
+        # An absent check is not a check that passed. `build` assembles the
+        # list from flags the Makefile passes, so a run that measured nothing
+        # would otherwise be read as a run that measured the claim and found
+        # it whole.
+        reasons += [f"checks.{name} is missing from an agent envelope"
+                    for name in CLAIM_1_CHECKS if name not in envelope["checks"]]  # fmt: skip
     reasons += [
         f"check {name} failed: {check['url']}"
         for name, check in sorted(envelope["checks"].items())

@@ -1,8 +1,13 @@
 """`GovernedAgent`, and the checks over the whole synthesised stack (Security seat).
 
 An agent exists on this platform only as an instance of this construct
-(SPEC/01 §2). Three of M01's seeded cases are read here, and each is read
-over the **whole stack**, not inside the construct:
+(SPEC/01 §2) — at synth, in a stack that installs these checks. Nothing in
+the account says so: there is no service control policy, and a role whose
+own policy were widened could call `CreateAgentRuntime` directly. That is
+landing-zone work (SPEC/00 §2, §12), and no role's policy grants it today.
+
+Three of M01's seeded cases are read here, and each is read over the whole
+stack, not inside the construct:
 
 - **S3** an egress rule the manifest does not list, added through the
   construct's security group or as a separate resource naming it;

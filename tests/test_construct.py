@@ -9,6 +9,9 @@ synthesising with nothing refused.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -17,7 +20,24 @@ from infra.construct import synth_refusal
 
 ROOT = Path(__file__).resolve().parents[1]
 APPS = Path(__file__).parent / "fixtures" / "construct"
-TEMPLATE = ROOT / "infra" / "construct" / "cdk.out" / "AgentkeelRefagent.template.json"
+REFAGENT_APP = ROOT / "infra" / "construct" / "app.py"
+
+
+@pytest.fixture(scope="module")
+def template(tmp_path_factory) -> dict:
+    """refagent's template, synthesised here rather than read from `cdk.out`.
+
+    `cdk.out/` is gitignored and is written by `make validate`. Reading it
+    would let these tests pass on a template from an earlier synth, or fail
+    on a fresh clone for the wrong reason.
+    """
+    out = tmp_path_factory.mktemp("synth")
+    done = subprocess.run(
+        [sys.executable, str(REFAGENT_APP)], cwd=ROOT, capture_output=True, text=True, check=False,
+        env={**os.environ, "PYTHONPATH": str(ROOT), "CDK_OUTDIR": str(out)},
+    )  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    return json.loads((out / "AgentkeelRefagent.template.json").read_text(encoding="utf-8"))
 
 
 def app(tmp_path: Path, body: str) -> Path:
@@ -57,9 +77,8 @@ def test_refagents_own_stack_synthesises():
     assert synth_refusal(ROOT / "infra" / "construct" / "app.py") is None
 
 
-def test_the_runtime_is_in_the_vpc_and_the_egress_is_the_manifests():
-    """Read from the template `make validate` just wrote, not from the construct's own claim."""
-    template = json.loads(TEMPLATE.read_text(encoding="utf-8"))
+def test_the_runtime_is_in_the_vpc_and_the_egress_is_the_manifests(template):
+    """Read from the rendered template, not from the construct's own claim."""
     resources = template["Resources"].values()
     runtimes = [r for r in resources if r["Type"] == "AWS::BedrockAgentCore::Runtime"]
     assert len(runtimes) == 1
@@ -81,8 +100,49 @@ def test_the_runtime_is_in_the_vpc_and_the_egress_is_the_manifests():
     assert all("DestinationPrefixListId" in rule for rule in apart)
 
 
-def test_every_role_in_the_stack_carries_a_boundary():
-    template = json.loads(TEMPLATE.read_text(encoding="utf-8"))
+def test_every_role_in_the_stack_carries_a_boundary(template):
     roles = [r for r in template["Resources"].values() if r["Type"] == "AWS::IAM::Role"]
     assert roles and all(r["Properties"].get("PermissionsBoundary") for r in roles)
     assert all(r["Properties"].get("Path") == "/agentkeel/agents/" for r in roles)
+
+
+def test_the_same_egress_rule_written_raw_is_refused_too(tmp_path):
+    """platform-architect BLOCK 3: matched by CloudFormation type, not by Python class."""
+    refusal = synth_refusal(app(tmp_path, (
+        'a = GovernedAgent(stack, "R", bundle="agents/refagent")\n'
+        'cdk.CfnResource(stack, "Raw", type="AWS::EC2::SecurityGroupEgress", properties={\n'
+        '    "GroupId": a.security_group.security_group_id, "IpProtocol": "tcp",\n'
+        '    "FromPort": 443, "ToPort": 443, "CidrIp": "0.0.0.0/0"})'
+    )))
+    assert refusal is not None and "egress to 0.0.0.0/0" in refusal
+    assert "added outside the construct" in refusal
+
+
+def test_a_second_runtime_inside_the_construct_is_not_the_constructs_own(tmp_path):
+    """platform-architect finding 4: the check is identity, not a place in the tree."""
+    refusal = synth_refusal(app(tmp_path, (
+        'from aws_cdk import aws_bedrockagentcore as ac\n'
+        'a = GovernedAgent(stack, "R", bundle="agents/refagent")\n'
+        'ac.CfnRuntime(a, "Extra", agent_runtime_name="extra", role_arn="arn:aws:iam::1:role/x",\n'
+        '    agent_runtime_artifact=ac.CfnRuntime.AgentRuntimeArtifactProperty(\n'
+        '        container_configuration=ac.CfnRuntime.ContainerConfigurationProperty(container_uri="x")),\n'
+        '    network_configuration=ac.CfnRuntime.NetworkConfigurationProperty(network_mode="PUBLIC"))'
+    )))
+    assert refusal is not None and "not a GovernedAgent's own runtime" in refusal
+
+
+def test_a_rule_to_an_approved_endpoint_on_a_wider_port_range_is_refused():
+    """platform-architect note 1: tcp 1-443 to an approved endpoint reaches more than 443.
+
+    Read directly: through a synth the destination check fires first, because
+    an approved destination is an SSM token no fixture can name.
+    """
+    from infra.construct.governed_agent import _egress_refusal
+
+    approved = {"Ref": "SsmParameterValue"}
+    exact = {"destinationSecurityGroupId": approved, "ipProtocol": "tcp", "fromPort": 443, "toPort": 443}
+    assert _egress_refusal(exact, [approved]) is None
+    assert "tcp 1-443" in _egress_refusal({**exact, "fromPort": 1}, [approved])
+    assert "udp 443-443" in _egress_refusal({**exact, "ipProtocol": "udp"}, [approved])
+    # an absent destination is 0.0.0.0/0 (SPEC/01 §6)
+    assert "no destination" in _egress_refusal({"ipProtocol": "tcp", "toPort": 443}, [approved])

@@ -20,7 +20,7 @@
       },
       "platform": {"enum": ["AVOD", "PVOD", "SVOD", "THEATRICAL"]},
       "date": {
-        "description": "The publication date, YYYY-MM-DD, or an instant for a theatrical release under embargo.",
+        "description": "The publication date, YYYY-MM-DD, or an instant for a theatrical release under embargo. It is recorded with the call and is not matched on: the row is found by title, territory and platform, and whether the date falls in the window is read from the row.",
         "type": "string",
         "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}([T ][0-9]{2}:[0-9]{2}(:[0-9]{2})?Z?)?$"
       }

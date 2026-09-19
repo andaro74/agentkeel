@@ -6,17 +6,21 @@ failure now, and a failure the first time it passes, so the marker has to
 come off in the commit that lands the reader. A seed cannot start passing
 without somebody saying so.
 
-S1 and S2 are read by src/bundle/verify.py, S3, S5 and S8 by infra/construct/
-(M01 PR 2, their markers off). S4 and S6 are attempts against the deployed
-bootstrap stack; their markers come off when the human has made them and
-CI has looked each request id up in CloudTrail. S7 is read by
-`verdict.build` and `verdict.gate` in M01 PR 1 (F1.4); its marker came off
-in the commit that landed that reading.
+Every marker is off as of M01 PR 2: each seed's reader is in the tree. S1
+and S2 are read by src/bundle/verify.py, S3, S5 and S8 by infra/construct/,
+S4 and S6 by scripts/observe_attempt.py and `--check-attempt`, S7 by
+`verdict.build` and `verdict.gate` (its marker came off at PR 1).
+
+S4 and S6 fail while their run files say `observed: null`, and that is the
+row going RED until the human makes the attempts — not a marker waiting to
+come off. A strict xfail here would have done the opposite: it would have
+failed the measuring run the moment the attempts were recorded.
 """
 
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -28,7 +32,6 @@ from .conftest import COMMIT, URL, make_raw
 
 FIXTURES = Path(__file__).parent / "fixtures"
 RUNS = ROOT / "milestones" / "M01" / "runs"
-PR2 = "no reader until M01 PR 2"
 
 
 def test_s1_an_unsigned_bundle_is_refused():
@@ -39,10 +42,16 @@ def test_s1_an_unsigned_bundle_is_refused():
 
 
 def test_s2_a_bundle_changed_after_signing_is_refused():
-    from src.bundle import verify
+    """Refused because its bytes hash to something else — not because no digest was found."""
+    from src.bundle import pack, verify
 
-    with pytest.raises(verify.Refused, match="digest"):
+    with pytest.raises(verify.Refused) as refusal:
         verify.verify(FIXTURES / "bundles" / "altered")
+    signed = verify.signed_digest(verify.cosign_bundle(FIXTURES / "bundles" / "altered"))
+    digests = [reason for reason in refusal.value.reasons if reason.startswith("digest: ")]
+    assert len(digests) == 1 and signed[:12] in digests[0]
+    assert pack.digest(pack.pack(FIXTURES / "bundles" / "altered", Path(tempfile.mkdtemp()) / "s2.tar"))[:12] \
+        in digests[0]  # the bundle's own digest is in the reason, so the comparison really ran
 
 
 def test_s3_egress_not_in_the_manifest_is_refused_at_synth():
@@ -58,7 +67,6 @@ def test_s3_egress_not_in_the_manifest_is_refused_at_synth():
     assert "added outside the construct" not in through
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=f"S4: {PR2} (the bootstrap stack's deploy role)")
 def test_s4_a_laptop_deploy_was_refused():
     run = yaml.safe_load((RUNS / "f1_1_laptop.yaml").read_text(encoding="utf-8"))
     observed = run["observed"]
@@ -74,7 +82,6 @@ def test_s5_a_role_without_the_boundary_is_refused_at_synth():
     assert refusal is not None and "no permissions boundary" in refusal
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=f"S6: {PR2} (the bootstrap stack's key policy)")
 def test_s6_the_agent_role_cannot_read_its_key_policy():
     run = yaml.safe_load((RUNS / "f1_3_key_policy.yaml").read_text(encoding="utf-8"))
     observed = run["observed"]
@@ -88,7 +95,7 @@ def test_s8_an_agent_outside_the_construct_is_refused_at_synth():
     from infra.construct import synth_refusal
 
     refusal = synth_refusal(FIXTURES / "construct" / "outside_construct.py")
-    assert refusal is not None and "outside GovernedAgent" in refusal
+    assert refusal is not None and "not a GovernedAgent's own runtime" in refusal
 
 
 def test_s7_an_answer_that_cites_nothing_is_not_a_pass(tmp_path, goldens):

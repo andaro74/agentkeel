@@ -29,11 +29,14 @@ ROOT = Path(__file__).resolve().parents[1]
 def tokens_spent(raw: dict) -> int:
     spent = 0
     for observation in raw["observations"]:
-        if "error" in observation:  # the call failed; the runner saw no bill
-            continue
         usage = observation.get("usage")
+        if "error" in observation and not usage:
+            continue  # the call failed before anything was billed
         if not usage:
             raise ValueError(f"{observation.get('id')}: a reply with no usage cannot be counted")
+        # A golden that spent and then failed is counted for what it spent: an
+        # agent may make several calls for one golden, and the last one failing
+        # does not refund the others (Threshold Owner, M01 PR 2).
         # in plus out, as verdict.build counts it: one count in both readers
         spent += usage.get("inputTokens", 0) + usage.get("outputTokens", 0)
     return spent

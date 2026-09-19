@@ -11,7 +11,7 @@
 # `checks.F1_1`. A human-written file feeds no check by itself.
 #
 # Each observed entry: what, request_id, event_name, at (ISO 8601, UTC),
-# result, message. `event_name` is the CloudTrail event, because CloudTrail
+# result, message, and message_must_contain where the attempt above names one. `event_name` is the CloudTrail event, because CloudTrail
 # has no lookup attribute for a request id.
 seed: S4
 falsifier: F1.1

@@ -143,7 +143,11 @@ class BootstrapStack(cdk.Stack):
                     effect=iam.Effect.DENY,
                     actions=["iam:CreateUser", "iam:DeleteRolePermissionsBoundary", "iam:PutUserPolicy",
                              "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy", "kms:PutKeyPolicy",
-                             "kms:ScheduleKeyDeletion", "kms:DisableKey", "kms:GetKeyPolicy",
+                             "kms:ScheduleKeyDeletion", "kms:DisableKey",
+                             # kms:GetKeyPolicy is deliberately NOT here. The key policy is what
+                             # must refuse it (seed S6, F1.3); a boundary that refused it first
+                             # would make F1.3 a check that cannot fail, whatever the key policy
+                             # said. The key policy denies it by role path (ruling b).
                              "ec2:CreateInternetGateway", "ec2:AttachInternetGateway", "ec2:CreateNatGateway",
                              "ec2:CreateVpc", "ec2:CreateVpcPeeringConnection"],
                     resources=["*"],
@@ -266,11 +270,22 @@ class BootstrapStack(cdk.Stack):
                                      "logs:Get*", "logs:Describe*", "bedrock:List*"],
             resources=["*"],
         ))  # fmt: skip
+        # Seed S4 attempts the assume, and the thing that must refuse it is the
+        # deploy role's TRUST policy, not this role's own Deny. So the assume is
+        # allowed here, exactly as S6 grants kms:GetKeyPolicy in the agent role's
+        # own policy for its attempt. If the trust conditions are ever relaxed,
+        # the assume succeeds and S4 fires.
         role.add_to_policy(iam.PolicyStatement(
-            sid="NeverDeployNeverAssumeTheDeployRole",
+            sid="AssumeIsAllowedHereSoTheTrustPolicyIsWhatRefusesIt",
+            actions=["sts:AssumeRole"],
+            resources=[f"arn:aws:iam::{self.account}:role/agentkeel-deploy",
+                       f"arn:aws:iam::{self.account}:role/agentkeel-cfn-exec"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="NeverDeploy",
             effect=iam.Effect.DENY,
             actions=["cloudformation:CreateStack", "cloudformation:UpdateStack", "cloudformation:DeleteStack",
-                     "cloudformation:ExecuteChangeSet", "sts:AssumeRole", "iam:PassRole",
+                     "cloudformation:ExecuteChangeSet", "iam:PassRole",
                      "bedrock-agentcore:CreateAgentRuntime", "bedrock-agentcore:UpdateAgentRuntime"],
             resources=["*"],
         ))  # fmt: skip
@@ -337,7 +352,12 @@ class BootstrapStack(cdk.Stack):
             conditions={"ArnLike": {"aws:PrincipalArn": agent_roles}},
         ))  # fmt: skip
         key.add_to_resource_policy(iam.PolicyStatement(
-            sid="OnlySecurityChangesThisKey",  # R4: not the deploy role, not the execution role
+            # R4: not the deploy role, not the execution role. `agentkeel-security`
+            # does not exist yet, so in practice the only principal left is the
+            # account root — the break-glass admin SPEC/01 §1 puts out of scope.
+            # The half this does hold is the deploy role and the execution role,
+            # and SPEC/01 §9 lists it as a control with no seeded case.
+            sid="OnlyRootAndSecurityChangeThisKey",
             effect=iam.Effect.DENY,
             principals=[iam.AnyPrincipal()],
             actions=["kms:PutKeyPolicy", "kms:CreateGrant", "kms:ScheduleKeyDeletion", "kms:DisableKey"],
@@ -411,8 +431,6 @@ class BootstrapStack(cdk.Stack):
 
 # A fixed output directory, so `make validate` reads the NagReport of the
 # synth it just ran. The cdk CLI sets CDK_OUTDIR; a plain python run does not.
-    # --- what the construct reads ------------------------------------------
-
     def _image_repository(self) -> ecr.Repository:
         """Where the runtime image is pulled from. Tag-immutable: a digest is the bytes (SPEC/01 §6)."""
         return ecr.Repository(

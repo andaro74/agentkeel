@@ -110,9 +110,14 @@ def signed_digest(bundle: dict[str, Any]) -> str | None:
 
 
 def cosign_accepts(archive: Path, bundle_path: Path, identity: str) -> str | None:
-    """None when cosign verifies the blob, else why not. Skipped when cosign is absent."""
+    """None when cosign verifies the blob, else why not.
+
+    When cosign is not on the machine the signature itself cannot be checked,
+    and the caller is told so rather than being given a pass. The identity and
+    the digest are still read here, from the bundle, without it.
+    """
     if not shutil.which("cosign"):
-        return None
+        return "cosign is not on this machine, so the signature itself was not checked"
     done = subprocess.run(
         ["cosign", "verify-blob", "--bundle", str(bundle_path), "--certificate-oidc-issuer", ISSUER,
          "--certificate-identity", identity, str(archive)],
@@ -127,6 +132,7 @@ def verify(bundle_dir: Path, *, measure_identity: str | None = None) -> dict[str
     identity = measure_identity or DEPLOY_IDENTITY
     bundle = cosign_bundle(bundle_dir)
 
+    checked_signature = False
     with tempfile.TemporaryDirectory() as work:
         archive = pack(bundle_dir, Path(work) / ARCHIVE_NAME)
         archive_digest = digest(archive)
@@ -137,12 +143,19 @@ def verify(bundle_dir: Path, *, measure_identity: str | None = None) -> dict[str
             reasons.append(f"signature: {BUNDLE_NAME} is not JSON")
         else:
             san, repository_id = certificate_fields(certificate(bundle))
+            if san is None or repository_id is None:
+                # A certificate this cannot read is not a certificate that
+                # signed anything. Reading the two fields as "no reason to
+                # refuse" would let a hand-written bundle with no `cert` and a
+                # matching digest through, which is F1.1's first clause.
+                reasons.append("identity: no certificate in the cosign bundle that this can read")
             if san is not None and san != identity:
                 reasons.append(f"identity: signed by {san}, not {identity}")
             if repository_id is not None and repository_id != REPOSITORY_ID:
                 reasons.append(f"identity: source repository id {repository_id}, not {REPOSITORY_ID}")
             if (refusal := cosign_accepts(archive, bundle_dir / BUNDLE_NAME, identity)) and not reasons:
                 reasons.append(f"signature: {refusal}")
+            checked_signature = refusal is None
 
             signed = signed_digest(bundle)
             if signed is None:
@@ -153,7 +166,7 @@ def verify(bundle_dir: Path, *, measure_identity: str | None = None) -> dict[str
     if reasons:
         raise Refused(reasons)
     return {"bundle": bundle_dir.as_posix(), "digest": archive_digest, "identity": identity,
-            "measurement_only": bool(measure_identity)}  # fmt: skip
+            "signature_checked": checked_signature, "measurement_only": bool(measure_identity)}  # fmt: skip
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -172,6 +185,9 @@ def main(argv: list[str] | None = None) -> int:
         return 4
     if checked["measurement_only"]:
         print(f"accepted for a MEASUREMENT only, on identity {checked['identity']}: not a deploy")
+    if not checked["signature_checked"]:
+        print("warning: cosign is not on this machine; the identity and the digest were read, "
+              "the signature was not", file=sys.stderr)  # fmt: skip
     print(f"ok {checked['bundle']} {checked['digest']}")
     return 0
 

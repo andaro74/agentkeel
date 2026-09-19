@@ -20,7 +20,7 @@
 # concerned, and the deny under test is the same one.
 #
 # Each observed entry: what, request_id, event_name, at (ISO 8601, UTC),
-# result, message.
+# result, message, and message_must_contain where the attempt above names one.
 seed: S6
 falsifier: F1.3
 principal: a role under /agentkeel/agents/ with the boundary and kms:GetKeyPolicy in its own policy
@@ -29,4 +29,8 @@ attempts:
     event_name: GetKeyPolicy
     command: aws kms get-key-policy --key-id alias/agentkeel-refagent --policy-name default
     refused_when: AccessDenied with an explicit deny in a resource-based policy
+    # The check reads this against CloudTrail's own errorMessage, not against
+    # the human's note. A denial that named the role's own policy would be the
+    # wrong control firing, and the error code alone cannot tell them apart.
+    message_must_contain: resource-based policy
 observed: null

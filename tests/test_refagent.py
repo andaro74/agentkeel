@@ -86,3 +86,25 @@ def test_the_prompt_names_every_title_and_the_model_the_manifest_pins():
 def test_a_reply_that_is_not_json_parses_to_nothing_rather_than_being_repaired():
     assert agent.parse_json("I think we can publish.") is None
     assert agent.parse_json('here you go: {"table_row": "r-001"} ok') == {"table_row": "r-001"}
+
+
+def test_two_rows_on_one_key_is_refused_rather_than_chosen_between():
+    """Tool Owner finding 6: nothing holds (title, territory, platform) unique in the table."""
+    twice = [*ROWS, {**ROWS[0], "table_row": "r-999"}]
+    with pytest.raises(ValueError, match="2 rows for t-001/US/SVOD: r-001, r-999"):
+        agent.check_availability(ASKED, twice, SOURCE)
+
+
+def test_every_row_field_the_prompt_names_is_in_the_tool_contract():
+    """Tool Owner finding 9: nothing bound the prompt's field names to the schema."""
+    contract = json.loads((ROOT / "agents" / "refagent" / "tools" / "check_availability.json").read_text("utf-8"))
+    row_fields = set(contract["output"]["properties"]["row"]["anyOf"][1]["properties"])
+    for field in ("window_start", "window_end", "holdback_until", "clearance_expiry", "embargo_lift_local"):
+        assert field in row_fields and field in agent.PROMPT
+    assert "clause_candidates" in contract["output"]["properties"] and "clause_candidates" in agent.PROMPT
+
+
+def test_the_rights_table_has_one_row_per_title_territory_platform_today():
+    """The tool refuses a repeat; this says the table does not have one now."""
+    keys = [(r["title_id"], r["territory"], r["platform"]) for r in ROWS]
+    assert len(keys) == len(set(keys))

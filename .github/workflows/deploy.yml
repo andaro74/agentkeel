@@ -77,7 +77,9 @@ jobs:
         run: |
           set -euo pipefail
           uv run python -m src.bundle.pack "$BUNDLE" --out "$BUNDLE/dist" | tee pack.out
-          echo "digest=$(awk '{print $1}' pack.out)" >> "$GITHUB_OUTPUT"
+          # NR==1 and one field: a second line would otherwise set a second
+          # output, and this value is used in the job that holds the deploy role.
+          echo "digest=$(awk 'NR==1{print $1}' pack.out)" >> "$GITHUB_OUTPUT"
 
       - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
 
@@ -142,12 +144,15 @@ jobs:
         id: image
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
+          # Through the environment, never interpolated into the script: this
+          # job holds the deploy role, and ${{ }} is expanded before bash sees it.
+          TAG: ${{ needs.sign.outputs.digest }}
         run: |
           set -euo pipefail
           # The tag is the bundle digest, so the image and the bundle it was
           # built from carry the same name. The repository is tag-immutable,
           # so this tag can be written once.
-          tag="${{ needs.sign.outputs.digest }}"
+          tag="$TAG"
           docker build -f "$BUNDLE/Dockerfile" -t "$REGISTRY/$IMAGE:$tag" .
           docker push "$REGISTRY/$IMAGE:$tag"
           digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$REGISTRY/$IMAGE:$tag" | cut -d@ -f2)

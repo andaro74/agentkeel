@@ -302,7 +302,8 @@ def _nag_rows(path: Path, rel: str) -> list[str]:
 
 
 def _names_its_case(reason: str) -> bool:
-    return bool(re.search(r"\bS[34568]\b", reason) or "SPEC/01 §6" in reason)
+    """`seed S3`, not `the S3 gateway endpoint`: the service name is not the seed."""
+    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason)
 
 
 CHECKS = {

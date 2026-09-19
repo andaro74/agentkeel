@@ -34,6 +34,7 @@ BOUNDARY_PARAM = "/agentkeel/security/boundary-arn"
 VPC_PARAM = "/agentkeel/security/vpc-id"
 SUBNETS_PARAM = "/agentkeel/security/subnet-ids"
 ENDPOINT_PARAM = "/agentkeel/security/endpoint/{name}"
+PREFIX_LIST_PARAM = "/agentkeel/security/prefix-list/{name}"
 # The two the manifest may list that are gateway endpoints, not interface
 # ones (ruling e, ADR-0006): egress to them is a prefix list, not a
 # security group.
@@ -111,10 +112,11 @@ class GovernedAgent(Construct):
 
         approved: list[Any] = []
         for name in self.manifest["endpoint_allowlist"]:
+            gateway = name in GATEWAY_ENDPOINTS
+            template = PREFIX_LIST_PARAM if gateway else ENDPOINT_PARAM
             destination = _parameter(self, f"Endpoint{name.title().replace('-', '')}",
-                                     ENDPOINT_PARAM.format(name=name))  # fmt: skip
-            peer = (ec2.Peer.prefix_list(destination) if name in GATEWAY_ENDPOINTS
-                    else ec2.Peer.security_group_id(destination))  # fmt: skip
+                                     template.format(name=name))  # fmt: skip
+            peer = ec2.Peer.prefix_list(destination) if gateway else ec2.Peer.security_group_id(destination)
             group.add_egress_rule(peer, ec2.Port.tcp(PORT), f"{name}, from the manifest")
             approved.append(destination)
         rules.own_security_group(group, approved)
@@ -234,10 +236,20 @@ def _parameter(scope: Construct, construct_id: str, name: str) -> str:
 class _StackRules:
     """What the stack must be true of, checked after every aspect has run.
 
-    CDK runs validations after aspects, so the boundary a stack-wide
-    `PermissionsBoundary` writes is on the roles by the time this reads
-    them. Anything added to the stack after the construct — S3's second
-    form, S8's bare runtime — is in the tree by then too.
+    CDK runs validations last, after every aspect and before the template is
+    rendered, so anything added to the stack after the construct — S3's
+    second form, S8's bare runtime — is in the tree by the time this reads
+    it. (`PermissionsBoundary.of(stack).apply()` is not an aspect in this
+    version of aws-cdk-lib: it sets a context key the `Role` constructor
+    reads. The placement works either way, but do not rely on the aspect
+    ordering for it.)
+
+    **Which stack.** `Stack.of(the construct)`, and the constructs below it.
+    A rule or a runtime in a sibling or parent stack is out of reach: a
+    `CfnSecurityGroupEgress` in another stack naming this security group
+    through a cross-stack export is not read here, and neither is a runtime
+    in a stack that never installs these checks (`platform-architect`,
+    M01 PR 2).
     """
 
     def __init__(self, stack: cdk.Stack) -> None:
@@ -271,17 +283,15 @@ class _StackRules:
                 if reason := _egress_refusal(_lower_first(rule), allowed):
                     found.append(f"{group.node.path}: {reason}")
             for node in self.stack.node.find_all():
-                if not isinstance(node, ec2.CfnSecurityGroupEgress):
+                # By CloudFormation type, not by Python class: the same rule
+                # written as a raw `cdk.CfnResource` of this type is the same
+                # rule, and SPEC/01 §3 says "however the rule is added".
+                if _resource_type(node) != ec2.CfnSecurityGroupEgress.CFN_RESOURCE_TYPE_NAME:
                     continue
-                if self.stack.resolve(node.group_id) != self.stack.resolve(group.security_group_id):
+                rule = _lower_first(self.stack.resolve(_properties(node)))
+                if rule.get("groupId") != self.stack.resolve(group.security_group_id):
                     continue
-                rule = {
-                    "cidrIp": node.cidr_ip, "cidrIpv6": node.cidr_ipv6, "ipProtocol": node.ip_protocol,
-                    "fromPort": node.from_port, "toPort": node.to_port,
-                    "destinationSecurityGroupId": node.destination_security_group_id,
-                    "destinationPrefixListId": node.destination_prefix_list_id,
-                }  # fmt: skip
-                if reason := _egress_refusal(self.stack.resolve(rule), allowed):
+                if reason := _egress_refusal(rule, allowed):
                     found.append(f"{node.node.path}: {reason} (added outside the construct)")
         return found
 
@@ -316,14 +326,31 @@ class _StackRules:
         for node in self.stack.node.find_all():
             if _resource_type(node) != RUNTIME_TYPE:
                 continue
-            if not any(isinstance(scope, GovernedAgent) for scope in node.node.scopes):
-                found.append(f"{node.node.path}: an {RUNTIME_TYPE} outside GovernedAgent. An agent exists on "
-                             f"this platform only as an instance of the construct (SPEC/01 §2).")  # fmt: skip
+            # Identity, not location: a runtime added inside a GovernedAgent's
+            # scope is not the construct's own runtime, and the construct
+            # built none of its network configuration or its role.
+            if not any(isinstance(scope, GovernedAgent) and node is scope.runtime for scope in node.node.scopes):
+                found.append(f"{node.node.path}: an {RUNTIME_TYPE} that is not a GovernedAgent's own runtime. "
+                             f"An agent exists on this platform only as an instance of the construct "
+                             f"(SPEC/01 §2).")  # fmt: skip
         return found
 
 
 def _resource_type(node: Any) -> str | None:
     return getattr(node, "cfn_resource_type", None)
+
+
+def _properties(node: Any) -> dict[str, Any]:
+    """An L1's properties, whether it is a typed class or a raw `CfnResource`.
+
+    `_toCloudFormation` is not public, so this reads the two places CDK keeps
+    them: `cfn_properties` on a typed L1, and the `properties` a raw resource
+    was given.
+    """
+    for attribute in ("_cfn_properties", "cfn_properties"):
+        if isinstance(value := getattr(node, attribute, None), dict):
+            return value
+    return {}
 
 
 def _lower_first(rule: Any) -> dict[str, Any]:
@@ -346,7 +373,8 @@ def _egress_refusal(rule: dict[str, Any], allowed: list[Any]) -> str | None:
         return "an egress rule with no destination: an absent destination is 0.0.0.0/0 (SPEC/01 §6)."
     if destination not in allowed:
         return f"egress to {destination}: not an endpoint the manifest's endpoint_allowlist names."
-    if rule.get("toPort") != PORT or (rule.get("ipProtocol") or "").lower() != "tcp":
+    if rule.get("fromPort") != PORT or rule.get("toPort") != PORT \
+            or (rule.get("ipProtocol") or "").lower() != "tcp":  # fmt: skip
         return (f"egress on {rule.get('ipProtocol')} {rule.get('fromPort')}-{rule.get('toPort')}: "
                 f"the endpoints are reached on tcp {PORT} and nothing else.")  # fmt: skip
     return None

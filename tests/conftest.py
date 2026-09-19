@@ -65,14 +65,43 @@ def chain(tmp_path: Path, goldens):
         raw_path.write_text(json.dumps(make_raw(goldens, () if agent else right, **top)), encoding="utf-8")
         assert build.main(["card", "--raw", str(raw_path), "--out", str(card_path)]) == 0
         history = history_dir or tmp_path / "no-history"
+        flags: list[str] = []
         if agent:
             raw_path = tmp_path / f"{COMMIT}.agent-raw.json"
             raw_path.write_text(json.dumps(make_raw(goldens, right, model_id="agent-under-test", **top)), encoding="utf-8")
+            flags = claim_1_checks(tmp_path)
         assert build.main(["envelope", "--raw", str(raw_path), "--control-card", str(card_path),
-                           "--out", str(envelope_path), "--history-dir", str(history), "--run-url", URL]) == 0  # fmt: skip
+                           "--out", str(envelope_path), "--history-dir", str(history), "--run-url", URL,
+                           *flags]) == 0  # fmt: skip
         return envelope_path, card_path, raw_path
 
     return run
+
+
+def claim_1_checks(tmp_path: Path) -> list[str]:
+    """The flags CI passes for F1_1, F1_2 and F1_3, over files this writes.
+
+    An agent envelope must carry all four of claim 1's checks (SPEC/01 §4),
+    and the gate refuses one that does not. So the fixture passes what CI
+    passes: a junit file with the seed tests in it, and CloudTrail
+    observations for S4 and S6. F1_4 comes from the envelope's own goldens.
+    """
+    junit = tmp_path / "junit.xml"
+    names = ("test_s1_an_unsigned_bundle_is_refused", "test_s2_a_bundle_changed_after_signing_is_refused",
+             "test_s3_egress_not_in_the_manifest_is_refused_at_synth",
+             "test_s8_an_agent_outside_the_construct_is_refused_at_synth",
+             "test_s5_a_role_without_the_boundary_is_refused_at_synth")  # fmt: skip
+    cases = "".join(f'<testcase classname="tests.test_m01_seeds" name="{name}"/>' for name in names)
+    junit.write_text(f"<testsuites><testsuite>{cases}</testsuite></testsuites>", encoding="utf-8")
+    flags = ["--check-cases", "F1_1", ",".join(names[:4]), str(junit),
+             "--check-cases", "F1_2", names[4], str(junit)]  # fmt: skip
+    for falsifier, seed in (("F1_1", "S4"), ("F1_3", "S6")):
+        observation = tmp_path / f"{seed}.json"
+        observation.write_text(json.dumps({"seed": seed, "attempts": [
+            {"request_id": f"{seed}-1", "found": True, "error_code": "AccessDenied",
+             "error_message": "explicit deny in a resource-based policy"}]}), encoding="utf-8")  # fmt: skip
+        flags += ["--check-attempt", falsifier, str(observation)]
+    return flags
 
 
 @pytest.fixture

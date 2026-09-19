@@ -93,16 +93,35 @@ def test_a_bundle_with_a_broken_signature_file_is_refused(tmp_path):
         verify.verify(copy)
 
 
+@pytest.mark.skipif(not shutil.which("cosign"), reason="the signature itself cannot be checked without cosign")
 def test_a_bundle_signed_over_its_own_bytes_is_accepted(tmp_path):
-    """S1's bytes with S1's signature: nothing to refuse. The signature file is not packed."""
+    """S1's bytes with S1's signature: nothing to refuse. The signature file is not packed.
+
+    Skipped where cosign is absent, and that is the point: `verify` refuses a
+    bundle whose signature it could not check rather than accepting it, so
+    this can only pass where the check really ran. CI installs cosign before
+    pytest for exactly this test.
+    """
     copy = tmp_path / "matching"
     shutil.copytree(S1, copy)
     (copy / pack.BUNDLE_NAME).write_text((S2 / pack.BUNDLE_NAME).read_text(encoding="utf-8"), encoding="utf-8")
     checked = verify.verify(copy, measure_identity=signer_identity())
     assert checked["digest"] == signed_digest_of(S2)
-    assert checked["measurement_only"] is True
-    # cosign itself runs in CI, where it is installed; here the other two checks carry it
-    assert shutil.which("cosign") or True
+    assert checked["measurement_only"] is True and checked["signature_checked"] is True
+
+
+def test_a_bundle_whose_signature_cannot_be_checked_is_refused_not_accepted(tmp_path, monkeypatch):
+    """Cold review finding 5: no cosign, no certificate, matching digest — this used to pass."""
+    copy = tmp_path / "unchecked"
+    shutil.copytree(S1, copy)
+    archive = pack.pack(copy, tmp_path / "s1.tar")
+    forged = {"rekorBundle": {"Payload": {"body": base64.b64encode(json.dumps(
+        {"spec": {"data": {"hash": {"algorithm": "sha256", "value": pack.digest(archive)}}}}).encode()).decode()}}}
+    (copy / pack.BUNDLE_NAME).write_text(json.dumps(forged), encoding="utf-8")
+    monkeypatch.setattr(verify.shutil, "which", lambda _: None)  # a machine with no cosign
+    with pytest.raises(verify.Refused) as refusal:
+        verify.verify(copy)
+    assert "identity: no certificate in the cosign bundle that this can read" in refusal.value.reasons
 
 
 def test_the_rekor_entry_carries_the_digest():
