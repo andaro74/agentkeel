@@ -270,6 +270,9 @@ def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
         raise Rejected(f"history cannot be replayed: {exc}") from exc
     kinds = load_golden_kinds(GOLDENS)
     cap = (thresholds().get("cost_cap") or {}).get("tokens_per_run")
+    if not isinstance(cap, int) or isinstance(cap, bool) or cap <= 0:
+        # build refuses a missing cap; the gate does not read a deleted bar as "no cap" either
+        raise Rejected(f"thresholds.yaml cost_cap.tokens_per_run must be a positive integer, got {cap!r}")
     return judge(envelope, kinds, history, plants.plant_ids(kinds, ROOT), cap)
 
 

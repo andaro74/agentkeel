@@ -34,7 +34,8 @@ def tokens_spent(raw: dict) -> int:
         usage = observation.get("usage")
         if not usage:
             raise ValueError(f"{observation.get('id')}: a reply with no usage cannot be counted")
-        spent += usage.get("totalTokens", usage.get("inputTokens", 0) + usage.get("outputTokens", 0))
+        # in plus out, as verdict.build counts it: one count in both readers
+        spent += usage.get("inputTokens", 0) + usage.get("outputTokens", 0)
     return spent
 
 

@@ -24,6 +24,24 @@ def test_cost_cap(tmp_path, goldens, capsys, cap, code, said):
     assert capsys.readouterr().out.startswith(said)
 
 
+def test_cost_cap_counts_as_build_does(tmp_path, goldens, capsys):
+    """In plus out; totalTokens can carry cache writes, and build does not read it."""
+    raw_doc = make_raw(goldens)
+    for observation in raw_doc["observations"]:
+        observation["usage"]["totalTokens"] = 10_000
+    raw = tmp_path / "raw.json"
+    raw.write_text(json.dumps(raw_doc), encoding="utf-8")
+    assert cost_cap.main(["--raw", str(raw)]) == 0
+    assert "4,500 tokens this run" in capsys.readouterr().out
+
+
+def test_the_gate_does_not_read_a_deleted_cap_as_no_cap(chain, monkeypatch):
+    envelope_path, _, _ = chain(agent=True)
+    monkeypatch.setattr(gate, "thresholds", lambda path=None: {})
+    with pytest.raises(gate.Rejected, match="tokens_per_run"):
+        gate.rule(envelope_path, envelope_path.parent / "none")
+
+
 def test_cost_cap_counts_both_subjects(tmp_path, goldens, capsys):
     control, agent = tmp_path / "control.json", tmp_path / "agent.json"
     for raw in (control, agent):
