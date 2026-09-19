@@ -63,3 +63,11 @@ def test_s5_a_role_without_the_boundary_is_refused_at_synth():
     from infra.construct import synth_refusal  # type: ignore[import-not-found]
 
     assert synth_refusal(FIXTURES / "construct" / "role_without_boundary.py") is not None
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=f"S6: {PR2} (the bootstrap stack's key policy)")
+def test_s6_the_agent_role_cannot_read_its_key_policy():
+    observed = yaml.safe_load((RUNS / "f1_3_key_policy.yaml").read_text(encoding="utf-8"))["observed"]
+    assert observed is not None, "the attempt has not been made"
+    assert all(attempt["result"] == "AccessDenied" for attempt in observed)
+    assert all("resource-based policy" in attempt["message"] for attempt in observed)  # the key policy refused it
