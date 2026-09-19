@@ -58,7 +58,9 @@ the diff; you do not merge.
 - Never edit `src/baseline/` after tag `m00`. It is the control.
 - Never write an envelope by hand or from a runner. Only
   `src/verdict/build.py` writes envelopes; only `src/verdict/gate.py`
-  reads them; a test proves they can disagree.
+  reads them; a test proves they can disagree. The one exception is a
+  seed under tests/fixtures/: a false state, never copied to
+  evals/history/, named in tests/fixtures/README.md.
 - Never touch `evals/goldens/`, `thresholds.yaml`, `rules/`,
   `data/corpus/` or the guardrail/judge/model ids in `manifest.yaml`
   without naming the seat that owns the path and the ruling that
@@ -80,12 +82,12 @@ the diff; you do not merge.
 | Path | Seat | Gate |
 |---|---|---|
 | `SPEC/**`, `milestones/**`, `CLAUDE.md`, `.claude/skills/**`, `docs/**`, `README.md`, `LICENSE` | Product | `ruling-cited` |
-| `rules/**`, guardrail id/version | Rule Owner | `ruling-cited`, `two-key` on relaxation |
+| `rules/**`, `agents/*/rules/**`, guardrail id/version | Rule Owner | `ruling-cited`, `two-key` on relaxation |
 | `evals/goldens/**`, `data/**` | Data Owner | `ruling-cited`, `two-key` on retire |
-| `tools/**`, `may_call`, `may_be_called_by` | Tool Owner | `ruling-cited`, computed semver |
+| `tools/**`, `agents/*/tools/**`, `may_call`, `may_be_called_by` | Tool Owner | `ruling-cited`, computed semver |
 | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region | Threshold Owner | `two-key` on any downward move |
-| `.github/workflows/**`, `infra/**`, key policy, cosign identity | Security | `ruling-cited`, `security-reviewer` |
-| `src/**`, `scripts/**`, `tests/**`, `Makefile`, `pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`, `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | Engineering | `cold-review-ruling`; `two-key` on a human commit to `evals/history/**` |
+| `.github/workflows/**`, `infra/**` (incl. `infra/bootstrap/**`, `infra/construct/**`), key policy, cosign identity, seats → groups in a manifest | Security | `ruling-cited`, `security-reviewer` |
+| `src/**`, `scripts/**`, `tests/**`, `Makefile`, `pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`, `.gitattributes`, `agents/<name>/**` (but for the rows above and the manifest fields their seats own), `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | Engineering | `cold-review-ruling`; `two-key` on a human commit to `evals/history/**` |
 | `.claude/agents/<name>.md` | the seat in its `seat:` front matter | `ruling-cited` |
 
 Every seat is one human (R1). No gate waits for a human approval; all
@@ -125,14 +127,17 @@ milestones/MNN/       README.md (row + open/close detail), feasibility.md,
                       into MNN at the last close), runs/
 src/baseline/         frozen control
 src/verdict/          schema.json, build.py, gate.py, replay_history
-agents/refagent/      the reference agent (title availability)
+agents/refagent/      the reference agent (title availability): manifest.yaml,
+                      prompt.txt, tools/, rules/ (ADR-0003 amendment 1)
 agents/ratings-helper/
 evals/goldens/v1/     g-NNN.yaml, immutable ids
 evals/history/        CI-written envelopes (evidence)
 evals/local/          your runs (not evidence)
 data/                 slate.json, rights_table.json, clause_index.json (M00);
                       corpus/ (M01)
-infra/                CDK: bootstrap stack, GovernedAgent construct
+infra/                CDK: bootstrap stack, GovernedAgent construct; eval-role/
+                      (M00, absorbed at M01 PR 2); ruleset/main.json (the
+                      exported main ruleset); workflows.sha256 (validate)
 scripts/seed_slate.py writes data/slate.json and data/rights_table.json
 tests/
 Makefile              Engineering; all five targets exist from M00 PR 1
