@@ -5,8 +5,8 @@ status: Accepted
 date: 2026-09-18
 seat: Product
 authorises:
-  - Product  # SPEC/00 §10.5, fourth bullet; §10.3's delivery sentence
-amendments: 0
+  - Product  # SPEC/00 §10.5, fourth bullet; §10.3's delivery sentence; amendment 1: where the video is committed
+amendments: 1
 ---
 
 # ADR-0005 — The milestone video is recorded at the tag
@@ -59,3 +59,25 @@ and re-recording to match is exactly the retake §10.2 forbids.
 - This does not loosen §10.5's other three bullets. No document describes
   a control that has not fired on its seeded case; the quickstart is
   timed at M06 PR 3; recordings are evidence, not marketing.
+
+## Amendment 1 (M01 PR 1, 2026-09-19): the video rides in the next milestone's PR 1
+
+Product.
+
+**From M01, a milestone's video is committed in the next milestone's
+PR 1, never in a PR of its own milestone.** M00 PR 4 (#6) is the one
+exception: it carried only the M00 video, and it spent M00's cap of four.
+A milestone that closes in three PRs has a PR left over; that PR is still
+not used for the video, because a PR spent on a recording is a PR the
+next milestone's cap does not see.
+
+So the video is always the next milestone's first item. M01's video is an
+item in `milestones/M02/open.md`, Product, and lands in M02 PR 1.
+
+SPEC/00 §10.5's fourth bullet is amended to say so.
+
+Not changed here: SPEC/00 §8 M08 PR 4 still lists "video" among the close
+PR's contents. There is no next milestone after M08, so this rule cannot
+apply to it as written. M08 open rules how the last video lands.
+
+This is ADR-0005's first amendment. One is left.
