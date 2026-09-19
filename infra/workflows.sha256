@@ -5,4 +5,4 @@
 # (infra/ruleset/README.md).
 0d938815e7d3756e05659beb95a82f490b521a183bf34f9584cd98874cf36567  .github/workflows/cold-review-ruling.yml
 8d1a025bf933ab2070205b2cdcbda8dfa8e318de5b8738590db40c0afcff971b  .github/workflows/evals.yml
-608098a15902201cc2b0a54a9b1272bbc59d335331b02bbb179ed2d5a911eed6  .github/workflows/sign-fixture.yml
+da40cf7f73d13e320f5c3d323dc3a2540118364eaebc40ee558b4ede4ee4a831  .github/workflows/sign-fixture.yml

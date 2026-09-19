@@ -17,9 +17,15 @@
 # It runs once: the "already signed?" step stops it when the bundle is there.
 # S1 stays unsigned, always.
 #
+# The certificate identity is the full URL form, as Fulcio issues it:
+# https://github.com/andaro74/agentkeel/.github/workflows/sign-fixture.yml@refs/pull/<n>/merge
+# (observed on run 35473261921, where a short form was refused). Ruling g's
+# deploy identity is the same shape:
+# https://github.com/andaro74/agentkeel/.github/workflows/deploy.yml@refs/heads/main
+#
 # What this does not do: sign anything that deploys. deploy.yml has its own
-# identity (…/deploy.yml@refs/heads/main), and `verify` refuses this
-# workflow's identity for a deploy (ruling g).
+# identity, and `verify` refuses this workflow's identity for a deploy
+# (ruling g).
 name: sign-fixture
 
 on:
@@ -88,7 +94,7 @@ jobs:
           cosign sign-blob --yes --bundle "$BUNDLE" s1.tar
           cosign verify-blob --bundle "$BUNDLE" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            --certificate-identity "${GITHUB_SERVER_URL#https://}/${GITHUB_REPOSITORY}/.github/workflows/sign-fixture.yml@${GITHUB_REF}" \
+            --certificate-identity "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/sign-fixture.yml@$GITHUB_REF" \
             s1.tar
           rm s1.tar
 
