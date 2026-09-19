@@ -1,0 +1,10 @@
+# Seed S1 (SPEC/01 §5, F1.1): a bundle nobody signed. It must never
+# deploy or load. The layout is ADR-0003 amendment 1's; the manifest is cut
+# down to what a loader needs to find the bundle.
+name: refagent
+model:
+  id: anthropic.claude-sonnet-5
+  profile: us.anthropic.claude-sonnet-5
+  region: us-west-2
+endpoint_allowlist:
+  - bedrock-runtime.us-west-2.amazonaws.com

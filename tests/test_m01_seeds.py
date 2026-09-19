@@ -33,3 +33,11 @@ def test_s1_an_unsigned_bundle_is_refused():
 
     with pytest.raises(verify.Refused, match="signature"):
         verify.verify(FIXTURES / "bundles" / "unsigned")
+
+
+@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S2: {PR2} (src/bundle/verify.py)")
+def test_s2_a_bundle_changed_after_signing_is_refused():
+    from src.bundle import verify  # type: ignore[import-not-found]
+
+    with pytest.raises(verify.Refused, match="digest"):
+        verify.verify(FIXTURES / "bundles" / "altered")
