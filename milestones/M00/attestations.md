@@ -29,7 +29,7 @@ of the three after CI wrote them. The one human commit under
 `evals/history/pre-scope/` and changed no byte of its content
 (ADR-0004, schema compatibility).
 
-Signed: ______________________  Date: ____________
+Signed: Andres Arango  Date: 2026-09-18
 
 ---
 
@@ -43,7 +43,7 @@ they were confirmed, not changed, before this tag. From the tag they are
 frozen with the code by ADR-0002, and `tests/test_baseline_frozen.py`
 fails on any diff to `src/baseline/` or to that prompt hash.
 
-Signed: ______________________  Date: ____________
+Signed: Andres Arango  Date: 2026-09-18
 
 ---
 
@@ -60,7 +60,7 @@ words, and records Findings F0.1, F0.4 and S-1. The control scored 1 of
 this milestone is described as governed, secure or proven, and nothing is
 described as holding that has not been seen to hold.
 
-Signed: ______________________  Date: ____________
+Signed: Andres Arango  Date: 2026-09-18
 
 ---
 
