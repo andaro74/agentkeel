@@ -1,5 +1,8 @@
 # evals (SPEC/00 §5 `regression` and `cost-cap`, P11). Security seat.
-# Authorised by SPEC/00-overview.md#8-M00 and the ruling on report 2.3.
+# Authorised by SPEC/00-overview.md#8-M00 and the ruling on report 2.3;
+# changed at M01 PR 1 by SPEC/00-overview.md#8-M01 and
+# milestones/M01/rulings/pr1.md (items 9 and 16). Its hash is listed in
+# infra/workflows.sha256, which `make validate` reads (item 29).
 #
 # Runs `make evals` with the role in infra/eval-role/ and writes the
 # envelope to evals/history/<commit>.json with a commit from this workflow.
@@ -13,9 +16,10 @@
 # Makefile decides what its own envelope says. Known gap until the reader
 # can be taken from main.
 #
-# A commit pushed with GITHUB_TOKEN starts no workflow. So the envelope
-# commit has no check runs of its own, and the next human push is what
-# `cold-review-ruling` reads. That next push does not spend again: the
+# A commit pushed with GITHUB_TOKEN starts a run of each workflow, which
+# GitHub parks at action_required with no jobs; so the envelope commit has
+# no check runs of its own, and the next human push is what
+# cold-review-ruling reads. That next push does not spend again: the
 # first step finds the envelope whose commit differs from HEAD only in
 # prose and history. It then asks verdict.gate to rule on that envelope,
 # and the gate's exit code is the job's. A RED envelope stays RED.
@@ -24,9 +28,15 @@
 # main changes, a prose-only push does not measure again; change a
 # measured path, such as milestones/M00/runs/f0_3.yaml.
 #
+# A run with no agent under test (M01 PR 1) writes the control's envelope,
+# in M00's form (ADR-0004 amendment 2); it is gated and recorded like any
+# other.
+#
 # What this does not do:
 # - stop someone with write access from editing this file, or from adding
-#   a workflow that assumes the same role. Nothing gates that until M02.
+#   a workflow that assumes the same role. `validate` fails on a workflow
+#   whose hash is not in infra/workflows.sha256, and a PR can edit both.
+#   Nothing gates that until M02.
 # - tell a hand-written evals/history/<commit>.json from a recorded one,
 #   beyond what verdict.gate checks. `two-key` on a human commit there is M02.
 # - record on `push` to main. It measures and gates only.
@@ -59,6 +69,7 @@ jobs:
       COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     outputs:
       envelope: ${{ steps.written.outputs.envelope }}
+      gate_exit: ${{ steps.gate.outputs.gate_exit }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -145,7 +156,25 @@ jobs:
         if: steps.current.outputs.measured_at == ''
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: make evals F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" RUN_URL="$RUN_URL"
+        run: make evals F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit"
+
+      # The gate's own exit code: 0 GREEN, 1 RED or UNMEASURED, 2 REJECTED.
+      # A REJECTED envelope is not evidence and is not recorded (M01 item 9);
+      # this run's URL and its step summary are the record of the rejection.
+      # The file is written by `make evals`, which is the PR's own code, so a
+      # PR that edits the gate or the Makefile decides this too; the same gap
+      # as the header's. Not yet fired on a seeded REJECTED run in CI.
+      - name: The gate's exit
+        id: gate
+        if: always() && steps.current.outputs.measured_at == ''
+        run: |
+          if [ -f "$RUNNER_TEMP/gate_exit" ]; then
+            code=$(tr -dc '0-9' < "$RUNNER_TEMP/gate_exit")
+            echo "gate_exit=$code" >> "$GITHUB_OUTPUT"
+            if [ "$code" = "2" ]; then
+              echo "**REJECTED** by verdict.gate (exit 2). Not recorded in evals/history/; this run is the record." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
 
       - name: The envelope
         id: written
@@ -169,10 +198,14 @@ jobs:
         run: exit 1
 
   # Writes evals/history/. Runs git and nothing else: no `make`, no `uv`,
-  # no code from the PR. A RED envelope is recorded too.
+  # no code from the PR. A RED envelope is recorded too; a REJECTED one
+  # (gate exit 2) is not.
   record:
     needs: evals
-    if: always() && github.event_name == 'pull_request' && needs.evals.outputs.envelope == 'true'
+    if: >-
+      always() && github.event_name == 'pull_request'
+      && needs.evals.outputs.envelope == 'true'
+      && (needs.evals.outputs.gate_exit == '0' || needs.evals.outputs.gate_exit == '1')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
