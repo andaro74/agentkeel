@@ -71,3 +71,30 @@ def test_s6_the_agent_role_cannot_read_its_key_policy():
     assert observed is not None, "the attempt has not been made"
     assert all(attempt["result"] == "AccessDenied" for attempt in observed)
     assert all("resource-based policy" in attempt["message"] for attempt in observed)  # the key policy refused it
+
+
+@pytest.mark.xfail(strict=True, reason="S7: the F1.4 rule is not in verdict.build or verdict.gate yet")
+def test_s7_an_answer_that_cites_nothing_is_not_a_pass(tmp_path, goldens):
+    """Every answer field right, no table_row, no clause_id: pass false, checks.F1_4 fail, RED (F1.4)."""
+    control_raw = tmp_path / f"{COMMIT}.baseline-raw.json"
+    control_raw.write_text(json.dumps(make_raw(goldens)), encoding="utf-8")
+    card = tmp_path / f"{COMMIT}.baseline-card.json"
+    assert build.main(["card", "--raw", str(control_raw), "--out", str(card)]) == 0
+
+    seed = json.loads((FIXTURES / "refagent_raw_uncited.json").read_text(encoding="utf-8"))
+    agent_raw = tmp_path / f"{COMMIT}.agent-raw.json"
+    agent_raw.write_text(json.dumps({**seed, "commit": COMMIT}), encoding="utf-8")
+    out, no_history = tmp_path / f"{COMMIT}.json", tmp_path / "no-history"
+    assert build.main(["envelope", "--raw", str(agent_raw), "--control-card", str(card), "--out", str(out),
+                       "--history-dir", str(no_history), "--run-url", URL]) == 0  # fmt: skip
+
+    citing = {g: r for g, r in gate.read(out)["goldens"].items() if r["kind"] in build.CITING_KINDS}
+    assert len(citing) == 12
+    for result in citing.values():
+        assert result == {"kind": result["kind"], "scope": "agent", "score": True, "cites": False, "pass": False}
+    envelope = gate.read(out)
+    assert envelope["checks"]["F1_4"]["status"] == "fail"  # build: RED on the first run, whatever the history
+    assert envelope["verdict"] == "RED"
+    verdict, reasons = gate.rule(out, no_history)
+    assert verdict == "RED"  # the gate works F1.4 out again from goldens, and agrees
+    assert not any("pass is not" in reason or "F1_4 is" in reason for reason in reasons)
