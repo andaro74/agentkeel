@@ -44,7 +44,7 @@ Written at M00 PR 1 open. The row in `milestones/README.md` is the one
 | Seeded commit | `22b5499` on `m00-pr1`: the plant. Goldens `g-001` to `g-015`, `data/` and the baseline code are from `8a31e8d`; the baseline prompt is as revised once in `22b5499`. |
 | Expected gate output | Baseline card written; `score` and `cites` recorded per golden; traps expected 1/3 on the plant, F0.1 recorded as a finding. A 0/3 or 2/3 in PR 2's CI run is a non-determinism finding to record. `g-013` to `g-015` fail and land in `never_passed`; `plants_expected = 0` under the plant rule. A run without a baseline card is rejected by `verdict.build`. From ADR-0004 (PR 2): every result is `scope: control`, so `regressed` is 0 by construction and `checks.F0_2`, `checks.F0_3` decide the verdict. |
 | Measured | control: traps 1/3 (g-012); ordinary 0/9; guardrail 0/3; never_passed 14; regressed 0; plants 0/0; F0_2 pass; F0_3 pass; GREEN; envelope `9407615dcde09308490f6699c21a18100bfedcd2`. Both check URLs are in the cell in `milestones/README.md`, which is the one `make ledger` reads. |
-| PRs used / cap | 3 / 4 |
+| PRs used / cap | 4 / 4 |
 | State | GREEN |
 
 ### Open detail (PR 1, 2026-09-18)

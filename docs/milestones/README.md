@@ -4,7 +4,7 @@ Generated from `milestones/README.md` by `make ledger-plain`. Do not edit.
 
 | Milestone | In plain words | Result | Video |
 |---|---|---|---|
-| [M00 — Start from nothing](M00.md) | Before any guardrail, a plain model gets the trick questions wrong; every later number is measured against that. | GREEN | not recorded |
+| [M00 — Start from nothing](M00.md) | Before any guardrail, a plain model gets the trick questions wrong; every later number is measured against that. | GREEN | [watch](../video/milestones/M00.mp4) |
 | M01 — Nothing runs unsigned | An agent can only be deployed from a build the pipeline signed; a changed byte, or a laptop, is refused. | OPEN | not recorded |
 | M02 — Rules have owners | A rule, a test, or a threshold changes only when the person who owns it says so, and loosening one needs two owners. | OPEN | not recorded |
 | M03 — It can't get worse quietly | A test that used to pass and now fails stops the deploy; the attacks we planted must all be caught; a fake contract never reaches the agent. | OPEN | not recorded |
