@@ -57,15 +57,18 @@ golden, because every result is `scope: control` and the control is never
 gated (ADR-0004). `docs/milestones/M00.md` says so in the reader's own
 words, and records Findings F0.1, F0.4 and S-1. The control scored 1 of
 15 on the measured run and no more than 2 of 15 on any run. Nothing in
-this milestone is described as governed, secure or proven.
+this milestone is described as governed, secure or proven, and nothing is
+described as holding that has not been seen to hold.
 
 Signed: ______________________  Date: ____________
 
 ---
 
 Not attested here, and deliberately: that the narrowed eval role is
-enforced by STS. The stack was redeployed on 2026-09-19T00:20:25Z and no
-run had assumed it when these lines were written. The close PR's own
-`evals` run is the first, and `milestones/M00/rulings/pr3.md` records it
-when it finishes. Security signs that in M01, on the observation, not
-here on a deploy.
+enforced by STS. The stack was redeployed on 2026-09-19T00:20:25Z and the
+close PR's own run
+([35412277571](https://github.com/andaro74/agentkeel/actions/runs/35412277571),
+`c547f4f`) is the one run that has assumed it, printing the claims the
+policy matches on and succeeding. One run is thin, and Security signs
+S-1 at M01 on that observation rather than here, where the milestone it
+would be signed under is the one that took it.

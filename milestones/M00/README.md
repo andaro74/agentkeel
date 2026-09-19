@@ -202,8 +202,9 @@ human's, after the merge.
 
 **What a reader should not take from GREEN.** The control scored 1 of 15
 on the measured run, and the one it got right is a trap it got right for
-the wrong reason (§6.4). Two of the fifteen have passed on some run; no
-run has passed two.
+the wrong reason (§6.4). Three of the fifteen have passed on some run
+(`g-001`, `g-006`, `g-012`) and no run has passed more than two;
+`never_passed` is 14 because the gate's history holds `g-012` only.
 GREEN says no check failed and nothing the gate reads regressed; at M00
 the gate reads no golden at all, because every result is `scope: control`
 and the control is never gated (ADR-0004).

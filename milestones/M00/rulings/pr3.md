@@ -29,8 +29,8 @@ authorises:
   # parameters) and Product (SPEC/00 §8 M00) as the seats whose rules it
   # changes.
   - tests/test_baseline_frozen.py
-  # Security (ruling K): Finding S-1 is recorded as deployed and not yet
-  # observed. infra/eval-role/app.py is not touched.
+  # Security (ruling K): Finding S-1 is recorded as deployed, and then as
+  # observed on this PR's own run. infra/eval-role/app.py is not touched.
   - infra/eval-role/README.md
 evidence:
   # PRIMARY. The measurement row 0 rests on: the CI run at 9407615 and the
@@ -46,8 +46,14 @@ evidence:
   # taken before this PR was written.
   - milestones/M00/rulings/pr2.md
   - milestones/M00/feasibility.md#2
-  # Finding F0.4, run by run, including this PR's own run
+  # Finding F0.4, run by run, including this PR's own runs
   - milestones/M00/feasibility.md#6.5
+  # This PR's own measurement, run 6: the first run to assume the role as
+  # redeployed for S-1. Not cited by row 0; it prints the same headline.
+  - https://github.com/andaro74/agentkeel/actions/runs/35412277571
+  - evals/history/c547f4f1175f9aac03228b2da82f09d2b1fc5d50.json
+  - evals/history/c547f4f1175f9aac03228b2da82f09d2b1fc5d50.baseline-card.json
+  - evals/history/c547f4f1175f9aac03228b2da82f09d2b1fc5d50.baseline-raw.json
   - docs/adr/ADR-0002-baseline-frozen.md
   - docs/adr/ADR-0004-measurement-fields.md
   - docs/adr/ADR-0005-video-follows-the-tag.md
@@ -88,10 +94,14 @@ character.
    so fourteen of the fifteen have never passed.
 2. "The control scored 2 of 15" is wrong for the measured run and stood
    in two places in the first draft of this PR. The envelope has one
-   `pass: true`, `g-012`. Two of fifteen is the union across four runs —
-   `g-001` on the plant, `g-006` on the first CI run, `g-012` every time
-   — and no single run has passed two. `milestones/M00/README.md` and the
-   explainer now say one on the measured run and two at best on any run.
+   `pass: true`, `g-012`. Two of fifteen is the most any single run has
+   managed: the plant passed `g-001` and `g-012`, the first CI run passed
+   `g-006` and `g-012`, and the measured run passed only `g-012`. Three
+   different goldens have been right on some run; `never_passed` is 14
+   because the gate's history holds only `g-012`, the local runs not
+   being evidence and the pre-scope envelope not being read.
+   `milestones/M00/README.md` and the explainer now say one on the
+   measured run, two at best on any run.
 
 The sentence the close was asked to carry verbatim — "GREEN means nothing
 regressed against an empty history; it does not mean 2 of 15 passing is
@@ -126,10 +136,12 @@ because the words "linear history" it was to lose are not in the tree.
 `feasibility.md` §7 item 5.
 
 **K. Security — Finding S-1.** The narrowed role was redeployed on
-2026-09-19T00:20:25Z and no run had assumed it at the time this PR was
-written. Recorded in `infra/eval-role/README.md` as deployed and not
-observed, with the `describe-stacks` output that says so. The run below
-is the first to assume it.
+2026-09-19T00:20:25Z, with the `describe-stacks` output in
+`infra/eval-role/README.md` for anyone who wants to check rather than
+believe. No run had assumed it when this PR was written; this PR's own
+run then did, and the README now records the observation instead of the
+absence of one. Security signs S-1 at M01, on the run, not on the
+deploy.
 
 **L. Product — the video follows the tag (ADR-0005).** The first draft of
 this close took a departure from SPEC/00 §10.5 in prose and left the SPEC
@@ -162,17 +174,48 @@ re-open the claim. This PR's run is recorded here and in
 `feasibility.md` §6.5 as another reading of the control under Finding
 F0.4.
 
-**The run.** Recorded here when it finishes, before the merge. It is
-what Security signs S-1 on at M01, and it is also the first observation
-of the two things `infra/eval-role/README.md` says are unobserved: that
-STS evaluates the `job_workflow_ref` condition, and that this repo issues
-that claim in the form the trust policy pins. If the assume is refused,
-this PR is RED, the refusal is the finding, and the row is rewritten
-before the tag.
+**The run.**
+[35412277571](https://github.com/andaro74/agentkeel/actions/runs/35412277571)
+at `c547f4f`, 2026-09-19. Its `record` job committed
+`evals/history/c547f4f1175f9aac03228b2da82f09d2b1fc5d50.*` as
+`github-actions[bot]` (`7bad8d6`). What the gate reads in it:
 
-> _(pending: the run had not started when this ruling was written — the
-> PR was not open yet. No other file may claim this record exists until
-> the line below replaces this one.)_
+> control: traps 1/3 (g-012); ordinary 0/9; guardrail 0/3; never_passed
+> 14; regressed 0; plants 0/0; F0_2 pass; F0_3 pass; GREEN
+
+The same headline as `9407615`, so the row does not move and this
+envelope is not cited by it. 1,899 output tokens against a cap of
+20,000.
+
+**It is the first run to assume the role as redeployed for S-1,** and it
+settles both of the things `infra/eval-role/README.md` said were
+unobserved about the `job_workflow_ref` condition. The
+`OIDC claims the role trusts` step, which runs before the assume, printed:
+
+```
+aud = sts.amazonaws.com
+sub = repo:andaro74@3157440/agentkeel@1376369685:pull_request
+job_workflow_ref = andaro74/agentkeel/.github/workflows/evals.yml@refs/pull/5/merge
+```
+
+`sub` is the immutable form and `job_workflow_ref` is the classic one —
+the asymmetry the Security read flagged as the risk — and the assume
+succeeded, so the pinned pattern matches what GitHub issues and STS
+evaluates it. The README bullet is corrected in this PR from "Not
+observed yet" to the observation. Security signs S-1 at M01 on this run,
+not on the deploy.
+
+**And it is run 6 under Finding F0.4.** Same prompt hash, four more cells
+moved against run 5: `g-001`, `g-007`, `g-009`, and `g-014`, which
+returned no JSON at all for the first time. Runs 5 and 6 print the same
+row and disagree on four of fifteen replies underneath it. That is in
+`feasibility.md` §6.5 as a sixth column, which is what row 0 said to do
+with a reading that differs.
+
+**Correcting the README re-measured once more,** because
+`infra/eval-role/README.md` is not one of the paths `evals.yml` excludes.
+That run is recorded below. It is the last measurement in this PR: every
+remaining edit is under `milestones/**/*.md`, which the skip excludes.
 
 ## Cold review
 

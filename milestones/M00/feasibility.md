@@ -850,42 +850,55 @@ hash in every run; nothing under `src/baseline/` changed between them.
 Each cell is the parsed reply as `available/exclusive/[constraints]`;
 bold is a pass on `score`; † marks a golden whose parsed reply differed
 in at least one run. Runs 2 and 3 are local and are not evidence; they
-are here because the diff is the finding. Runs 4 and 5 are CI-written:
-run 4 is the first measurement (`evals/history/pre-scope/`), run 5 the
-re-measure after ADR-0004. Run 1 (§6.1) used the first
-prompt and is not comparable.
+are here because the diff is the finding. Runs 4, 5 and 6 are
+CI-written: run 4 is the first measurement
+(`evals/history/pre-scope/`), run 5 the re-measure after ADR-0004 and
+the one row 0 rests on, run 6 the close PR's own run, which measured
+again because that PR changes `tests/` and `infra/eval-role/README.md`.
+Run 1 (§6.1) used the first prompt and is not comparable.
 
-| | Run 2, the plant | Run 3 | Run 4 | Run 5 |
-|---|---|---|---|---|
-| Commit | `22b5499` | `e12ab7d` | `8fb4b80` | `9407615` |
-| Where | local | local | CI | CI |
-| Prompt sha256 | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` |
-| `g-001` ordinary † | **T/T/[]** | T/F/[window_closed] | F/F/[window_closed, holdback] | T/F/[] |
-| `g-002` ordinary † | no JSON | T/F/[window_not_open, holdback] | T/F/[window_not_open] | T/F/[window_not_open] |
-| `g-003` ordinary † | T/T/[] | T/T/[window_not_open, holdback] | T/F/[] | T/F/[window_not_open] |
-| `g-004` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] | T/F/[] |
-| `g-005` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] | T/F/[window_not_open] |
-| `g-006` ordinary † | T/T/[] | T/T/[] | **T/F/[non_exclusive]** | T/T/[] |
-| `g-007` ordinary † | T/F/[window_not_open] | T/F/[] | F/F/[window_closed, holdback] | T/F/[window_not_open, holdback] |
-| `g-008` ordinary | T/F/[] | T/F/[] | T/F/[] | T/F/[] |
-| `g-009` ordinary † | T/F/[window_not_open] | T/F/[window_open, holdback_passed, clearance_valid, no_embargo] | T/F/[window_not_open] | T/F/[window_not_open] |
-| `g-010` trap | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] |
-| `g-011` trap † | F/F/[window_not_open, holdback] | F/F/[window_not_open] | F/F/[window_not_open, holdback] | F/F/[window_not_open] |
-| `g-012` trap | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** |
-| `g-013` guardrail | T/F/[] | T/F/[] | T/F/[] | T/F/[] |
-| `g-014` guardrail † | T/F/[] | T/F/[] | T/F/[window_not_open] | T/F/[] |
-| `g-015` guardrail | no JSON | no JSON | no JSON | no JSON |
-| trap passing | `g-012` | `g-012` | `g-012` | `g-012` |
-| ordinary passing | `g-001` | none | `g-006` | none |
+| | Run 2, the plant | Run 3 | Run 4 | Run 5 | Run 6 |
+|---|---|---|---|---|---|
+| Commit | `22b5499` | `e12ab7d` | `8fb4b80` | `9407615` | `c547f4f` |
+| Where | local | local | CI | CI | CI |
+| Prompt sha256 | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` |
+| `g-001` ordinary † | **T/T/[]** | T/F/[window_closed] | F/F/[window_closed, holdback] | T/F/[] | F/F/[window_not_open, holdback] |
+| `g-002` ordinary † | no JSON | T/F/[window_not_open, holdback] | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open, holdback] |
+| `g-003` ordinary † | T/T/[] | T/T/[window_not_open, holdback] | T/F/[] | T/F/[window_not_open] | T/F/[window_not_open] |
+| `g-004` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] | T/F/[] | T/F/[window_not_open] |
+| `g-005` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] | T/F/[window_not_open] | T/F/[window_not_open] |
+| `g-006` ordinary † | T/T/[] | T/T/[] | **T/F/[non_exclusive]** | T/T/[] | T/T/[] |
+| `g-007` ordinary † | T/F/[window_not_open] | T/F/[] | F/F/[window_closed, holdback] | T/F/[window_not_open, holdback] | T/F/[] |
+| `g-008` ordinary | T/F/[] | T/F/[] | T/F/[] | T/F/[] | T/F/[] |
+| `g-009` ordinary † | T/F/[window_not_open] | T/F/[window_open, holdback_passed, clearance_valid, no_embargo] | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] |
+| `g-010` trap | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] |
+| `g-011` trap † | F/F/[window_not_open, holdback] | F/F/[window_not_open] | F/F/[window_not_open, holdback] | F/F/[window_not_open] | F/F/[window_not_open, holdback] |
+| `g-012` trap | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** |
+| `g-013` guardrail | T/F/[] | T/F/[] | T/F/[] | T/F/[] | T/F/[] |
+| `g-014` guardrail † | T/F/[] | T/F/[] | T/F/[window_not_open] | T/F/[] | no JSON |
+| `g-015` guardrail | no JSON | no JSON | no JSON | no JSON | no JSON |
+| trap passing | `g-012` | `g-012` | `g-012` | `g-012` | `g-012` |
+| ordinary passing | `g-001` | none | `g-006` | none | none |
 
-10 of 15 goldens got a different parsed reply in at least one run (†). The three traps have not moved: `g-012` passed every time,
-`g-010` gave the same wrong answer every time, and `g-011` kept its two
-booleans and changed only its constraint list. The ordinary goldens are
-where the control moves: which one it gets right was `g-001`, then none,
-then `g-006`, then none again. A control that scores 1/9, 0/9, 1/9, 0/9,
-and never the same question twice, is a base that moves under every
-delta read against it. Run 5's trap count is 1/3, as row 0 expects, so
-there is no trap-count entry to make here.
+10 of 15 goldens got a different parsed reply in at least one run (†).
+The three traps still have not moved across five runs: `g-012` passed
+every time, `g-010` gave the same wrong answer every time, and `g-011`
+kept its two booleans and changed only its constraint list. The ordinary
+goldens are where the control moves: which one it gets right was
+`g-001`, then none, then `g-006`, then none, then none. A control that
+scores 1/9, 0/9, 1/9, 0/9, 0/9, and never the same question twice, is a
+base that moves under every delta read against it.
+
+Run 6 moved four more cells with the same prompt hash: `g-001` went from
+`T/F/[]` to `F/F/[window_not_open, holdback]`, `g-007` and `g-009` each
+dropped a constraint they had in run 5, and `g-014` returned no JSON at
+all for the first time. Runs 5 and 6 share a headline — traps 1/3,
+ordinary 0/9, guardrail 0/3, `never_passed` 14, GREEN — and disagree on
+four of the fifteen replies underneath it. Two runs can print the same
+row and not be the same measurement.
+
+Run 5's and run 6's trap counts are both 1/3, as row 0 expects, so there
+is no trap-count entry to make here.
 
 What it seeds: SPEC/04's A-vs-A control assumes a model compared with
 itself shows zero diff (F4.3, "the suite is flaky; milestone stops").
