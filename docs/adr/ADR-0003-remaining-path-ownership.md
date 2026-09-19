@@ -68,10 +68,14 @@ file on `main` has a seat (§5), so each gets one here, before the file
 exists. Ruled for M01 PR 1 (`milestones/M01/rulings/pr1.md`).
 
 - **`.gitattributes`** → Engineering. Root config, beside `.gitignore`.
-  It holds one line: `docs/video/**/*.mp4 filter=lfs diff=lfs merge=lfs -text`.
+  It holds two lines: `docs/video/**/*.mp4 filter=lfs diff=lfs merge=lfs -text`,
+  and `docs/video/milestones/M00.mp4 -filter -diff -merge`.
   The line was first ruled as `docs/video/** …`; that made
   `docs/video/README.md` an LFS pointer (commit `fa21d9d`), so Engineering
-  narrowed it to the recordings before the PR opened.
+  narrowed it to the recordings before the PR opened. The second line
+  takes the filter off M00.mp4, which is a plain blob: with the filter on
+  it, every fresh checkout reports it modified, and the PR's first `evals`
+  run refused as a dirty tree (run 35469006669).
 - **`agents/<name>/**`** → Engineering, except:
   - `agents/*/rules/**` → Rule Owner;
   - `agents/*/tools/**` → Tool Owner;

@@ -30,7 +30,7 @@ was the one exception, and it spent M00's cap.
 ## Storage and size
 
 M00.mp4 is a plain blob (84.4 MiB); recordings from M01 are LFS objects
-under .gitattributes. It is not migrated: a migration would rewrite
+under .gitattributes, whose second line keeps the filter off M00.mp4. It is not migrated: a migration would rewrite
 `cfbd8ba` and `8252763` and move tag `m00`, and envelopes are keyed to
 commits (ADR-0004). CI checks out with `lfs: false` and reads no video
 bytes; `make ledger-plain` links a recording when its path exists, which a
