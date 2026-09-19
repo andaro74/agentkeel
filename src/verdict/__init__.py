@@ -4,11 +4,18 @@ Runners write raw observations. `build` is the only writer of envelopes.
 `gate` is the only reader that rules on one; `replay_history` reads past
 envelopes for both, keyed on golden id. A test asserts they can disagree.
 
-What build and the gate share: the schema, the hash, `plants.plant_ids` and
-`replay_history`. So they agree on the plant rule and on "ever passed" by
-construction; a bug in either is a bug in both. They can disagree on what
-they are given (the history, the tree) and on everything the gate works out
-again from `goldens`. Only build reads `expected`.
+What build and the gate share: the schema, the hash, `plants.plant_ids`,
+`replay_history` and `thresholds.yaml`. So they agree on the plant rule and
+on "ever passed" by construction; a bug in either is a bug in both. They can
+disagree on what they are given (the history, the tree) and on everything
+the gate works out again from `goldens`: pass, F1.4, the lists, the cost
+cap. Only build reads `expected`.
+
+P5 separates judgment, not inputs. `replay_history` and `plants.plant_ids`
+are inputs both build and gate read; neither rules on anything. P5 requires
+that build's verdict and gate's verdict are computed separately from the
+same inputs, which tests/test_p5_disagree.py shows. (Engineering, M01 open
+items 4 and 6: no split.)
 """
 
 from __future__ import annotations

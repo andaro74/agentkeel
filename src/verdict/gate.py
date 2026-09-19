@@ -4,20 +4,33 @@
     python -m src.verdict.gate --plants      make plants
 
 The gate does not trust the writer. It rejects an envelope that does not
-validate, or whose baseline card is missing, altered or for another commit;
-a hand-written envelope gets no pass for being hand-written (F0.2). Then it
+validate, or whose cards are missing, altered or for another commit; a
+hand-written envelope gets no pass for being hand-written (F0.2). Then it
 works the lists out again from `goldens` and history and goes RED where the
 envelope disagrees with itself or with the gate.
 
+Two shapes, told apart by scope (ADR-0004 amendment 2). A control envelope,
+M00's form and from M01 the form of any run where no agent ran, holds
+`control` results and names its own run's card in `baseline_card_ref`, with
+no `control_card_ref`. An agent envelope holds `agent` results only;
+`control_card_ref` names this run's control card, and `baseline_card_ref`
+names the card at tag `m00`, whose hash `thresholds.yaml` pins; that hash is
+checked on agent envelopes only. The three M00 envelopes still validate,
+replay and read.
+
 What it rules on (SPEC/00 §5 `regression`, P7, R2, ADR-0004): RED on an
 `agent` result that has ever passed and now fails, on a silent plant among
-the `agent` results, or on a failed check. A golden that has never passed
-reports and does not gate. A `control` result is the baseline's: it is
-reported, its drift is printed as a note, and it never blocks. At M00 every
-result is the control's, so the checks decide the verdict.
+the `agent` results, on a failed check, and on a run over the token cap
+(Threshold Owner, M01 item 22). A golden that has never passed reports and
+does not gate. A `control` result is the baseline's: it is reported, its
+drift is printed as a note, and it never blocks.
 
-What it cannot see: a hand-written envelope that validates, points at a
-real card and agrees with itself. Nothing signs an envelope yet.
+F1.4 (SPEC/01 §4), worked out here again, not taken from build: an agent's
+ordinary or trap answer passes only if it cites, and `checks.F1_4` fails
+when any ordinary answer does not.
+
+What it cannot see: a hand-written envelope that validates, points at real
+cards and agrees with itself. Nothing signs an envelope yet.
 """
 
 from __future__ import annotations
@@ -28,6 +41,8 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from src.verdict import (
     ROOT,
@@ -42,10 +57,33 @@ __all__ = ["Rejected", "control_drift", "judge", "measured", "measured_at", "rea
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
+THRESHOLDS = ROOT / "thresholds.yaml"
+CITING_KINDS = {"ordinary", "trap"}
 
 
 class Rejected(Exception):
     """Not an envelope the gate will rule on."""
+
+
+def thresholds(path: Path = THRESHOLDS) -> dict[str, Any]:
+    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def card_at(path: Path, ref: Any, root: Path, field: str) -> dict[str, Any]:
+    """The card `ref` names, if it resolves, hashes to `ref`, and says scope control."""
+    if not isinstance(ref, dict):
+        raise Rejected(f"{path}: no {field}")
+    card_path = Path(ref["path"]) if Path(ref["path"]).is_absolute() else root / ref["path"]
+    try:
+        card = json.loads(card_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise Rejected(f"{path}: {field} {ref['path']} does not resolve: {exc}") from exc
+    if canonical_sha256(card) != ref["sha256"]:
+        raise Rejected(f"{path}: {field} {ref['path']} is not the one the envelope names")
+    if card.get("scope") != "control":
+        raise Rejected(f"{path}: {field} {ref['path']} does not say scope: control")
+    return card
 
 
 def read(path: Path, root: Path = ROOT) -> dict[str, Any]:
@@ -56,27 +94,45 @@ def read(path: Path, root: Path = ROOT) -> dict[str, Any]:
     if errors := schema_errors(envelope):
         raise Rejected(f"{path}: does not validate: " + "; ".join(errors))
 
-    ref = envelope["baseline_card_ref"]
-    card_path = Path(ref["path"]) if Path(ref["path"]).is_absolute() else root / ref["path"]
-    try:
-        card = json.loads(card_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise Rejected(f"{path}: baseline_card_ref {ref['path']} does not resolve: {exc}") from exc
-    if canonical_sha256(card) != ref["sha256"]:
-        raise Rejected(f"{path}: baseline card {ref['path']} is not the one the envelope names")
+    scopes = {result["scope"] for result in envelope["goldens"].values()}
+    if "agent" in scopes:
+        return read_agent(path, envelope, scopes, root)
+    if envelope.get("control_card_ref") is not None:
+        raise Rejected(f"{path}: control results beside a control_card_ref: a control envelope's base is its own card")
+
+    card = card_at(path, envelope["baseline_card_ref"], root, "baseline_card_ref")
     if card.get("commit") != envelope["commit"]:
         raise Rejected(f"{path}: baseline card is for {card.get('commit')}, not {envelope['commit']}")
-    if card.get("scope") != "control":
-        raise Rejected(f"{path}: baseline card {ref['path']} does not say scope: control")
     # `control` is not a label an envelope can give itself to get out from
     # under the bar. A control result is the card's result, or it is rejected.
     for golden_id, result in envelope["goldens"].items():
-        if result["scope"] != "control":
-            continue
         unscoped = {name: value for name, value in result.items() if name != "scope"}
         if unscoped != card.get("goldens", {}).get(golden_id):
             raise Rejected(f"{path}: {golden_id} says scope control and differs from the baseline card")
     return envelope
+
+
+def read_agent(path: Path, envelope: dict[str, Any], scopes: set[str], root: Path) -> dict[str, Any]:
+    """From M01: one subject, two cards (ADR-0004 amendment 2)."""
+    if scopes != {"agent"}:
+        raise Rejected(f"{path}: an envelope holds one subject; the control is its card, not its results")
+    for field in ("control_card_ref", "tokens_in"):
+        if envelope.get(field) is None:
+            raise Rejected(f"{path}: an agent envelope without {field}")
+    pinned = (thresholds(root / "thresholds.yaml").get("baseline_card") or {}).get("sha256")
+    if envelope["baseline_card_ref"]["sha256"] != pinned:
+        raise Rejected(f"{path}: baseline_card_ref is not the card at tag m00 that thresholds.yaml pins")
+    card_at(path, envelope["baseline_card_ref"], root, "baseline_card_ref")
+    control = card_at(path, envelope["control_card_ref"], root, "control_card_ref")
+    if control.get("commit") != envelope["commit"]:
+        raise Rejected(f"{path}: control card is for {control.get('commit')}, not {envelope['commit']}")
+    return envelope
+
+
+def f1_4(results: dict[str, dict[str, Any]]) -> str:
+    """The gate's own reading of F1.4 (SPEC/01 §4). build has one too; they are not shared (P5)."""
+    uncited = [g for g, r in results.items() if r["scope"] == "agent" and r["kind"] == "ordinary" and r["cites"] is not True]
+    return "fail" if uncited else "pass"
 
 
 def judge(
@@ -84,6 +140,7 @@ def judge(
     kinds: dict[str, str],
     history: replay_history.History,
     plant_ids: list[str],
+    cap: int | None = None,
 ) -> tuple[str, list[str]]:
     """The gate's own verdict and its reasons. `envelope` has passed `read`."""
     results = envelope["goldens"]
@@ -91,7 +148,12 @@ def judge(
 
     if {g: r["kind"] for g, r in results.items()} != kinds:
         reasons.append("the envelope's goldens are not the goldens in the tree")
-    reasons += [f"{g}: pass is not score" for g, r in results.items() if r["pass"] != r["score"]]
+    for g, r in results.items():
+        if r["scope"] == "agent" and r["kind"] in CITING_KINDS:
+            if r["pass"] != (r["score"] and r["cites"] is True):
+                reasons.append(f"{g}: pass is not score and cites (F1.4)")
+        elif r["pass"] != r["score"]:
+            reasons.append(f"{g}: pass is not score")
 
     # Only `agent` results are gated: the bar, and the plants (ADR-0004).
     failing = [g for g in sorted(results) if not results[g]["pass"]]
@@ -114,13 +176,24 @@ def judge(
     reasons += [f"regressed: {g} has passed before and fails now" for g in regressed]
     if fired != len(plant_ids):
         reasons.append(f"silent plant: expected {len(plant_ids)}, fired {fired}")
+    if any(r["scope"] == "agent" for r in results.values()):
+        said = envelope["checks"].get("F1_4")
+        mine_f1_4 = f1_4(results)
+        if said is None:
+            reasons.append("checks.F1_4 is missing from an agent envelope")
+        elif said["status"] != mine_f1_4:
+            reasons.append(f"envelope says F1_4 is {said['status']}, the gate reads {mine_f1_4}")
     reasons += [
         f"check {name} failed: {check['url']}"
         for name, check in sorted(envelope["checks"].items())
         if check["status"] == "fail"
     ]
 
-    if envelope["verdict"] == "UNMEASURED":
+    # An over-cap run is a recorded RED, whatever else it measured (M01 item 22).
+    over_cap = cap is not None and "tokens_in" in envelope and envelope["tokens_in"] + envelope["tokens_out"] > cap
+    if over_cap:
+        reasons.append(f"cost-cap: {envelope['tokens_in'] + envelope['tokens_out']} over {cap}")
+    if envelope["verdict"] == "UNMEASURED" and not over_cap:
         return "UNMEASURED", reasons + ["the run did not measure: a call failed"]
     verdict = "RED" if reasons else "GREEN"
     if envelope["verdict"] != verdict:
@@ -138,26 +211,36 @@ def control_drift(envelope: dict[str, Any], history: replay_history.History) -> 
     )
 
 
-def measured(envelope: dict[str, Any], verdict: str) -> str:
-    """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's."""
+def tallies(label: str, results: dict[str, dict[str, Any]]) -> str:
+    """`label: traps a/3 (ids); ordinary b/9; guardrail c/3`, from results keyed by golden id."""
+
+    def tally(kind: str) -> str:
+        of_kind = [r for r in results.values() if r["kind"] == kind]
+        return f"{sum(r['pass'] for r in of_kind)}/{len(of_kind)}"
+
+    traps = sorted(g for g, r in results.items() if r["kind"] == "trap" and r["pass"])
+    return (
+        f"{label}: traps {tally('trap')}" + (f" ({', '.join(traps)})" if traps else "")
+        + f"; ordinary {tally('ordinary')}; guardrail {tally('guardrail')}"
+    )
+
+
+def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any] | None = None) -> str:
+    """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's.
+
+    An M00 envelope: its control tallies. From M01: the agent's tallies, then
+    this run's control card's, then the base the numbers are a delta against.
+    """
     results = envelope["goldens"]
-
-    def tallies(scope: str) -> str:
-        def tally(kind: str) -> str:
-            of_kind = [r for r in results.values() if r["scope"] == scope and r["kind"] == kind]
-            return f"{sum(r['pass'] for r in of_kind)}/{len(of_kind)}"
-
-        traps = sorted(
-            g for g, r in results.items() if r["scope"] == scope and r["kind"] == "trap" and r["pass"]
-        )
-        return (
-            f"{scope}: traps {tally('trap')}" + (f" ({', '.join(traps)})" if traps else "")
-            + f"; ordinary {tally('ordinary')}; guardrail {tally('guardrail')}"
-        )
-
-    scopes = [s for s in ("control", "agent") if any(r["scope"] == s for r in results.values())]
+    agent = {g: r for g, r in results.items() if r["scope"] == "agent"}
+    if agent:
+        if control_card is None:
+            raise ValueError("an agent envelope's cell needs its control card")
+        heads = [tallies("agent", agent), tallies("control", control_card["goldens"])]
+    else:
+        heads = [tallies("control", results)]
     parts = [
-        *(tallies(scope) for scope in scopes),
+        *heads,
         f"never_passed {len(envelope['never_passed'])}",
         f"regressed {len(envelope['regressed'])}",
         f"plants {envelope['plants_fired']}/{envelope['plants_expected']}",
@@ -165,6 +248,8 @@ def measured(envelope: dict[str, Any], verdict: str) -> str:
         verdict,
         f"envelope `{envelope['commit']}`",
     ]
+    if agent:
+        parts.append(f"base {envelope['baseline_card_ref']['sha256'][:8]}")
     return "; ".join(parts)
 
 
@@ -184,13 +269,29 @@ def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
     except ValueError as exc:  # a bad file in history: the gate cannot rule, which is not RED
         raise Rejected(f"history cannot be replayed: {exc}") from exc
     kinds = load_golden_kinds(GOLDENS)
-    return judge(envelope, kinds, history, plants.plant_ids(kinds, ROOT))
+    cap = (thresholds().get("cost_cap") or {}).get("tokens_per_run")
+    return judge(envelope, kinds, history, plants.plant_ids(kinds, ROOT), cap)
+
+
+def control_card_of(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> dict[str, Any] | None:
+    ref = envelope.get("control_card_ref")
+    return card_at(path, ref, root, "control_card_ref") if ref else None
 
 
 def measured_at(path: Path, history_dir: Path = HISTORY) -> str:
     """What `make ledger` holds a Measured cell to: the envelope's numbers under the gate's verdict."""
     verdict, _ = rule(path, history_dir)
-    return measured(read(path), verdict)
+    envelope = read(path)
+    return measured(envelope, verdict, control_card_of(envelope, path))
+
+
+def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> str | None:
+    """This run's control card beside the card at tag m00. Printed, never gated (Finding F0.4)."""
+    control = control_card_of(envelope, path, root)
+    if control is None:
+        return None
+    base = card_at(path, envelope["baseline_card_ref"], root, "baseline_card_ref")
+    return f"{tallies('control this run', control['goldens'])} | {tallies('base at m00', base['goldens'])}"
 
 
 def print_plants() -> int:
@@ -211,6 +312,11 @@ def print_plants() -> int:
         print("not plants until their enforcing control is in the repo (SPEC/00 section 5):")
         print("  " + " ".join(waiting))
     print(f"last run: {path.relative_to(ROOT).as_posix() if path else 'no CI-written envelope yet'}")
+    print("seeded cases (SPEC/01 section 5; not plants, not in plants_expected):")
+    for seed, (falsifier, planted, reader) in plants.SEEDS.items():
+        state = "in the tree" if (ROOT / reader).exists() else "not in the tree yet"
+        print(f"  {seed} {falsifier} {planted}")
+        print(f"         reader {reader}: {state}")
     return 0
 
 
@@ -236,6 +342,8 @@ def main(argv: list[str] | None = None) -> int:
     history = replay_history.load(args.history_dir, exclude_commit=envelope["commit"])
     for golden_id in control_drift(envelope, history):
         print(f"  note: control {golden_id} has passed before and fails now; not gated (Finding F0.4)")
+    if against := control_against_base(envelope, args.envelope):
+        print(f"  note: {against}; not gated (Finding F0.4)")
     return 0 if verdict == "GREEN" else 1
 
 

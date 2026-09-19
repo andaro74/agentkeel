@@ -62,11 +62,23 @@ def test_gate_rejects_it_if_written_by_hand(chain, tmp_path):
 
 
 def test_a_run_without_a_baseline_card_is_refused(goldens, tmp_path, capsys):
+    """From M01 a run has two cards: this run's control card, and the base at tag m00 (ADR-0004 amendment 2)."""
     raw = tmp_path / "raw.json"
     raw.write_text(json.dumps(make_raw(goldens)), encoding="utf-8")
     out = tmp_path / "envelope.json"
     assert build.main(["envelope", "--raw", str(raw), "--out", str(out)]) == 3
-    assert "no baseline card" in capsys.readouterr().err
+    assert "no control card" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_a_run_without_the_base_is_refused(chain, tmp_path, capsys):
+    _, card_path, raw_path = chain(agent=True)
+    thresholds = tmp_path / "thresholds.yaml"
+    thresholds.write_text("cost_cap:\n  tokens_per_run: 150000\n", encoding="utf-8")
+    out = tmp_path / "envelope.json"
+    assert build.main(["envelope", "--raw", str(raw_path), "--control-card", str(card_path), "--out", str(out),
+                       "--thresholds", str(thresholds), "--run-url", "https://example.invalid/run"]) == 3  # fmt: skip
+    assert "pins no baseline_card" in capsys.readouterr().err
     assert not out.exists()
 
 

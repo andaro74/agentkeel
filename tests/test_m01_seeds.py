@@ -7,7 +7,7 @@ come off in the commit that lands the reader. A seed cannot start passing
 without somebody saying so.
 
 S1-S6 and S8 are read at M01 PR 2. S7 is read by `verdict.build` and `verdict.gate`
-in M01 PR 1, in the commit after this one.
+in M01 PR 1 (F1.4); its marker came off in the commit that landed that reading.
 """
 
 from __future__ import annotations
@@ -73,7 +73,13 @@ def test_s6_the_agent_role_cannot_read_its_key_policy():
     assert all("resource-based policy" in attempt["message"] for attempt in observed)  # the key policy refused it
 
 
-@pytest.mark.xfail(strict=True, reason="S7: the F1.4 rule is not in verdict.build or verdict.gate yet")
+@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S8: {PR2} (infra/construct/)")
+def test_s8_an_agent_outside_the_construct_is_refused_at_synth():
+    from infra.construct import synth_refusal  # type: ignore[import-not-found]
+
+    assert synth_refusal(FIXTURES / "construct" / "outside_construct.py") is not None
+
+
 def test_s7_an_answer_that_cites_nothing_is_not_a_pass(tmp_path, goldens):
     """Every answer field right, no table_row, no clause_id: pass false, checks.F1_4 fail, RED (F1.4)."""
     control_raw = tmp_path / f"{COMMIT}.baseline-raw.json"
@@ -98,10 +104,3 @@ def test_s7_an_answer_that_cites_nothing_is_not_a_pass(tmp_path, goldens):
     verdict, reasons = gate.rule(out, no_history)
     assert verdict == "RED"  # the gate works F1.4 out again from goldens, and agrees
     assert not any("pass is not" in reason or "F1_4 is" in reason for reason in reasons)
-
-
-@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S8: {PR2} (infra/construct/)")
-def test_s8_an_agent_outside_the_construct_is_refused_at_synth():
-    from infra.construct import synth_refusal  # type: ignore[import-not-found]
-
-    assert synth_refusal(FIXTURES / "construct" / "outside_construct.py") is not None

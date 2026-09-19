@@ -23,8 +23,9 @@ that reason and no other.
 
 ## M01 (SPEC/01 §5)
 
-Committed at M01 PR 1, in one commit with `tests/test_m01_seeds.py` and
-before any code that reads them. Each test is `xfail(strict=True)` until
+Committed at M01 PR 1, one commit per seed (`a7b088e` S1 to `6b8b8cf`
+S8), each with its test in `tests/test_m01_seeds.py`, before any code that
+reads them. Each test is `xfail(strict=True)` until
 its reader lands.
 
 | Seed | File | What is wrong with it |

@@ -13,13 +13,23 @@ from src.verdict import gate
 from .conftest import make_raw
 
 
-@pytest.mark.parametrize(("cap", "code"), [(4500, 0), (4499, 1), (0, 1), ("20000", 1)])
-def test_cost_cap(tmp_path, goldens, cap, code):
+@pytest.mark.parametrize(("cap", "code", "said"), [(4500, 0, "ok"), (4499, 0, "OVER"), (0, 1, "FAIL"), ("20000", 1, "FAIL")])
+def test_cost_cap(tmp_path, goldens, capsys, cap, code, said):
+    """From M01 over the cap is a recorded RED, written by build (item 22): cost-cap prints it and exits 0."""
     raw = tmp_path / "raw.json"
     raw.write_text(json.dumps(make_raw(goldens)), encoding="utf-8")  # 15 calls x 300 tokens
     thresholds = tmp_path / "thresholds.yaml"
     thresholds.write_text(f"cost_cap:\n  tokens_per_run: {cap!r}\n", encoding="utf-8")
     assert cost_cap.main(["--raw", str(raw), "--thresholds", str(thresholds)]) == code
+    assert capsys.readouterr().out.startswith(said)
+
+
+def test_cost_cap_counts_both_subjects(tmp_path, goldens, capsys):
+    control, agent = tmp_path / "control.json", tmp_path / "agent.json"
+    for raw in (control, agent):
+        raw.write_text(json.dumps(make_raw(goldens)), encoding="utf-8")
+    assert cost_cap.main(["--raw", str(control), "--raw", str(agent)]) == 0
+    assert "9,000 tokens this run" in capsys.readouterr().out
 
 
 def test_a_reply_with_no_usage_fails_the_cap(tmp_path, goldens):
