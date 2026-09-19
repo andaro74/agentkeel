@@ -49,3 +49,10 @@ def test_s3_egress_not_in_the_manifest_is_refused_at_synth():
 
     assert synth_refusal(FIXTURES / "construct" / "extra_egress.py") is not None
     assert synth_refusal(FIXTURES / "construct" / "extra_egress_standalone.py") is not None
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason=f"S4: {PR2} (the bootstrap stack's deploy role)")
+def test_s4_a_laptop_deploy_was_refused():
+    observed = yaml.safe_load((RUNS / "f1_1_laptop.yaml").read_text(encoding="utf-8"))["observed"]
+    assert observed is not None, "the attempt has not been made"
+    assert all(attempt["result"] == "AccessDenied" for attempt in observed)
