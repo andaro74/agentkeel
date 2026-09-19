@@ -28,7 +28,14 @@ What it makes:
 - one **KMS key per agent**, whose policy denies key-policy changes to
   everyone but Security, and denies `kms:GetKeyPolicy` to the agent role
   path `/agentkeel/agents/*` (ruling b, seed S6);
-- a **Budgets action** on Bedrock spend at `daily_usd: 10` (ruling a).
+- a **Budgets action** on Bedrock spend at `daily_usd: 10` (ruling a);
+- the **ECR repository** the runtime image is pulled from, tag-immutable, so
+  a digest cannot be moved to other bytes (SPEC/01 §6, "at load");
+- the **Security-owned parameters** `GovernedAgent` reads: the boundary ARN,
+  the VPC, the subnets and the three interface endpoints' security groups.
+  The two gateway-endpoint prefix lists have no CloudFormation attribute; the
+  human who deploys this stack writes those two parameters, with one command
+  each (`infra/bootstrap/README.md`).
 
 What it does not do: wire Gateway or Identity (cut at open), reach the
 security account (cut 2), or hold anything M05 owns.
@@ -36,11 +43,16 @@ security account (cut 2), or hold anything M05 owns.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import aws_cdk as cdk
 from aws_cdk import aws_budgets as budgets
 from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_ecr as ecr
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_kms as kms
+from aws_cdk import aws_ssm as ssm
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from constructs import Construct
 
@@ -50,6 +62,13 @@ REGION = "us-west-2"
 AGENT_ROLE_PATH = "/agentkeel/agents/"  # ruling b: the key policy matches agent roles by path
 BOUNDARY_NAME = "agentkeel-boundary"
 EVAL_ROLE_NAME = "agentkeel-evals"  # ruling f; replaces agentkeel-m00-evals
+# What GovernedAgent reads. The names are the construct's; they are repeated
+# here rather than imported, because the bootstrap stack is deployed by hand
+# and must not depend on the construct's code being importable.
+BOUNDARY_PARAM = "/agentkeel/security/boundary-arn"
+VPC_PARAM = "/agentkeel/security/vpc-id"
+SUBNETS_PARAM = "/agentkeel/security/subnet-ids"
+ENDPOINT_PARAM = "/agentkeel/security/endpoint/{name}"
 DAILY_USD = 10  # Threshold Owner (ruling a); the action attaches a Deny to the eval role
 
 MODELS = ["amazon.nova-micro-v1:0", "anthropic.claude-sonnet-5"]
@@ -78,6 +97,7 @@ class BootstrapStack(cdk.Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        self.endpoint_groups: dict[str, ec2.ISecurityGroup] = {}
         boundary = self._boundary()
         # Stack-wide: every role this stack makes carries it, named or not.
         iam.PermissionsBoundary.of(self).apply(boundary)
@@ -88,13 +108,17 @@ class BootstrapStack(cdk.Stack):
         )  # fmt: skip
 
         vpc = self._vpc()
-        self._execution_role(boundary)
+        execution_role = self._execution_role(boundary)
         self._deploy_role(provider)
         self._developer_role()
         eval_role = self._eval_role(provider)
         self._agent_key(eval_role)
         self._budget(eval_role)
 
+        self._image_repository()
+        self._parameters(boundary, vpc)
+
+        cdk.CfnOutput(self, "ExecutionRoleArn", value=execution_role.role_arn)
         cdk.CfnOutput(self, "VpcId", value=vpc.vpc_id)
         cdk.CfnOutput(self, "BoundaryArn", value=boundary.managed_policy_arn)
 
@@ -154,6 +178,7 @@ class BootstrapStack(cdk.Stack):
             endpoint = vpc.add_interface_endpoint(
                 f"Endpoint{name.title().replace('-', '')}", service=interface, private_dns_enabled=True)
             endpoint.add_to_policy(this_account())
+            self.endpoint_groups[name] = endpoint.connections.security_groups[0]
         for name, gateway in GATEWAY_ENDPOINTS.items():
             vpc.add_gateway_endpoint(f"Endpoint{name.title()}", service=gateway).add_to_policy(this_account())
         return vpc
@@ -360,6 +385,13 @@ class BootstrapStack(cdk.Stack):
                 cost_filters={"Service": ["Amazon Bedrock"]},
             ),
         )  # fmt: skip
+        # CloudFormation requires at least one subscriber. The address is not
+        # in the repo: the human passes it at deploy (README.md).
+        subscriber = cdk.CfnParameter(
+            self, "BudgetSubscriberEmail",
+            description="Who Budgets notifies when Bedrock spend passes the daily figure.",
+            allowed_pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+        )
         budgets.CfnBudgetsAction(
             self, "BedrockDailyStop",
             action_threshold=budgets.CfnBudgetsAction.ActionThresholdProperty(type="PERCENTAGE", value=100),
@@ -371,47 +403,122 @@ class BootstrapStack(cdk.Stack):
                     policy_arn=deny_invoke.managed_policy_arn, roles=[eval_role.role_name])),
             execution_role_arn=action_role.role_arn,
             notification_type="ACTUAL",
-            subscribers=[],
+            subscribers=[budgets.CfnBudgetsAction.SubscriberProperty(
+                address=subscriber.value_as_string, type="EMAIL")],
         )  # fmt: skip
         return budget
 
 
-app = cdk.App()
+# A fixed output directory, so `make validate` reads the NagReport of the
+# synth it just ran. The cdk CLI sets CDK_OUTDIR; a plain python run does not.
+    # --- what the construct reads ------------------------------------------
+
+    def _image_repository(self) -> ecr.Repository:
+        """Where the runtime image is pulled from. Tag-immutable: a digest is the bytes (SPEC/01 §6)."""
+        return ecr.Repository(
+            self, "RefagentImage",
+            repository_name="agentkeel-refagent",
+            image_tag_mutability=ecr.TagMutability.IMMUTABLE,
+            image_scan_on_push=True,
+            encryption=ecr.RepositoryEncryption.AES_256,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )  # fmt: skip
+
+    def _parameters(self, boundary: iam.ManagedPolicy, vpc: ec2.Vpc) -> None:
+        """The Security-owned parameters `GovernedAgent` reads (SPEC/01 §6).
+
+        Not CDK context: a construct that read context would take whatever
+        the synthesising machine had in `cdk.context.json`. These are
+        written by this stack, in the account, and only this stack changes
+        them.
+
+        The two gateway endpoints are missing on purpose. AWS gives no
+        CloudFormation attribute for a managed prefix list id, so inventing
+        one here would be a guess; the human who deploys this stack writes
+        those two parameters (README.md), and a deploy of an agent stack
+        fails while they are absent.
+        """
+        ssm.StringParameter(
+            self, "ParamBoundary", parameter_name=BOUNDARY_PARAM, string_value=boundary.managed_policy_arn,
+            description="agentkeel: the permission boundary every platform role carries.",
+        )  # fmt: skip
+        ssm.StringParameter(
+            self, "ParamVpc", parameter_name=VPC_PARAM, string_value=vpc.vpc_id,
+            description="agentkeel: the platform VPC. An agent runs in this one or in none.",
+        )  # fmt: skip
+        ssm.StringListParameter(
+            self, "ParamSubnets", parameter_name=SUBNETS_PARAM,
+            string_list_value=[subnet.subnet_id for subnet in vpc.isolated_subnets],
+            description="agentkeel: the isolated subnets. No internet gateway, no NAT.",
+        )  # fmt: skip
+        for name, group in self.endpoint_groups.items():
+            ssm.StringParameter(
+                self, f"ParamEndpoint{name.title().replace('-', '')}",
+                parameter_name=ENDPOINT_PARAM.format(name=name),
+                string_value=group.security_group_id,
+                description=f"agentkeel: the {name} interface endpoint. An agent reaches it and nothing else.",
+            )  # fmt: skip
+
+
+app = cdk.App(outdir=os.environ.get("CDK_OUTDIR") or str(Path(__file__).parent / "cdk.out"))
 stack = BootstrapStack(
     app, "AgentkeelBootstrap",
     env=cdk.Environment(region=REGION),  # account comes from the deployer's credentials
     description="agentkeel M01 bootstrap: boundary, roles, VPC, key, budget. Security seat.",
     synthesizer=cdk.LegacyStackSynthesizer(),  # the account is not CDK-bootstrapped in us-west-2
 )
-# One suppression per resource, each with the reason that resource needs it.
-# A stack-wide suppression would silence IAM5 on an Allow added later, which
-# is the rule worth keeping. Every Allow in this stack names its resources.
-CEILING = ("A ceiling, not a grant: a Deny that must cover every resource, including ones that do not "
-           "exist yet. Narrowing it to named ARNs would let a later attach slip past it.")
-for path, reason in [
-    ("AgentkeelBootstrap/Boundary/Resource",
-     f"The permission boundary itself. {CEILING}"),
-    ("AgentkeelBootstrap/ExecutionRole/DefaultPolicy/Resource",
-     f"iam:CreateRole is scoped to the agent role path and conditioned on the boundary; the Deny is a "
-     f"ceiling. {CEILING}"),
-    ("AgentkeelBootstrap/DeployRole/DefaultPolicy/Resource",
-     "cloudformation:* is scoped to stack/agentkeel-*, which is the set of stacks this platform deploys; "
-     "the stack id suffix is AWS's and cannot be named in advance."),
-    ("AgentkeelBootstrap/DeveloperRole/DefaultPolicy/Resource",
-     f"A read-only Allow over describe and list calls, and a Deny on deploying. {CEILING}"),
-    ("AgentkeelBootstrap/EvalRole/DefaultPolicy/Resource",
-     f"The pinned profiles and foundation models are named; runtime/refagent* covers the versioned runtime "
-     f"name AgentCore assigns. The five-action Deny is a ceiling. {CEILING}"),
-]:
+# One suppression per resource, and each one names what it serves: the
+# seeded case (S3, S4, S5, S6, S8) or the line of SPEC/01 §6 that requires
+# the wildcard. A suppression that names neither is a finding, not a
+# suppression: remove it and let the rule fail until a seat rules on it
+# (Security, M01 PR 2). A stack-wide suppression would silence IAM5 on an
+# Allow added later, which is the rule worth keeping.
+CEILING = ("A ceiling, not a grant: a Deny must cover every resource, including ones that do not exist "
+           "yet, or a later attach slips past it.")
+SUPPRESSIONS = {
+    "Boundary/Resource": (
+        "SPEC/01 §6: 'the permission boundary, on every role either stack synthesises, applied "
+        "stack-wide'. This is that boundary, and it is what seed S5 reads: a role handed to GovernedAgent "
+        f"without it is refused at synth. {CEILING}"
+    ),
+    "ExecutionRole/DefaultPolicy/Resource": (
+        "SPEC/01 §6: 'the CloudFormation execution role the deploy passes, which carries the "
+        "boundary and may create a role only with the boundary attached'. iam:CreateRole is scoped to "
+        f"{AGENT_ROLE_PATH} and conditioned on iam:PermissionsBoundary; the wildcard is in the Deny. It is "
+        f"half of what seed S4 reads: the laptop cannot reach CloudFormation, and CloudFormation cannot "
+        f"exceed this. {CEILING}"
+    ),
+    "DeployRole/DefaultPolicy/Resource": (
+        "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "
+        "refs/heads/main, and job_workflow_ref'. Seed S4 is an attempt to do from a laptop what only this "
+        "role may do. cloudformation:* is scoped to stack/agentkeel-*, the set of stacks this platform "
+        "deploys; AWS appends the stack id suffix, which cannot be named in advance."
+    ),
+    "DeveloperRole/DefaultPolicy/Resource": (
+        "SPEC/01 §6: 'the developer role (§1), boundary on'. This is seed S4's principal. "
+        "The Allow is read-only describe and list; the wildcard is in the Deny that refuses the deploy. "
+        f"{CEILING}"
+    ),
+    "EvalRole/DefaultPolicy/Resource": (
+        "SPEC/01 §6: 'the eval role, absorbed from infra/eval-role/ under a new name, with its Deny "
+        "statement (item 33) and trust conditions as they stand'. The two profiles and the foundation "
+        "models are named by ARN; runtime/refagent* covers the versioned runtime name AgentCore assigns, "
+        f"which does not exist until the deploy. The five-action Deny is the ceiling. {CEILING}"
+    ),
+}
+for path, reason in SUPPRESSIONS.items():
     NagSuppressions.add_resource_suppressions_by_path(
-        stack, path, [{"id": "AwsSolutions-IAM5", "reason": reason}])
-# The endpoint security groups are CDK's own, and their rule is the VPC's CIDR,
-# which cdk-nag cannot resolve at synth (it reads as an intrinsic function).
+        stack, f"AgentkeelBootstrap/{path}", [{"id": "AwsSolutions-IAM5", "reason": reason}])
+# Not an IAM wildcard: cdk-nag cannot resolve these rules at all. They are
+# CDK's own endpoint security groups, and their source is the VPC's CIDR,
+# an intrinsic function at synth.
 for name in ("EndpointBedrockRuntime", "EndpointKms", "EndpointLogs"):
     NagSuppressions.add_resource_suppressions_by_path(
         stack, f"AgentkeelBootstrap/Vpc/{name}/SecurityGroup/Resource",
-        [{"id": "CdkNagValidationFailure", "reason": "AwsSolutions-EC23 cannot resolve the rule: the source "
-                                                     "is the VPC's own CIDR, an intrinsic function at synth. "
-                                                     "The rule allows 443 from inside this VPC and nothing else."}])
+        [{"id": "CdkNagValidationFailure",
+          "reason": "SPEC/01 §6: 'a VPC with no internet gateway, endpoints with policies scoped to "
+                    "the account'. AwsSolutions-EC23 cannot resolve this rule: the source is the VPC's own "
+                    "CIDR, an intrinsic function at synth. The rule allows 443 from inside this VPC and "
+                    "nothing else, and the VPC has no way out."}])
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

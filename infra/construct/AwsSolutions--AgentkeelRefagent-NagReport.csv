@@ -1,0 +1,7 @@
+Rule ID,Resource ID,Compliance,Exception Reason,Rule Level,Rule Info
+"AwsSolutions-EC23","AgentkeelRefagent/Refagent/Sg/Resource","Compliant","N/A","Error","The Security Group allows for 0.0.0.0/0 or ::/0 inbound access."
+"AwsSolutions-EC27","AgentkeelRefagent/Refagent/Sg/Resource","Compliant","N/A","Error","The Security Group does not have a description."
+"AwsSolutions-DDB3","AgentkeelRefagent/Refagent/RightsTable/Resource","Compliant","N/A","Warning","The DynamoDB table does not have Point-in-time Recovery enabled."
+"AwsSolutions-IAM4","AgentkeelRefagent/Refagent/Role/Resource","Compliant","N/A","Error","The IAM user, role, or group uses AWS managed policies."
+"AwsSolutions-IAM5","AgentkeelRefagent/Refagent/Role/Resource","Compliant","N/A","Error","The IAM entity contains wildcard permissions and does not have a cdk-nag rule suppression with evidence for those permission."
+"AwsSolutions-IAM5","AgentkeelRefagent/Refagent/Role/DefaultPolicy/Resource","Suppressed","SPEC/01 §6, 'its own log group' and 'the agent's key': logs:CreateLogStream, logs:PutLogEvents, kms:Decrypt and kms:GenerateDataKey are on *, because the log stream does not exist until the runtime writes it and the key is reached through the grant, not by ARN. The boundary (S5) caps all four, and the key policy denies this role its own key policy (S6). The profile and the rights table are named by ARN.","Error","The IAM entity contains wildcard permissions and does not have a cdk-nag rule suppression with evidence for those permission."

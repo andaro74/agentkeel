@@ -6,9 +6,12 @@ failure now, and a failure the first time it passes, so the marker has to
 come off in the commit that lands the reader. A seed cannot start passing
 without somebody saying so.
 
-S1 and S2 are read by src/bundle/verify.py (M01 PR 2, their markers off).
-S3, S5, S8 and the S4, S6 observations are read later in PR 2. S7 is read by `verdict.build` and `verdict.gate`
-in M01 PR 1 (F1.4); its marker came off in the commit that landed that reading.
+S1 and S2 are read by src/bundle/verify.py, S3, S5 and S8 by infra/construct/
+(M01 PR 2, their markers off). S4 and S6 are attempts against the deployed
+bootstrap stack; their markers come off when the human has made them and
+CI has looked each request id up in CloudTrail. S7 is read by
+`verdict.build` and `verdict.gate` in M01 PR 1 (F1.4); its marker came off
+in the commit that landed that reading.
 """
 
 from __future__ import annotations
@@ -42,12 +45,17 @@ def test_s2_a_bundle_changed_after_signing_is_refused():
         verify.verify(FIXTURES / "bundles" / "altered")
 
 
-@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S3: {PR2} (infra/construct/)")
 def test_s3_egress_not_in_the_manifest_is_refused_at_synth():
-    from infra.construct import synth_refusal  # type: ignore[import-not-found]
+    """Both forms: through the construct's own security group, and as a separate resource."""
+    from infra.construct import synth_refusal
 
-    assert synth_refusal(FIXTURES / "construct" / "extra_egress.py") is not None
-    assert synth_refusal(FIXTURES / "construct" / "extra_egress_standalone.py") is not None
+    through = synth_refusal(FIXTURES / "construct" / "extra_egress.py")
+    standalone = synth_refusal(FIXTURES / "construct" / "extra_egress_standalone.py")
+    for refusal in (through, standalone):
+        assert refusal is not None and "egress to 0.0.0.0/0" in refusal
+    # the second is refused as what it is: a rule the construct never saw
+    assert "added outside the construct" in standalone
+    assert "added outside the construct" not in through
 
 
 @pytest.mark.xfail(strict=True, raises=AssertionError, reason=f"S4: {PR2} (the bootstrap stack's deploy role)")
@@ -59,11 +67,11 @@ def test_s4_a_laptop_deploy_was_refused():
     assert all(attempt["result"] == "AccessDenied" and attempt["request_id"] for attempt in observed)
 
 
-@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S5: {PR2} (infra/construct/)")
 def test_s5_a_role_without_the_boundary_is_refused_at_synth():
-    from infra.construct import synth_refusal  # type: ignore[import-not-found]
+    from infra.construct import synth_refusal
 
-    assert synth_refusal(FIXTURES / "construct" / "role_without_boundary.py") is not None
+    refusal = synth_refusal(FIXTURES / "construct" / "role_without_boundary.py")
+    assert refusal is not None and "no permissions boundary" in refusal
 
 
 @pytest.mark.xfail(strict=True, raises=AssertionError, reason=f"S6: {PR2} (the bootstrap stack's key policy)")
@@ -76,11 +84,11 @@ def test_s6_the_agent_role_cannot_read_its_key_policy():
     assert all("resource-based policy" in attempt["message"] for attempt in observed)  # the key policy refused it
 
 
-@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S8: {PR2} (infra/construct/)")
 def test_s8_an_agent_outside_the_construct_is_refused_at_synth():
-    from infra.construct import synth_refusal  # type: ignore[import-not-found]
+    from infra.construct import synth_refusal
 
-    assert synth_refusal(FIXTURES / "construct" / "outside_construct.py") is not None
+    refusal = synth_refusal(FIXTURES / "construct" / "outside_construct.py")
+    assert refusal is not None and "outside GovernedAgent" in refusal
 
 
 def test_s7_an_answer_that_cites_nothing_is_not_a_pass(tmp_path, goldens):

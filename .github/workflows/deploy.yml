@@ -1,0 +1,185 @@
+# deploy (SPEC/01 §6, M01 PR 2). Security seat.
+# Authorised by SPEC/00-overview.md#8-M01 and milestones/M01/rulings/pr2.md.
+# Its hash is listed in infra/workflows.sha256, which `make validate` reads.
+#
+# On `main` only. Packs refagent's bundle, signs the archive with cosign
+# keyless, verifies it, builds and pushes the image, verifies again inside
+# the job that deploys, and deploys `AgentkeelRefagent` through the deploy
+# role. Four things are worth reading closely.
+#
+# 1. **The identity is this file on main.** `src/bundle/verify.py` accepts
+#    one identity for a deploy (ruling g):
+#    https://github.com/andaro74/agentkeel/.github/workflows/deploy.yml@refs/heads/main
+#    and refuses anything else, including sign-fixture.yml's. It also reads
+#    the certificate's Fulcio source-repository id, so a fork of this file
+#    under the same name signs nothing that deploys here.
+# 2. **Verify runs twice.** Once where the signature is made, and again at
+#    the start of the deploy job, on the bytes that job holds. The second
+#    run is the one that matters: it is the only one whose subject is the
+#    bytes being deployed.
+# 3. **The image is pinned by digest.** The repository is tag-immutable
+#    (infra/bootstrap), so the digest cannot be moved to other bytes, and
+#    the stack is synthesised with that digest.
+# 4. **The load check.** After the deploy, `verify` runs once more against
+#    the bundle the runtime was built from, and the runtime is called once.
+#    It runs outside the bundle's own code (SPEC/01 §6, the repair on
+#    platform-architect BLOCK 3).
+#
+# What this does not do, and what M01 does not claim it does. **No deploy
+# has run.** This path is written at M01 PR 2 and is not what row 1
+# measures: S1 and S2 are measured by `verify` in the PR run, S3, S5 and S8
+# at synth, S4 and S6 against the deployed bootstrap stack (SPEC/01 §5).
+# Until a run of this file is in the record, nothing here has fired on a
+# seeded case, and no prose may call it proven (SPEC/00 §10.5).
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - agents/refagent/**
+      - infra/construct/**
+      - .github/workflows/deploy.yml
+
+permissions: {}
+
+concurrency:
+  group: deploy-refagent
+  cancel-in-progress: false
+
+env:
+  BUNDLE: agents/refagent
+  IMAGE: agentkeel-refagent
+  REGION: us-west-2
+  STACK: AgentkeelRefagent
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # OIDC to Fulcio, keyless
+    outputs:
+      digest: ${{ steps.pack.outputs.digest }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Pack the bundle
+        id: pack
+        run: |
+          set -euo pipefail
+          uv run python -m src.bundle.pack "$BUNDLE" --out "$BUNDLE/dist" | tee pack.out
+          echo "digest=$(awk '{print $1}' pack.out)" >> "$GITHUB_OUTPUT"
+
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+
+      - name: Sign the archive, keyless
+        run: cosign sign-blob --yes --bundle "$BUNDLE/bundle.cosign.json" "$BUNDLE/dist/bundle.tar"
+
+      # The first of the two verifies. The identity is this workflow on main,
+      # which is the only one a deploy accepts.
+      - name: Verify what was just signed
+        run: uv run python -m src.bundle.verify "$BUNDLE"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-bundle
+          path: |
+            ${{ env.BUNDLE }}/bundle.cosign.json
+            ${{ env.BUNDLE }}/dist/bundle.tar
+          if-no-files-found: error
+          retention-days: 90
+
+  deploy:
+    needs: sign
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # OIDC to AWS, as the deploy role
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: signed-bundle
+          path: ${{ env.BUNDLE }}
+
+      # The second verify, on the bytes this job will deploy. If the tree
+      # this job checked out differs from the tree that was signed by one
+      # byte, the digest does not match and the deploy stops here.
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+
+      - name: Verify the bytes this job deploys
+        run: uv run python -m src.bundle.verify "$BUNDLE"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: agentkeel-deploy-${{ github.run_id }}
+          role-duration-seconds: 3600
+          aws-region: us-west-2
+
+      - uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        id: ecr
+
+      - name: Build and push the image
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          # The tag is the bundle digest, so the image and the bundle it was
+          # built from carry the same name. The repository is tag-immutable,
+          # so this tag can be written once.
+          tag="${{ needs.sign.outputs.digest }}"
+          docker build -f "$BUNDLE/Dockerfile" -t "$REGISTRY/$IMAGE:$tag" .
+          docker push "$REGISTRY/$IMAGE:$tag"
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$REGISTRY/$IMAGE:$tag" | cut -d@ -f2)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image $REGISTRY/$IMAGE@$digest" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy refagent's stack
+        env:
+          AGENTKEEL_IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          uv run python -m infra.construct.app
+          aws cloudformation deploy \
+            --stack-name agentkeel-refagent \
+            --template-file "infra/construct/cdk.out/$STACK.template.json" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --role-arn "$(aws cloudformation describe-stacks --stack-name AgentkeelBootstrap \
+              --query "Stacks[0].Outputs[?OutputKey=='ExecutionRoleArn'].OutputValue" --output text)" \
+            --no-fail-on-empty-changeset
+
+      - name: Load the rights table
+        run: uv run python scripts/load_rights_table.py --table "$IMAGE-rights"
+
+      # The load check (SPEC/01 §6). It runs here, outside the bundle's own
+      # code, and it checks the cosign signature, not a digest the deployer
+      # wrote down. Then one call, so "loads" means something that happened.
+      - name: The check at load
+        run: |
+          set -euo pipefail
+          uv run python -m src.bundle.verify "$BUNDLE"
+          arn=$(aws cloudformation describe-stacks --stack-name agentkeel-refagent \
+            --query "Stacks[0].Outputs[?OutputKey=='RuntimeArn'].OutputValue" --output text)
+          AGENTKEEL_RUNTIME_ARN="$arn" uv run python -m src.agent.run --out "$RUNNER_TEMP/after-deploy.json" \
+            --goldens evals/goldens/v1
+          echo "deployed and answered: $arn" >> "$GITHUB_STEP_SUMMARY"

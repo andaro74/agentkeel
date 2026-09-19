@@ -225,3 +225,8 @@ cdk.out/
 !src/manifest/
 !src/manifest/**
 src/manifest/__pycache__/
+
+# Bundles are packed and signed in CI; neither the archive nor the
+# signature is committed (ruling h).
+agents/*/dist/
+agents/*/bundle.cosign.json

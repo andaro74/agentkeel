@@ -42,11 +42,19 @@ def files(bundle_dir: Path) -> list[Path]:
     The signature and the build folder are not part of what is signed: the
     cosign bundle is written beside the bundle after the archive is made
     (ruling h), so packing it would change the digest it records.
+
+    Nor is anything Python left behind. `__pycache__` holds bytes that
+    differ by interpreter and by when the file was last imported, so a
+    bundle packed after a local run would not have the digest CI signed.
+    The fixtures have no such folder, so this excludes nothing sign-fixture
+    packed.
     """
     return sorted(
         path
         for path in bundle_dir.rglob("*")
-        if path.is_file() and path.name != BUNDLE_NAME and "dist" not in path.relative_to(bundle_dir).parts
+        if path.is_file()
+        and path.name != BUNDLE_NAME
+        and not {"dist", "__pycache__"} & set(path.relative_to(bundle_dir).parts)
     )
 
 

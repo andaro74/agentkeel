@@ -3,21 +3,30 @@
 # creates, boundary on, used from any machine. Not the admin who deploys
 # the bootstrap stack; that is break-glass and landing-zone work.
 #
-# Planted at M01 PR 1 as the attempt to make. It is made on the first main
-# run after M01 PR 2 merges, once the bootstrap stack exists, and
-# `observed` is filled from what AWS returned, with the request id of each
-# call. Nothing reads this file until then.
+# Planted at M01 PR 1 as the attempt to make. It is made by the human
+# during M01 PR 2, after the bootstrap stack is deployed and before PR 2's
+# first CI run (ruling 4, before PR #7 merged). The human fills `observed`
+# from what AWS returned; PR 2's CI run then looks each request id up in
+# CloudTrail (`scripts/observe_attempt.py`), and that lookup is what writes
+# `checks.F1_1`. A human-written file feeds no check by itself.
+#
+# Each observed entry: what, request_id, event_name, at (ISO 8601, UTC),
+# result, message. `event_name` is the CloudTrail event, because CloudTrail
+# has no lookup attribute for a request id.
 seed: S4
 falsifier: F1.1
 principal: the developer role (bootstrap stack, boundary on), assumed from a laptop
 attempts:
   - what: assume the deploy role from the developer session
-    command: aws sts assume-role --role-arn <deploy role ARN> --role-session-name seed-s4
+    event_name: AssumeRole
+    command: aws sts assume-role --role-arn arn:aws:iam::<account>:role/agentkeel-deploy --role-session-name seed-s4
     refused_when: AccessDenied
-  - what: assume a CDK bootstrap role from the developer session
-    command: aws sts assume-role --role-arn <cdk deploy role ARN> --role-session-name seed-s4
+  - what: assume the CloudFormation execution role from the developer session
+    event_name: AssumeRole
+    command: aws sts assume-role --role-arn arn:aws:iam::<account>:role/agentkeel-cfn-exec --role-session-name seed-s4
     refused_when: AccessDenied
   - what: deploy refagent's stack with the developer session
-    command: npx cdk deploy <refagent stack>
+    event_name: CreateStack
+    command: aws cloudformation create-stack --stack-name agentkeel-refagent --template-body file://infra/construct/cdk.out/AgentkeelRefagent.template.json --capabilities CAPABILITY_NAMED_IAM
     refused_when: AccessDenied, and no stack event for the attempt
 observed: null

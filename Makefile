@@ -13,6 +13,10 @@
 # time (P6) and its card is written first. Until an agent runner is in the
 # tree (M01 PR 2) there is no agent under test, so the envelope is the
 # control's. A run always writes an envelope.
+#
+# From M01 PR 2 `src/agent/run.py` is in the tree, so both run: the control
+# writes the card, refagent writes the envelope, and cost-cap adds the two
+# up against one cap (ruling l).
 
 .PHONY: evals evals-local validate plants ledger ledger-plain
 
@@ -22,11 +26,24 @@ LOCAL := evals/local
 AGENT_RUNNER := $(wildcard src/agent/run.py)
 
 # CI passes these. Each becomes an entry in the envelope's `checks`.
+# M01 PR 2 adds claim 1's (SPEC/01 §4). F1_1 is read from two sources and
+# passes only if both do: the S1, S2, S3 and S8 tests, and CloudTrail's
+# record of S4's attempts. F1_2 is the S5 test. F1_3 is CloudTrail's record
+# of S6's attempt. F1_4 is the envelope's own goldens and needs no flag.
 F0_2_JUNIT ?=
 F0_3_OBS ?=
+JUNIT ?=
+S4_OBS ?=
+S6_OBS ?=
 RUN_URL ?=
+F1_1_CASES := test_s1_an_unsigned_bundle_is_refused,test_s2_a_bundle_changed_after_signing_is_refused,test_s3_egress_not_in_the_manifest_is_refused_at_synth,test_s8_an_agent_outside_the_construct_is_refused_at_synth
+F1_2_CASES := test_s5_a_role_without_the_boundary_is_refused_at_synth
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \
           $(if $(F0_3_OBS),--check-pr F0_3 "$(F0_3_OBS)") \
+          $(if $(JUNIT),--check-cases F1_1 "$(F1_1_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F1_2 "$(F1_2_CASES)" "$(JUNIT)") \
+          $(if $(S4_OBS),--check-attempt F1_1 "$(S4_OBS)") \
+          $(if $(S6_OBS),--check-attempt F1_3 "$(S6_OBS)") \
           $(if $(RUN_URL),--run-url "$(RUN_URL)")
 # CI passes a file path; the gate's exit code is written there, so a REJECTED
 # envelope (exit 2) is told from a RED one and is not recorded (M01 item 9).

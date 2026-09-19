@@ -13,7 +13,9 @@ amendment 2: one subject per envelope, `control_card_ref`, `tokens_in`,
 F1.4, over the cap is RED; M01 PR 1) ·
 ADR-0002 (the baseline is frozen at tag `m00`; M00 PR 3) · ADR-0005
 (the milestone video is recorded at the tag; M00 PR 3; with amendment 1:
-it is committed in the next milestone's PR 1; M01 PR 1)
+it is committed in the next milestone's PR 1; M01 PR 1) · ADR-0006
+(the platform VPC has gateway endpoints for S3 and DynamoDB as well as
+interface endpoints; §8 M01; M01 PR 2)
 
 ## 1. What this is
 
@@ -345,7 +347,8 @@ row 0 measured value in `milestones/README.md`.
 ### M01 — Signed bundle, construct, first tenant
 Build: manifest schema; cosign in CI; **bootstrap stack** (GitHub OIDC
 provider, deploy role scoped to repo and branch, permission boundary,
-VPC with interface endpoints only, KMS key with Security-owned policy,
+VPC with interface endpoints, and gateway endpoints for S3 and DynamoDB
+(ADR-0006), KMS key with Security-owned policy,
 log and audit delivery to the security account, Budgets alarm);
 `GovernedAgent` construct (AgentCore Runtime + Gateway + Identity,
 boundary applied, Bedrock application inference profile per agent for

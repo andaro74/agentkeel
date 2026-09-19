@@ -298,6 +298,9 @@ the `check_availability` tool with its strict schema, inside
 | j | **Redeploy record:** the `describe-stacks` line and the `simulate-principal-policy` table go in `infra/eval-role/README.md` under "Redeployed 2026-09-19 (items 14, 33)". One refused call on a denied action is the `evals.yml` probe step at PR 2 (item 18). |
 | k | **The re-export** of `infra/ruleset/main.json`, with `evals` as a required check, is PR 2's first Security commit. If the live ruleset still lists one check, stop and say so. (At the M01 PR 1 merge the live ruleset already listed both; the export in the tree is from before that change.) |
 
+| q | **The cdk-nag report is committed.** Both stacks' `NagReport` CSVs are committed beside their `app.py`, written by the same synth `make validate` runs; the check compares them and fails if they differ, so a suppression cannot be added without the report beside it changing in the same commit. |
+| r | **A suppression names what it serves.** A suppression on an IAM wildcard, a boundary rule or a key-policy rule names the seeded case (S3, S4, S5, S6 or S8) or the SPEC/01 §6 line that requires it. One that names neither is a finding, not a suppression: it comes out and the rule fails until a seat rules on it. `make validate` fails on a suppression that names neither. |
+
 **PR 2 mechanics (Product with Security).** The PR opens as a **draft**
 right after the Security setup commit, so `sign-fixture.yml` can run on
 the `pull_request` event. The S2 signature is the bot's commit and

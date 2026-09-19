@@ -12,7 +12,7 @@ Written at M01 PR 1 open. The row in `milestones/README.md` is the one
 | Seeded commit | `a7b088e` (S1); `df7c735` (S2 content; its signature over S1's bytes is M01 PR 2's first commit, before `src/bundle/verify.py`); `48669ba` (S3); `1b4c2f6` (S4); `19131e9` (S5); `091cc45` (S6); `2f4cacb` (S7); `6b8b8cf` (S8), each its own commit (SPEC/01 §5) |
 | Expected gate output | PR 1: no agent under test, so the envelope is the control's, in M00's form (`control_card_ref` null), gated and recorded as at M00; it says nothing about claim 1. `make plants` lists S1–S8, S7's reader in the tree. On S7: 12 of 12 ordinary and trap results `score` true, `cites` false, `pass` false; `checks.F1_4` fail; build and gate RED. PR 2, on the PR: S1, S2 refused by `verify`, each with its planted reason; S3 (both forms), S5, S8 refused at synth; refagent's envelope has `checks.F1_1`, `F1_2`, `F1_4` pass. No count of refagent's passes is expected: agent history is empty (P7), so the checks decide the row. During PR 2, before its first CI run, the human deploys the bootstrap stack and attempts S4 and S6; PR 2's CI run looks up each request id in CloudTrail (`scripts/observe_attempt.py`) and writes `checks.F1_1` and `checks.F1_3`. Refagent's first agent envelope is PR 2's. Nothing about claim 1 is first measured after PR 2 merges (P3). |
 | Measured | — |
-| PRs used / cap | 1 / 4 |
+| PRs used / cap | 2 / 4 |
 | State | OPEN |
 
 ### Open detail (PR 1, #7, 2026-09-19)

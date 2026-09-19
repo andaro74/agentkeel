@@ -1,17 +1,32 @@
 # Seed S6 (SPEC/01 §5, F1.3): the agent's role reads its own KMS key
 # policy. For the attempt, the role's own policy is given
 # `kms:GetKeyPolicy` on the key, so a refusal can only come from the key
-# policy. A refusal that names the role's own policy does not count.
+# policy. A refusal that names the role's own policy does not count: the
+# message must say an explicit deny in a resource-based policy.
 #
-# Planted at M01 PR 1 as the attempt to make. It is made on the first main
-# run after M01 PR 2 merges, once refagent's key exists, and `observed` is
-# filled from what AWS returned, with the request id. Nothing reads this
-# file until then.
+# Planted at M01 PR 1 as the attempt to make. It is made by the human
+# during M01 PR 2, after the bootstrap stack is deployed and before PR 2's
+# first CI run (ruling 4, before PR #7 merged). The human fills `observed`
+# from what AWS returned; PR 2's CI run then looks the request id up in
+# CloudTrail (`scripts/observe_attempt.py`), and that lookup is what writes
+# `checks.F1_3`. A human-written file feeds no check by itself.
+#
+# refagent's runtime role does not exist until refagent's stack is
+# deployed, which happens from `main` after PR 2 merges. So the attempt is
+# made with a role the human creates by hand for it, under the same path
+# `/agentkeel/agents/`, with the boundary attached and `kms:GetKeyPolicy`
+# on the key in its own policy. The key policy matches agent roles by path
+# (ruling b), so that role is the same principal as far as the key is
+# concerned, and the deny under test is the same one.
+#
+# Each observed entry: what, request_id, event_name, at (ISO 8601, UTC),
+# result, message.
 seed: S6
 falsifier: F1.3
-principal: refagent's runtime role, with kms:GetKeyPolicy on its key in its own policy for the attempt
+principal: a role under /agentkeel/agents/ with the boundary and kms:GetKeyPolicy in its own policy
 attempts:
   - what: read the key policy of refagent's KMS key
-    command: aws kms get-key-policy --key-id <refagent key ARN> --policy-name default
+    event_name: GetKeyPolicy
+    command: aws kms get-key-policy --key-id alias/agentkeel-refagent --policy-name default
     refused_when: AccessDenied with an explicit deny in a resource-based policy
 observed: null

@@ -261,3 +261,16 @@ def test_a_bad_history_file_is_rejected_not_red(chain, capsys):
     (envelope_path.parent / f"{'b' * 40}.json").write_text("{}", encoding="utf-8")
     assert gate.main([str(envelope_path), "--history-dir", str(envelope_path.parent)]) == 2
     assert "history cannot be replayed" in capsys.readouterr().out
+
+
+def test_the_cap_is_the_one_that_stood_at_the_envelopes_commit():
+    """Ruling m: a later cap change does not re-rule an old envelope.
+
+    `55dadb2` is M00's last envelope commit. `thresholds.yaml` said 20000
+    there and says 150000 in the tree; the gate reads 20000 for it.
+    """
+    m00 = "55dadb2f221e60036bdba0b01fdb6eff025d74bc"
+    assert gate.cap_at(m00) == (20000, "55dadb2f221e, the envelope's own commit")
+    assert gate.thresholds(gate.THRESHOLDS)["cost_cap"]["tokens_per_run"] == 150000
+    # A commit git cannot resolve falls back to the tree, and says so.
+    assert gate.cap_at("a" * 40) == (150000, "the working tree")
