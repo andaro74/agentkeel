@@ -124,6 +124,14 @@ jobs:
         if: steps.current.outputs.measured_at == ''
         run: make validate
 
+      # `src/bundle/verify.py` skips the cosign check when cosign is not on
+      # the machine, and says so. Without this step S1 and S2 would still be
+      # refused — for the missing signature and for the digest — but the
+      # signature check itself would never run in the run that measures
+      # them. It is installed before pytest for that reason (M01 PR 2).
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+        if: steps.current.outputs.measured_at == ''
+
       # A failing test must reach the envelope as checks.F0_2 = fail, so the
       # job goes on and fails at the end.
       - name: pytest
