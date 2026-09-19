@@ -2,8 +2,9 @@
 # Each bar says which direction relaxes it.
 # Opened at M00 PR 2 by ruling of the Threshold Owner: R3-5 in
 # milestones/M00/feasibility.md §2, carried by milestones/M00/rulings/pr2.md.
-# Changed at M01 PR 1 with two keys, Threshold Owner and Engineering, both
-# named in milestones/M01/rulings/pr1.md (M01 open items 5, 22, 23).
+# Changed at M01 PR 1 with two keys: Threshold Owner in
+# milestones/M01/rulings/pr1-threshold-owner.md, Engineering in
+# milestones/M01/rulings/pr1.md (ruling B; M01 open items 5, 22, 23).
 
 # cost-cap: total tokens, in plus out, for one `make evals` run.
 # A budget, not a quality bar. Relaxes upward: a higher number needs two keys.
