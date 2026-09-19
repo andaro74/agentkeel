@@ -16,14 +16,12 @@ being filled (SPEC/00 §10.3).
 
 | M | Recorded at | Shows | State |
 |---|---|---|---|
-| M00 | tag `m00` | the three traps and the baseline prompt; `make evals-local` losing; `verdict.gate` on `tests/fixtures/hand_written_envelope_no_baseline_card_ref.json` exiting 2, REJECTED; the CI-written envelope for `9407615`; `make ledger` printing row 0 GREEN and exiting 0 | **pending, tag `m00`** |
+| M00 | tag `m00`, commit `cfbd8ba`, 2026-09-19 | trap `g-012` and its answer; `make evals-local` losing, live; the seed commit `f9f1342` with no `src/verdict/`; `verdict.gate` on `tests/fixtures/hand_written_envelope_no_baseline_card_ref.json` exiting 2, REJECTED; row 0 before and after the close; `make ledger` exiting 0; `tests/test_baseline_frozen.py`, 9 passed | recorded, 4:16 |
 
-M00's video is recorded after the close PR merges and the tag is cut, not
-inside the close PR. SPEC/00 §10.5 says a close is not ruled ready
-without the page and the video; the page is in the close PR and this
-departure is ruled by Product at the M00 close
-(`milestones/M00/README.md`, close detail) and carried as item 27 of
-`milestones/M01/open.md`.
+M00's video was recorded on `main` at tag `m00`, after the close PR
+merged, and committed in M00 PR 4 (ADR-0005). The live `make evals-local`
+in it is a laptop run and is not evidence; its counts may differ from the
+recorded envelope's, which is Finding F0.4.
 
 ## Acts (`docs/video/actN-*.mp4`, ≤ 8 minutes)
 

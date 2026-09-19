@@ -77,7 +77,7 @@ Ruled at the close, and listed here because they land in M01:
 
 | # | Item | Seat | When |
 |---|---|---|---|
-| 27 | `docs/video/milestones/M00.mp4`. SPEC/00 §10.5 says a close is not ruled ready without the explainer page and the video. The page is in the close PR; the video is recorded at the tag, after the merge. The departure is ruled at the M00 close and written in `milestones/M00/README.md`. Record the video, or amend §10.5 to say the video follows the tag. | Product | before M01 PR 1 |
+| 27 | **Done in M00 PR 4 (#6):** recorded at tag `m00`, 4:16, committed with its entry in `docs/video/README.md`. `docs/video/milestones/M00.mp4`. SPEC/00 §10.5 says a close is not ruled ready without the explainer page and the video. The page is in the close PR; the video is recorded at the tag, after the merge. The departure is ruled at the M00 close and written in `milestones/M00/README.md`. Record the video, or amend §10.5 to say the video follows the tag. | Product | before M01 PR 1 |
 
 ## Not carried — already homed, named here so M04 does not have to go looking
 
