@@ -56,3 +56,10 @@ def test_s4_a_laptop_deploy_was_refused():
     observed = yaml.safe_load((RUNS / "f1_1_laptop.yaml").read_text(encoding="utf-8"))["observed"]
     assert observed is not None, "the attempt has not been made"
     assert all(attempt["result"] == "AccessDenied" for attempt in observed)
+
+
+@pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S5: {PR2} (infra/construct/)")
+def test_s5_a_role_without_the_boundary_is_refused_at_synth():
+    from infra.construct import synth_refusal  # type: ignore[import-not-found]
+
+    assert synth_refusal(FIXTURES / "construct" / "role_without_boundary.py") is not None
