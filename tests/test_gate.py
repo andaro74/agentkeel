@@ -86,7 +86,21 @@ def test_an_agent_cannot_call_itself_the_control(chain):
     for field in ("control_card_ref", "tokens_in"):
         del envelope[field]
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(gate.Rejected, match="claim 1 is read on an agent envelope only"):
+        gate.read(envelope_path)
+    del envelope["checks"]["F1_4"]  # and without its claim-1 check, its base is another commit's card
+    envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(gate.Rejected, match="baseline card is for 9407615"):
+        gate.read(envelope_path)
+
+
+def test_a_control_envelope_carries_no_claim_1_check(chain):
+    """Cold review F4: with no agent under test, an envelope says nothing about claim 1."""
+    envelope_path, _, _ = chain()
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    envelope["checks"]["F1_1"] = {"status": "pass", "url": URL}
+    envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(gate.Rejected, match="claim 1 is read on an agent envelope only"):
         gate.read(envelope_path)
 
 

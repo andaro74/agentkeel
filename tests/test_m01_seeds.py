@@ -53,9 +53,11 @@ def test_s3_egress_not_in_the_manifest_is_refused_at_synth():
 
 @pytest.mark.xfail(strict=True, raises=AssertionError, reason=f"S4: {PR2} (the bootstrap stack's deploy role)")
 def test_s4_a_laptop_deploy_was_refused():
-    observed = yaml.safe_load((RUNS / "f1_1_laptop.yaml").read_text(encoding="utf-8"))["observed"]
+    run = yaml.safe_load((RUNS / "f1_1_laptop.yaml").read_text(encoding="utf-8"))
+    observed = run["observed"]
     assert observed is not None, "the attempt has not been made"
-    assert all(attempt["result"] == "AccessDenied" for attempt in observed)
+    assert len(observed) == len(run["attempts"]), "every attempt is made, not some"
+    assert all(attempt["result"] == "AccessDenied" and attempt["request_id"] for attempt in observed)
 
 
 @pytest.mark.xfail(strict=True, raises=ModuleNotFoundError, reason=f"S5: {PR2} (infra/construct/)")
@@ -67,9 +69,11 @@ def test_s5_a_role_without_the_boundary_is_refused_at_synth():
 
 @pytest.mark.xfail(strict=True, raises=AssertionError, reason=f"S6: {PR2} (the bootstrap stack's key policy)")
 def test_s6_the_agent_role_cannot_read_its_key_policy():
-    observed = yaml.safe_load((RUNS / "f1_3_key_policy.yaml").read_text(encoding="utf-8"))["observed"]
+    run = yaml.safe_load((RUNS / "f1_3_key_policy.yaml").read_text(encoding="utf-8"))
+    observed = run["observed"]
     assert observed is not None, "the attempt has not been made"
-    assert all(attempt["result"] == "AccessDenied" for attempt in observed)
+    assert len(observed) == len(run["attempts"]), "every attempt is made, not some"
+    assert all(attempt["result"] == "AccessDenied" and attempt["request_id"] for attempt in observed)
     assert all("resource-based policy" in attempt["message"] for attempt in observed)  # the key policy refused it
 
 

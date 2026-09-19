@@ -99,6 +99,8 @@ def read(path: Path, root: Path = ROOT) -> dict[str, Any]:
         return read_agent(path, envelope, scopes, root)
     if envelope.get("control_card_ref") is not None:
         raise Rejected(f"{path}: control results beside a control_card_ref: a control envelope's base is its own card")
+    if claim_1 := sorted(name for name in envelope["checks"] if name.startswith("F1_")):
+        raise Rejected(f"{path}: a control envelope carries {claim_1}: claim 1 is read on an agent envelope only")
 
     card = card_at(path, envelope["baseline_card_ref"], root, "baseline_card_ref")
     if card.get("commit") != envelope["commit"]:
