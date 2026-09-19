@@ -1,0 +1,208 @@
+# evals (SPEC/00 §5 `regression` and `cost-cap`, P11). Security seat.
+# Authorised by SPEC/00-overview.md#8-M00 and the ruling on report 2.3.
+#
+# Runs `make evals` with the role in infra/eval-role/ and writes the
+# envelope to evals/history/<commit>.json with a commit from this workflow.
+# That commit is what "CI-written" means (ADR-0003); a human commit to
+# evals/history/ needs two keys.
+#
+# Two jobs. The job that runs the PR's code, and whatever `uv sync` pulls
+# in, has no write token. The job with the write token runs git only. It
+# still commits bytes the first job produced, so "CI-written" means who
+# pushed the file, not what wrote it: a PR that edits src/verdict/ or the
+# Makefile decides what its own envelope says. Known gap until the reader
+# can be taken from main.
+#
+# A commit pushed with GITHUB_TOKEN starts no workflow. So the envelope
+# commit has no check runs of its own, and the next human push is what
+# `cold-review-ruling` reads. That next push does not spend again: the
+# first step finds the envelope whose commit differs from HEAD only in
+# prose and history. It then asks verdict.gate to rule on that envelope,
+# and the gate's exit code is the job's. A RED envelope stays RED.
+#
+# checks.F0_3 is read from GitHub, not from the tree. If the ruleset on
+# main changes, a prose-only push does not measure again; change a
+# measured path, such as milestones/M00/runs/f0_3.yaml.
+#
+# What this does not do:
+# - stop someone with write access from editing this file, or from adding
+#   a workflow that assumes the same role. Nothing gates that until M02.
+# - tell a hand-written evals/history/<commit>.json from a recorded one,
+#   beyond what verdict.gate checks. `two-key` on a human commit there is M02.
+# - record on `push` to main. It measures and gates only.
+name: evals
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: evals-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  evals:
+    # A fork gets no OIDC token. Skip it; do not fail it.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # OIDC to AWS
+      checks: read # the F0.3 observer reads one check run
+      pull-requests: read
+    env:
+      COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+    outputs:
+      envelope: ${{ steps.written.outputs.envelope }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Is this tree already measured?
+        id: current
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$COMMIT"
+          for f in evals/history/*.json; do
+            [ -f "$f" ] || continue
+            sha=$(basename "$f" .json)
+            case "$sha" in *[!0-9a-f]*) continue ;; esac
+            [ "${#sha}" -eq 40 ] || continue
+            git merge-base --is-ancestor "$sha" HEAD || continue
+            # Prose, the ledger, subagent prompts and history do not change
+            # what the tree measures.
+            if git diff --quiet "$sha" HEAD -- . \
+              ':(exclude)evals/history' ':(exclude)docs' ':(exclude)SPEC' ':(exclude).claude' \
+              ':(exclude,glob)milestones/**/*.md' \
+              ':(exclude)README.md' ':(exclude)CLAUDE.md' ':(exclude)LICENSE'; then
+              echo "::notice::measured at $sha; nothing measured has changed since. Not spending again; the gate rules on that envelope."
+              echo "measured_at=$sha" >> "$GITHUB_OUTPUT"
+              break
+            fi
+          done
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      # The skip path. No AWS, no spend. The gate decides, not this file.
+      - name: Gate the recorded envelope
+        if: steps.current.outputs.measured_at != ''
+        env:
+          MEASURED_AT: ${{ steps.current.outputs.measured_at }}
+        run: uv run python -m src.verdict.gate "evals/history/$MEASURED_AT.json"
+
+      - name: make validate
+        if: steps.current.outputs.measured_at == ''
+        run: make validate
+
+      # A failing test must reach the envelope as checks.F0_2 = fail, so the
+      # job goes on and fails at the end.
+      - name: pytest
+        id: pytest
+        if: steps.current.outputs.measured_at == ''
+        continue-on-error: true
+        run: uv run pytest --junitxml="$RUNNER_TEMP/junit.xml"
+
+      - name: Observe the F0.3 plant
+        if: steps.current.outputs.measured_at == ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run python scripts/observe_pr_check.py milestones/M00/runs/f0_3.yaml --out "$RUNNER_TEMP/f0_3.json"
+
+      # The three claims the role's trust policy matches on: `aud` and `sub`
+      # exactly, `job_workflow_ref` by pattern. When an assume is refused, look
+      # here first: the first deploy trusted a `sub` this repo never issues
+      # (feasibility.md §9.5). Prints the claims, never the token. A diagnostic:
+      # if it fails, the measurement goes on.
+      - name: OIDC claims the role trusts
+        if: steps.current.outputs.measured_at == ''
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
+            | python3 -c 'import base64, json, sys; p = json.load(sys.stdin)["value"].split(".")[1]; c = json.loads(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4))); [print(k, "=", c.get(k)) for k in ("aud", "sub", "job_workflow_ref")]'
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: steps.current.outputs.measured_at == ''
+        with:
+          role-to-assume: ${{ vars.AWS_EVAL_ROLE_ARN }}
+          role-session-name: agentkeel-evals-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+
+      - name: make evals
+        if: steps.current.outputs.measured_at == ''
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: make evals F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" RUN_URL="$RUN_URL"
+
+      - name: The envelope
+        id: written
+        if: always() && steps.current.outputs.measured_at == ''
+        run: |
+          if [ -f "evals/history/$COMMIT.json" ]; then
+            echo "envelope=true" >> "$GITHUB_OUTPUT"
+            { echo '```json'; cat "evals/history/$COMMIT.json"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always() && steps.written.outputs.envelope == 'true'
+        with:
+          name: history-${{ env.COMMIT }}
+          path: evals/history/${{ env.COMMIT }}.*
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Fail if pytest failed
+        if: steps.pytest.outcome == 'failure'
+        run: exit 1
+
+  # Writes evals/history/. Runs git and nothing else: no `make`, no `uv`,
+  # no code from the PR. A RED envelope is recorded too.
+  record:
+    needs: evals
+    if: always() && github.event_name == 'pull_request' && needs.evals.outputs.envelope == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      COMMIT: ${{ github.event.pull_request.head.sha }}
+      BRANCH: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: history-${{ env.COMMIT }}
+          path: ${{ runner.temp }}/history
+
+      - name: Commit evals/history/<commit>.*
+        run: |
+          set -euo pipefail
+          if [ "$(git rev-parse HEAD)" != "$COMMIT" ]; then
+            echo "::warning::$BRANCH moved past $COMMIT; this run's envelope is not recorded"
+            exit 0
+          fi
+          mkdir -p evals/history
+          for name in "$COMMIT.json" "$COMMIT.baseline-card.json" "$COMMIT.baseline-raw.json"; do
+            cp "$RUNNER_TEMP/history/$name" "evals/history/$name"
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "evals/history/$COMMIT.json" "evals/history/$COMMIT.baseline-card.json" "evals/history/$COMMIT.baseline-raw.json"
+          git commit -m "evals: CI-written envelope for $COMMIT" -m "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          git push origin "HEAD:refs/heads/$BRANCH"

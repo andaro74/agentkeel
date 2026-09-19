@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "verdict.schema.json",
+  "title": "Envelope (SPEC/00 section 6 as amended by ADR-0004: checks, and scope on each result)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commit",
+    "tag",
+    "model_id",
+    "guardrail_version",
+    "judge_model_id",
+    "corpus_fingerprint",
+    "cache_state",
+    "baseline_card_ref",
+    "goldens",
+    "regressed",
+    "fragile",
+    "never_passed",
+    "plants_expected",
+    "plants_fired",
+    "guardrail_hits",
+    "p95_ms",
+    "tokens_out",
+    "cost_usd",
+    "rejected_over_ceiling",
+    "alarm_latency_s",
+    "checks",
+    "verdict"
+  ],
+  "properties": {
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "tag": {"type": ["string", "null"]},
+    "model_id": {"type": "string", "minLength": 1},
+    "guardrail_version": {
+      "description": "null until a guardrail exists (M03).",
+      "type": ["string", "null"]
+    },
+    "judge_model_id": {
+      "description": "null until the judge is picked (M03).",
+      "type": ["string", "null"]
+    },
+    "corpus_fingerprint": {
+      "description": "null until the corpus exists (M01). M03 makes null a failure (F3.4).",
+      "type": ["string", "null"]
+    },
+    "cache_state": {"enum": ["bypass", "disabled", "uncacheable"]},
+    "baseline_card_ref": {
+      "description": "The baseline card this run is a delta against. Required: F0.2.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "goldens": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^g-[0-9]{3}$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "scope", "score", "cites", "pass"],
+          "properties": {
+            "kind": {"enum": ["ordinary", "trap", "guardrail", "redteam"]},
+            "scope": {
+              "description": "control: the baseline's own reply, reported and never gated. agent: the agent under test, which the regression bar reads. No third value until a milestone needs one (ADR-0004).",
+              "enum": ["control", "agent"]
+            },
+            "score": {"type": "boolean"},
+            "cites": {
+              "description": "Row and clause present and existing. null for guardrail and redteam.",
+              "type": ["boolean", "null"]
+            },
+            "pass": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "regressed": {"$ref": "#/$defs/golden_ids"},
+    "fragile": {"$ref": "#/$defs/golden_ids"},
+    "never_passed": {"$ref": "#/$defs/golden_ids"},
+    "plants_expected": {"type": "integer", "minimum": 0},
+    "plants_fired": {"type": "integer", "minimum": 0},
+    "guardrail_hits": {"type": "integer", "minimum": 0},
+    "p95_ms": {"type": ["integer", "null"], "minimum": 0},
+    "tokens_out": {"type": "integer", "minimum": 0},
+    "cost_usd": {
+      "description": "null at M00: no seat owns a price table yet. The cap is in tokens.",
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "rejected_over_ceiling": {
+      "description": "null until ceilings exist (M01).",
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "alarm_latency_s": {
+      "description": "null until the security account exists (M05).",
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "checks": {
+      "description": "Keyed by falsifier id. pass: the falsifier did not fire. url: the CI evidence.",
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^F[0-9]+_[0-9]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "url"],
+          "properties": {
+            "status": {"enum": ["pass", "fail"]},
+            "url": {"type": "string", "pattern": "^https://"}
+          }
+        }
+      }
+    },
+    "verdict": {"enum": ["GREEN", "RED", "UNMEASURED"]}
+  },
+  "$defs": {
+    "golden_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^g-[0-9]{3}$"}
+    }
+  }
+}

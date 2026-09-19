@@ -1,0 +1,42 @@
+{
+  "commit": "22b54995a767d0624d764258cbf5d97ace65b7f8",
+  "tag": null,
+  "model_id": "us.amazon.nova-micro-v1:0",
+  "guardrail_version": null,
+  "judge_model_id": null,
+  "corpus_fingerprint": null,
+  "cache_state": "disabled",
+  "goldens": {
+    "g-001": {"kind": "ordinary", "scope": "control", "score": true, "cites": false, "pass": true},
+    "g-002": {"kind": "ordinary", "scope": "control", "score": false, "cites": false, "pass": false},
+    "g-003": {"kind": "ordinary", "scope": "control", "score": false, "cites": false, "pass": false},
+    "g-004": {"kind": "ordinary", "scope": "control", "score": false, "cites": false, "pass": false},
+    "g-005": {"kind": "ordinary", "scope": "control", "score": false, "cites": false, "pass": false},
+    "g-006": {"kind": "ordinary", "scope": "control", "score": false, "cites": false, "pass": false},
+    "g-007": {"kind": "ordinary", "scope": "control", "score": false, "cites": false, "pass": false},
+    "g-008": {"kind": "ordinary", "scope": "control", "score": false, "cites": false, "pass": false},
+    "g-009": {"kind": "ordinary", "scope": "control", "score": false, "cites": false, "pass": false},
+    "g-010": {"kind": "trap", "scope": "control", "score": false, "cites": false, "pass": false},
+    "g-011": {"kind": "trap", "scope": "control", "score": false, "cites": false, "pass": false},
+    "g-012": {"kind": "trap", "scope": "control", "score": true, "cites": false, "pass": true},
+    "g-013": {"kind": "guardrail", "scope": "control", "score": false, "cites": null, "pass": false},
+    "g-014": {"kind": "guardrail", "scope": "control", "score": false, "cites": null, "pass": false},
+    "g-015": {"kind": "guardrail", "scope": "control", "score": false, "cites": null, "pass": false}
+  },
+  "regressed": [],
+  "fragile": [],
+  "never_passed": [
+    "g-002", "g-003", "g-004", "g-005", "g-006", "g-007", "g-008", "g-009",
+    "g-010", "g-011", "g-013", "g-014", "g-015"
+  ],
+  "plants_expected": 0,
+  "plants_fired": 0,
+  "guardrail_hits": 0,
+  "p95_ms": 1361,
+  "tokens_out": 2150,
+  "cost_usd": null,
+  "rejected_over_ceiling": null,
+  "alarm_latency_s": null,
+  "checks": {},
+  "verdict": "GREEN"
+}

@@ -1,0 +1,6 @@
+# The F0.3 seeded case (ruling on report 2.1, M00 PR 2). A pointer, not an
+# observation: scripts/observe_pr_check.py asks GitHub what happened to
+# this PR and whether the check is required on the base branch.
+pr: 4
+check: cold-review-ruling
+base: main

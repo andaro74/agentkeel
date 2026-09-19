@@ -333,6 +333,123 @@ seat's original.
 Every other FINDING and NOTE in the report is unruled and stands as
 written in §1.
 
+### Third round: rulings that bind PR 2 (2026-09-18, at PR 2 open)
+
+The four report findings that `rulings/pr1.md` listed as binding PR 2.
+Ruled by the seats before PR 2 was written. The formats they needed are
+named in §8.
+
+**R3-1. CI credential path (report 2.3). Security.** PR 2 adds
+`infra/eval-role/`: a minimal CDK stack with one IAM role trusted by the
+GitHub OIDC provider (repo `andaro74/agentkeel`; any branch for
+`pull_request`, `main` for `push`). Permissions are
+`bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on the
+six pinned profile and model ARNs only, and no S3. The OIDC provider
+already exists; the stack imports it. M01's bootstrap stack absorbs the
+role. Security deploys it once with admin. CI assumes it through
+`aws-actions/configure-aws-credentials` pinned to a commit SHA. The
+workflow file is `.github/workflows/evals.yml`.
+
+**R3-2. Observing F0.2 (report 3.2). Engineering.** A pytest builds an
+envelope dict with no `baseline_card_ref` in memory and asserts (a)
+`verdict.build` refuses to emit it and (b) `verdict.gate` rejects it if
+written by hand. An in-memory dict is not a committed envelope; P11 is
+not violated. The second seed itself is a hand-written file under
+`tests/fixtures/`, committed first, with the test that expects the gate
+to reject it.
+
+**R3-3. Recording the plant (report 2.1). Engineering, Threshold Owner.**
+The envelope gains `checks`, keyed by falsifier id, each with `pass` or
+`fail` and the CI URL. At M00: `checks.F0_2` from the pytest above;
+`checks.F0_3` from a deliberate PR opened without a ruling file, left
+unmerged and closed, whose failed check run is the evidence.
+`plants_expected = 0` at M00 under the plant rule (ADR-0001 amendment 1,
+item 6, in the list "Rulings on what neither file specified"). The
+ruling as given cited "B1.6", an id nothing in the tree carries; Product
+ruled the citation (C, fourth round).
+
+**R3-4. The measured cell (report 4.2). Product.** Written in the close
+PR by Product, copied from the CI-written envelope, citing its commit
+and run URL. `make ledger` fails if the cell differs from the envelope.
+
+**R3-5. cost-cap. Threshold Owner.** Enforced from `thresholds.yaml` at
+M00: 20,000 tokens per run. SPEC/00 §5 says the cap is "in `evals.yml`"
+and §8 lists `cost-cap` under M03; this ruling is earlier and names a
+different file. SPEC/00 has not been amended to match.
+
+### Fourth round: rulings on what PR 2 found (2026-09-18, after the first CI measurement)
+
+PR 2 measured at `8fb4b80`, GREEN, and listed twelve items as Unsure.
+The seats ruled six. They are applied in one commit on `m00-pr2`.
+
+**A. Scope. Threshold Owner, Data Owner.** The regression bar applies to
+the agent under test; the baseline is the control and is never gated.
+`scope` is on each per-golden result in the envelope, and once on the
+baseline card (`scope: control`). Enum: `control`, `agent`; no third
+value until a milestone needs one. `gate.py` reads `scope: agent`
+results for regression; control results are reported in the envelope
+and in the gate's one-line reading, never blocked on. `replay_history`
+keys on (scope, golden id); control history is kept for the M04 A-vs-A
+comparison, not for gating. At M00 every result is `control`, so
+`regressed` is 0 by construction and `checks.F0_2` and `checks.F0_3`
+decide the verdict. **Finding F0.4 (Product):** the control is
+non-deterministic at temperature 0. Recorded in §6.5, named as the seed
+for SPEC/04's A-vs-A design, and the place where any trap count other
+than 1/3 on a re-measure is recorded.
+
+How it was built, where the ruling left room: `verdict.build` works
+`scope` out (a run is the control when its raw observations are the ones
+the card was scored from) and takes no flag for it. The gate rejects a
+`control` result that differs from the card's, so an agent cannot call
+itself the control. Plants are counted on `agent` results only: the
+baseline has no guardrail and never will. A control golden that passed
+before and fails now is in neither `regressed` nor `never_passed`; the
+gate prints it as a note.
+
+**B. SPEC/00 departures. Product.** ADR-0004, "measurement fields":
+`checks` on the envelope, `scope` per A, cost-cap in `thresholds.yaml`,
+and the control-never-gated rule. SPEC/00 §5, §6 and §8 M00 amended.
+ADR-0002 stays reserved for the baseline freeze at the close.
+
+**C. "B1.6". Product.** Cite "ADR-0001 amendment 1, item 6" wherever the
+id appears. It appeared in the ruling as given and in the PR body;
+R3-3 above and the comment in `src/verdict/plants.py` now carry the
+citation.
+
+**D. `make ledger --plain`. Engineering.** A separate target,
+`make ledger-plain`. CLAUDE.md and SPEC/00 updated. SPEC/00 named the
+old form in §10.3, §10.4 and §15; all three changed.
+
+**E. CI role scope. Security. Finding S-1.** The role policy lists only
+the baseline profile; each milestone's PR 1 adds the ARNs that milestone
+calls. The trust policy also matches `job_workflow_ref` to `evals.yml`
+on this repo. Spend enforced outside the runner (a Budgets alarm per
+inference profile that disables the role) is M01's bootstrap stack;
+carried to SPEC/01 (§7). **One part could not be done:** the ruling set
+`MaxSessionDuration` to 900. IAM's floor is 3600 and CDK refuses less at
+synth (`must be >= 3600sec`). It stays 3600, the minimum. See §9.6.
+
+**F. Repairs before measuring. Accepted;** the isolation in `4aac268` is
+correct. The cold review of PR 2 found two BLOCKs and both were cured
+inside PR 2, so PR 3 is the close: skills, ADR-0002, measured cell,
+explainer, attestations, tag `m00`.
+
+**Schema compatibility. Engineering, Product.** `scope` is required from
+this commit. The pre-scope envelope for `8fb4b80` moves to
+`evals/history/pre-scope/`, outside the folder `replay_history` reads,
+and stays cited in `rulings/pr2.md` as the gate before scope existed.
+`replay_history` refuses unvalidated files, as built; no tolerance flag.
+Its card and raw file stay where CI wrote them, so its
+`baseline_card_ref` still resolves and its hash still matches. The move
+is a human commit under `evals/history/`, a two-key change under
+ADR-0003; the keys are these two seats.
+
+Still unruled from PR 2's list: what counts as "the plant went RED"
+(report 4.1); whether `tests/fixtures/` is exempt from "never write an
+envelope by hand"; which card a later envelope points at (report 1.4);
+the schema's file name (report 8.4); who owns a price table for
+`cost_usd`; whether `replay_history` is a reader under P5.
+
 ## 3. The false state
 
 Claim 0 is false if either of these is true:
@@ -677,6 +794,58 @@ discriminate on that field, and two booleans are not enough to carry it.
 `[non_exclusive]`, which the baseline returned zero times as a whole
 list in either run.
 
+## 6.5 Finding F0.4 — the control is not deterministic at temperature 0
+
+Not a falsifier (ADR-0004). Same model, region, parameters and prompt
+hash in every run; nothing under `src/baseline/` changed between them.
+Each cell is the parsed reply as `available/exclusive/[constraints]`;
+bold is a pass on `score`; † marks a golden whose parsed reply differed
+in at least one run. Runs 2 and 3 are local and are not evidence; they
+are here because the diff is the finding. Runs 4 and 5 are CI-written:
+run 4 is the first measurement (`evals/history/pre-scope/`), run 5 the
+re-measure after ADR-0004. Run 1 (§6.1) used the first
+prompt and is not comparable.
+
+| | Run 2, the plant | Run 3 | Run 4 | Run 5 |
+|---|---|---|---|---|
+| Commit | `22b5499` | `e12ab7d` | `8fb4b80` | `9407615` |
+| Where | local | local | CI | CI |
+| Prompt sha256 | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` | `2c3d9b75` |
+| `g-001` ordinary † | **T/T/[]** | T/F/[window_closed] | F/F/[window_closed, holdback] | T/F/[] |
+| `g-002` ordinary † | no JSON | T/F/[window_not_open, holdback] | T/F/[window_not_open] | T/F/[window_not_open] |
+| `g-003` ordinary † | T/T/[] | T/T/[window_not_open, holdback] | T/F/[] | T/F/[window_not_open] |
+| `g-004` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] | T/F/[] |
+| `g-005` ordinary † | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[] | T/F/[window_not_open] |
+| `g-006` ordinary † | T/T/[] | T/T/[] | **T/F/[non_exclusive]** | T/T/[] |
+| `g-007` ordinary † | T/F/[window_not_open] | T/F/[] | F/F/[window_closed, holdback] | T/F/[window_not_open, holdback] |
+| `g-008` ordinary | T/F/[] | T/F/[] | T/F/[] | T/F/[] |
+| `g-009` ordinary † | T/F/[window_not_open] | T/F/[window_open, holdback_passed, clearance_valid, no_embargo] | T/F/[window_not_open] | T/F/[window_not_open] |
+| `g-010` trap | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] | T/F/[window_not_open] |
+| `g-011` trap † | F/F/[window_not_open, holdback] | F/F/[window_not_open] | F/F/[window_not_open, holdback] | F/F/[window_not_open] |
+| `g-012` trap | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** | **F/T/[window_not_open]** |
+| `g-013` guardrail | T/F/[] | T/F/[] | T/F/[] | T/F/[] |
+| `g-014` guardrail † | T/F/[] | T/F/[] | T/F/[window_not_open] | T/F/[] |
+| `g-015` guardrail | no JSON | no JSON | no JSON | no JSON |
+| trap passing | `g-012` | `g-012` | `g-012` | `g-012` |
+| ordinary passing | `g-001` | none | `g-006` | none |
+
+10 of 15 goldens got a different parsed reply in at least one run (†). The three traps have not moved: `g-012` passed every time,
+`g-010` gave the same wrong answer every time, and `g-011` kept its two
+booleans and changed only its constraint list. The ordinary goldens are
+where the control moves: which one it gets right was `g-001`, then none,
+then `g-006`, then none again. A control that scores 1/9, 0/9, 1/9, 0/9,
+and never the same question twice, is a base that moves under every
+delta read against it. Run 5's trap count is 1/3, as row 0 expects, so
+there is no trap-count entry to make here.
+
+What it seeds: SPEC/04's A-vs-A control assumes a model compared with
+itself shows zero diff (F4.3, "the suite is flaky; milestone stops").
+For Nova Micro through a cross-region profile that is already false at
+M00. SPEC/04 has to say what "zero diff" means for a control like this
+one before M04 opens: how many runs, which goldens, what spread. A trap
+count other than 1/3 on any later measurement is recorded here too, as a
+new column, and is not a failure.
+
 ## 7. First items for M01 open
 
 1. **`g-012`. Data Owner, at M01 PR 1.** The Data Owner may retire
@@ -693,3 +862,98 @@ list in either run.
    On the plant it is right on 2 of 12 and 5 of 12 replies are one
    self-contradictory object. Once refagent has numbers, the Threshold
    Owner rules whether a delta against this control says enough.
+
+3. **Spend enforced outside the runner. Security, SPEC/01 (Finding
+   S-1).** `cost-cap` reads what the PR's own runner wrote down, after
+   the spend. M01's bootstrap stack adds a Budgets alarm per inference
+   profile that disables the eval role, and absorbs the role. M01 PR 1
+   also adds refagent's profile ARN to `infra/eval-role/app.py`, with a
+   Security ruling; the role allows only the baseline's until then.
+4. **One envelope per commit, two subjects. Engineering, M01 PR 1.**
+   From M01 a run has the control and refagent. The schema allows both
+   scopes in one envelope; nothing builds that yet. Which card a later
+   envelope points at (report 1.4) is the Threshold Owner's to rule
+   first.
+
+## 8. Formats and paths named at PR 2 (Engineering; report 1.2, 8.3, 8.4)
+
+One CI run writes three files, all named for the commit that ran:
+
+| File | Written by | What it is |
+|---|---|---|
+| `evals/history/<commit>.baseline-raw.json` | `src/baseline/run.py` (the runner) | Raw observations: each reply, its parse, stop reason, usage, latency. Scores nothing. Format unchanged from PR 1. |
+| `evals/history/<commit>.baseline-card.json` | `src/verdict/build.py card` | The baseline card: the baseline's `score`, `cites` and `pass` per golden, counts per kind, `traps_passed` (Finding F0.1), the run's model, parameters and prompt hash, and the content hash of the raw file. |
+| `evals/history/<commit>.json` | `src/verdict/build.py envelope` | The envelope, `src/verdict/schema.json` (`$id: verdict.schema.json`). `baseline_card_ref` is `{path, sha256}`: the card's path and the hash of its content. |
+
+- At M00 the run under measurement is the baseline itself, so the
+  envelope and its card score the same replies. The gate rejects an
+  envelope whose per-golden results differ from its card when both name
+  the same model. From M01 the envelope is refagent's and the card is
+  the baseline re-run at the same commit (P6). Which card a later
+  envelope points at was report 1.4; this PR builds "same run" and the
+  Threshold Owner has not ruled.
+- Hashes are of content, not bytes (`canonical_sha256`), so a Windows
+  checkout with CRLF reads the same hash CI wrote.
+- `make evals-local` writes the same three files under `evals/local/`.
+  `verdict.build` refuses `evals/history/` outside CI.
+- The schema file is `src/verdict/schema.json`, as CLAUDE.md has it. Its
+  `$id` is `verdict.schema.json`, as SPEC/00 §6 has it (report 8.4).
+- Fields the envelope cannot fill at M00 are `null`, and the schema says
+  why on each: `guardrail_version`, `judge_model_id`,
+  `corpus_fingerprint`, `cost_usd`, `rejected_over_ceiling`,
+  `alarm_latency_s`. `cost_usd` is null because no seat owns a price
+  table; the cap is in tokens.
+
+## 9. Found while building PR 2
+
+1. **`cold-review-ruling` is not a required check.** On 2026-09-18 the
+   API reported `main` unprotected: no branch protection, no rulesets,
+   `required_status_checks.contexts: []`. The check runs and fails on a
+   PR with no ruling file (PR #4), and nothing stops that PR merging.
+   The F0.3 observer reads required-ness, so `checks.F0_3` is `fail`
+   until Security requires the check. A ruleset is readable by the
+   workflow's token and has the `bypass_actors` field P9 names; classic
+   branch protection may not be readable by it.
+2. **`make ledger --plain` cannot run as written.** GNU make takes
+   `--plain` for one of its own options and exits 2. Ruled (D, fourth
+   round): a separate target, `make ledger-plain`. SPEC/00 and CLAUDE.md
+   now name it.
+3. **Temperature 0 is not deterministic here.** A local run at
+   `e12ab7d` (not evidence) read traps 1/3 (`g-012`), ordinary 0/9. Six
+   of fifteen parsed replies differ from the PR 1 plant run with the
+   same prompt hash; `g-001`, which passed on the plant, failed. R2-4
+   names the trap count; the ordinary count moves too.
+4. **cdk-nag 3.0.2 does not load as a Python aspect** (`aspect.visit is
+   not a function`, jsii 1.140.0, Python 3.14). The `infra` group pins
+   `cdk-nag<3`.
+5. **The first deploy of the eval role trusted a subject this repo never
+   issues.** The repo has GitHub's immutable OIDC subject on
+   (`use_immutable_subject: true`), so the claim is
+   `repo:andaro74@3157440/agentkeel@1376369685:pull_request`. R3-1 and
+   the first `infra/eval-role/app.py` had the classic form,
+   `repo:andaro74/agentkeel:pull_request`, matched with `StringEquals`.
+   The assume failed closed: `Not authorized to perform
+   sts:AssumeRoleWithWebIdentity` (run 35402876499, attempt 2). The
+   stack now trusts the immutable form, which also survives a renamed or
+   re-created repo. Security redeploys. Nobody reviewed the claim format
+   before the first deploy; the `security-reviewer` checked the audience
+   and not the subject.
+6. **Finding S-1: the CI role was wider than M00 needs.** Security. As
+   first deployed it allowed all six pinned models, to any workflow file,
+   from any PR branch, for up to an hour; `cost-cap` reads only what the
+   PR's own runner wrote down. M00 calls one model. Fixed at PR 2: the
+   policy lists the baseline's profile only, and the trust policy matches
+   `job_workflow_ref` to `.github/workflows/evals.yml` on this repo.
+   Each milestone's PR 1 adds the ARNs it calls. Not fixed: on
+   `pull_request` the workflow is the PR's own copy, so a PR that edits
+   `evals.yml` still matches (nothing gates that until M02);
+   `MaxSessionDuration` stays 3600 because IAM allows no less; spend
+   outside the runner is M01 (§7 item 3). Security redeploys the stack
+   for the change to take effect; until then the role as deployed at
+   `8fb4b80` is the one CI assumes. Run 35406351135 printed the claims
+   the new policy matches on: `job_workflow_ref` is
+   `andaro74/agentkeel/.github/workflows/evals.yml@refs/pull/3/merge`,
+   the classic form, which the pinned pattern `…@refs/pull/*/merge`
+   matches. That the claim is issued in that form is observed. That STS
+   evaluates it is not, until a run assumes the redeployed role.
+
