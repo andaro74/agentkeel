@@ -298,6 +298,15 @@ the `check_availability` tool with its strict schema, inside
 | j | **Redeploy record:** the `describe-stacks` line and the `simulate-principal-policy` table go in `infra/eval-role/README.md` under "Redeployed 2026-09-19 (items 14, 33)". One refused call on a denied action is the `evals.yml` probe step at PR 2 (item 18). |
 | k | **The re-export** of `infra/ruleset/main.json`, with `evals` as a required check, is PR 2's first Security commit. If the live ruleset still lists one check, stop and say so. (At the M01 PR 1 merge the live ruleset already listed both; the export in the tree is from before that change.) |
 
+**PR 2 mechanics (Product with Security).** The PR opens as a **draft**
+right after the Security setup commit, so `sign-fixture.yml` can run on
+the `pull_request` event. The S2 signature is the bot's commit and
+precedes `src/bundle/`. Row 1's measurement is the CI run on the head
+that is merged; earlier branch runs are recorded, not cited. Pushes are
+batched: one for the Security setup, one for the build (step 2), one
+after the human's attempts. The PR is undrafted only after the attempts
+are observed and the cold review is done.
+
 **Engineering**
 
 | | Ruling |
