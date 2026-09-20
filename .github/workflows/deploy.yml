@@ -25,6 +25,11 @@
 #    It runs outside the bundle's own code (SPEC/01 §6, the repair on
 #    platform-architect BLOCK 3).
 #
+# **It refuses at its first step, and will until M01 PR 3.** The execution
+# role it would deploy through has no service grants at all (BLOCK F), so a
+# run would fail partway and leave a half-built stack. The `refuse` job says
+# so and stops; nothing below it runs.
+#
 # What this does not do, and what M01 does not claim it does. **No deploy
 # has run.** This path is written at M01 PR 2 and is not what row 1
 # measures: S1 and S2 are measured by `verify` in the PR run, S3, S5 and S8
@@ -54,7 +59,28 @@ env:
   STACK: AgentkeelRefagent
 
 jobs:
+  # BLOCK F (M01 PR 2, Security). `agentkeel-cfn-exec` is the role
+  # CloudFormation acts as, and its whole policy is `iam:CreateRole`,
+  # `iam:PutRolePolicy` and `iam:AttachRolePolicy` under
+  # `role/agentkeel/agents/*`, plus a Deny. It has no `bedrock-agentcore`,
+  # `ec2`, `logs`, `kms`, `s3` or `dynamodb`, and the construct makes all of
+  # them, so this workflow would fail partway and leave a half-built stack
+  # behind. It refuses up front instead, and says why.
+  #
+  # Delete this job and the `needs:` below when cfn-exec has its grants
+  # (M01 PR 3), and rewrite infra/workflows.sha256.
+  refuse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Refuse to deploy
+        run: |
+          echo "cfn-exec has no service grants: BLOCK F, repaired in M01 PR 3"
+          echo "cfn-exec has no service grants: BLOCK F, repaired in M01 PR 3" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
   sign:
+    needs: refuse
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

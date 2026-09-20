@@ -52,6 +52,14 @@ authorises:
   - agents/refagent/Dockerfile
   - scripts/load_rights_table.py
   - scripts/observe_attempt.py
+  - src/cost_cap.py
+  # CI-written, never by hand (SPEC/00 §5). Listed because this PR's diff
+  # carries them, not because anything here authorises writing one.
+  - evals/history/**
+  # Security. The M00 eval role was redeployed for Sonnet 4.6 (ruling j)
+  # before it was absorbed; both files change in this PR.
+  - infra/eval-role/app.py
+  - infra/eval-role/README.md
   - src/agent/**
   - src/bundle/**
   - src/manifest/**
@@ -151,14 +159,16 @@ or a check that could not see:
 | 20 | **The Budgets action would not deploy.** It hung off a daily budget, and AWS Budgets Actions do not support one. The daily figure notifies now and a monthly budget carries the stop, so the figure that was ruled and the figure that stops anything are no longer the same figure (ruling a, amended). | `infra/bootstrap/app.py`, `tests/test_bootstrap.py` |
 | 19 | **The key policy could not be created.** It denied the four admin actions with `ArnNotLike` on `agentkeel-security` — a role nothing creates — plus root, so it covered the human running the deploy, and KMS refused: "The new key policy will not allow you to update the key policy in the future". It names the principals it refuses now: agent roles by path, and the deploy, execution, eval and developer roles. That is `security-reviewer` F6 and `platform-architect` finding 9 as well, which said the policy named a seat that does not exist. | `infra/bootstrap/app.py`, `tests/test_bootstrap.py` |
 
-**Not repaired; for a seat, before this PR is undrafted.** Each is in the
-PR body under **Unsure** with the seat and the milestone.
+**Ruled here, repaired in PR 3.** Each of the three is ruled in its own
+section below, with the seat that owns it. None is repaired in this PR:
+PR 2 is the measurement, and PR 3 is the repair PR the cap allows.
 
-| # | BLOCK | Seat |
-|---|---|---|
-| A | The tool's return shape is not the one SPEC/00 §9 publishes. SPEC/00 is the authority, so either §9 is amended or the tool returns its fields. | Product |
-| C | A fork PR skips the `evals` job, and a skipped required check counts as success on GitHub, so a fork PR merges with no `validate` and no pytest. | Security |
-| D | S8's check is installed by the stack under test. A stack that never imports `infra.construct` is not checked, so what fired is narrower than false state 8. | Security |
+| # | BLOCK | Seat | Ruled | Repair |
+|---|---|---|---|---|
+| A | The tool's return shape is not the one SPEC/00 §9 publishes. | Product | the tool stands; §9 is amended | **amended here** |
+| C | A fork PR skips the `evals` job, and a skipped required check counts as success on GitHub. | Security | real; the skip is not the defect | PR 3, and M02 plants the case |
+| D | S8's check is installed by the stack under test. | Security | what fired is narrower than false state 8, and the ledger says the narrower thing | PR 3 wording; M05 the control |
+| F | Found after the cold review: the execution role cannot create refagent's stack. | Security | `deploy.yml` refuses at its first step and says why; `evals.yml` is untouched by F | the refusal is **here**, the grants in PR 3 |
 
 ## What refagent's first agent envelope found (run 35529132275)
 
@@ -228,11 +238,215 @@ operation`). The attempt was made with the key id. The `command:` field is
 documentation and feeds no check, but it is wrong as written and Product
 carries the correction.
 
-## Four failures this milestone's tests could not have caught
+## BLOCK A — the tool returns the row; SPEC/00 §9 published the answer
+
+**Seat: Product.** SPEC/00 §9 publishes
+
+```
+check_availability(title_id, territory, platform, date)
+  -> {available, exclusive, constraints[], table_row, clause_id, confidence}
+```
+
+and `agents/refagent/tools/check_availability.json` returns
+`{found, row, clause_candidates, source}`. SPEC/00 is the authority, so one
+of the two is wrong.
+
+**Ruled: the tool stands and §9 is amended.** Three reasons, heaviest first.
+
+1. **The fields §9 lists are the answer's, and the answer has them.** Run
+   35544267728, golden g-004: `{'table_row': 'r-029', 'clause_id': 'MC-4',
+   'available': False, 'exclusive': False, 'constraints':
+   ['clearance_expired', 'non_exclusive']}`. Five of the six named fields,
+   produced one layer up from the tool. §9 drew one arrow where the design
+   has two hops.
+2. **A tool that returned them would decide, and F1.4 would stop measuring
+   the agent.** F1.4 asks whether the agent cites a `table_row` and a
+   `clause_id` that exist. Hand the model both, already chosen, and it
+   relays them: F1.4 then measures a table lookup. The tool's own
+   description says the same thing and has since it was written — "Returns
+   the row; it does not decide the answer", and of `clause_candidates`,
+   "Which one the question turns on is the agent's to say."
+3. **`confidence` is not a naming difference. It does not exist anywhere in
+   the repo.** `grep -rn confidence agents/ src/ evals/goldens/` returns
+   nothing. §9 also keys HITL to it — "confidence below 0.7 ... refuses and
+   mints a resume token". The HITL branch was **cut at M01 open** (cuts 1, 3
+   and 4, recorded in `agents/refagent/agent.py`), and §9 was never updated
+   to say so. A cut list that does not reach the spec it cuts from is how a
+   spec starts describing something nobody built.
+
+**Amended here, not in PR 3.** SPEC/00 §9 now gives the tool's return as
+`{found, row, clause_candidates, source}` and the answer's shape as
+`{available, exclusive, constraints[], table_row, clause_id}` in a bullet
+of its own, with the sentence that makes the split matter: a tool that
+returned `available` and `clause_id` would decide, and F1.4 would measure a
+table lookup rather than the agent. `confidence` and the HITL rule stay in
+§9, both marked **M07 (HITL cut from M01 at open)** — the rule is still the
+rule; what changed is when it is built.
+
+This is the only BLOCK whose repair edits SPEC/00, the authority. The
+measurement is not affected: the workflow's already-measured check excludes
+`SPEC`, and the envelope at `305da212` was written against the tool as it
+stands, which is the half of the pair that did not move.
+
+## BLOCK C — a fork PR skips `evals`, and a skipped required check passes
+
+**Seat: Security.** `.github/workflows/evals.yml:67`:
+
+```yaml
+# A fork gets no OIDC token. Skip it; do not fail it.
+if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+```
+
+GitHub counts a skipped required check as success, so a fork PR merges with
+no `make validate` and no `pytest`.
+
+**Ruled: real, and the skip is not the defect.** A fork has no OIDC token
+and the measuring half genuinely cannot run; failing it would be a red
+check that means "not applicable". The defect is that the half needing no
+credentials was skipped along with it.
+
+**Repair, in PR 3:** split the job. `make validate` and `uv run pytest`
+move into a job with no `configure-aws-credentials` and no `if:`, required
+on the branch, so they run on a fork. The measuring job keeps the skip.
+
+**What that leaves, named rather than closed:** a fork PR would then merge
+with no envelope at all. Whether it may is M02's, the milestone that
+measures seat-owned files and the ruleset.
+
+And the part worth saying plainly: **today the exposure is zero, and that
+is not a control.** R1 is one human; this repo has no external
+contributors, so no fork PR has ever been opened and none will be before
+M02. A check that has never met the case it guards against is an absence of
+a test, not a guarantee. M02 plants the case.
+
+## BLOCK D — S8's check is installed by the stack it checks
+
+**Seat: Security.** `refuse_outside_construct(stack)` is opt-in, and
+`tests/fixtures/construct/outside_construct.py` calls it on its own last
+line. A stack that never imports `infra.construct` is never checked.
+
+**Ruled: what fired is narrower than false state 8, and the ledger says the
+narrower thing.**
+
+- **What S8 proves.** A stack that installs the platform's checks and then
+  makes a bare `AWS::BedrockAgentCore::Runtime` is refused at synth, with
+  "not a GovernedAgent's own runtime". That is a real refusal of a real
+  false state, and it is what `checks.F1_1` carries.
+- **What it does not prove.** That a stack which never imports the module is
+  refused. Nothing at synth can bind code that does not call it. That is
+  the ceiling of synth-time checking, not a bug in the check.
+
+**What is closed today by something other than synth**, and it is more than
+the cold review credited: the developer role — seed S4's own principal — is
+denied both `bedrock-agentcore:CreateAgentRuntime` and
+`cloudformation:CreateStack` by `NeverDeploy`, and CloudTrail recorded the
+second being refused on 2026-09-20.
+
+**What would bind an author who did not ask to be bound:** a CloudFormation
+Hook on the resource type, or a service control policy. SPEC/01 §1 already
+puts SCPs in the landing zone. **M05** — five hostile attempts — is where an
+author who skips the import belongs, and this ruling names it as M05's.
+
+**In PR 3:** SPEC/01 §5's wording for S8 takes the narrowing, and M01's
+explainer does not say the construct is the only way to make an agent on
+this platform. It says a stack that asks the platform to check it is
+refused, which is what happened.
+
+## BLOCK F — the execution role cannot create refagent's stack
+
+**Seat: Security. Found after the cold review, while ruling D.**
+
+`agentkeel-deploy` may create a stack and may `iam:PassRole` exactly one
+role, `agentkeel-cfn-exec`; CloudFormation then acts as that role. Its
+whole policy, read from the deployed account on 2026-09-20:
+
+```
+Allow CreateRolesOnlyInsideTheBoundary: iam:CreateRole, iam:PutRolePolicy,
+      iam:AttachRolePolicy  ->  role/agentkeel/agents/*
+Deny  NeverTouchTheBoundaryOrAKeyPolicy: iam:DeleteRolePermissionsBoundary,
+      iam:CreatePolicyVersion, iam:DeletePolicy, kms:PutKeyPolicy,
+      ec2:CreateInternetGateway, ec2:AttachInternetGateway,
+      ec2:CreateNatGateway  ->  *
+```
+
+No `bedrock-agentcore`, no `ec2`, no `logs`, no `kms`, no `s3`, no
+`dynamodb`. The construct makes all of those. **refagent's stack will fail
+on its first non-IAM resource**, and `simulate-principal-policy` returns
+`implicitDeny` for `bedrock-agentcore:CreateAgentRuntime`.
+
+Nothing has told us because `deploy.yml` has never run — which this file
+already said under "What this PR does not show", without knowing what was
+waiting there.
+
+### Ruled: `deploy.yml` refuses up front, and `evals.yml` is left alone
+
+**`deploy.yml` refuses at its first step**, with the message
+
+```
+cfn-exec has no service grants: BLOCK F, repaired in M01 PR 3
+```
+
+A `refuse` job runs before everything; `sign` needs it and `deploy` needs
+`sign`, so nothing signs, pushes or half-builds a stack. Without it the
+first push to `main` after this PR merges would run a deploy that fails
+partway and leaves a partial `AgentkeelRefagent` behind, and the failure it
+printed would be a permissions error on whichever resource happened to come
+first — true, and useless. It refuses in one line instead, and names the
+block and the PR that lifts it. `infra/workflows.sha256` is rewritten.
+
+**The grants themselves are PR 3**, and narrowly: cfn-exec gets what the
+construct makes and nothing else, read back with the same
+`simulate-principal-policy` table the eval role's deploy prints (ruling j)
+before `deploy.yml` is trusted with anything.
+
+### What `evals.yml` on `main` does, which is not what this seat assumed
+
+This ruling was drafted on the premise that a failed deploy would leave
+`evals.yml` with no runtime to call, so the merge commit would carry a RED
+whose real cause was F — and that the answer was to write the control's
+envelope in M00 form (`control_card_ref: null`), as PR 1's did, until
+refagent is deployed.
+
+**That premise does not hold, and the change it implied is not made.**
+`AGENTKEEL_RUNTIME_ARN` is set nowhere: not in `.github/workflows/evals.yml`,
+not in the `Makefile`. `src/agent/run.py` reads it and falls back to running
+refagent's code **in the runner** when it is absent, which is the mode every
+run so far has used, on a PR and on `main` alike. So after this PR merges,
+`evals.yml` on `main` writes the same agent-scope envelope it writes on a
+PR, with `control_card_ref` populated, and the verdict is **GREEN**. The
+deploy is invisible to it.
+
+Downgrading that to a control-only envelope would not protect the merge
+commit from a RED it was never going to carry. It would throw away a real
+measurement of refagent to do it, and P3 wants claim 1 measured by PR 2,
+not deferred past it. So `evals.yml` is untouched.
+
+**What this does cost, and it is worth naming.** The envelope on `main`
+will say `where: refagent's code, in the runner` and
+`source: data/rights_table.json`, exactly as on the PR. Nothing in M01
+measures the deployed runtime or the DynamoDB read, and the ledger row
+already says so. BLOCK F does not change that; it explains why it will
+still be true after the merge.
+
+**The instruction this seat gave, and what was done instead**, recorded
+because a ruling that quietly became something else is worse than a ruling
+that was wrong: the refusal in `deploy.yml` is implemented as ruled; the
+`evals.yml` fallback to M00 form is not, on the finding above. If this seat
+wants the fallback anyway, it is one `if:` on the agent step and this
+section is the place to say so.
+
+**One consequence for D.** Part of what makes S8's gap small today is that
+the deploy plane cannot make a runtime either. That is this hole, not a
+control, and it disappears the moment cfn-exec is given what it needs. D's
+narrowing does not get to lean on it.
+
+## Five failures this milestone's tests could not have caught
 
 Sonnet 5 was not available to the account; the KMS key policy failed the
-lockout safety check; the Budgets action refused a daily budget; and the
-eval role could not call CloudTrail. Synth passed, cdk-nag passed and 168
+lockout safety check; the Budgets action refused a daily budget; the eval
+role could not call CloudTrail; and the CloudFormation execution role
+cannot create refagent's stack (BLOCK F, which has not fired yet because
+nothing has asked it to). Synth passed, cdk-nag passed and 168
 tests passed before each one. All four are service behaviour rather than
 template shape, and the fourth is worse than the other three: the template
 was right, the code was right, and the **permission the instrument needed
