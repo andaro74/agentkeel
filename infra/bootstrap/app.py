@@ -32,7 +32,11 @@ What it makes:
 - one **KMS key per agent**, whose policy denies key-policy changes to
   everyone but Security, and denies `kms:GetKeyPolicy` to the agent role
   path `/agentkeel/agents/*` (ruling b, seed S6);
-- a **Budgets action** on Bedrock spend at `daily_usd: 10` (ruling a);
+- **two Budgets budgets** on Bedrock spend (ruling a, amended): a daily one
+  at `daily_usd` that notifies and stops nothing, and a monthly one that
+  carries the Deny action. AWS Budgets Actions do not support a daily
+  budget, so the figure that was ruled and the figure that stops anything
+  are not the same figure;
 - the **ECR repository** the runtime image is pulled from, tag-immutable, so
   a digest cannot be moved to other bytes (SPEC/01 §6, "at load");
 - the **Security-owned parameters** `GovernedAgent` reads: the boundary ARN,
@@ -74,7 +78,13 @@ BOUNDARY_PARAM = "/agentkeel/security/boundary-arn"
 VPC_PARAM = "/agentkeel/security/vpc-id"
 SUBNETS_PARAM = "/agentkeel/security/subnet-ids"
 ENDPOINT_PARAM = "/agentkeel/security/endpoint/{name}"
-DAILY_USD = 10  # Threshold Owner (ruling a); the action attaches a Deny to the eval role
+DAILY_USD = 10  # Threshold Owner (ruling a). At M01 this is an alert, not a stop: see below.
+# AWS Budgets Actions do not support a daily budget ("AWS Budgets Actions
+# don't support daily granularity budget for now", 2026-09-20), so the
+# mechanical stop has to hang off a monthly budget. 30 x the ruled daily
+# figure is the literal translation and nothing more; the Threshold Owner
+# re-rules it against measured spend (ruling a, amended).
+MONTHLY_USD = DAILY_USD * 30
 
 MODELS = ["amazon.nova-micro-v1:0", "anthropic.claude-sonnet-4-6"]  # ruling p
 PROFILE_REGIONS = ["us-east-1", "us-east-2", "us-west-2"]
@@ -486,18 +496,44 @@ class BootstrapStack(cdk.Stack):
     # --- spend -------------------------------------------------------------
 
     def _budget(self, eval_role: iam.Role) -> budgets.CfnBudget:
-        """Bedrock spend for the account, daily (ruling a). The action attaches a Deny to the eval role.
+        """Bedrock spend for the account: a daily alert, and a monthly stop (ruling a, amended).
 
-        Budgets data refreshes up to three times a day, so the worst case this
-        bounds is up to one refresh interval at the account quota. No smaller
-        figure is invented here.
+        Ruling a asked for one daily budget whose action attaches a Deny on
+        `bedrock:Invoke*` to the eval role. **AWS will not build that.** A
+        Budgets Action cannot hang off a daily budget:
+
+            AWS Budgets Actions don't support daily granularity budget for
+            now. (Service: Budgets, Status Code: 400)
+
+        So the two halves are separated, and only one of them is a control:
+
+        - **daily, `daily_usd`**: a notification to the human. No action.
+          This is the figure the Threshold Owner ruled, and at M01 it tells
+          somebody; it stops nothing.
+        - **monthly, `MONTHLY_USD`**: the Deny action, at 100% of the
+          budget. This is the only mechanical stop, and a month is a coarse
+          bound: a run that spent the whole month's figure in an afternoon
+          is stopped after it, not during it.
+
+        Two lags, and neither is invented here. Budgets data refreshes up
+        to three times a day, so the worst case the monthly stop bounds is
+        one refresh interval of Bedrock spend at the account quota, on top
+        of the month's own granularity.
+
+        What the number should be is the Threshold Owner's, and the first
+        measurement now exists: refagent plus the control is 54,250 tokens
+        a run (run 35532168520), which on Sonnet 4.6's published rates is
+        about USD 0.23. 30 x the daily figure is three hundred runs' worth
+        of headroom and is almost certainly far looser than this milestone
+        needs. It is the literal translation of what was ruled, and it is
+        flagged rather than quietly narrowed.
         """
         deny_invoke = iam.ManagedPolicy(
             self, "BudgetStop",
             managed_policy_name="agentkeel-budget-stop",
-            description="Attached by the Budgets action when Bedrock spend passes the daily figure.",
+            description="Attached by the Budgets action when Bedrock spend passes the monthly figure.",
             document=iam.PolicyDocument(statements=[iam.PolicyStatement(
-                sid="NoMoreBedrockToday", effect=iam.Effect.DENY,
+                sid="NoMoreBedrockThisMonth", effect=iam.Effect.DENY,
                 actions=["bedrock:Invoke*"], resources=["*"],
             )]),
         )  # fmt: skip
@@ -508,29 +544,50 @@ class BootstrapStack(cdk.Stack):
         )  # fmt: skip
         action_role.add_to_policy(iam.PolicyStatement(
             actions=["iam:AttachRolePolicy"], resources=[eval_role.role_arn]))
-        budget = budgets.CfnBudget(
-            self, "BedrockDaily",
-            budget=budgets.CfnBudget.BudgetDataProperty(
-                budget_name="agentkeel-bedrock-daily",
-                budget_type="COST",
-                time_unit="DAILY",
-                budget_limit=budgets.CfnBudget.SpendProperty(amount=DAILY_USD, unit="USD"),
-                cost_filters={"Service": ["Amazon Bedrock"]},
-            ),
-        )  # fmt: skip
+
         # CloudFormation requires at least one subscriber. The address is not
         # in the repo: the human passes it at deploy (README.md).
         subscriber = cdk.CfnParameter(
             self, "BudgetSubscriberEmail",
-            description="Who Budgets notifies when Bedrock spend passes the daily figure.",
+            description="Who Budgets notifies when Bedrock spend passes the daily or monthly figure.",
             allowed_pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
         )
+        bedrock_only = {"Service": ["Amazon Bedrock"]}
+
+        # The daily figure, as ruled. It notifies and it does not stop.
+        budgets.CfnBudget(
+            self, "BedrockDaily",
+            budget=budgets.CfnBudget.BudgetDataProperty(
+                budget_name="agentkeel-bedrock-daily",
+                budget_type="COST", time_unit="DAILY",
+                budget_limit=budgets.CfnBudget.SpendProperty(amount=DAILY_USD, unit="USD"),
+                cost_filters=bedrock_only,
+            ),
+            notifications_with_subscribers=[budgets.CfnBudget.NotificationWithSubscribersProperty(
+                notification=budgets.CfnBudget.NotificationProperty(
+                    comparison_operator="GREATER_THAN", notification_type="ACTUAL",
+                    threshold=100, threshold_type="PERCENTAGE"),
+                subscribers=[budgets.CfnBudget.SubscriberProperty(
+                    address=subscriber.value_as_string, subscription_type="EMAIL")],
+            )],
+        )  # fmt: skip
+
+        # The monthly figure, which is the only one an action may hang off.
+        monthly = budgets.CfnBudget(
+            self, "BedrockMonthly",
+            budget=budgets.CfnBudget.BudgetDataProperty(
+                budget_name="agentkeel-bedrock-monthly",
+                budget_type="COST", time_unit="MONTHLY",
+                budget_limit=budgets.CfnBudget.SpendProperty(amount=MONTHLY_USD, unit="USD"),
+                cost_filters=bedrock_only,
+            ),
+        )  # fmt: skip
         budgets.CfnBudgetsAction(
-            self, "BedrockDailyStop",
+            self, "BedrockMonthlyStop",
             action_threshold=budgets.CfnBudgetsAction.ActionThresholdProperty(type="PERCENTAGE", value=100),
             action_type="APPLY_IAM_POLICY",
             approval_model="AUTOMATIC",
-            budget_name=budget.budget.budget_name,
+            budget_name=monthly.budget.budget_name,
             definition=budgets.CfnBudgetsAction.DefinitionProperty(
                 iam_action_definition=budgets.CfnBudgetsAction.IamActionDefinitionProperty(
                     policy_arn=deny_invoke.managed_policy_arn, roles=[eval_role.role_name])),
@@ -539,13 +596,12 @@ class BootstrapStack(cdk.Stack):
             subscribers=[budgets.CfnBudgetsAction.SubscriberProperty(
                 address=subscriber.value_as_string, type="EMAIL")],
         )  # fmt: skip
-        return budget
+        monthly.node.add_dependency(deny_invoke)
+        return monthly
 
 
-# A fixed output directory, so `make validate` reads the NagReport of the
-# synth it just ran. The cdk CLI sets CDK_OUTDIR; a plain python run does not.
     def _image_repository(self) -> ecr.Repository:
-        """Where the runtime image is pulled from. Tag-immutable: a digest is the bytes (SPEC/01 §6)."""
+        """Where the runtime image is pulled from. Tag-immutable: a digest is the bytes (SPEC/01 Â§6)."""
         return ecr.Repository(
             self, "RefagentImage",
             repository_name="agentkeel-refagent",
@@ -556,7 +612,7 @@ class BootstrapStack(cdk.Stack):
         )  # fmt: skip
 
     def _parameters(self, boundary: iam.ManagedPolicy, vpc: ec2.Vpc) -> None:
-        """The Security-owned parameters `GovernedAgent` reads (SPEC/01 §6).
+        """The Security-owned parameters `GovernedAgent` reads (SPEC/01 Â§6).
 
         Not CDK context: a construct that read context would take whatever
         the synthesising machine had in `cdk.context.json`. These are
@@ -589,7 +645,6 @@ class BootstrapStack(cdk.Stack):
                 string_value=group.security_group_id,
                 description=f"agentkeel: the {name} interface endpoint. An agent reaches it and nothing else.",
             )  # fmt: skip
-
 
 app = cdk.App(outdir=os.environ.get("CDK_OUTDIR") or str(Path(__file__).parent / "cdk.out"))
 stack = BootstrapStack(

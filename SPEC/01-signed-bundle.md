@@ -191,9 +191,12 @@ None of it is in PR 1, except the F1.4 reading in `verdict.build` and
     create a key whose policy locks its own creator out of
     `kms:PutKeyPolicy`, and SPEC/01 §1 already puts that principal in the
     landing zone;
-  - a Budgets action on the eval role at `daily_usd: 10` (Threshold
-    Owner's number). Budgets data lags by hours; until PR 2 the spend is
-    unbounded at the account quota.
+  - two Budgets budgets on Bedrock spend (ruling a, amended at PR 2). The
+    daily one at `daily_usd: 10` notifies and stops nothing; the monthly
+    one carries the Deny action, because AWS Budgets Actions do not
+    support a daily budget. Budgets data lags by hours and the action's
+    own window is a month, so what is bounded is a month's spend plus one
+    refresh interval at the account quota.
   - Order (Security, item 20; ruling 4): the human deploys the bootstrap
     stack with admin during PR 2, before PR 2's first CI run, points
     `AWS_EVAL_ROLE_ARN` at the new eval role, and PR 2's CI runs; then

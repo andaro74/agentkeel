@@ -26,10 +26,14 @@ the developer role this stack creates, boundary on. Stopping the admin who
 deploys this stack takes a service control policy, which is landing-zone
 work (SPEC/00 §2, §12).
 
-**The Budgets lag is AWS's.** Budgets data refreshes up to three times a
-day. The worst case this stack bounds is therefore up to one refresh
-interval of Bedrock spend at the account quota. No smaller figure is
-invented (ruling a).
+**The daily budget does not stop anything.** AWS Budgets Actions cannot
+hang off a daily budget, so the figure the Threshold Owner ruled —
+`daily_usd: 10` — notifies, and a second, monthly budget carries the Deny
+that stops the eval role (ruling a, amended). Budgets data also refreshes
+only up to three times a day. So what this stack bounds is a month's
+Bedrock spend plus one refresh interval at the account quota, and a run
+that spends the month's figure in an afternoon is stopped after it, not
+during it. No smaller figure is invented.
 
 **Two parameters are written by hand.** `GovernedAgent` reads five
 endpoint destinations from SSM. The three interface endpoints publish

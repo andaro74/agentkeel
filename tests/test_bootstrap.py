@@ -201,3 +201,37 @@ def test_an_agent_role_is_denied_its_own_key_policy(template):
              if s["Effect"] == "Deny" and "kms:GetKeyPolicy" in actions(s)]  # fmt: skip
     assert len(reads) == 1
     assert "agentkeel/agents/*" in json.dumps(reads[0]["Condition"]["ArnLike"]["aws:PrincipalArn"])
+
+
+# --- the budgets -----------------------------------------------------------
+
+
+def test_the_stop_hangs_off_the_monthly_budget_because_aws_allows_no_other(template):
+    """Ruling a asked for the action on the daily budget. AWS refuses to build that:
+
+    "AWS Budgets Actions don't support daily granularity budget for now"
+    (Budgets, 400, 2026-09-20). So the daily figure notifies and the monthly
+    figure stops, and the two are not the same figure.
+    """
+    budgets = {b["Properties"]["Budget"]["BudgetName"]: b["Properties"]["Budget"]
+               for b in of_type(template, "AWS::Budgets::Budget").values()}  # fmt: skip
+    assert budgets["agentkeel-bedrock-daily"]["TimeUnit"] == "DAILY"
+    assert budgets["agentkeel-bedrock-monthly"]["TimeUnit"] == "MONTHLY"
+
+    actions_on = [a["Properties"]["BudgetName"] for a in of_type(template, "AWS::Budgets::BudgetsAction").values()]
+    assert actions_on == ["agentkeel-bedrock-monthly"], "a Budgets Action on a daily budget will not deploy"
+
+
+def test_the_daily_budget_still_tells_somebody(template):
+    """It stops nothing, so if it did not notify it would do nothing at all."""
+    daily = next(b["Properties"] for b in of_type(template, "AWS::Budgets::Budget").values()
+                 if b["Properties"]["Budget"]["BudgetName"] == "agentkeel-bedrock-daily")  # fmt: skip
+    subscribers = daily["NotificationsWithSubscribers"]
+    assert len(subscribers) == 1
+    assert subscribers[0]["Subscribers"][0]["SubscriptionType"] == "EMAIL"
+
+
+def test_both_budgets_count_bedrock_and_nothing_else(template):
+    for budget in of_type(template, "AWS::Budgets::Budget").values():
+        assert budget["Properties"]["Budget"]["CostFilters"] == {"Service": ["Amazon Bedrock"]}
+        assert budget["Properties"]["Budget"]["BudgetType"] == "COST"
