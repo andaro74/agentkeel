@@ -48,6 +48,19 @@ def git(*args: str) -> str:
     return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
 
 
+def dirty() -> bool:
+    """Is the tree other than what this commit names?
+
+    `evals/` is excluded, and it has to be: the control runs first and its
+    card is written into `evals/history/` before this runner starts, so
+    without the exclusion every CI run would see a dirty tree and `build`
+    would refuse the envelope. What this run writes is not what it ran.
+    `src/baseline/run.py` has no such line because nothing writes there
+    before it, and it is frozen at tag m00 either way.
+    """
+    return bool(git("status", "--porcelain", "--", ".", ":(exclude)evals"))
+
+
 def invoke_deployed(client: Any, runtime_arn: str, question: str) -> dict[str, Any]:
     """The deployed runtime answers. The payload is the observation refagent's code would have written."""
     response = client.invoke_agent_runtime(
@@ -87,15 +100,22 @@ def main(argv: list[str] | None = None) -> int:
                 entry.update(agent.answer(client, golden["question"], model_id, rows, source))
         except (BotoCoreError, ClientError, ValueError, KeyError) as exc:  # a failed call is an observation too
             entry["error"] = f"{type(exc).__name__}: {exc}"
-            errors += 1
         observations.append(entry)
-        print(f"{entry['id']} {entry['kind']:<9} {entry.get('stop_reason', 'ERROR'):<12} {entry.get('parsed')}")
+        # `agent.answer` returns its own failures rather than raising, so that a
+        # golden which spent and then failed still reports what it spent. Count
+        # and print those too: a runner that said "0 errors" while every call
+        # failed is a runner that cannot be read (M01 PR 2, run 35477627103).
+        if failure := entry.get("error"):
+            errors += 1
+            print(f"{entry['id']} {entry['kind']:<9} ERROR        {failure[:160]}")
+        else:
+            print(f"{entry['id']} {entry['kind']:<9} {entry.get('stop_reason', ''):<12} {entry.get('parsed')}")
 
     result = {
         "what": "raw observations from refagent; not an envelope; scores nothing",
         "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "commit": git("rev-parse", "HEAD"),
-        "dirty": bool(git("status", "--porcelain")),
+        "dirty": dirty(),
         "model_id": model_id,
         "region": region,  # the request region, the profile ARN's (item 23)
         "inference_config": agent.INFERENCE_CONFIG,

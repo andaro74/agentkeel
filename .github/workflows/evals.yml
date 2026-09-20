@@ -236,6 +236,17 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      # When build REFUSES, no envelope is written and the artifact above does
+      # not run, so the raw observations — the only place a failed call's own
+      # error text lives — are lost with the runner. This keeps them.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always() && steps.current.outputs.measured_at == '' && steps.written.outputs.envelope != 'true'
+        with:
+          name: raw-${{ env.COMMIT }}
+          path: evals/history/${{ env.COMMIT }}.*raw.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Fail if pytest failed
         if: steps.pytest.outcome == 'failure'
         run: exit 1
