@@ -27,6 +27,8 @@ attempts:
     refused_when: AccessDenied
   - what: deploy refagent's stack with the developer session
     event_name: CreateStack
-    command: aws cloudformation create-stack --stack-name agentkeel-refagent --template-body file://infra/construct/cdk.out/AgentkeelRefagent.template.json --capabilities CAPABILITY_NAMED_IAM
+    # The template is a placeholder on purpose. What is under test is whether
+    # this principal may create a stack at all, not what the stack would hold.
+    command: aws cloudformation create-stack --stack-name agentkeel-refagent --template-body '{"Resources":{"Nothing":{"Type":"AWS::CloudFormation::WaitConditionHandle"}}}'
     refused_when: AccessDenied, and no stack event for the attempt
 observed: null
