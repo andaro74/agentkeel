@@ -411,12 +411,27 @@ class BootstrapStack(cdk.Stack):
     # --- the key -----------------------------------------------------------
 
     def _agent_key(self, eval_role: iam.Role) -> kms.Key:
-        """refagent's key. Its policy is Security's, and the agent cannot read it (S6, ruling b)."""
+        """refagent's key. No platform role may administer it, and the agent cannot read its policy.
+
+        Two separate things, and only one of them has a seeded case:
+
+        - **S6, F1.3**: an agent role is denied `kms:GetKeyPolicy` by this
+          policy, matched by role path (ruling b). The agent boundary allows
+          the action (ruling t) so that this deny is what refuses it.
+        - **R4, first half**: no role the platform creates may alter, grant
+          on, disable or delete the key. SPEC/01 §9 lists that as a control
+          with no seeded case, and it stays there.
+
+        The human with admin can still administer the key. That is not an
+        oversight: stopping them takes a service control policy, which
+        SPEC/01 §1 puts in the landing zone, and a key policy that tried to
+        stop them cannot be created at all (see the deny below).
+        """
         key = kms.Key(
             self, "RefagentKey",
             alias="alias/agentkeel-refagent",
             enable_key_rotation=True,
-            description="agentkeel: refagent's key. Only Security may change this policy (R4).",
+            description="agentkeel: refagent key. No role the platform creates may administer it (R4).",
         )  # fmt: skip
         agent_roles = f"arn:aws:iam::{self.account}:role{AGENT_ROLE_PATH}*"
         key.add_to_resource_policy(iam.PolicyStatement(
@@ -434,19 +449,35 @@ class BootstrapStack(cdk.Stack):
             conditions={"ArnLike": {"aws:PrincipalArn": agent_roles}},
         ))  # fmt: skip
         key.add_to_resource_policy(iam.PolicyStatement(
-            # R4: not the deploy role, not the execution role. `agentkeel-security`
-            # does not exist yet, so in practice the only principal left is the
-            # account root — the break-glass admin SPEC/01 §1 puts out of scope.
-            # The half this does hold is the deploy role and the execution role,
-            # and SPEC/01 §9 lists it as a control with no seeded case.
-            sid="OnlyRootAndSecurityChangeThisKey",
+            # R4, first half: no role this platform creates may alter, grant on,
+            # disable or delete this key. Named principals, not "everyone except".
+            #
+            # It was `ArnNotLike` on `agentkeel-security` and the account root,
+            # and that was wrong twice. `agentkeel-security` is a role nothing
+            # creates, so the policy read as "only root may administer this key"
+            # while appearing to name a seat (`security-reviewer` F6,
+            # `platform-architect` finding 9). And an IAM admin is neither root
+            # nor that role, so the deny covered the human deploying the stack:
+            # KMS refused to create the key at all, because a key policy that
+            # locks its creator out of `kms:PutKeyPolicy` fails the lockout
+            # safety check ("The new key policy will not allow you to update the
+            # key policy in the future", 2026-09-20).
+            #
+            # Naming the principals says the same thing about the platform and
+            # says it truthfully: the admin who deploys this stack can still
+            # administer the key, which SPEC/01 §1 already concedes is
+            # landing-zone work, and no role the platform runs as can.
+            sid="NoPlatformRoleChangesThisKey",
             effect=iam.Effect.DENY,
             principals=[iam.AnyPrincipal()],
             actions=["kms:PutKeyPolicy", "kms:CreateGrant", "kms:ScheduleKeyDeletion", "kms:DisableKey"],
             resources=["*"],
-            conditions={"ArnNotLike": {"aws:PrincipalArn": [
-                f"arn:aws:iam::{self.account}:role/agentkeel-security",
-                f"arn:aws:iam::{self.account}:root",
+            conditions={"ArnLike": {"aws:PrincipalArn": [
+                agent_roles,
+                f"arn:aws:iam::{self.account}:role/agentkeel-deploy",
+                f"arn:aws:iam::{self.account}:role/agentkeel-cfn-exec",
+                f"arn:aws:iam::{self.account}:role/{EVAL_ROLE_NAME}",
+                f"arn:aws:iam::{self.account}:role/agentkeel-developer",
             ]}},
         ))  # fmt: skip
         key.grant_decrypt(eval_role)

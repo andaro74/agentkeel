@@ -151,3 +151,53 @@ def test_the_deploy_boundary_holds_r4_and_the_escalation_primitives(template):
             "iam:CreatePolicyVersion", "iam:SetDefaultPolicyVersion"} <= deploy  # fmt: skip
     # Evidence, and the network the VPC has no way out of.
     assert {"logs:Delete*", "s3:PutBucketPolicy", "ec2:CreateInternetGateway", "ec2:CreateNatGateway"} <= deploy
+
+
+# --- the key policy --------------------------------------------------------
+
+
+def key_policy(template: dict[str, Any]) -> list[dict[str, Any]]:
+    key = next(iter(of_type(template, "AWS::KMS::Key").values()))
+    return key["Properties"]["KeyPolicy"]["Statement"]
+
+
+def test_the_key_policy_can_be_created_at_all(template):
+    """KMS refuses a key whose policy locks its creator out of kms:PutKeyPolicy.
+
+    The first version denied the four admin actions with `ArnNotLike` on a
+    Security role that nothing creates, plus the account root. An IAM admin
+    is neither, so the deny covered the human running the deploy and the
+    key could not be created: "The new key policy will not allow you to
+    update the key policy in the future" (2026-09-20).
+
+    The rule that keeps it creatable: the deny names the principals it
+    refuses, rather than excepting the ones it allows.
+    """
+    admin = [s for s in key_policy(template)
+             if s["Effect"] == "Deny" and "kms:PutKeyPolicy" in actions(s)]  # fmt: skip
+    assert len(admin) == 1
+    assert "ArnNotLike" not in admin[0].get("Condition", {}), (
+        "an ArnNotLike deny on kms:PutKeyPolicy covers every principal the list does not name, "
+        "including whoever deploys the stack, and KMS will refuse to create the key"
+    )
+    assert "ArnLike" in admin[0]["Condition"]
+
+
+def test_no_role_the_platform_creates_may_administer_the_key(template):
+    """R4, first half, and it is named principal by principal."""
+    admin = next(s for s in key_policy(template)
+                 if s["Effect"] == "Deny" and "kms:PutKeyPolicy" in actions(s))  # fmt: skip
+    assert actions(admin) == {"kms:PutKeyPolicy", "kms:CreateGrant",
+                              "kms:ScheduleKeyDeletion", "kms:DisableKey"}  # fmt: skip
+    covered = json.dumps(admin["Condition"]["ArnLike"]["aws:PrincipalArn"])
+    for role in ("agentkeel/agents/*", "agentkeel-deploy", "agentkeel-cfn-exec",
+                 "agentkeel-evals", "agentkeel-developer"):  # fmt: skip
+        assert role in covered, f"{role} may administer the key"
+
+
+def test_an_agent_role_is_denied_its_own_key_policy(template):
+    """Seed S6. The agent boundary allows the action (ruling t) so this is what refuses it."""
+    reads = [s for s in key_policy(template)
+             if s["Effect"] == "Deny" and "kms:GetKeyPolicy" in actions(s)]  # fmt: skip
+    assert len(reads) == 1
+    assert "agentkeel/agents/*" in json.dumps(reads[0]["Condition"]["ArnLike"]["aws:PrincipalArn"])

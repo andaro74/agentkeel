@@ -184,9 +184,13 @@ None of it is in PR 1, except the F1.4 reading in `verdict.build` and
     deploy-plane role carrying the agent allow-list;
   - a VPC with no internet gateway, endpoints with policies scoped to the
     account, and the boundary denying internet and NAT gateway creation;
-  - one KMS key per agent. Its policy denies key-policy changes, grants
-    and deletion to every principal but a named Security principal, and
-    denies `kms:GetKeyPolicy` to agent roles, matched by role path;
+  - one KMS key per agent. Its policy denies key-policy changes, grants,
+    disabling and deletion to every role the platform creates, named one
+    by one, and denies `kms:GetKeyPolicy` to agent roles, matched by role
+    path. It does not deny them to the human with admin: KMS refuses to
+    create a key whose policy locks its own creator out of
+    `kms:PutKeyPolicy`, and SPEC/01 §1 already puts that principal in the
+    landing zone;
   - a Budgets action on the eval role at `daily_usd: 10` (Threshold
     Owner's number). Budgets data lags by hours; until PR 2 the spend is
     unbounded at the account quota.

@@ -39,6 +39,30 @@ AWS gives no CloudFormation attribute for a prefix list id, so those two
 parameters are written by the same human, with one command each, below.
 Until they exist an agent stack does not deploy.
 
+## One failure worth knowing about before you deploy
+
+The first attempt failed on the KMS key:
+
+```
+CREATE_FAILED AWS::KMS::Key RefagentKey
+"The new key policy will not allow you to update the key policy in the future."
+```
+
+The policy denied `kms:PutKeyPolicy` to every principal except a named
+Security role and the account root. An IAM admin is neither, so the deny
+covered the person running the deploy, and KMS will not create a key whose
+policy locks out its own creator. The policy now names the principals it
+refuses — agent roles by path, and the deploy, execution, eval and
+developer roles — rather than excepting the ones it allows. The human with
+admin can administer the key, which SPEC/01 §1 already puts in the landing
+zone.
+
+If a deploy fails this way again, the stack is left `ROLLBACK_COMPLETE`
+and cannot be updated: delete it first. The ECR repository has
+`RemovalPolicy.RETAIN`, so a rollback leaves it behind and the next create
+fails on a name that already exists; delete that too when it holds no
+images.
+
 ## Deploying it
 
 ```bash
