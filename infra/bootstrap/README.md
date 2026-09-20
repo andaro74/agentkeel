@@ -12,6 +12,15 @@ could change it could widen its own permissions.
 What it makes is listed at the top of `app.py`. Three things are worth
 saying here.
 
+**Two boundaries, one per plane** (ruling s). `agentkeel-boundary` is the
+agent plane's allow-list; nothing in this stack carries it, and
+`GovernedAgent` puts it on the agent role from the Security-owned
+parameter. `agentkeel-deploy-boundary` is the deploy plane's deny-list and
+is on every role this stack makes. The first version of this stack applied
+the allow-list to everything, which left the execution role able to create
+nothing and the Budgets stop unable to attach. When you create the role for
+seed S6's attempt, attach **`agentkeel-boundary`** — the agent one.
+
 **The break-glass admin is not in scope.** SPEC/01 §1: "a laptop" means
 the developer role this stack creates, boundary on. Stopping the admin who
 deploys this stack takes a service control policy, which is landing-zone

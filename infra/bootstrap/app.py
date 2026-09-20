@@ -8,9 +8,13 @@ else may change it.
 
 What it makes:
 
-- the **permission boundary**, applied stack-wide (`PermissionsBoundary.of`)
-  so every role either stack synthesises carries it, not only the ones named
-  here (`platform-architect` finding);
+- **two permission boundaries** (ruling s). `agentkeel-boundary` is the agent
+  plane's allow-list: attached to nothing here, published as a parameter, and
+  put on the agent role by `GovernedAgent`. It is what S5 and S6 read.
+  `agentkeel-deploy-boundary` is the deploy plane's deny-list, applied
+  stack-wide (`PermissionsBoundary.of`) so every role this stack synthesises
+  carries it, not only the ones named here — including the flow-log role and
+  the Budgets action role;
 - the **CloudFormation execution role** the deploy passes, which carries the
   boundary and may create a role only with the boundary attached. Without it
   the deploy role would act as admin (`platform-architect` BLOCK 1);
@@ -60,7 +64,8 @@ REPO = "andaro74/agentkeel"
 SUBJECT = "repo:andaro74@3157440/agentkeel@1376369685"  # the immutable subject, as at M00
 REGION = "us-west-2"
 AGENT_ROLE_PATH = "/agentkeel/agents/"  # ruling b: the key policy matches agent roles by path
-BOUNDARY_NAME = "agentkeel-boundary"
+BOUNDARY_NAME = "agentkeel-boundary"  # the agent plane's allow-list (S5, S6)
+DEPLOY_BOUNDARY_NAME = "agentkeel-deploy-boundary"  # the deploy plane's deny-list (ruling s)
 EVAL_ROLE_NAME = "agentkeel-evals"  # ruling f; replaces agentkeel-m00-evals
 # What GovernedAgent reads. The names are the construct's; they are repeated
 # here rather than imported, because the bootstrap stack is deployed by hand
@@ -99,8 +104,14 @@ class BootstrapStack(cdk.Stack):
 
         self.endpoint_groups: dict[str, ec2.ISecurityGroup] = {}
         boundary = self._boundary()
-        # Stack-wide: every role this stack makes carries it, named or not.
-        iam.PermissionsBoundary.of(self).apply(boundary)
+        deploy_boundary = self._deploy_boundary()
+        # Stack-wide, and it is the DEPLOY boundary, not the agent one (ruling
+        # s). This stack creates no role under /agentkeel/agents/: the roles
+        # here deploy the platform, and capping them with the agent plane's
+        # allow-list left the execution role able to create nothing. Every role
+        # this stack makes carries this one, named here or not — the flow-log
+        # role and the Budgets action role included.
+        iam.PermissionsBoundary.of(self).apply(deploy_boundary)
 
         provider = iam.OpenIdConnectProvider.from_open_id_connect_provider_arn(
             self, "GitHubOidc",
@@ -121,11 +132,20 @@ class BootstrapStack(cdk.Stack):
         cdk.CfnOutput(self, "ExecutionRoleArn", value=execution_role.role_arn)
         cdk.CfnOutput(self, "VpcId", value=vpc.vpc_id)
         cdk.CfnOutput(self, "BoundaryArn", value=boundary.managed_policy_arn)
+        cdk.CfnOutput(self, "DeployBoundaryArn", value=deploy_boundary.managed_policy_arn)
 
     # --- the boundary ------------------------------------------------------
 
     def _boundary(self) -> iam.ManagedPolicy:
-        """What no role the platform creates may ever exceed (R3)."""
+        """The agent plane's ceiling: what an agent role may never exceed (R3, ruling s).
+
+        An allow-list, and it is attached to nothing in this stack. Roles
+        under `/agentkeel/agents/` carry it, and `GovernedAgent` is what
+        attaches it, by ARN, from the parameter published below. Seeds S5
+        and S6 read this policy; the deploy plane has its own, and the two
+        must not be confused, because an allow-list on a role that deploys
+        caps it to nothing.
+        """
         return iam.ManagedPolicy(
             self, "Boundary",
             managed_policy_name=BOUNDARY_NAME,
@@ -135,7 +155,14 @@ class BootstrapStack(cdk.Stack):
                     sid="WhatAnyPlatformRoleMayDo",
                     actions=["bedrock:Invoke*", "bedrock-agentcore:*", "dynamodb:GetItem", "dynamodb:Query",
                              "kms:Decrypt", "kms:GenerateDataKey", "logs:CreateLogStream", "logs:PutLogEvents",
-                             "s3:GetObject", "cloudformation:Describe*", "sts:AssumeRoleWithWebIdentity"],
+                             "s3:GetObject", "cloudformation:Describe*", "sts:AssumeRoleWithWebIdentity",
+                             # Seed S6, and the only reason it is here (ruling t).
+                             # An allow-list caps by omission, so leaving this
+                             # out would have made the BOUNDARY refuse S6 and
+                             # F1.3 a check that cannot fail. A ceiling is not a
+                             # grant: no agent role's own policy allows it, and
+                             # the key policy denies it by role path (ruling b).
+                             "kms:GetKeyPolicy"],
                     resources=["*"],
                 ),
                 iam.PolicyStatement(
@@ -144,12 +171,67 @@ class BootstrapStack(cdk.Stack):
                     actions=["iam:CreateUser", "iam:DeleteRolePermissionsBoundary", "iam:PutUserPolicy",
                              "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy", "kms:PutKeyPolicy",
                              "kms:ScheduleKeyDeletion", "kms:DisableKey",
-                             # kms:GetKeyPolicy is deliberately NOT here. The key policy is what
-                             # must refuse it (seed S6, F1.3); a boundary that refused it first
-                             # would make F1.3 a check that cannot fail, whatever the key policy
-                             # said. The key policy denies it by role path (ruling b).
+                             # kms:GetKeyPolicy is not here, and it is in the Allow above:
+                             # the key policy is what must refuse S6 (ruling t).
                              "ec2:CreateInternetGateway", "ec2:AttachInternetGateway", "ec2:CreateNatGateway",
                              "ec2:CreateVpc", "ec2:CreateVpcPeeringConnection"],
+                    resources=["*"],
+                ),
+            ]),
+        )  # fmt: skip
+
+    def _deploy_boundary(self) -> iam.ManagedPolicy:
+        """The deploy plane's ceiling: everything, less what no deployer may ever do (ruling s).
+
+        A deny-list, not an allow-list, and that is the whole point. The
+        execution role has to be able to create a VPC endpoint, a table, a
+        security group and an agent runtime; an allow-list of the agent's
+        ten actions capped it to nothing, so the stack deployed and could
+        then deploy nothing (`platform-architect` BLOCK 1).
+
+        Two actions are deliberately **not** denied here, and each would
+        undo a control if it were:
+
+        - `iam:*` as a whole. It would cap `iam:CreateRole` on the execution
+          role and `iam:PassRole` on the deploy role, which is the hole this
+          policy exists to close. The escalation primitives are denied by
+          name instead, and creating a role is still conditioned on the
+          agent boundary in the execution role's own policy.
+        - `sts:AssumeRole`. The developer role holds it on purpose, so that
+          seed S4's first two attempts are refused by the deploy role's
+          **trust policy** and by nothing nearer. A boundary that refused
+          the assume would be the wrong control firing, which is the defect
+          repaired in `c5bfdd1`, one level up.
+
+        R4 is held by the four key-policy actions below, which is what R4
+        names: no deploy-plane role may alter, grant on, disable or delete
+        a key.
+        """
+        return iam.ManagedPolicy(
+            self, "DeployBoundary",
+            managed_policy_name=DEPLOY_BOUNDARY_NAME,
+            description="agentkeel: the ceiling on every role that deploys the platform (R3, R4).",
+            document=iam.PolicyDocument(statements=[
+                iam.PolicyStatement(
+                    sid="WhatADeployerMayDo",
+                    actions=["*"], resources=["*"],
+                ),
+                iam.PolicyStatement(
+                    sid="NeverEscalate",
+                    effect=iam.Effect.DENY,
+                    actions=["iam:CreateUser", "iam:PutUserPolicy", "iam:AttachUserPolicy",
+                             "iam:CreateAccessKey", "iam:CreateLoginProfile", "iam:UpdateLoginProfile",
+                             "iam:PutRolePermissionsBoundary", "iam:DeleteRolePermissionsBoundary",
+                             "iam:CreatePolicyVersion", "iam:SetDefaultPolicyVersion"],
+                    resources=["*"],
+                ),
+                iam.PolicyStatement(
+                    sid="NeverTouchAKeyPolicyNeverEraseEvidenceNeverOpenTheNetwork",
+                    effect=iam.Effect.DENY,
+                    actions=["kms:PutKeyPolicy", "kms:CreateGrant", "kms:ScheduleKeyDeletion", "kms:DisableKey",
+                             "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy",
+                             "ec2:CreateInternetGateway", "ec2:AttachInternetGateway",
+                             "ec2:CreateNatGateway", "ec2:CreateVpcPeeringConnection"],
                     resources=["*"],
                 ),
             ]),
@@ -494,6 +576,13 @@ stack = BootstrapStack(
 CEILING = ("A ceiling, not a grant: a Deny must cover every resource, including ones that do not exist "
            "yet, or a later attach slips past it.")
 SUPPRESSIONS = {
+    "DeployBoundary/Resource": (
+        "SPEC/01 §6: 'two permission boundaries, one per plane'. This is the deploy plane's, and it is a "
+        "deny-list: Allow * with the escalation, key-policy, evidence and network primitives denied by name. "
+        "It is what makes seed S4 readable at all — the developer role keeps sts:AssumeRole, so the deploy "
+        "role's trust policy is what refuses the attempt — and R4 is held by its four kms denies. An "
+        "allow-list here capped the execution role to creating nothing (ruling s)."
+    ),
     "Boundary/Resource": (
         "SPEC/01 §6: 'the permission boundary, on every role either stack synthesises, applied "
         "stack-wide'. This is that boundary, and it is what seed S5 reads: a role handed to GovernedAgent "

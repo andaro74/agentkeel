@@ -171,9 +171,17 @@ None of it is in PR 1, except the F1.4 reading in `verdict.build` and
   - the developer role (§1), boundary on;
   - the eval role, absorbed from `infra/eval-role/` under a **new name**,
     with its Deny statement (item 33) and trust conditions as they stand;
-  - the permission boundary, on every role either stack synthesises,
-    applied stack-wide, with a synth test that fails on any role without
-    it;
+  - **two permission boundaries**, one per plane (ruling s,
+    `feasibility.md` §2.6). `agentkeel-boundary` is the agent plane's
+    allow-list, attached to roles under `/agentkeel/agents/` and to no
+    others; it is what S5 and S6 read, and it allows `kms:GetKeyPolicy`
+    so that the key policy is what refuses S6 (ruling t).
+    `agentkeel-deploy-boundary` is the deploy plane's deny-list, on every
+    role the bootstrap stack makes, so the execution role can create what
+    a deploy creates while R4 still holds. Every role either stack
+    synthesises carries one of the two, and a synth test fails on a role
+    with neither, on an agent-path role with the wrong one, and on a
+    deploy-plane role carrying the agent allow-list;
   - a VPC with no internet gateway, endpoints with policies scoped to the
     account, and the boundary denying internet and NAT gateway creation;
   - one KMS key per agent. Its policy denies key-policy changes, grants

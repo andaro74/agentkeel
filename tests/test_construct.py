@@ -100,10 +100,23 @@ def test_the_runtime_is_in_the_vpc_and_the_egress_is_the_manifests(template):
     assert all("DestinationPrefixListId" in rule for rule in apart)
 
 
-def test_every_role_in_the_stack_carries_a_boundary(template):
+def test_every_role_in_the_stack_carries_the_agent_boundary(template):
+    """Ruling s: an agent-path role carries the agent plane's allow-list, and no other.
+
+    The ARN is a Security-owned SSM parameter, so what the template can say
+    is which parameter it reads. That is the point: the construct cannot
+    name a boundary of its own.
+    """
+    boundary_param = [
+        logical for logical, parameter in template.get("Parameters", {}).items()
+        if parameter.get("Default") == "/agentkeel/security/boundary-arn"
+    ]  # fmt: skip
+    assert len(boundary_param) == 1
     roles = [r for r in template["Resources"].values() if r["Type"] == "AWS::IAM::Role"]
-    assert roles and all(r["Properties"].get("PermissionsBoundary") for r in roles)
-    assert all(r["Properties"].get("Path") == "/agentkeel/agents/" for r in roles)
+    assert roles
+    for role in roles:
+        assert role["Properties"].get("PermissionsBoundary") == {"Ref": boundary_param[0]}
+        assert role["Properties"].get("Path") == "/agentkeel/agents/"
 
 
 def test_the_same_egress_rule_written_raw_is_refused_too(tmp_path):
