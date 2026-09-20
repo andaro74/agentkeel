@@ -73,13 +73,19 @@ images.
 # 1. As the admin, in the agent account, us-west-2.
 aws sts get-caller-identity
 cd infra/bootstrap
-npx aws-cdk@2 diff --parameters BudgetSubscriberEmail=<your address>
+# `diff` takes no --parameters (CDK CLI 2.1137.0 warns and ignores it);
+# only `deploy` does.
+npx aws-cdk@2 diff
 npx aws-cdk@2 deploy --parameters BudgetSubscriberEmail=<your address>
 ```
 
 The email is a CloudFormation parameter, not a value in the repo:
 CloudFormation requires at least one Budgets subscriber, and an address
 belongs to a person, not to a git history.
+
+On a **redeploy** the address can be left off: `deploy` defaults to
+`--previous-parameters`, which keeps what the stack already holds. Pass it
+again if you want to change it.
 
 ```bash
 # 2. The two prefix lists, which CloudFormation cannot publish.
