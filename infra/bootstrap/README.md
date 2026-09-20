@@ -9,7 +9,7 @@ during M01 PR 2 and before PR 2's first CI run (ruling f, ruling 4). It is
 never deployed by CI: the roles CI uses are in it, so a pipeline that
 could change it could widen its own permissions.
 
-What it makes is listed at the top of `app.py`. Three things are worth
+What it makes is listed at the top of `app.py`. Four things are worth
 saying here.
 
 **Two boundaries, one per plane** (ruling s). `agentkeel-boundary` is the

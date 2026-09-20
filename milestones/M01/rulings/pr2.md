@@ -122,7 +122,7 @@ the S3 check accepts both shapes and nothing else.
 Five seats read this PR before it was undrafted: `security-reviewer`,
 `platform-architect` (on S3, S5 and S8), `threshold-owner`, `tool-owner`
 and `engineering-cold-reviewer`. Every report is in the PR body verbatim.
-Counts: 6 BLOCK, 39 FINDING, 43 NOTE.
+Counts: 6 BLOCK, 39 FINDING, 43 NOTE. One BLOCK (B) is ruled and repaired here; four stand.
 
 **Repaired in this PR.** Each of these was a control that could not fail,
 or a check that could not see:
@@ -145,6 +145,8 @@ or a check that could not see:
 | 14 | `deploy.yml` set an output from every line of `pack`'s stdout and interpolated it into a shell in the credentialed job. | `.github/workflows/deploy.yml` |
 | 15 | The construct read the two gateway endpoints under a parameter name nothing writes: refagent's stack could not have deployed. | `infra/construct/governed_agent.py` |
 | 16 | `make validate`'s ruling-r check matched `S3` the AWS service as if it were seed S3. | `src/validate/checks.py` |
+| 17 | **BLOCK B, ruled and repaired** (rulings s and t). One allow-list boundary was on every role the bootstrap stack makes, so the execution role could create nothing and the Budgets stop could not attach. Split per plane: the agent allow-list on agent-path roles only, a deploy-plane deny-list on the rest. The deny-list denies neither `iam:*` nor `sts:AssumeRole`, because either would be the wrong control firing. | `infra/bootstrap/app.py`, `tests/test_bootstrap.py` |
+| 18 | The agent boundary did not **allow** `kms:GetKeyPolicy`. An allow-list caps by omission, so taking it out of the Deny at repair 1 was not enough: the boundary, not the key policy, would still have refused S6. | `infra/bootstrap/app.py` |
 
 **Not repaired; for a seat, before this PR is undrafted.** Each is in the
 PR body under **Unsure** with the seat and the milestone.
@@ -152,7 +154,6 @@ PR body under **Unsure** with the seat and the milestone.
 | # | BLOCK | Seat |
 |---|---|---|
 | A | The tool's return shape is not the one SPEC/00 §9 publishes. SPEC/00 is the authority, so either §9 is amended or the tool returns its fields. | Product |
-| B | The boundary is an allow-list and is applied to the deploy-plane roles too, so the execution role, the deploy role and the Budgets action role are capped to nothing. The stack cannot deploy anything as written. | Security |
 | C | A fork PR skips the `evals` job, and a skipped required check counts as success on GitHub, so a fork PR merges with no `validate` and no pytest. | Security |
 | D | S8's check is installed by the stack under test. A stack that never imports `infra.construct` is not checked, so what fired is narrower than false state 8. | Security |
 | E | `pr2-threshold-owner.md` cannot be written until this PR's first agent envelope exists (ruling o). | Threshold Owner |
