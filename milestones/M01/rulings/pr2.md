@@ -158,6 +158,35 @@ PR body under **Unsure** with the seat and the milestone.
 | D | S8's check is installed by the stack under test. A stack that never imports `infra.construct` is not checked, so what fired is narrower than false state 8. | Security |
 | E | `pr2-threshold-owner.md` cannot be written until this PR's first agent envelope exists (ruling o). | Threshold Owner |
 
+## What refagent's first agent envelope found (run 35529132275)
+
+`aadc735` records the first envelope of `scope: agent` this repo has ever
+written. It is **UNMEASURED**, and the reason is not in the repo:
+
+```
+AccessDeniedException ... anthropic.claude-sonnet-5 is not available for this account
+```
+
+Fifteen goldens, fifteen identical refusals, and the control beside them
+answering normally on Nova Micro. The account has never had model access
+for Sonnet 5 enabled, and nothing before this run would have said so.
+
+**A finding for the Threshold Owner, to rule with (o) and (p).** The model
+was pinned on `list-foundation-models` reporting `modelLifecycle: ACTIVE`
+in us-west-2 on 2026-09-19 (`manifest.yaml`, the comment above `model`).
+ACTIVE says the model exists in the region. It does not say this account
+may call it, and the two were read as one. A pin is not verified until
+something has called it: one `converse` against the pinned profile, once,
+at the milestone that pins it. Nothing in `validate` reads model access,
+and it could not without spending.
+
+What the envelope does show, and it is the first time any of it has been
+in CI evidence: `F1_2` **pass** — S5's role without a boundary refused at
+synth; `F1_1` and `F1_3` **fail** — S4's and S6's attempts have not been
+made; `F1_4` **fail** — refagent cited nothing, because it answered
+nothing. The cost-cap read 5,534 tokens against 150,000, all of it the
+control's.
+
 ## What a reader can run to falsify this PR's own claims
 
 ```bash
