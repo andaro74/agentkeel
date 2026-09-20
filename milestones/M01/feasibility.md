@@ -96,7 +96,7 @@ Read: SPEC/01 (untracked draft), SPEC/00 §3–§10.3, milestones/README.md, mil
 
 **11. FINDING. SPEC/01 rules items that belong to the Threshold Owner (checks 7, 8).**
 - §7: "Cost is a recorded RED" (open.md #22), "The card's `region` is the request region" (#23), and the `m00` card hash "in `thresholds.yaml`" (#5).
-- §6: "Sonnet 5 through `us.anthropic.claude-sonnet-5`".
+- §6: "Sonnet 4.6 through `us.anthropic.claude-sonnet-4-6`".
 - What is wrong: each of these belongs to the Threshold Owner. Item 22 is dated "before M01 PR 1".
 - What would settle it: Threshold Owner ruling files cited from SPEC/01, not Product text.
 - Seat: Threshold Owner.
@@ -212,7 +212,7 @@ PR was committed.
 | 8 | Repaired. SPEC/01 §8 and the ledger row state what is expected, and that no count of refagent's passes is expected on empty history (P7). S1–S8 are seeded cases, not plants, and do not enter `plants_expected`; `make plants` lists them separately. |
 | 9 | Repaired with `platform-architect` BLOCK 3: the load check verifies the signature, outside the bundle's own code, on a digest-pinned image. Where the digest lives (the stack or the manifest; SPEC/00 §5 says "digest matches manifest") is **Unsure**: Security with Product, at M01 PR 2 open. |
 | 10 | Repaired. ADR-0003 amendment 1 and ADR-0004 amendment 2 are in this PR, with SPEC/00 §6's field list, in the commit before the F1.4 reader. |
-| 11 | Repaired by citation. Items 5, 22 and 23 are the Threshold Owner's rulings (§2.1, §6), carried in `rulings/pr1.md` with the Threshold Owner's key; SPEC/01 §7 names them as such. The Sonnet 5 pin is the Threshold Owner's, from the M00 table, now in `agents/refagent/manifest.yaml`. |
+| 11 | Repaired by citation. Items 5, 22 and 23 are the Threshold Owner's rulings (§2.1, §6), carried in `rulings/pr1.md` with the Threshold Owner's key; SPEC/01 §7 names them as such. The Sonnet 4.6 pin is the Threshold Owner's, from the M00 table, now in `agents/refagent/manifest.yaml`. |
 | 12 | Repaired. Items 1 and 6 were ruled before PR 1's first commit (§2.1). |
 | 13 | Repaired. SPEC/01 §6 lists each `validate` check with its milestone; the ledger header has the M01 PR 1 row. |
 | 14 | Repaired. SPEC/01 §5 names `platform-architect`, exercised on S3, S5 and S8 at PR 2. Its prompt is in this PR and it was run once on SPEC/01's design; its report is in the PR body. |
@@ -262,7 +262,7 @@ Added to the rulings above; they bind this PR.
 | D | Item 33: `s3:PutBucketPolicy` joins the Deny in this PR. Five actions, one deploy. "Exactly four" is superseded. | Security |
 | E | `cold-review-ruling` accepting a PR-carried ruling is known and by design at M00 and is not R9's line. Carried to M02 PR 1 with `ruling-cited`: `milestones/M02/open.md` item 1, with R9's sentence quoted. | Security |
 | F | S7: the PR body names its falsifier, its seed commit and the file that reads it here. If that reader is anything other than build.py's `pass = score and cites`, it moves out of this PR and S7 stays xfail strict. After the commits, the seed commit is checked out and `pytest` run; the failing tests and their reasons are pasted in §3. | Engineering |
-| G | The manifest's model `version` stays null until Bedrock returns a version for `us.anthropic.claude-sonnet-5`; re-ruled at PR 2 with the cap. | Threshold Owner |
+| G | The manifest's model `version` stays null until Bedrock returns a version for `us.anthropic.claude-sonnet-4-6`; re-ruled at PR 2 with the cap. | Threshold Owner |
 
 ### 2.6 Rulings for M01 PR 2 open (2026-09-19, R1)
 
@@ -277,8 +277,8 @@ knowledge base over `data/corpus/` → M03; the HITL branch → M07. Gateway
 and Identity are **not** never-cut at M01 (finding 17): the construct
 declares both as props and wires neither. Identity's claim is M05's
 (credentials only via Identity); Gateway's is M02's edge and M07's HITL
-tool. Never-cut stays as written in §10. refagent at M01 is Sonnet 5
-through `us.anthropic.claude-sonnet-5`, the rights table in DynamoDB, and
+tool. Never-cut stays as written in §10. refagent at M01 is Sonnet 4.6
+through `us.anthropic.claude-sonnet-4-6`, the rights table in DynamoDB, and
 the `check_availability` tool with its strict schema, inside
 `GovernedAgent`. F1.4 reads the table and the tool.
 
@@ -393,7 +393,7 @@ dropped.
 | 11 | Engineering | Ruled with item 5: one envelope per commit, one subject; ADR-0004 amendment 2, item 2. |
 | 12 | Security | Signed: Security, 2026-09-19, on run 35412277571. `infra/eval-role/README.md`, `rulings/pr1.md`. "A second workflow file refused" carried: Security, **M01 PR 2**. |
 | 13 | Security | Re-dated to **M01 PR 2**, with the bootstrap stack (Budgets action at `daily_usd: 10`). |
-| 14 | Security | Built: `MODELS` gains `anthropic.claude-sonnet-5`. The human redeploys after this PR opens and before PR 2's first run. |
+| 14 | Security | Built: `MODELS` gains `anthropic.claude-sonnet-5`. The human redeploys after this PR opens and before PR 2's first run. **Superseded at PR 2 (ruling p):** the account cannot call Sonnet 5, so `MODELS` names `anthropic.claude-sonnet-4-6` in both `infra/eval-role/` and `infra/bootstrap/`. |
 | 15 | Security | Closed on the export (item 31). |
 | 16 | Security | Built: `evals.yml`'s header sentence replaced, before the hashes were computed. |
 | 17 | Security | Closed. The five `git ls-remote` results are in `rulings/pr1.md`. |

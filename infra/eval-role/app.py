@@ -42,10 +42,10 @@ ROLE_NAME = "agentkeel-m00-evals"
 # Security ruling: M01 adds refagent's, M04 the swap candidates'.
 MODELS = [
     "amazon.nova-micro-v1:0",  # baseline (M00)
-    "anthropic.claude-sonnet-5",  # refagent, model under test (M01 PR 1, item 14)
+    "anthropic.claude-sonnet-4-6",  # refagent, model under test (M01 PR 2, ruling p)
 ]
 # Where the `us.` profiles route, from `aws bedrock get-inference-profile`
-# in us-west-2: Nova Micro on 2026-09-18, Sonnet 5 on 2026-09-19, the same
+# in us-west-2: Nova Micro on 2026-09-18, Sonnet 4.6 on 2026-09-20, the same
 # three regions for both. A profile call is authorised on the profile and on
 # the foundation model in whichever of these serves it.
 PROFILE_REGIONS = ["us-east-1", "us-east-2", "us-west-2"]

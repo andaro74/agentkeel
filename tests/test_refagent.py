@@ -79,7 +79,7 @@ def test_the_prompt_names_every_title_and_the_model_the_manifest_pins():
     slate = json.loads((ROOT / "data" / "slate.json").read_text(encoding="utf-8"))["titles"]
     for title in slate:
         assert f"{title['title_id']} {title['title']}" in agent.PROMPT
-    assert MANIFEST["model"]["profile"] == "us.anthropic.claude-sonnet-5"
+    assert MANIFEST["model"]["profile"] == "us.anthropic.claude-sonnet-4-6"
     assert MANIFEST["memory"] is None and MANIFEST["may_call"] == []  # cuts 1, 3 and 4, taken at open
 
 

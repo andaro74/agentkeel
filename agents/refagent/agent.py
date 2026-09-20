@@ -1,6 +1,6 @@
 """refagent: title availability, from the rights table and one tool (SPEC/01 §6, ruling SCOPE).
 
-Sonnet 5 through the pinned inference profile, one tool, no knowledge base,
+Sonnet 4.6 through the pinned inference profile, one tool, no knowledge base,
 no HITL branch and no memory: cuts 1, 3 and 4 are taken at M01 open
 (`milestones/M01/feasibility.md` §2.6). What is left is the claim's own
 half: refagent answers an ordinary golden, and the answer carries a

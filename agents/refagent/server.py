@@ -27,7 +27,7 @@ from agents.refagent import agent
 
 PORT = 8080
 REGION = os.environ.get("AWS_REGION", "us-west-2")
-MODEL_ID = os.environ.get("AGENTKEEL_MODEL_PROFILE", "us.anthropic.claude-sonnet-5")
+MODEL_ID = os.environ.get("AGENTKEEL_MODEL_PROFILE", "us.anthropic.claude-sonnet-4-6")
 TABLE = os.environ.get("AGENTKEEL_RIGHTS_TABLE")
 
 

@@ -203,8 +203,8 @@ None of it is in PR 1, except the F1.4 reading in `verdict.build` and
   `0.0.0.0/0`); a Bedrock application inference profile per agent, for
   cost tagging. The boundary ARN is read from a Security-owned parameter,
   not from CDK context.
-- **refagent** (`agents/refagent/`): Sonnet 5 through
-  `us.anthropic.claude-sonnet-5`, us-west-2; the rights table in DynamoDB,
+- **refagent** (`agents/refagent/`): Sonnet 4.6 through
+  `us.anthropic.claude-sonnet-4-6`, us-west-2; the rights table in DynamoDB,
   loaded from `data/rights_table.json`; the tool
   `check_availability(title_id, territory, platform, date)` with a strict
   schema both ways; the knowledge base over `data/corpus/` (Data Owner);

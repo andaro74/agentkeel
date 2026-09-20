@@ -76,7 +76,7 @@ SUBNETS_PARAM = "/agentkeel/security/subnet-ids"
 ENDPOINT_PARAM = "/agentkeel/security/endpoint/{name}"
 DAILY_USD = 10  # Threshold Owner (ruling a); the action attaches a Deny to the eval role
 
-MODELS = ["amazon.nova-micro-v1:0", "anthropic.claude-sonnet-5"]
+MODELS = ["amazon.nova-micro-v1:0", "anthropic.claude-sonnet-4-6"]  # ruling p
 PROFILE_REGIONS = ["us-east-1", "us-east-2", "us-west-2"]
 INVOKE = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
 DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy"]

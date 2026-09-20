@@ -122,7 +122,7 @@ the S3 check accepts both shapes and nothing else.
 Five seats read this PR before it was undrafted: `security-reviewer`,
 `platform-architect` (on S3, S5 and S8), `threshold-owner`, `tool-owner`
 and `engineering-cold-reviewer`. Every report is in the PR body verbatim.
-Counts: 6 BLOCK, 39 FINDING, 43 NOTE. One BLOCK (B) is ruled and repaired here; four stand.
+Counts: 6 BLOCK, 39 FINDING, 43 NOTE. Two BLOCKs are ruled here (B, repaired; E, ruled in `pr2-threshold-owner.md`); three stand.
 
 **Repaired in this PR.** Each of these was a control that could not fail,
 or a check that could not see:
@@ -156,7 +156,6 @@ PR body under **Unsure** with the seat and the milestone.
 | A | The tool's return shape is not the one SPEC/00 §9 publishes. SPEC/00 is the authority, so either §9 is amended or the tool returns its fields. | Product |
 | C | A fork PR skips the `evals` job, and a skipped required check counts as success on GitHub, so a fork PR merges with no `validate` and no pytest. | Security |
 | D | S8's check is installed by the stack under test. A stack that never imports `infra.construct` is not checked, so what fired is narrower than false state 8. | Security |
-| E | `pr2-threshold-owner.md` cannot be written until this PR's first agent envelope exists (ruling o). | Threshold Owner |
 
 ## What refagent's first agent envelope found (run 35529132275)
 
@@ -171,14 +170,16 @@ Fifteen goldens, fifteen identical refusals, and the control beside them
 answering normally on Nova Micro. The account has never had model access
 for Sonnet 5 enabled, and nothing before this run would have said so.
 
-**A finding for the Threshold Owner, to rule with (o) and (p).** The model
-was pinned on `list-foundation-models` reporting `modelLifecycle: ACTIVE`
-in us-west-2 on 2026-09-19 (`manifest.yaml`, the comment above `model`).
-ACTIVE says the model exists in the region. It does not say this account
-may call it, and the two were read as one. A pin is not verified until
-something has called it: one `converse` against the pinned profile, once,
-at the milestone that pins it. Nothing in `validate` reads model access,
-and it could not without spending.
+**Ruled, in `rulings/pr2-threshold-owner.md` (o and p).** The model was
+pinned on `list-foundation-models` reporting `modelLifecycle: ACTIVE` in
+us-west-2. ACTIVE says the model exists in the region; it does not say
+this account may call it, and the two were read as one. refagent's model
+is now `anthropic.claude-sonnet-4-6`, verified by a call rather than by a
+listing, and `scripts/check_model_access.py` is what makes that check
+repeatable. It is a script and not a `validate` check because it spends.
+The cap stays at 150,000 as a **pre-run** number: ruling m makes an
+over-cap envelope RED at its commit forever, so the cap has to be right
+before the run, not calibrated after it.
 
 What the envelope does show, and it is the first time any of it has been
 in CI evidence: `F1_2` **pass** — S5's role without a boundary refused at

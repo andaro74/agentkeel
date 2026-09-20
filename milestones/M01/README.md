@@ -55,7 +55,8 @@ Written at M01 PR 1 open. The row in `milestones/README.md` is the one
 - The seats' rulings on all 35 items M00 carried in are in
   `feasibility.md` §6, item by item, and in `rulings/pr1.md`.
 - Before PR 2's first run: the human redeploys `infra/eval-role` with
-  admin (Sonnet 5's profile, item 14; the Deny statement, item 33).
+  admin (Sonnet 4.6's profile, item 14 with ruling p; the Deny statement,
+  item 33).
 
 ### Scope taken at open (PR 2 rulings, `feasibility.md` §2.6)
 
@@ -65,8 +66,9 @@ against the cap: `ratings-helper` → M02; the knowledge base over
 delivery to the security account) stands as a cut if the cap is
 threatened; cut 5 is not taken, so the per-agent inference profile stays.
 Gateway and Identity are not never-cut: the construct declares both as
-props and wires neither. refagent at M01 is Sonnet 5 through
-`us.anthropic.claude-sonnet-5`, the rights table in DynamoDB, and the
+props and wires neither. refagent at M01 is Sonnet 4.6 through
+`us.anthropic.claude-sonnet-4-6` (ruling p: Sonnet 5 is not available to
+this account), the rights table in DynamoDB, and the
 `check_availability` tool, inside `GovernedAgent`; F1.4 reads the table
 and the tool.
 
@@ -107,8 +109,9 @@ From the `threshold-owner` report on this PR, for the Threshold Owner:
 - rule the cap again against PR 2's first agent envelope (150,000 is not
   a measurement);
 - refagent's model `version` stays null until Bedrock returns a version
-  for `us.anthropic.claude-sonnet-5`; re-ruled at PR 2 with the cap
-  (ruling G). `modelLifecycle` for `anthropic.claude-sonnet-5` in
+  for the profile; re-ruled at PR 2 with the cap (ruling G, then ruling p:
+  the model is Sonnet 4.6, verified by a call rather than by a listing).
+  `modelLifecycle` for `anthropic.claude-sonnet-5` in
   us-west-2 read ACTIVE on 2026-09-19 (`list-foundation-models`).
 
 For Product, at M01 PR 2 open: whether Gateway and Identity are never-cut

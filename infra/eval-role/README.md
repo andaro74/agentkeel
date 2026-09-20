@@ -46,7 +46,9 @@ One IAM role, `agentkeel-m00-evals`.
   route to (us-east-1, us-east-2, us-west-2) only when the call comes
   through one of those profiles. **At M01 that is two profiles:
   `us.amazon.nova-micro-v1:0` (the control) and
-  `us.anthropic.claude-sonnet-5` (refagent, item 14).** Both route to the
+  `us.anthropic.claude-sonnet-4-6` (refagent, item 14; re-ruled at PR 2,
+  ruling p, from `us.anthropic.claude-sonnet-5`, which this account cannot
+  call).** Both route to the
   same three regions (`aws bedrock get-inference-profile`, 2026-09-18 and
   2026-09-19). Each milestone's PR 1 adds the ARNs that milestone calls,
   to `MODELS` in `app.py`, with a Security ruling. **The human redeploys
