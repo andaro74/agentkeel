@@ -31,4 +31,22 @@ attempts:
     # this principal may create a stack at all, not what the stack would hold.
     command: aws cloudformation create-stack --stack-name agentkeel-refagent --template-body '{"Resources":{"Nothing":{"Type":"AWS::CloudFormation::WaitConditionHandle"}}}'
     refused_when: AccessDenied, and no stack event for the attempt
-observed: null
+observed:
+- what: assume the deploy role from the developer session
+  event_name: AssumeRole
+  request_id: 0c614348-008e-4d3e-b1cb-f19425c02ffb
+  at: '2026-09-20T21:21:40Z'
+  result: AccessDenied
+  message: 'User: arn:aws:sts::581208540944:assumed-role/agentkeel-developer/seed-s4 is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::581208540944:role/agentkeel-deploy'
+- what: assume the CloudFormation execution role from the developer session
+  event_name: AssumeRole
+  request_id: c92bc933-63a3-4804-b217-2c587ac9e55b
+  at: '2026-09-20T21:21:40Z'
+  result: AccessDenied
+  message: 'User: arn:aws:sts::581208540944:assumed-role/agentkeel-developer/seed-s4 is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::581208540944:role/agentkeel-cfn-exec'
+- what: deploy refagent's stack with the developer session
+  event_name: CreateStack
+  request_id: cb38e58a-042f-438b-a7bf-93a853f2ac3f
+  at: '2026-09-20T21:21:40Z'
+  result: AccessDenied
+  message: 'User: arn:aws:sts::581208540944:assumed-role/agentkeel-developer/seed-s4 is not authorized to perform: cloudformation:CreateStack on resource: arn:aws:cloudformation:us-west-2:581208540944:stack/agentkeel-refagent/* with an explicit deny in an identity-based policy'

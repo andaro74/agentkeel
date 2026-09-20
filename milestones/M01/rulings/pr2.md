@@ -190,13 +190,50 @@ made; `F1_4` **fail** — refagent cited nothing, because it answered
 nothing. The cost-cap read 5,534 tokens against 150,000, all of it the
 control's.
 
+## The S4 and S6 attempts, and how their record was written
+
+Both attempts were made on **2026-09-20** against account `581208540944`
+in us-west-2, and AWS refused all four calls. Each was refused by the
+control the seed names, which is the part a bare `AccessDenied` cannot
+tell you:
+
+| Seed | Call | What refused it |
+|---|---|---|
+| S4 | `sts:AssumeRole` on `agentkeel-deploy` | the **trust policy**. The developer role holds `sts:AssumeRole` on purpose (`AssumeIsAllowedHereSoTheTrustPolicyIsWhatRefusesIt`), and the message names no explicit deny, so the identity policy allowed it and the trust policy is what said no. |
+| S4 | `sts:AssumeRole` on `agentkeel-cfn-exec` | the trust policy, same reading. It trusts `cloudformation.amazonaws.com` and nothing else. |
+| S4 | `cloudformation:CreateStack` | `with an explicit deny in an identity-based policy` — the developer role's `NeverDeploy`. No stack was created. |
+| S6 | `kms:GetKeyPolicy` | `with an explicit deny in a resource-based policy` — **the key policy**. The role's own policy granted the action and the agent boundary allows it (ruling t), so nothing else was left to refuse it. |
+
+S6's attempt used a role created by hand for it, `agentkeel-seed-s6`, on
+path `/agentkeel/agents/` with `agentkeel-boundary` attached, and deleted
+after. refagent's runtime role does not exist until refagent's stack is
+deployed from `main`.
+
+**How the record was written, which is weaker than ruling i describes.**
+Ruling i has the human write what they saw and CI confirm it independently
+in CloudTrail, and `scripts/observe_attempt.py` puts the two side by side
+under `human_said` with the note that they must agree. Here the human made
+the attempts but did not keep the output, so the `observed:` entries were
+reconstructed from CloudTrail by request id. **The two halves therefore
+have one source, and the `human_said` comparison is vacuous for this
+milestone.** The request ids are real and the events are AWS's own; what
+is lost is the independence, not the refusal. Recorded rather than quietly
+left as it stands. From M02 the human's own output is kept.
+
+One further note for the record: the run file's command for S6 reads
+`--key-id alias/agentkeel-refagent`, and KMS refuses an alias for this
+operation (`InvalidArnException: Key Aliases are not supported for this
+operation`). The attempt was made with the key id. The `command:` field is
+documentation and feeds no check, but it is wrong as written and Product
+carries the correction.
+
 ## What a reader can run to falsify this PR's own claims
 
 ```bash
 uv sync --frozen
 
 # Each seed, refused for its own reason and no other.
-uv run pytest tests/test_m01_seeds.py -q          # S4 and S6 xfail: not yet attempted
+uv run pytest tests/test_m01_seeds.py -q          # S4 and S6 read the attempts made on 2026-09-20
 uv run python -m src.bundle.verify tests/fixtures/bundles/unsigned   # exit 4, signature
 uv run python -m src.bundle.verify tests/fixtures/bundles/altered    # exit 4, digest
 uv run python -c "from pathlib import Path; from infra.construct import synth_refusal; \

@@ -37,4 +37,11 @@ attempts:
     # the human's note. A denial that named the role's own policy would be the
     # wrong control firing, and the error code alone cannot tell them apart.
     message_must_contain: resource-based policy
-observed: null
+observed:
+- what: read the key policy of refagent's KMS key
+  event_name: GetKeyPolicy
+  request_id: 88b23818-807d-4d49-957c-f8777a2f609c
+  at: '2026-09-20T21:22:04Z'
+  result: AccessDenied
+  message: 'User: arn:aws:sts::581208540944:assumed-role/agentkeel-seed-s6/seed-s6 is not authorized to perform: kms:GetKeyPolicy on resource: arn:aws:kms:us-west-2:581208540944:key/a57f50b3-8a60-478f-8e3d-ef449f36ac42 with an explicit deny in a resource-based policy'
+  message_must_contain: resource-based policy
