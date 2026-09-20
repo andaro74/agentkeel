@@ -133,6 +133,42 @@ gh variable set AWS_EVAL_ROLE_ARN --body "$(aws cloudformation describe-stacks \
   --query 'Stacks[0].Outputs[?OutputKey==`EvalRoleArn`].OutputValue' --output text)"
 ```
 
+## Redeployed 2026-09-20 (ruling p: the model refagent actually runs on)
+
+`MODELS` named `anthropic.claude-sonnet-5`, which this account cannot
+call, so M01 PR 2's first agent run was fifteen `AccessDeniedException`
+(run 35529132275). refagent's model is now `anthropic.claude-sonnet-4-6`
+(`milestones/M01/rulings/pr2-threshold-owner.md`), and this role's pinned
+profiles follow it. Nothing else changed: same role, same trust policy,
+one IAM policy and six ARNs.
+
+```
+$ aws cloudformation describe-stacks --stack-name AgentkeelM00EvalRole     --query 'Stacks[0].Outputs'
+AgentkeelM00EvalRole.EvalRoleArn = arn:aws:iam::581208540944:role/agentkeel-m00-evals
+Stack ARN: arn:aws:cloudformation:us-west-2:581208540944:stack/AgentkeelM00EvalRole/61ba98e0-b3b4-11f1-b40f-06ffed3b8d53
+Deployment time: 21.79s
+```
+
+`aws iam simulate-principal-policy` against the deployed role, same day:
+
+| Action | Resource | Decision |
+|---|---|---|
+| `bedrock:InvokeModel` | `us.anthropic.claude-sonnet-4-6` | **allowed** |
+| `bedrock:InvokeModel` | `us.amazon.nova-micro-v1:0` | **allowed** |
+| `bedrock:InvokeModel` | `us.anthropic.claude-sonnet-5` | implicitDeny |
+| `iam:CreateUser` | `*` | explicitDeny |
+| `sts:AssumeRole` | `*` | explicitDeny |
+| `logs:DeleteLogGroup` | `*` | explicitDeny |
+| `s3:PutBucketPolicy` | `*` | explicitDeny |
+| `bedrock:CreateGuardrail` | `*` | explicitDeny |
+
+The old profile is `implicitDeny` rather than `explicitDeny`, and that is
+the pinning working: the role allows the profiles it names and nothing
+else, so a model leaving the list needs no Deny to become unreachable.
+The five `explicitDeny` rows are item 33's Deny statement, and this is the
+first time each has been read off the deployed role rather than the
+template.
+
 ## What is not here
 
 - No permission boundary (item 28). The boundary is M01 PR 2's bootstrap
