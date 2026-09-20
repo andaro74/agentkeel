@@ -153,6 +153,34 @@ def test_the_deploy_boundary_holds_r4_and_the_escalation_primitives(template):
     assert {"logs:Delete*", "s3:PutBucketPolicy", "ec2:CreateInternetGateway", "ec2:CreateNatGateway"} <= deploy
 
 
+# --- the eval role ---------------------------------------------------------
+
+
+def eval_role_policy(template: dict[str, Any]) -> list[dict[str, Any]]:
+    for logical, policy in of_type(template, "AWS::IAM::Policy").items():
+        if "EvalRole" in logical:
+            return policy["Properties"]["PolicyDocument"]["Statement"]
+    raise AssertionError("no policy on the eval role")
+
+
+def test_the_eval_role_may_ask_cloudtrail_what_happened(template):
+    """Ruling i. `observe_attempt.py` runs as this role; without the permission
+    it records "not found" for attempts CloudTrail has, and F1_1 and F1_3 fail
+    for want of a permission rather than for want of a refusal."""
+    allowed_here = {a for s in eval_role_policy(template) if s["Effect"] == "Allow" for a in actions(s)}
+    assert "cloudtrail:LookupEvents" in allowed_here
+
+
+def test_the_eval_role_may_not_change_what_cloudtrail_says(template):
+    """Read is the whole grant. An instrument that could edit the record it reads
+    would not be evidence of anything (P5)."""
+    allowed_here = {a for s in eval_role_policy(template) if s["Effect"] == "Allow" for a in actions(s)}
+    for action in allowed_here:
+        assert not action.startswith("cloudtrail:") or action == "cloudtrail:LookupEvents", (
+            f"{action} lets the instrument write the record it reads"
+        )
+
+
 # --- the key policy --------------------------------------------------------
 
 

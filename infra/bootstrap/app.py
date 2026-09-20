@@ -411,6 +411,24 @@ class BootstrapStack(cdk.Stack):
             actions=["bedrock-agentcore:InvokeAgentRuntime"],
             resources=[f"arn:aws:bedrock-agentcore:{REGION}:{self.account}:runtime/refagent*"],
         ))  # fmt: skip
+        # Ruling i: the human makes S4's and S6's attempts, and this role asks
+        # CloudTrail whether AWS refused each request id
+        # (`scripts/observe_attempt.py`). Without this the instrument cannot
+        # do its job: `LookupEvents` was an implicit deny, the lookup returned
+        # "0 of 3 attempts recorded as AccessDenied" for attempts CloudTrail
+        # had, and F1_1 and F1_3 failed for want of a permission rather than
+        # for want of a refusal (M01 PR 2, run 35539363797).
+        #
+        # Read only, and that is the whole point: this role may ask what
+        # happened and may not change the answer. `DENY` below already refuses
+        # `logs:Delete*`, and nothing here grants `cloudtrail:Delete*`,
+        # `PutEventSelectors` or `StopLogging`. `LookupEvents` takes no
+        # resource-level condition, so the resource is `*` (P5: the instrument
+        # reads AWS's record, it does not write it).
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadCloudTrailForTheSeedAttempts",
+            actions=["cloudtrail:LookupEvents"], resources=["*"],
+        ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="DenyEscalationAndEvidenceDeletion", effect=iam.Effect.DENY,
             actions=DENY, resources=["*"],
@@ -696,7 +714,11 @@ SUPPRESSIONS = {
         "SPEC/01 §6: 'the eval role, absorbed from infra/eval-role/ under a new name, with its Deny "
         "statement (item 33) and trust conditions as they stand'. The two profiles and the foundation "
         "models are named by ARN; runtime/refagent* covers the versioned runtime name AgentCore assigns, "
-        f"which does not exist until the deploy. The five-action Deny is the ceiling. {CEILING}"
+        "which does not exist until the deploy. The five-action Deny is the ceiling. Seeds S4 and S6: "
+        "cloudtrail:LookupEvents is on * because CloudTrail takes no resource-level condition for it, "
+        "and ruling i has this role ask CloudTrail whether the human's attempts were refused. It is the "
+        "only cloudtrail action granted, so the instrument may read the record and may not change it. "
+        f"{CEILING}"
     ),
 }
 for path, reason in SUPPRESSIONS.items():

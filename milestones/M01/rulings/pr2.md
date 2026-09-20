@@ -147,6 +147,7 @@ or a check that could not see:
 | 16 | `make validate`'s ruling-r check matched `S3` the AWS service as if it were seed S3. | `src/validate/checks.py` |
 | 17 | **BLOCK B, ruled and repaired** (rulings s and t). One allow-list boundary was on every role the bootstrap stack makes, so the execution role could create nothing and the Budgets stop could not attach. Split per plane: the agent allow-list on agent-path roles only, a deploy-plane deny-list on the rest. The deny-list denies neither `iam:*` nor `sts:AssumeRole`, because either would be the wrong control firing. | `infra/bootstrap/app.py`, `tests/test_bootstrap.py` |
 | 18 | The agent boundary did not **allow** `kms:GetKeyPolicy`. An allow-list caps by omission, so taking it out of the Deny at repair 1 was not enough: the boundary, not the key policy, would still have refused S6. | `infra/bootstrap/app.py` |
+| 21 | **The instrument could not read the record it exists to read.** `scripts/observe_attempt.py` runs as `agentkeel-evals`, and that role had no `cloudtrail:LookupEvents`: `simulate-principal-policy` returns `implicitDeny`. In CI the lookup wrote "0 of 3 attempts recorded as AccessDenied" for attempts CloudTrail held, and `F1_1` and `F1_3` failed for want of a permission rather than for want of a refusal (run 35539363797). The same lookup run with admin credentials found 3 of 3 and 1 of 1. The role now holds `cloudtrail:LookupEvents` and no other cloudtrail action, so the instrument may read the record and may not change it. **The bootstrap stack must be redeployed before the next CI run.** | `infra/bootstrap/app.py`, `tests/test_bootstrap.py` |
 | 20 | **The Budgets action would not deploy.** It hung off a daily budget, and AWS Budgets Actions do not support one. The daily figure notifies now and a monthly budget carries the stop, so the figure that was ruled and the figure that stops anything are no longer the same figure (ruling a, amended). | `infra/bootstrap/app.py`, `tests/test_bootstrap.py` |
 | 19 | **The key policy could not be created.** It denied the four admin actions with `ArnNotLike` on `agentkeel-security` — a role nothing creates — plus root, so it covered the human running the deploy, and KMS refused: "The new key policy will not allow you to update the key policy in the future". It names the principals it refuses now: agent roles by path, and the deploy, execution, eval and developer roles. That is `security-reviewer` F6 and `platform-architect` finding 9 as well, which said the policy named a seat that does not exist. | `infra/bootstrap/app.py`, `tests/test_bootstrap.py` |
 
@@ -226,6 +227,26 @@ operation (`InvalidArnException: Key Aliases are not supported for this
 operation`). The attempt was made with the key id. The `command:` field is
 documentation and feeds no check, but it is wrong as written and Product
 carries the correction.
+
+## Four failures this milestone's tests could not have caught
+
+Sonnet 5 was not available to the account; the KMS key policy failed the
+lockout safety check; the Budgets action refused a daily budget; and the
+eval role could not call CloudTrail. Synth passed, cdk-nag passed and 168
+tests passed before each one. All four are service behaviour rather than
+template shape, and the fourth is worse than the other three: the template
+was right, the code was right, and the **permission the instrument needed
+was never granted**, so the check failed silently in the direction of
+"nothing was refused".
+
+This milestone's infra was written against the API's shape and never
+against the API. M01's close carries that as its own line, and the
+remedies are already in the tree in two forms:
+`scripts/check_model_access.py` (a pin is not pinned until something has
+called it) and the `simulate-principal-policy` table the eval role's
+deploy prints (ruling j). Neither would have caught the other's failure.
+What is still missing is anything that runs an instrument as its own
+principal before a measuring run depends on it.
 
 ## What a reader can run to falsify this PR's own claims
 
