@@ -419,6 +419,11 @@ because BLOCK F means no runtime can be deployed until cfn-exec has its
 grants. The ledger row's Expected cell and `docs/milestones/M01.md` both
 carry the sentence, so a reader meets it before they meet the GREEN.
 
+A P3 exception is a change to a SPEC/00 §4 principle, so it takes a seat
+and an instrument, not a note. Authorised by Product under
+`SPEC/00-overview.md#8-M01`; carried into ADR-0007 with the mode field,
+since the field is what makes the exception readable from the envelope.
+
 **Made loud, here:** `src/agent/run.py` prints `mode: runner
 (AGENTKEEL_RUNTIME_ARN unset)` or `mode: runtime <arn>` as its first line,
 and `evals.yml` on `main` echoes that line into the job summary. Neither is
