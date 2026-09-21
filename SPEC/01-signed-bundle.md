@@ -43,8 +43,10 @@ takes a service control policy, which is landing-zone work (SPEC/00 §2,
   code and prompt. **Deploys** means CloudFormation creates or updates the
   agent's stack. Claim 1 is false if either happens to a seeded bundle.
 - **The construct.** `GovernedAgent`, a CDK construct under
-  `infra/construct/` (Security). An agent exists on this platform only as
-  an instance of it.
+  `infra/construct/` (Security). Every agent on this platform is meant to
+  be an instance of it. At M01 that is checked at synth on any stack that
+  installs the platform's checks, and no further: a stack that never
+  imports `infra.construct` is not read (§5, S8; BLOCK D, M01 PR 2).
 - **The bootstrap stack.** `infra/bootstrap/` (Security). Deployed by a
   human with admin, in the agent account, and changed only that way.
 
@@ -119,7 +121,28 @@ case is one that has never been shown to fire.
 | S5 role without boundary | F1.2 | `tests/fixtures/construct/role_without_boundary.py` | `GovernedAgent`, at synth |
 | S6 key policy read | F1.3 | `milestones/M01/runs/f1_3_key_policy.yaml`: the call made with `kms:GetKeyPolicy` granted in the role's own policy for the attempt, so the refusal can only be the key policy's explicit deny | the key policy |
 | S7 uncited answer | F1.4 | `tests/fixtures/refagent_raw_uncited.json`: fifteen raw replies that give every ordinary and trap golden's `answer_fields` right and cite nothing | `verdict.build` and `verdict.gate`, **in PR 1**, in the commit after the seed |
-| S8 agent outside the construct | F1.1 | `tests/fixtures/construct/outside_construct.py`: an AgentCore runtime resource made directly, with no `GovernedAgent` | a check over the whole synthesised stack |
+| S8 agent outside the construct | F1.1 | `tests/fixtures/construct/outside_construct.py`: an AgentCore runtime resource made directly, with no `GovernedAgent`, in a stack that installs the platform's checks | a check over the whole synthesised stack, **on a stack that installs it** (`GovernedAgent` or `refuse_outside_construct`). Narrowed at M01 PR 3 (BLOCK D): see below |
+
+**What S8 shows, and what it does not (BLOCK D, ruled at M01 PR 2 by
+Security, written here at PR 3).**
+- **What it shows.** A stack that installs the platform's checks and then
+  makes a bare AgentCore runtime is refused at synth, with "not a
+  GovernedAgent's own runtime".
+- **What it does not show.** That a stack which never imports
+  `infra.construct` is refused. Nothing at synth can bind code that does not
+  call it. That is the limit of synth-time checking, not a bug in the check.
+- **What else stands in the way at M01, and what does not.** The developer
+  role (S4's principal) is denied `CreateAgentRuntime` and `CreateStack`.
+  The deploy plane's `CreateAgentRuntime` is held by IAM to the platform
+  VPC's own subnets (M01 PR 3). That limits *where* a runtime can be made.
+  It does not limit *who* built it, so a bare runtime in those subnets,
+  deployed through `deploy.yml` from `main`, would pass IAM.
+- **Who binds an author who does not ask to be bound:** a CloudFormation
+  Hook on the resource type, or a service control policy. That is **M05's**.
+
+Claim 1's words, "refagent runs inside the construct", are about refagent,
+and S8 does not widen them. No page may say the construct is the only way to
+make an agent on this platform until M05's case has fired.
 
 Each seed goes in as its own commit, with its test in
 `tests/test_m01_seeds.py`, before any code that reads it. Each test is marked `xfail(strict=True)`: it reports
