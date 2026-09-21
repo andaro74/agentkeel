@@ -109,6 +109,46 @@ def test_the_measuring_command_does_not_discard_its_own_status(workflow):
         assert swallow not in run, f"`{swallow}` discards the exit status the gate sets"
 
 
+def test_the_credential_free_job_cannot_be_skipped(workflow):
+    """BLOCK C / B2. A skipped required check counts as success on GitHub.
+
+    `evals` skips on a fork because a fork gets no OIDC token, so while it was
+    the only required context a fork PR could merge with no `make validate`
+    and no pytest. The `checks` job is the half that needs no credentials: it
+    carries no `if:`, so it runs for every pull request and fails the PR.
+    """
+    job = workflow["jobs"]["checks"]
+    assert "if" not in job, "a job with an `if:` can be skipped, and a skipped required check passes"
+    assert job.get("continue-on-error") in (None, False)
+    for step in job["steps"]:
+        assert "if" not in step, f"step {step.get('name') or step.get('uses')} can be skipped"
+
+
+def test_the_credential_free_job_asks_for_no_credentials(workflow):
+    """If it ever needed a token it could not run on a fork, and the hole reopens."""
+    job = workflow["jobs"]["checks"]
+    assert job["permissions"] == {"contents": "read"}
+    body = str(job["steps"])
+    for forbidden in ("configure-aws-credentials", "id-token", "secrets."):
+        assert forbidden not in body, f"{forbidden} in the job that must run on a fork"
+
+
+def test_the_credential_free_job_runs_validate_and_pytest(workflow):
+    """The two things a fork PR was merging without."""
+    commands = " ".join(str(step.get("run", "")) for step in workflow["jobs"]["checks"]["steps"])
+    assert "make validate" in commands
+    assert "pytest" in commands
+
+
+def test_its_pytest_fails_the_job_unlike_the_one_in_evals(workflow):
+    """`evals` runs pytest with continue-on-error so a failure reaches the
+    envelope as checks.F0_2 = fail. This copy must do the opposite."""
+    step = next(s for s in workflow["jobs"]["checks"]["steps"] if "pytest" in str(s.get("run", "")))
+    assert step.get("continue-on-error") in (None, False), (
+        "the whole point of this job is that a failing test fails the pull request"
+    )
+
+
 def test_a_pipe_without_pipefail_really_does_swallow_the_exit():
     """The claim above, run rather than asserted from memory."""
     import subprocess

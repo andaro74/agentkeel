@@ -63,8 +63,54 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # BLOCK C / B2 (M01 PR 2's cold review, repaired here). `evals` below skips
+  # on a fork, because a fork gets no OIDC token and cannot measure. GitHub
+  # counts a **skipped required check as satisfied**, so while `evals` was the
+  # only required context a fork PR could merge with no `make validate` and no
+  # pytest at all.
+  #
+  # This job is the half that needs no credentials, and it carries no `if:`:
+  # it runs for every pull request, a fork's included, and it fails the PR
+  # when `validate` or pytest fails. `infra/ruleset/main.json` requires this
+  # context too — splitting the job without re-exporting the ruleset would
+  # have left the hole exactly where it was, because the required context
+  # would still have been the one a fork skips.
+  #
+  # pytest runs here **and** in `evals`, on purpose. The copy in `evals`
+  # carries `continue-on-error: true` so a failure reaches the envelope as
+  # `checks.F0_2 = fail` (SPEC/01 §4); this copy must fail the job instead.
+  # The two answer different questions, so neither can be dropped for the
+  # other, and about 40 seconds is the price.
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: make validate
+        run: make validate
+
+      # Same reason as in `evals`: without cosign the signature check never
+      # runs and S1/S2 are refused for the other half of their reasons.
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+
+      - name: pytest
+        run: uv run pytest -q
+
   evals:
-    # A fork gets no OIDC token. Skip it; do not fail it.
+    # A fork gets no OIDC token. Skip it; do not fail it. The `checks` job
+    # above is what a fork PR cannot skip.
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
