@@ -383,34 +383,47 @@ class BootstrapStack(cdk.Stack):
 
         # The security group, in this stack's VPC and no other.
         vpc_arn = f"arn:aws:ec2:{REGION}:{self.account}:vpc/{vpc.vpc_id}"
+        # CreateSecurityGroup authorises on the VPC and on the new group. The
+        # group does not exist yet, so IAM has no `ec2:Vpc` for it, and a
+        # condition on that key refuses every create; simulate-principal-policy
+        # read exactly that on the deployed role (M01 PR 3). The VPC resource
+        # is what holds creation to the platform VPC, as AWS's own examples do.
         role.add_to_policy(iam.PolicyStatement(
             sid="CreateSecurityGroupsInThePlatformVpcOnly",
             actions=["ec2:CreateSecurityGroup"],
-            resources=[vpc_arn],
+            resources=[vpc_arn, f"arn:aws:ec2:{REGION}:{self.account}:security-group/*"],
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="ManageSecurityGroupsInThePlatformVpcOnly",
-            actions=["ec2:CreateSecurityGroup", "ec2:DeleteSecurityGroup", "ec2:CreateTags",
+            actions=["ec2:DeleteSecurityGroup", "ec2:CreateTags",
                      "ec2:AuthorizeSecurityGroupEgress", "ec2:RevokeSecurityGroupEgress"],
             resources=[f"arn:aws:ec2:{REGION}:{self.account}:security-group/*"],
             conditions={"ArnEquals": {"ec2:Vpc": vpc_arn}},
         ))  # fmt: skip
         # The runtime in VPC mode places its interface in the platform's
         # subnets, behind the construct's group, and in no other VPC.
+        # All three resources must be allowed. The new interface has no
+        # `ec2:Vpc` until it exists (the same defect as CreateSecurityGroup,
+        # read on the deployed role), so the subnet and the group carry the
+        # condition and the interface does not.
         role.add_to_policy(iam.PolicyStatement(
             sid="RuntimeInterfacesInThePlatformVpcOnly",
             actions=["ec2:CreateNetworkInterface"],
-            resources=[f"arn:aws:ec2:{REGION}:{self.account}:{kind}/*"
-                       for kind in ("network-interface", "subnet", "security-group")],
+            resources=[f"arn:aws:ec2:{REGION}:{self.account}:{kind}/*" for kind in ("subnet", "security-group")],
             conditions={"ArnEquals": {"ec2:Vpc": vpc_arn}},
         ))  # fmt: skip
-        # An egress rule to a gateway endpoint names the AWS-owned prefix list,
-        # and the rule itself is a resource of its own for authorisation.
         role.add_to_policy(iam.PolicyStatement(
-            sid="EgressRulesToThePrefixLists",
+            sid="TheNewInterfaceItself",
+            actions=["ec2:CreateNetworkInterface"],
+            resources=[f"arn:aws:ec2:{REGION}:{self.account}:network-interface/*"],
+        ))  # fmt: skip
+        # An egress rule is a resource of its own for authorisation. The
+        # prefix list it names is not: AWS's service reference lists
+        # security-group and security-group-rule for these two, and no more.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="EgressRulesAsResources",
             actions=["ec2:AuthorizeSecurityGroupEgress", "ec2:RevokeSecurityGroupEgress"],
-            resources=[f"arn:aws:ec2:{REGION}:{self.account}:security-group-rule/*",
-                       f"arn:aws:ec2:{REGION}:aws:prefix-list/*"],
+            resources=[f"arn:aws:ec2:{REGION}:{self.account}:security-group-rule/*"],
         ))  # fmt: skip
         # Describe calls take no resource-level permission.
         role.add_to_policy(iam.PolicyStatement(
@@ -452,7 +465,7 @@ class BootstrapStack(cdk.Stack):
         agentcore = f"arn:aws:bedrock-agentcore:{REGION}:{self.account}"
         role.add_to_policy(iam.PolicyStatement(
             sid="TheRuntimeAndItsWorkloadIdentity",
-            actions=["bedrock-agentcore:CreateAgentRuntime", "bedrock-agentcore:GetAgentRuntime",
+            actions=["bedrock-agentcore:GetAgentRuntime",
                      "bedrock-agentcore:UpdateAgentRuntime", "bedrock-agentcore:DeleteAgentRuntime",
                      "bedrock-agentcore:CreateAgentRuntimeEndpoint", "bedrock-agentcore:GetAgentRuntimeEndpoint",
                      "bedrock-agentcore:UpdateAgentRuntimeEndpoint", "bedrock-agentcore:DeleteAgentRuntimeEndpoint",
@@ -462,6 +475,23 @@ class BootstrapStack(cdk.Stack):
             resources=[f"{agentcore}:runtime/*",
                        f"{agentcore}:workload-identity-directory/default",
                        f"{agentcore}:workload-identity-directory/default/workload-identity/*"],
+        ))  # fmt: skip
+        # CreateAgentRuntime takes no resource-level permission (AWS service
+        # reference: resource `*` only), so `runtime/*` never matched it, and
+        # simulate-principal-policy read implicitDeny on the deployed role.
+        # It does take `bedrock-agentcore:subnets`, so the create is held to
+        # the platform's own subnets instead, and must name subnets at all:
+        # no runtime outside the platform VPC, enforced by IAM as well as by
+        # the construct's synth check (S8).
+        role.add_to_policy(iam.PolicyStatement(
+            sid="CreateRuntimesInThePlatformSubnetsOnly",
+            actions=["bedrock-agentcore:CreateAgentRuntime"],
+            resources=["*"],
+            conditions={
+                "ForAllValues:StringEquals": {
+                    "bedrock-agentcore:subnets": [s.subnet_id for s in vpc.isolated_subnets]},
+                "Null": {"bedrock-agentcore:subnets": "false"},
+            },
         ))  # fmt: skip
         # The Runtime create handler's VPC-mode calls (describe-type,
         # 2026-09-21). Not scoped further because the handler does not say
@@ -905,10 +935,12 @@ SUPPRESSIONS = {
         f"{AGENT_ROLE_PATH} and conditioned on iam:PermissionsBoundary; the wildcard is in the Deny. It is "
         f"half of what seed S4 reads: the laptop cannot reach CloudFormation, and CloudFormation cannot "
         f"exceed this. BLOCK F's grants are what GovernedAgent renders, one statement per resource type: "
-        f"security-group/* is conditioned on ec2:Vpc being this stack's VPC; runtime/*, "
-        f"application-inference-profile/* and the agent role path name resources whose ids AWS assigns at "
-        f"create; ec2:Describe* takes no resource-level permission; security-group-rule/* and the AWS-owned "
-        f"prefix-list/* are the egress rule's own resources, whose group is still held to ec2:Vpc; the five "
+        f"managing security-group/* is conditioned on ec2:Vpc being this stack's VPC, and creating one is held "
+        f"by the VPC resource, because a new group has no ec2:Vpc yet; a new network-interface/* likewise, "
+        f"held by its subnet and group; CreateAgentRuntime takes no resource-level permission and is held to "
+        f"this stack's subnets by bedrock-agentcore:subnets; runtime/*, application-inference-profile/* and "
+        f"the agent role path name resources whose ids AWS assigns at create; ec2:Describe* takes no "
+        f"resource-level permission; security-group-rule/* is the egress rule's own resource; the five "
         f"vpc-lattice actions are the Runtime create handler's VPC-mode calls, which name no resource "
         f"in advance. The action lists are CloudFormation's published handler permissions (describe-type). "
         f"{CEILING}"

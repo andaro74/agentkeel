@@ -253,6 +253,42 @@ month at us-west-2 list price, before data.
   the runtime does not need them to answer. If a missing one ever stops the
   runtime, the deploy's load check will say so.
 
+## Read back from the account — the first read found two defects
+
+The human redeployed `AgentkeelBootstrap` on 2026-09-21
+(`UPDATE_COMPLETE`, 14:06:18 UTC, no failed events). All ten
+`/agentkeel/security/*` parameters exist, including the two for ECR.
+
+`simulate-principal-policy` on the deployed roles, as ruling j did, gave 37
+rows. 35 read as the template said. **Two did not, and both would have
+failed the first deploy**, with nothing in the template, the tests or cdk-nag
+to show it:
+
+| Principal | Action | Resource | Template said | Account said |
+|---|---|---|---|---|
+| `agentkeel-cfn-exec` | `ec2:CreateSecurityGroup` | `security-group/*`, `ec2:Vpc` = platform VPC | allowed | implicitDeny |
+| `agentkeel-cfn-exec` | `bedrock-agentcore:CreateAgentRuntime` | `runtime/refagent-abc` | allowed | implicitDeny |
+
+A probe found a third of the same kind: `ec2:CreateNetworkInterface` on
+`network-interface/*`. Why each failed:
+
+- **A resource being created has no `ec2:Vpc` yet.** A condition on that key
+  refuses the create, even when the VPC is right. The VPC resource, the
+  subnet and the group are what hold these creates to the platform VPC, so
+  they carry the scope now. That is AWS's own pattern.
+- **`CreateAgentRuntime` takes no resource-level permission.** AWS's service
+  reference lists `*` only, so `runtime/*` never matched it. It is now on `*`
+  with `bedrock-agentcore:subnets` limited to the platform's own subnets, and
+  it must name subnets at all. IAM now refuses a runtime outside the platform
+  VPC, alongside the construct's synth check (S8).
+- The `prefix-list/*` resource was dropped: the service reference does not
+  list it for these two actions.
+
+`test_no_create_is_conditioned_on_a_key_the_new_resource_does_not_have_yet`
+holds all three. **The bootstrap stack is redeployed a second time for this,
+and the full table is read again after it.** The earlier caution was right:
+a template is not a grant AWS has honoured.
+
 ## Still to land in PR 3
 
 | # | Item | Seat |

@@ -381,6 +381,25 @@ def test_the_execution_role_makes_security_groups_in_the_platform_vpc_only(templ
     assert "Vpc" in json.dumps(groups[0]["Condition"]["ArnEquals"]["ec2:Vpc"])  # this stack's VPC, by Ref
 
 
+def test_no_create_is_conditioned_on_a_key_the_new_resource_does_not_have_yet(template):
+    """Read on the deployed role, not in the template: ec2:Vpc on the new security group and the
+    new interface, and runtime/* for CreateAgentRuntime, each refused the create (M01 PR 3)."""
+    for s in role_statements(template, "ExecutionRole"):
+        if s["Effect"] != "Allow":
+            continue
+        resources = json.dumps(s["Resource"])
+        if "ec2:CreateSecurityGroup" in actions(s):
+            assert "Condition" not in s, "a new group has no ec2:Vpc: the VPC resource holds the create"
+            assert "vpc/" in resources and "Ref" in resources  # this stack's VPC, and no other
+        if "ec2:CreateNetworkInterface" in actions(s) and "network-interface/" in resources:
+            assert "Condition" not in s, "a new interface has no ec2:Vpc: the subnet and group hold the create"
+    runtime = [s for s in role_statements(template, "ExecutionRole") if "bedrock-agentcore:CreateAgentRuntime" in actions(s)]
+    assert len(runtime) == 1
+    assert runtime[0]["Resource"] == "*", "CreateAgentRuntime takes no resource-level permission"
+    assert "bedrock-agentcore:subnets" in runtime[0]["Condition"]["ForAllValues:StringEquals"]
+    assert runtime[0]["Condition"]["Null"] == {"bedrock-agentcore:subnets": "false"}
+
+
 def test_the_execution_role_passes_an_agent_role_to_agentcore_only(template):
     passes = [s for s in role_statements(template, "ExecutionRole") if "iam:PassRole" in actions(s)]
     assert len(passes) == 1
