@@ -7,7 +7,10 @@
 ruling: DRAFT
 seat: Engineering
 authorises:
-  - .github/workflows/evals.yml
+  # NOT .github/workflows/evals.yml, though this review's B1 is about it:
+  # that path is Security's (CLAUDE.md's seat table, and `pr2.md` says the
+  # same), and `pr2.md` already authorises it. Ruling B is one seat per file,
+  # so this file names the path in its body and takes no key over it.
   - src/agent/**
   - src/bundle/**
   - src/manifest/**
@@ -81,7 +84,7 @@ milestone is reviewed, which is M02's subject, not a footnote in M01 PR 2.
 
 ### B1 — `| tee` masks the gate's exit, so the required check can no longer fail. **Mine, introduced in `442484f`.**
 
-`.github/workflows/evals.yml:202`:
+`.github/workflows/evals.yml:217` (line 202 before the cure's comment block):
 
 ```yaml
 run: make evals ... GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
@@ -102,16 +105,17 @@ $ bash -ec 'false | tee /dev/null'; echo $?
 on a RED or REJECTED envelope. Verified by reading every step after it: the
 one `exit 1` in the job is `Fail if pytest failed`, which reads
 `steps.pytest.outcome`; `gate_exit` is consumed solely by the `record`
-job's `if:` at line 278, where a value other than 0 or 1 skips the commit
+job's `if:` (line 278 then, 290 now), where a value other than 0 or 1 skips the commit
 and fails nothing.
 
 `infra/ruleset/main.json` makes `evals` a required status check. So since
 `442484f`, **a RED envelope reports a green required check**.
 
 Why it has not shown: every RED envelope on this branch — `96331342`,
-`977af86`, `cef1500`, `ee2d219`, `6f3d161` — predates `442484f`. The only
-run after it, `a7419f4`, is GREEN, so the masking has never been exercised.
-The GREEN is a true GREEN; what is gone is the protection, not the result.
+`977af86`, `cef1500`, `ee2d219`, `6f3d161` — predates `442484f`, which the
+delta read confirmed with `git merge-base --is-ancestor`. Both runs after it,
+`a7419f4` and `2594d8e`, are GREEN, so the masking was never exercised. The
+GREENs are true GREENs; what was gone is the protection, not the result.
 
 The change that caused it was made to satisfy the ruling on runner mode: the
 step was piped so a later step could grep `mode:` out of the output. The
@@ -125,10 +129,17 @@ inside the PR they were found in; PR 3 keeps its scope). `shell: bash` on
 the step, which is what adds `-o pipefail`; `infra/workflows.sha256`
 rewritten; and `tests/test_evals_workflow.py` holds it — the step that runs
 `make evals` must declare `shell: bash`, there must be exactly one such
-step, the `record` job must still read `gate_exit`, and one test *runs* both
-bash invocations rather than asserting the claim from memory. A repair
-touches a measured path, so **the milestone measured again**; the verdict of
-that run is in `evidence:`.
+step, the step may not carry `continue-on-error`, its command may not end in
+`|| true` or its kin, the `record` job must still read `gate_exit`, and one
+test *runs* both bash invocations rather than asserting the claim from
+memory. The last three of those came from the delta read below, which broke
+the first version of the test in two ways. A repair touches a measured path,
+so **the milestone measured again**; the verdict of that run is in
+`evidence:`.
+
+The job has not yet been seen to fail on a RED envelope; that is M03's
+seeded case (claim 3), and `tests/test_evals_workflow.py` is sufficient for
+M01 because M01's claim is not the eval gate.
 
 ### B2 — a fork PR turns the required `evals` check green without measuring anything
 
@@ -196,6 +207,105 @@ record does *not* settle is written in it: with no version there is nothing
 to compare if the alias is ever re-pointed, and that is M04's.
 
 ---
+
+## The delta read of the cure, `a7419f4..2594d8e`
+
+`engineering-cold-reviewer`, given that range and nothing wider, and **it
+confirmed it could execute git before reading** (`git version
+2.55.0.windows.4`) — which is the thing three of the four reviewers above
+could not do. Every claim it makes was checked by command.
+
+**0 BLOCK · 4 FINDING · 6 NOTE.** It verified: the range does what it claims
+and smuggles nothing (the three files outside the cure's description are
+this ruling, M02's inbox and the bot's envelope commit, all cited); all four
+`workflows.sha256` digests recomputed from `git show 2594d8e:<path>` with LF
+endings; `shell: bash` maps to `bash --noprofile --norc -eo pipefail {0}` on
+GitHub's runners and the Makefile does propagate the gate's exit
+(`Makefile:63`, no leading `-`, so GNU make exits 2); and removing the
+`shell:` key does fail the test.
+
+**It found four things, and two of them were mine, in the cure.** All four
+are cured in turn, in this PR:
+
+| # | Finding | Cure |
+|---|---|---|
+| D1 | **The cure's own comment asserted an event that never happened.** `evals.yml` and the test docstring both read "between 442484f and its repair a RED envelope reported green". No RED run exists in that window — every non-GREEN envelope is an ancestor of `442484f`. This ruling said it correctly three paragraphs up; the two artefacts a reader meets *first* dropped the qualification. **It is the same defect the delta was curing, reintroduced by the cure.** | both now read "**would have** reported … no RED run occurred in that window, so the protection was gone and no result was wrong" |
+| D2 | **The test asserted less than its own title.** Two edits restore B1's hole with all four tests green: `continue-on-error: true` on the step, and `\|\| true` appended to the command — `measuring_steps` matches the substring `make evals` and never read the rest of the line. Confirmed by injecting `continue-on-error: true` and watching all four pass. | two assertions added — **and the first version of that cure was itself incomplete**: see D2b |
+| D3 | **"GREEN on this head" named an envelope for a different commit.** `pr2-body-draft.md` claimed GREEN on `2594d8e` citing `a7419f47…`, which measures the commit before it, and `2594d8e` changes five files none of which is in the workflow's skip-path exclusion list. **The fifth instance** of prose naming a state nothing checked. | cites `2594d8e4…`, carries the 9 + 3 + 3 breakdown, and says it was the fifth |
+| D4 | **Two seats, one workflow file.** This ruling is `seat: Engineering` and authorised `.github/workflows/evals.yml`, which CLAUDE.md's seat table and `pr2.md:93` both give to Security — and `pr2.md` already keys it. Ruling B is one seat per file. | the line is out of `authorises`, with a comment saying why; Security's key in `pr2.md` stands alone |
+
+Of its six notes, two are recorded here and four are dropped as not
+mattering later:
+
+- **Kept.** The new test is invisible from the envelope: `Makefile:41`
+  passes `--check-junit F0_2 tests.test_f0_2`, so a failure in
+  `test_evals_workflow.py` fails the job but leaves `checks.F0_2` pass and
+  the verdict GREEN. The guard blocks the merge; it does not appear in the
+  row or in `make plants`. Said once so nobody later reads a GREEN envelope
+  as evidence this guard held.
+- **Kept.** The empirical test proves bash, not GitHub. That `shell: bash`
+  adds `-o pipefail` on GitHub's runners is a vendor fact this repo cannot
+  test; what the repo can hold is the presence of the key, and that is what
+  it holds.
+- Dropped: the ruling's stale line citations (corrected in place), the
+  "nothing else reads the verdict" wording (the other reader is on the
+  mutually-exclusive already-measured path), the M02 inbox question
+  (answered: it is cited at `pr2.md`), and the cap note (PR 3 and PR 4 are
+  spoken for, which ledger row 1 already says).
+
+### D2b — the cure for D2 was incomplete, and the seat caught it, not a reviewer
+
+The first cure for D2 asserted `continue-on-error` **on the step**. The seat
+injected it and reported the test still passed. It was right, and the reason
+is one GitHub behaviour this seat did not check: `continue-on-error` set on
+the **job** applies to every step in it. Injected at job level, all six tests
+passed and B1's hole was fully restored.
+
+So D2's cure repeated D2's own mistake in miniature — a guard written against
+the one route that had been named, rather than against the thing it claims to
+guarantee. That is the third time in this PR, and the second time in this
+file, that a check was written narrower than its own title.
+
+`test_neither_the_step_nor_its_job_may_fail_quietly` now reads both levels
+through a `job_of()` helper. Four routes, each injected into the real file
+and each run:
+
+| Injection | Result |
+|---|---|
+| step-level `continue-on-error: true` | `FAILED … test_neither_the_step_nor_its_job_may_fail_quietly` |
+| **job-level** `continue-on-error: true` | `FAILED … test_neither_the_step_nor_its_job_may_fail_quietly` |
+| `\|\| true` appended to the command | `FAILED … test_the_measuring_command_does_not_discard_its_own_status` |
+| `shell: bash` removed | `FAILED … test_the_step_that_measures_declares_shell_bash` |
+
+The workflow was restored to sha256 `1a67aebe66e37f00` after the last
+injection, the same value it held before the first, and `make validate`
+reads `ok workflow-hash`.
+
+**What is still not covered, said rather than left to be found.** A step
+whose `if:` is edited to something never true is skipped, and a skipped step
+fails nothing; these tests do not read the `if:`. Nor do they cover the
+Makefile losing `exit $code`, which lives in another file. The claim these
+tests support is narrow and exact: *the four known ways to make this step
+stop failing the job are each refused.* It is not "the job cannot be made to
+pass a RED envelope".
+
+**One process note, because it cost something.** While injecting and
+restoring around an *uncommitted* edit, the D1 fix to `evals.yml` was lost —
+the file reverted to its committed state, still carrying the false sentence,
+and `make validate` caught it on `workflow-hash`. It was re-applied. A cure
+held only in the working tree is not yet a cure; this is an argument for
+committing each repair before testing the next.
+
+## Why this file is still DRAFT and not PASS
+
+The condition for PASS was that the delta read find nothing new. **It found
+four things**, two of them defects this cure introduced, including one that
+is the exact class of defect the cure existed to remove. They are fixed —
+and that fix is a further delta, which no reviewer has read.
+
+This seat does not certify its own repair of a mistake it made twice in the
+same file within one day. `ruling:` becomes `pr2-cold-review` when the seat
+reads the delta above, or ratifies it, and not before.
 
 ## FINDING — triage
 

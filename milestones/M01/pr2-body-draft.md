@@ -2,7 +2,7 @@ M01 PR 2 of 4: **measure** (P3). Claim 1: *an unsigned or tampered bundle never 
 
 Rulings: `milestones/M01/rulings/pr2.md`, and `pr2-threshold-owner.md` when this PR's first agent envelope exists (rulings o, p). Build paths cite `SPEC/00-overview.md#8-M01`. The seats' rulings for this PR are `milestones/M01/feasibility.md` §2.6: SCOPE, Security a–k and q–r, Engineering l–n, Threshold Owner o–p.
 
-**This PR is GREEN on this head.** Envelope `a7419f47…`: `F0_2`, `F0_3`, `F1_1`, `F1_2`, `F1_3`, `F1_4` all pass, 12 of 15 goldens, 53,771 tokens against a 150,000 cap. It was RED until 2026-09-20, when the human made S4's and S6's attempts against the deployed bootstrap stack and CloudTrail confirmed all four refusals. The gate is recorded going RED four times and UNMEASURED once before that, which is this PR's evidence that the instrument fires.
+**This PR is GREEN on this head.** Envelope `2594d8e4…`: `F0_2`, `F0_3`, `F1_1`, `F1_2`, `F1_3`, `F1_4` all pass, 12 of 15 goldens — 9 ordinary and 3 traps, the 3 guardrail goldens `never_passed` — and 53,578 tokens against a 150,000 cap. (Written first citing `a7419f47…`, which measured the commit before this one: the delta read of the cure caught it, which makes it the **fifth** instance of prose naming a state nothing checked.) It was RED until 2026-09-20, when the human made S4's and S6's attempts against the deployed bootstrap stack and CloudTrail confirmed all four refusals. The gate is recorded going RED four times and UNMEASURED once before that, which is this PR's evidence that the instrument fires.
 
 > **On the reviewer reports below.** They are pasted verbatim and are not
 > corrected when the tree moves. A report records what a seat saw on the day

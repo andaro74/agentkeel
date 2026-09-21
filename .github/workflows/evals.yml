@@ -200,9 +200,16 @@ jobs:
       # explicit `shell: bash` adds `-o pipefail`. Without it the `| tee`
       # below makes the step's exit status tee's, which is always 0, and
       # `make evals` exiting non-zero on a RED or REJECTED gate is swallowed.
-      # That was the job's only way to fail on the gate's verdict
-      # (`evals` is a required check, infra/ruleset/main.json), so between
-      # 442484f and its repair a RED envelope reported green.
+      # That was the job's only way to fail on the gate's verdict when this
+      # path runs (`evals` is a required check, infra/ruleset/main.json). So
+      # between 442484f and its repair a RED envelope **would have** reported
+      # a green required check. No RED run occurred in that window: the
+      # protection was gone, the results were not wrong.
+      #
+      # Neither this step nor its job may carry `continue-on-error`, and the
+      # command may not end in `|| true`: each restores the hole with
+      # `shell: bash` still set. tests/test_evals_workflow.py injects all
+      # four and fails on each.
       #
       #   $ bash -ec 'false | tee /dev/null'; echo $?
       #   0

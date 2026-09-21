@@ -15,10 +15,16 @@ Without it the step's status is tee's, which is 0:
     $ bash -eo pipefail -c 'false | tee /dev/null'; echo $?
     1
 
-So between 442484f and its repair a RED envelope reported a green required
-check. These tests are what stops the pipe being added back without the
-shell, and what stops the `record` job quietly recording an envelope the
-gate rejected.
+So between 442484f and its repair a RED envelope **would have** reported a
+green required check. No RED run occurred in that window, so the protection
+was gone and no result was wrong.
+
+`shell: bash` is not the only way to swallow the exit, and the first version
+of this file asserted only that. `continue-on-error: true` on the step, or
+`|| true` on the end of the command, each restores the hole and each left all
+four tests green. Both are asserted now. The job's other guard —
+`evals.yml`'s "Gate the recorded envelope" step — runs only on the
+already-measured path, so it does not cover this one.
 """
 
 from __future__ import annotations
@@ -46,6 +52,14 @@ def measuring_steps(workflow: dict[str, Any]) -> list[dict[str, Any]]:
     return [step for step in steps(workflow) if "make evals" in str(step.get("run", ""))]
 
 
+def job_of(workflow: dict[str, Any], step: dict[str, Any]) -> dict[str, Any]:
+    """The job a step belongs to. `continue-on-error` at that level covers every step."""
+    for job in workflow["jobs"].values():
+        if any(one is step for one in job.get("steps", [])):
+            return job
+    raise AssertionError("the step belongs to no job")
+
+
 def test_there_is_exactly_one_step_that_measures(workflow):
     """If a second appeared, the rule below would have to cover it too."""
     assert len(measuring_steps(workflow)) == 1
@@ -58,6 +72,41 @@ def test_the_step_that_measures_declares_shell_bash(workflow):
         "the step runs `make evals` through a pipe; without `shell: bash` there is no "
         "pipefail and the gate's non-zero exit is reported as success"
     )
+
+
+def test_neither_the_step_nor_its_job_may_fail_quietly(workflow):
+    """`continue-on-error` restores B1's hole with `shell: bash` still set.
+
+    The step would still exit non-zero and the job would still be green, and
+    nothing else on this path reads the verdict: the only other `exit 1` is
+    keyed to `steps.pytest.outcome`, and `gate_exit` is read solely by the
+    `record` job's `if:`, where a bad value skips a commit and fails nothing.
+
+    **Both levels.** The first version of this test read the step only, and a
+    job-level `continue-on-error: true` passed all six tests while fully
+    restoring the hole — GitHub applies it to every step in the job. Caught
+    by injection, not by reading.
+    """
+    step = measuring_steps(workflow)[0]
+    assert step.get("continue-on-error") in (None, False), (
+        "a step that may fail quietly cannot be the thing that fails on a RED gate"
+    )
+    job = job_of(workflow, step)
+    assert job.get("continue-on-error") in (None, False), (
+        "the job carries continue-on-error, so no step in it can fail the workflow"
+    )
+
+
+def test_the_measuring_command_does_not_discard_its_own_status(workflow):
+    """The other way round the guard: `make evals ... || true`.
+
+    `measuring_steps` matches on the substring `make evals`, so a trailing
+    `|| true` or `; true` would keep every other test green while making the
+    step's exit status unconditionally 0.
+    """
+    run = measuring_steps(workflow)[0]["run"]
+    for swallow in ("|| true", "|| :", "; true", "; :", "|| exit 0"):
+        assert swallow not in run, f"`{swallow}` discards the exit status the gate sets"
 
 
 def test_a_pipe_without_pipefail_really_does_swallow_the_exit():

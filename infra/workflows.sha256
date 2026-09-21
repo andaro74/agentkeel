@@ -8,5 +8,5 @@
 # and once more when evals.yml took `shell: bash` (cold review B1).
 0d938815e7d3756e05659beb95a82f490b521a183bf34f9584cd98874cf36567  .github/workflows/cold-review-ruling.yml
 f0e491db7d3304f51921fb5b6266adc3e66ab6a2b0241a929c9ed813dd19466d  .github/workflows/deploy.yml
-33a66780635d72caefe8d8c217e7b5a48ff6e3668759b0a46ae650abdb45da9a  .github/workflows/evals.yml
+1a67aebe66e37f00e2617f1a5359769c9bdb2b3c509e7f99b02f89d15d41c2a3  .github/workflows/evals.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml
