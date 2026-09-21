@@ -15,6 +15,12 @@ Two modes, and the raw file says which one ran (`where`):
   names it and the runner calls `InvokeAgentRuntime`, which is the one
   action the eval role holds on it (ruling f).
 
+The first line this prints is `mode: runner (AGENTKEEL_RUNTIME_ARN unset)`
+or `mode: runtime <arn>`, because the fallback used to be silent and the
+envelope cannot tell the two apart. M01 PR 2 measures runner mode only;
+construct tenancy is PR 3's measurement, and the envelope field that would
+record the mode is PR 3's too (a schema change, so a new ADR).
+
 The model id, the profile and the region come from
 `agents/refagent/manifest.yaml`, not from here: the Threshold Owner owns
 them and a runner that carried its own copy could measure a model the
@@ -81,6 +87,11 @@ def main(argv: list[str] | None = None) -> int:
     model_id, region = manifest["model"]["profile"], manifest["model"]["region"]
     runtime_arn = os.environ.get("AGENTKEEL_RUNTIME_ARN")
     table = os.environ.get("AGENTKEEL_RIGHTS_TABLE")
+
+    # The mode, before anything else it prints. The fallback used to be
+    # silent, and a silent fallback is how "refagent in the runner" and
+    # "refagent in the construct" became the same envelope.
+    print(f"mode: runtime {runtime_arn}" if runtime_arn else "mode: runner (AGENTKEEL_RUNTIME_ARN unset)")
 
     if runtime_arn:
         client: Any = boto3.client("bedrock-agentcore", region_name=region)

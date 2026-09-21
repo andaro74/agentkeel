@@ -399,6 +399,39 @@ construct makes and nothing else, read back with the same
 `simulate-principal-policy` table the eval role's deploy prints (ruling j)
 before `deploy.yml` is trusted with anything.
 
+### What runner mode means for claim 1, and what PR 3 owes
+
+The runner's fallback to in-process mode is silent, and the envelope can't distinguish "refagent in the runner" from "refagent in the construct." PR 2 measures the first, and claim 1's second half is not measured until PR 3 deploys the runtime.
+
+Claim 1 has two halves — "an unsigned or tampered bundle never loads" and
+"refagent runs inside the construct". The first is measured here: S1 and S2
+refused by `verify`, S3, S5 and S8 at synth, S4 and S6 against the deployed
+bootstrap stack. The second is not. Every run so far, on a PR and on
+`main`, has been runner mode, and nothing in the envelope says so — the
+observation records `where`, but `where` is written by the runner that
+chose the mode, and the gate never reads it.
+
+**This is a P3 exception and is named as one.** P3 says claim 1 is measured
+by PR 2. Half of it is; the half that needs a deployed runtime cannot be,
+because BLOCK F means no runtime can be deployed until cfn-exec has its
+grants. The ledger row's Expected cell and `docs/milestones/M01.md` both
+carry the sentence, so a reader meets it before they meet the GREEN.
+
+**Made loud, here:** `src/agent/run.py` prints `mode: runner
+(AGENTKEEL_RUNTIME_ARN unset)` or `mode: runtime <arn>` as its first line,
+and `evals.yml` on `main` echoes that line into the job summary. Neither is
+a check. They stop the fallback being silent; they do not stop it.
+
+**Carried to PR 3**, with the construct and not written here:
+
+1. cfn-exec's service grants (BLOCK F), and the first real deploy.
+2. The measurement of construct tenancy that the deploy makes possible.
+3. **An envelope field recording the mode.** `src/verdict/schema.json` is
+   `additionalProperties: false`, so this is a schema change, and ADR-0004
+   (measurement fields) already carries its two amendments. It needs a new
+   ADR. **The next free number is ADR-0007**, not ADR-0006: ADR-0006 is
+   `gateway-endpoints-for-s3-and-dynamodb`, added in this PR.
+
 ### What `evals.yml` on `main` does, which is not what this seat assumed
 
 This ruling was drafted on the premise that a failed deploy would leave

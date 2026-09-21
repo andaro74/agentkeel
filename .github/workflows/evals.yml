@@ -199,7 +199,22 @@ jobs:
         if: steps.current.outputs.measured_at == ''
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: make evals F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit"
+        run: make evals F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
+
+      # Which refagent answered. The runner falls back to in-process when
+      # AGENTKEEL_RUNTIME_ARN is unset, and the envelope has no field for the
+      # mode until PR 3 adds one, so on `main` the summary carries it. A run
+      # on `main` that says `mode: runner` measured refagent in the runner,
+      # not refagent as the construct's tenant.
+      - name: Which refagent answered
+        if: always() && github.ref == 'refs/heads/main' && steps.current.outputs.measured_at == ''
+        run: |
+          mode=$(grep -m 1 '^mode: ' "$RUNNER_TEMP/evals.out" || echo "mode: not reported")
+          echo "### $mode" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${mode#mode: runner}" != "$mode" ]; then
+            echo "PR 2 measures refagent in runner mode; construct tenancy is PR 3's measurement." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # The gate's own exit code: 0 GREEN, 1 RED or UNMEASURED, 2 REJECTED.
       # A REJECTED envelope is not evidence and is not recorded (M01 item 9);
