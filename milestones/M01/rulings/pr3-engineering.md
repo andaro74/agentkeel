@@ -10,6 +10,7 @@ ruling: pr3-engineering
 seat: Engineering
 authorises:
   - tests/test_evals_workflow.py
+  - tests/test_bootstrap.py
   - milestones/M01/rulings/pr3-engineering.md
 evidence:
   - milestones/M01/rulings/pr3.md
@@ -52,6 +53,43 @@ It is **not** "the job cannot be made to pass a RED envelope". PR 2's cold
 review found three checks written narrower than their own titles, all in
 this file's ancestry; the line above is written so this one cannot join
 them.
+
+## BLOCK F and item 7: `tests/test_bootstrap.py`, 17 cases to 38
+
+The 21 added hold the grants in `pr3.md`'s BLOCK F section against two
+things the tests read rather than remember: the construct's own template,
+synthesised in the test, and `deploy.yml`'s own text.
+
+| Test | What breaks it |
+|---|---|
+| `test_every_resource_type_the_construct_renders_is_one_the_grant_knows` | a resource type added to `GovernedAgent` with no row in the grant table, or a row for one it no longer renders |
+| `test_the_execution_role_may_make_what_the_construct_renders` (7) | a create, read or rollback action missing for any one type |
+| `test_the_execution_role_may_resolve_the_security_parameters` | the construct's SSM parameter count changing, or `ssm:GetParameters` leaving `/agentkeel/security/*` |
+| `test_the_execution_role_grants_no_service_wildcard_and_no_delete_of_the_table` | any `svc:*`, `DeleteTable`, or a write to the table's items |
+| `test_the_execution_role_makes_security_groups_in_the_platform_vpc_only` | the `ec2:Vpc` condition dropped |
+| `test_the_execution_role_passes_an_agent_role_to_agentcore_only` | `iam:PassedToService` dropped, or PassRole off the agent path |
+| `test_every_iam_write_on_the_execution_role_is_on_the_agent_path` | an IAM write off `/agentkeel/agents/`, or role creation without the boundary condition |
+| `test_the_deploy_role_may_do_what_each_step_of_deploy_yml_calls` (5) | a step's action missing |
+| `test_the_deploy_role_may_not_delete_or_batch_write` | `ecr:Delete*`, `DeleteItem`, `BatchWriteItem`, a service wildcard |
+| `test_the_deploy_role_calls_refagents_runtime_and_no_other` | `InvokeAgentRuntime` widened past `runtime/refagent*` |
+| `test_every_stack_deploy_yml_names_is_one_the_deploy_role_may_touch` | any `--stack-name` in a command that `stack/agentkeel-*` does not match, case-sensitively (item 7) |
+
+16 of the 21 fail on the tree before the repair: run in a worktree at
+`60fee1a` with this test file copied in. The other 5 pass there too. Three
+are ceilings the old grant met by granting nothing. One reads only the
+construct. One is `cloudformation deploy`, which the old grant already
+covered.
+
+**What they cannot say.** They read the template, not the account. A
+grant that the template holds and AWS does not honour for this action on
+this resource shape is invisible here. The `simulate-principal-policy`
+table and the first deploy are what read that (`pr3.md`). The action lists
+per resource type are AWS's published handler permissions
+(`aws cloudformation describe-type`, read 2026-09-21), less the calls made
+only by features the template does not use. They are copied into the test,
+not fetched by it (`security-reviewer` F2). So a change on AWS's side, or a
+feature added to the construct, shows up as a failed deploy and not as a
+red test until someone re-reads `describe-type`.
 
 ## One thing a reader should know about these tests
 

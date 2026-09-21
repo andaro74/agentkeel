@@ -11,6 +11,9 @@ authorises:
   - infra/workflows.sha256
   - infra/ruleset/main.json
   - infra/ruleset/README.md
+  - infra/bootstrap/app.py
+  - infra/bootstrap/AwsSolutions--AgentkeelBootstrap-NagReport.csv
+  - .github/workflows/deploy.yml
   - milestones/M01/rulings/pr3.md
 evidence:
   - SPEC/00-overview.md#8-M01
@@ -70,14 +73,16 @@ dangerous. `bypass_actors` is `[]` and `current_user_can_bypass` is
 
 1. push, and let `checks` report green once on this pull request — done,
    run 35555584127;
-2. `PUT` the context into the live ruleset;
-3. re-export, so the file in the tree is a true export again.
+2. `PUT` the context into the live ruleset — done;
+3. re-export, so the file in the tree is a true export again — done,
+   `5693447`.
 
-**Splitting the job without step 2 leaves the hole exactly where it was**,
-because the required context would still be the one a fork skips. Until
-step 2 is done this PR has improved nothing mechanically; it has only made
-the improvement available. That sentence stays here until the re-export
-lands in this PR.
+**Splitting the job without step 2 would have left the hole exactly where
+it was**, because the required context would still have been the one a
+fork skips. Steps 2 and 3 are done: the live ruleset (id 23685206) requires
+`checks`, `cold-review-ruling` and `evals`, and `infra/ruleset/main.json`
+says the same three. B2 is closed mechanically, not only made available.
+What it does not close is below.
 
 ## What B2 does not close
 
@@ -93,17 +98,97 @@ lands in this PR.
   fired. **M02 plants the case**; until it does, no prose here calls this
   proven.
 
+## BLOCK F and item 7 — written, not yet deployed
+
+**The defect.** `agentkeel-cfn-exec` could create a role under
+`/agentkeel/agents/` and nothing else, and the construct makes a security
+group, two egress rules, a table, an inference profile and a runtime. The
+deploy role could drive CloudFormation and pass cfn-exec, and could not log
+in to ECR, push the image, load the table or call the runtime, all of which
+`deploy.yml` does. Item 7 is the same shape: `deploy.yml` described
+`AgentkeelBootstrap` with a grant on `stack/agentkeel-*/*`, and IAM ARN
+matching is case-sensitive.
+
+**The repair, in `infra/bootstrap/app.py`.** cfn-exec gets one statement
+per resource type `GovernedAgent` renders, and nothing for a type it does
+not render: security groups only in the platform VPC (`ec2:Vpc`), the table
+with no `DeleteTable` (it is RETAIN), `iam:PassRole` on the agent path to
+`bedrock-agentcore.amazonaws.com` only, `ssm:GetParameters` on
+`/agentkeel/security/*` for the eight parameters CloudFormation resolves, and
+AgentCore's network service-linked role by service name. The deploy role gets
+what each step of `deploy.yml` calls: `ecr:GetAuthorizationToken`, the push
+actions on `repository/agentkeel-*`, `dynamodb:PutItem` and `DescribeTable`
+(the loader calls `put_item`, not `BatchWriteItem`), and
+`InvokeAgentRuntime` on `runtime/refagent*`. No `ecr:Delete*`, no
+`DeleteItem`, no service wildcard on either role.
+
+**Where the action lists come from.** The first draft of cfn-exec's grant was
+a reading of what CloudFormation calls, and `security-reviewer` found it
+short (F1): a rollback would have left the agent role `DELETE_FAILED`,
+because the IAM::Role delete handler calls `ListRolePolicies` and
+`ListAttachedRolePolicies`. The lists are now the handler permissions AWS
+publishes for each type (`aws cloudformation describe-type`, read
+2026-09-21). Calls made only by features the template does not use are
+left out: Kinesis streaming, table import, replicas, a customer key, S3
+code artifacts and capacity providers.
+
+**Item 7, in `deploy.yml`.** The step builds the execution role's ARN from
+its fixed name and `sts get-caller-identity`, which needs no grant, rather
+than widening the deploy role to a second stack pattern.
+`infra/workflows.sha256` is rewritten.
+
+**What holds it.** `tests/test_bootstrap.py` grew from 17 cases to 38 (Engineering's key,
+`pr3-engineering.md`). The grant is tested against the construct's own
+template in both directions: a resource type the construct renders with no
+grant fails, and so does a grant for a type it no longer renders. 16 of the
+new tests fail on the tree before this repair, and all pass after it.
+
+**What has not happened.** None of this is in the account. The bootstrap
+stack is redeployed by the human (R1), after reading `cdk diff`, and then
+read back with `aws iam simulate-principal-policy`, as ruling j did for the
+eval role. The table goes here. `deploy.yml`'s `refuse` job stays until both
+are done. A template is what exists today, and a template is not a grant
+AWS has honoured.
+
+**Unsure, for the Security seat** (from `security-reviewer` on this diff:
+2 BLOCK, 6 FINDING, 7 NOTE; the full report is in the PR body). None of
+these is repaired here, because each changes the agent's ceiling or the
+construct, not cfn-exec:
+
+1. **B1: the runtime probably cannot pull its image.** Neither the agent
+   role nor `agentkeel-boundary` allows `ecr:BatchGetImage`,
+   `ecr:GetDownloadUrlForLayer` or `ecr:GetAuthorizationToken`. Adding them
+   widens the boundary that seeds S5 and S6 read, so it needs a ruling that
+   says both still fire. F6 is the same question on the network side: the
+   VPC has no ECR endpoints, and it is not known whether AgentCore pulls
+   through it.
+2. **B2: the agent cannot call its model.** `governed_agent.py` grants invoke
+   on `application-inference-profile/agentkeel-refagent`, but AWS gives an
+   application profile a generated id, not its name. The runtime is also
+   pointed at the system profile, which the role does not grant. The stack
+   would deploy and the load check would fail.
+3. **The five `vpc-lattice` actions are on `*`.** They are the Runtime
+   create handler's VPC-mode calls, and the handler does not say which
+   resources they name.
+4. **F3: whether CloudFormation resolves the SSM parameters as cfn-exec or
+   as the caller.** If it resolves them as the caller, the change set fails
+   cleanly at create, and the deploy role needs `ssm:GetParameters` on
+   `/agentkeel/security/*`. The first deploy settles it.
+5. **F4: nothing constrains an agent-path role's trust policy.** A template
+   merged to `main` could make one that something other than AgentCore can
+   assume. The fix is for S5's synth check to also read the principal.
+
 ## Still to land in PR 3
 
 | # | Item | Seat |
 |---|---|---|
-| 1 | The live ruleset `PUT` and re-export (above) | Security |
-| 2 | **BLOCK F**: `agentkeel-cfn-exec`'s service grants, **and** the deploy role's — `ecr:*`, `dynamodb:*Item`, `bedrock-agentcore:InvokeAgentRuntime` — then delete `deploy.yml`'s `refuse` job | Security |
+| 1 | ~~The live ruleset `PUT` and re-export~~ — done, `5693447` | Security |
+| 2 | **BLOCK F**: grants written (above); redeploy, `simulate-principal-policy` table, then delete `deploy.yml`'s `refuse` job | Security |
 | 3 | The first real deploy, and construct tenancy with it: claim 1's second half, the P3 exception named in ledger row 1 | Security |
 | 4 | **ADR-0007**: the envelope's mode field, plus region and model version (`schema.json` is `additionalProperties: false`) | Product, with Threshold Owner |
 | 5 | **BLOCK D**: SPEC/01 §5's wording for S8 takes the narrowing | Security |
 | 6 | The two routes `tests/test_evals_workflow.py` does not cover: a step `if:` edited to never-true, and the `Makefile` losing `exit $code` | Engineering |
-| 7 | `deploy.yml:198` reads `--stack-name AgentkeelBootstrap`; the deploy role's grant is `stack/agentkeel-*/*` and IAM ARN matching is case-sensitive | Security |
+| 7 | ~~`deploy.yml:198` reads `--stack-name AgentkeelBootstrap`~~ — written (above); holds once `deploy.yml` runs | Security |
 
 PR 4 must close the milestone. There is no fifth PR; if this list will not
 fit, the cut is item 3, and claim 1's second half becomes a stated RED half
@@ -124,8 +209,8 @@ job = yaml.safe_load(pathlib.Path('.github/workflows/evals.yml').read_text())['j
 print('job if:', job.get('if'), '| permissions:', job['permissions'])
 print('step ifs:', [s.get('if') for s in job['steps']])"
 
-# The export still says what GitHub holds. Until step 2 above, `checks`
-# is NOT in this list, and that is the honest state.
+# The export still says what GitHub holds: checks, cold-review-ruling,
+# evals, in both.
 grep -o '"required_status_checks":\[[^]]*\]' infra/ruleset/main.json
 gh api repos/andaro74/agentkeel/rulesets/23685206 \
   --jq '.rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context'
