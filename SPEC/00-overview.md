@@ -561,8 +561,10 @@ for real IP at M01 by hand; `legal-compliance` re-checks at M07.
   which this section did not record until M01 PR 2.
 - **Declared call** — `refagent → ratings-helper@v1`, a stub agent that
   returns `{rating, required_cuts[]}` from a 12-row table. Exercises the
-  two-sided edge, budget headers, chain identity and the graph diff from
-  M01.
+  two-sided edge, budget headers, chain identity and the graph diff.
+  **M02 (cut from M01 at open; `may_call: []` until then).** The cut is
+  SPEC/01 §10's first, and this section did not record it until M01 PR 2;
+  `agents/ratings-helper/` does not exist in the tree.
 - **Guardrail** — denied topic: plot or synopsis of the embargoed title;
   PII: talent contact details present in the license; blocked intent:
   deal terms requested for a third party.

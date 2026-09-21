@@ -8,7 +8,12 @@ name: refagent
 
 # Threshold Owner: the agent model id + version + region (A-vs-A compares
 # the pair). Sonnet 4.6's id carries no version suffix. `version` stays null
-# until Bedrock returns a version for us.anthropic.claude-sonnet-4-6.
+# under ruling G: the field records what Bedrock returns, and Bedrock returns
+# no version for this model. That is not asserted here, it is recorded —
+# `milestones/M01/runs/model_lifecycle.txt` holds the listing, dated
+# 2026-09-20, account 581208540944: one id, no suffix, modelLifecycle ACTIVE.
+# The cold review asked (B4), because this is the only unversioned Anthropic
+# pin in this file while m04_equivalent_swap and the rest carry dated ones.
 #
 # Re-ruled at M01 PR 2 (ruling p, rulings/pr2-threshold-owner.md). It was
 # anthropic.claude-sonnet-5, pinned on modelLifecycle: ACTIVE. That reading

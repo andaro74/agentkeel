@@ -7,6 +7,9 @@ seat: Threshold Owner
 authorises:
   - agents/refagent/manifest.yaml
   - scripts/check_model_access.py
+  # The listing behind `version: null`, committed at the cold review's
+  # B4 rather than described in this file's prose.
+  - milestones/M01/runs/model_lifecycle.txt
 evidence:
   - milestones/M01/feasibility.md
   - evals/history/96331342d12e16ac08781a2292923f595438fe95.json

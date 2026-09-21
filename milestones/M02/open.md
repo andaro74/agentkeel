@@ -14,3 +14,25 @@ is answered before that PR's first commit.
 | 5 | `validate` diffs the live `main` ruleset against `infra/ruleset/main.json`, and fails unless `bypass_actors` is `[]`. M01 open item 31. | Security | M02 PR 1 |
 | 6 | "CI-written" becomes real with `two-key` (`GITHUB_ACTIONS == "true"` is an environment variable). M01 open item 8. | Engineering | M02 |
 | 7 | The workflow-hash check can be edited in the same PR as the workflow it guards, and it hashes the workflow's text only, not the `Makefile`, `src/` or `scripts/` it runs (`infra/ruleset/README.md`). `ruling-cited` on `infra/**` closes the first. M01 open item 29. | Security | M02 |
+
+## Carried from M01 PR 2's cold review (Product, `.claude/skills/**`)
+
+**A cold review read the tree, not the diff, and nothing would have caught
+it.** Of the four seat subagents `/cold-review` called on M01 PR 2, three
+reported that Bash was unavailable to them, so they reviewed the tree at
+HEAD instead of `git diff main...HEAD`. Their findings therefore cannot say
+which of them this PR caused and which predate it, and every one had to be
+re-checked by hand before it could be triaged.
+
+The skill names which subagent to call per path and says nothing about the
+tools each needs. `make validate` does not read subagent definitions. The
+only reason this was noticed is that three of the reports opened by
+admitting it — had they not, the review would have read as four seats
+agreeing on the state of a diff none of them had seen.
+
+Settle at M02 by one of: granting Bash in each `.claude/agents/*.md` whose
+seat reviews a diff; or a line in `.claude/skills/cold-review` requiring
+each report to state whether it read the diff or the tree, so a report that
+read the tree is visibly a weaker witness. M02 is the milestone whose claim
+is that seat-owned files change only with a ruling, and a review that cannot
+see the change is that claim's blind spot.

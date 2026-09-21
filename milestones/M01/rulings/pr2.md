@@ -15,6 +15,8 @@ authorises:
   - milestones/M01/feasibility.md
   # The explainer's draft. "What happened" stays empty until the close.
   - docs/milestones/M01.md
+  # M02's inbox: the cold review's finding against the skill itself.
+  - milestones/M02/open.md
   - milestones/M01/pr2-body-draft.md
   - milestones/M01/rulings/pr2.md
   - milestones/M01/runs/f1_1_laptop.yaml
@@ -96,11 +98,21 @@ cited (PR 2 mechanics, `feasibility.md` §2.6).
 gains has its own seat (ADR-0003 amendment 1): `endpoint_allowlist` and
 `seats` are Security's (ruling d), `may_call`, `may_be_called_by` and
 `ceilings` the Tool Owner's, `max_tokens_per_session` and `daily_usd` the
-Threshold Owner's. The model id, version and region do not move; they are
-re-ruled with the cap (rulings o and p) in `pr2-threshold-owner.md`.
+Threshold Owner's. The model id **moved** in this PR, from
+`anthropic.claude-sonnet-5` to `anthropic.claude-sonnet-4-6`; `version` and
+region did not. It is keyed by `pr2-threshold-owner.md` alone, and one key
+is enough because nothing was relaxed — the incumbent could not be called at
+all. This sentence read "do not move" until the cold review found it
+(finding 40): a key attached to a sentence that denied the edit it keyed.
 
-S4 and S6 fail on this head, and that is the row RED for the stated
-reason: the attempts have not been made. Their markers are off because
+S4 and S6 **passed** on 2026-09-20, and the row is GREEN on this head
+(envelope `a7419f47…`, all six checks). This paragraph read "S4 and S6 fail
+on this head, and that is the row RED for the stated reason: the attempts
+have not been made" until the attempts were made and nothing came back to
+correct it. It is the same defect the cold review found twice elsewhere
+(findings 6 and 40) and it is the third instance: prose in this repo
+describes the state it was written in, and nothing checks it against the
+envelope. Their markers are off because
 their reader — `scripts/observe_attempt.py` and `--check-attempt` — landed
 in this PR, which is the rule (a marker comes off in the commit that lands
 the reader). Leaving `xfail(strict=True)` on would have failed the

@@ -2,11 +2,17 @@ M01 PR 2 of 4: **measure** (P3). Claim 1: *an unsigned or tampered bundle never 
 
 Rulings: `milestones/M01/rulings/pr2.md`, and `pr2-threshold-owner.md` when this PR's first agent envelope exists (rulings o, p). Build paths cite `SPEC/00-overview.md#8-M01`. The seats' rulings for this PR are `milestones/M01/feasibility.md` §2.6: SCOPE, Security a–k and q–r, Engineering l–n, Threshold Owner o–p.
 
-**This PR is RED on this head, and for the right reason.** `pytest` fails on S4 and S6 — "the attempt has not been made". The two attempts are the human's, during this PR, against the deployed bootstrap stack. Nothing else fails.
+**This PR is GREEN on this head.** Envelope `a7419f47…`: `F0_2`, `F0_3`, `F1_1`, `F1_2`, `F1_3`, `F1_4` all pass, 12 of 15 goldens, 53,771 tokens against a 150,000 cap. It was RED until 2026-09-20, when the human made S4's and S6's attempts against the deployed bootstrap stack and CloudTrail confirmed all four refusals. The gate is recorded going RED four times and UNMEASURED once before that, which is this PR's evidence that the instrument fires.
+
+> **On the reviewer reports below.** They are pasted verbatim and are not
+> corrected when the tree moves. A report records what a seat saw on the day
+> it looked; editing one to agree with today's tree would destroy the only
+> evidence that the review happened at all. Where a report names
+> `anthropic.claude-sonnet-5`, that is what was pinned when it was written.
 
 ## Scope at M01, as ruled at PR 2 open
 
-Cuts 1, 3 and 4 of SPEC/01 §10 are taken: `ratings-helper` → M02, the knowledge base over `data/corpus/` → M03, the HITL branch → M07. Gateway and Identity are declared as props of `GovernedAgent` and wired to nothing; passing either is refused at synth. Identity's claim is M05's, Gateway's is M02's and M07's. refagent at M01 is Sonnet 5 through `us.anthropic.claude-sonnet-5`, the rights table, and `check_availability` with its strict schema, inside the construct.
+Cuts 1, 3 and 4 of SPEC/01 §10 are taken: `ratings-helper` → M02, the knowledge base over `data/corpus/` → M03, the HITL branch → M07. Gateway and Identity are declared as props of `GovernedAgent` and wired to nothing; passing either is refused at synth. Identity's claim is M05's, Gateway's is M02's and M07's. refagent at M01 is Sonnet 4.6 through `us.anthropic.claude-sonnet-4-6`, the rights table, and `check_availability` with its strict schema. It runs **in the runner**, not in the construct: PR 2 measures runner mode, and construct tenancy is PR 3's measurement (BLOCK F).
 
 ## Step 1 — Security setup
 
@@ -25,7 +31,7 @@ Cuts 1, 3 and 4 of SPEC/01 §10 are taken: `ratings-helper` → M02, the knowled
 | The checks that read S3 (both forms), S5 and S8, over the whole stack | `infra/construct/governed_agent.py` | SPEC/01 §5 |
 | cdk-nag over both stacks, with the committed report held to that synth | `src/validate/checks.py` | q, r |
 | Gateway endpoints for S3 and DynamoDB | `docs/adr/ADR-0006` | e |
-| refagent at M01 scope: Sonnet 5, the rights table, `check_availability` | `agents/refagent/` | SCOPE |
+| refagent at M01 scope: Sonnet 4.6, the rights table, `check_availability` | `agents/refagent/` | SCOPE |
 | The agent runner; the Makefile writes the control card and refagent's envelope | `src/agent/run.py`, `Makefile` | l |
 | The gate reads `thresholds.yaml` at the envelope's commit | `src/verdict/gate.py` | m |
 | CloudTrail lookup of S4's and S6's request ids; the item 18 probe | `scripts/observe_attempt.py`, `evals.yml` | i, j |
