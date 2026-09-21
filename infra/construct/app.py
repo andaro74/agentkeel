@@ -64,7 +64,10 @@ NagSuppressions.add_resource_suppressions_by_path(
                 "logs:PutLogEvents, kms:Decrypt and kms:GenerateDataKey are on *, because the log stream "
                 "does not exist until the runtime writes it and the key is reached through the grant, not "
                 "by ARN. The boundary (S5) caps all four, and the key policy denies this role its own key "
-                "policy (S6). The profile and the rights table are named by ARN."}],
+                "policy (S6). The profile and the rights table are named by ARN. B1 (M01 PR 3): "
+                "ecr:GetAuthorizationToken and logs:DescribeLogGroups take no resource-level permission; "
+                "the image pull is on this agent's repository and the log group under "
+                "/aws/bedrock-agentcore/runtimes/*, whose suffix AgentCore assigns."}],
 )
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

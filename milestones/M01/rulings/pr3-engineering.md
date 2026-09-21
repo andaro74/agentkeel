@@ -12,6 +12,8 @@ authorises:
   - tests/test_evals_workflow.py
   - tests/test_bootstrap.py
   - tests/test_construct.py
+  - src/manifest/schema.json
+  - agents/refagent/manifest.yaml
   - milestones/M01/rulings/pr3-engineering.md
 evidence:
   - milestones/M01/rulings/pr3.md
@@ -104,6 +106,34 @@ These tests read the rendered template:
 
 All four fail on the construct at `cb94995`. They cannot say whether Bedrock
 honours the grant; only a call from the runtime can.
+
+## B1: ruling d amended — the schema, refagent's manifest, seven tests
+
+Security amended ruling d in `pr3.md`: `ecr.api` and `ecr.dkr` join the
+`endpoint_allowlist` enum. This key covers the three files in Engineering's
+paths that carry the amendment:
+- `src/manifest/schema.json`: the enum goes from 5 names to 7;
+- `agents/refagent/manifest.yaml`: lists both;
+- `tests/test_construct.py`: refagent's egress count goes from (3, 2) to
+  (5, 2).
+
+`tests/test_bootstrap.py`'s parameter test now checks that every SSM
+parameter falls under `/agentkeel/security/`, instead of counting to eight.
+
+The seven new tests, and what breaks each:
+
+| Test | What breaks it |
+|---|---|
+| `test_the_agent_boundary_allows_the_pull_and_no_ecr_write` | the pull missing from the ceiling, or any other `ecr:` action in it |
+| `test_the_vpc_has_the_two_endpoints_an_image_pull_needs` | either ECR endpoint gone |
+| `test_both_are_published_for_the_construct` | either SSM parameter gone |
+| `test_the_s3_endpoint_reaches_outside_the_account_for_the_image_layers_only` | a second unscoped statement, or this one wider than `GetObject` on the layer bucket |
+| `test_a_manifest_without_the_image_pull_endpoints_is_refused_at_synth` | the construct's refusal dropped |
+| `test_the_role_pulls_its_own_image_read_only` | the pull off this agent's repository, or an ECR write |
+| `test_the_role_makes_its_log_group_under_agentcores_prefix_only` | the log-group grant widened |
+
+All seven fail on the tree at `65ba8cc`. The S3, S5, S6 and S8 seed tests are
+unchanged, and they still pass.
 
 ## One thing a reader should know about these tests
 

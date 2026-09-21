@@ -27,8 +27,9 @@ What it makes:
   (ruling f): the two pinned profiles, the five-action Deny,
   `bedrock-agentcore:InvokeAgentRuntime` on refagent's runtime only;
 - a **VPC with no internet gateway and no NAT**: interface endpoints for
-  bedrock-runtime, kms and logs, gateway endpoints for s3 and dynamodb
-  (ruling e, ADR-0006), each with a policy scoped to this account;
+  bedrock-runtime, kms, logs, ecr.api and ecr.dkr, gateway endpoints for s3
+  and dynamodb (ruling e, ADR-0006), each with a policy scoped to this
+  account. The one exception is s3's read of ECR's own layer bucket (B1);
 - one **KMS key per agent**, whose policy denies key-policy changes to
   everyone but Security, and denies `kms:GetKeyPolicy` to the agent role
   path `/agentkeel/agents/*` (ruling b, seed S6);
@@ -40,7 +41,7 @@ What it makes:
 - the **ECR repository** the runtime image is pulled from, tag-immutable, so
   a digest cannot be moved to other bytes (SPEC/01 §6, "at load");
 - the **Security-owned parameters** `GovernedAgent` reads: the boundary ARN,
-  the VPC, the subnets and the three interface endpoints' security groups.
+  the VPC, the subnets and the five interface endpoints' security groups.
   The two gateway-endpoint prefix lists have no CloudFormation attribute; the
   human who deploys this stack writes those two parameters, with one command
   each (`infra/bootstrap/README.md`).
@@ -95,17 +96,32 @@ EVAL_WORKFLOWS = [
     f"{REPO}/.github/workflows/evals.yml@refs/heads/main",
 ]
 DEPLOY_WORKFLOW = f"{REPO}/.github/workflows/deploy.yml@refs/heads/main"
-# The five service names a manifest may list (ruling d). Interface endpoints,
-# except s3 and dynamodb, which AWS offers as gateway endpoints (ruling e).
+# The seven service names a manifest may list (ruling d, amended at M01 PR 3).
+# Interface endpoints, except s3 and dynamodb, which AWS offers as gateway
+# endpoints (ruling e).
 INTERFACE_ENDPOINTS = {
     "bedrock-runtime": ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
     "kms": ec2.InterfaceVpcEndpointAwsService.KMS,
     "logs": ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+    # Ruling d, amended at M01 PR 3 (B1): a runtime in a VPC with no way out
+    # pulls its image through these two, and AWS lists both as required.
+    "ecr.api": ec2.InterfaceVpcEndpointAwsService.ECR,
+    "ecr.dkr": ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
 }
+# The regional bucket ECR keeps image layers in. AWS owns it, so the S3
+# endpoint's this-account policy refused it; it is named here and nowhere
+# else is outside the account (B1, from AgentCore's VPC documentation).
+ECR_LAYER_BUCKET = f"prod-{REGION}-starport-layer-bucket"
 GATEWAY_ENDPOINTS = {
     "s3": ec2.GatewayVpcEndpointAwsService.S3,
     "dynamodb": ec2.GatewayVpcEndpointAwsService.DYNAMODB,
 }
+
+
+def endpoint_id(name: str) -> str:
+    """`bedrock-runtime` -> `BedrockRuntime`, `ecr.api` -> `EcrApi`. The three older ids are unchanged,
+    so their endpoints and parameters are not replaced on redeploy."""
+    return name.title().replace("-", "").replace(".", "")
 
 
 class BootstrapStack(cdk.Stack):
@@ -166,6 +182,12 @@ class BootstrapStack(cdk.Stack):
                     actions=["bedrock:Invoke*", "bedrock-agentcore:*", "dynamodb:GetItem", "dynamodb:Query",
                              "kms:Decrypt", "kms:GenerateDataKey", "logs:CreateLogStream", "logs:PutLogEvents",
                              "s3:GetObject", "cloudformation:Describe*", "sts:AssumeRoleWithWebIdentity",
+                             # B1, ruling d amended (M01 PR 3): the runtime
+                             # pulls its own image and makes its own log
+                             # group, as its role. Read-only on ECR: no push,
+                             # no delete. AgentCore's documented execution role.
+                             "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:GetAuthorizationToken",
+                             "logs:CreateLogGroup", "logs:DescribeLogStreams", "logs:DescribeLogGroups",
                              # Seed S6, and the only reason it is here (ruling t).
                              # An allow-list caps by omission, so leaving this
                              # out would have made the BOUNDARY refuse S6 and
@@ -272,11 +294,19 @@ class BootstrapStack(cdk.Stack):
 
         for name, interface in INTERFACE_ENDPOINTS.items():
             endpoint = vpc.add_interface_endpoint(
-                f"Endpoint{name.title().replace('-', '')}", service=interface, private_dns_enabled=True)
+                f"Endpoint{endpoint_id(name)}", service=interface, private_dns_enabled=True)
             endpoint.add_to_policy(this_account())
             self.endpoint_groups[name] = endpoint.connections.security_groups[0]
         for name, gateway in GATEWAY_ENDPOINTS.items():
-            vpc.add_gateway_endpoint(f"Endpoint{name.title()}", service=gateway).add_to_policy(this_account())
+            endpoint = vpc.add_gateway_endpoint(f"Endpoint{name.title()}", service=gateway)
+            endpoint.add_to_policy(this_account())
+            if name == "s3":
+                # B1: the image's layers, read-only, from ECR's own bucket.
+                endpoint.add_to_policy(iam.PolicyStatement(
+                    sid="EcrImageLayersOnly",
+                    principals=[iam.AnyPrincipal()], actions=["s3:GetObject"],
+                    resources=[f"arn:aws:s3:::{ECR_LAYER_BUCKET}/*"],
+                ))  # fmt: skip
         return vpc
 
     # --- the roles ---------------------------------------------------------
@@ -835,7 +865,7 @@ class BootstrapStack(cdk.Stack):
         )  # fmt: skip
         for name, group in self.endpoint_groups.items():
             ssm.StringParameter(
-                self, f"ParamEndpoint{name.title().replace('-', '')}",
+                self, f"ParamEndpoint{endpoint_id(name)}",
                 parameter_name=ENDPOINT_PARAM.format(name=name),
                 string_value=group.security_group_id,
                 description=f"agentkeel: the {name} interface endpoint. An agent reaches it and nothing else.",
@@ -914,7 +944,7 @@ for path, reason in SUPPRESSIONS.items():
 # Not an IAM wildcard: cdk-nag cannot resolve these rules at all. They are
 # CDK's own endpoint security groups, and their source is the VPC's CIDR,
 # an intrinsic function at synth.
-for name in ("EndpointBedrockRuntime", "EndpointKms", "EndpointLogs"):
+for name in (f"Endpoint{endpoint_id(n)}" for n in INTERFACE_ENDPOINTS):
     NagSuppressions.add_resource_suppressions_by_path(
         stack, f"AgentkeelBootstrap/Vpc/{name}/SecurityGroup/Resource",
         [{"id": "CdkNagValidationFailure",

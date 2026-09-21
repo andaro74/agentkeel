@@ -44,6 +44,12 @@ PREFIX_LIST_PARAM = "/agentkeel/security/prefix-list/{name}"
 # ones (ruling e, ADR-0006): egress to them is a prefix list, not a
 # security group.
 GATEWAY_ENDPOINTS = ("s3", "dynamodb")
+# Ruling d, amended at M01 PR 3 (B1). A container runtime in a VPC with no
+# way out pulls its image through these two, so a manifest without them is
+# refused at synth rather than failing to pull after the deploy. The
+# manifest lists them itself: egress the manifest does not list is F1.1.
+IMAGE_PULL_ENDPOINTS = ("ecr.api", "ecr.dkr")
+RUNTIME_LOG_GROUPS = "/aws/bedrock-agentcore/runtimes/"
 
 # Until deploy.yml passes the digest of the image it just signed. A stack
 # synthesised without one is a synth, never a deploy: the placeholder is
@@ -93,6 +99,9 @@ class GovernedAgent(Construct):
             rules.refuse(f"{self.node.path}: Gateway is a declared prop and is not wired at M01 (SPEC/01 §10).")
         if identity is not None:
             rules.refuse(f"{self.node.path}: Identity is a declared prop and is not wired at M01 (SPEC/01 §10).")
+        if missing := [n for n in IMAGE_PULL_ENDPOINTS if n not in self.manifest["endpoint_allowlist"]]:
+            rules.refuse(f"{self.node.path}: endpoint_allowlist lacks {', '.join(missing)}. The runtime pulls its "
+                         f"image through them and the VPC has no other way out (ruling d, amended at M01 PR 3).")
 
         self.boundary_arn = _parameter(self, "Boundary", BOUNDARY_PARAM)
         self.security_group = self._security_group(rules)
@@ -119,7 +128,7 @@ class GovernedAgent(Construct):
         for name in self.manifest["endpoint_allowlist"]:
             gateway = name in GATEWAY_ENDPOINTS
             template = PREFIX_LIST_PARAM if gateway else ENDPOINT_PARAM
-            destination = _parameter(self, f"Endpoint{name.title().replace('-', '')}",
+            destination = _parameter(self, f"Endpoint{name.title().replace('-', '').replace('.', '')}",
                                      template.format(name=name))  # fmt: skip
             peer = ec2.Peer.prefix_list(destination) if gateway else ec2.Peer.security_group_id(destination)
             group.add_egress_rule(peer, ec2.Port.tcp(PORT), f"{name}, from the manifest")
@@ -192,6 +201,26 @@ class GovernedAgent(Construct):
             sid="ReadTheRightsTableAndNeverWriteIt",
             actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
             resources=[self.rights_table.table_arn],
+        ))  # fmt: skip
+        # B1 (M01 PR 3). AgentCore pulls the image as this role, and the
+        # runtime makes its own log group as it. The pull is read-only and
+        # on this agent's repository alone; GetAuthorizationToken and
+        # DescribeLogGroups take no resource. The boundary caps all of it.
+        stack = cdk.Stack.of(self)
+        role.add_to_policy(iam.PolicyStatement(
+            sid="PullItsOwnImageOnly",
+            actions=["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
+            resources=[f"arn:aws:ecr:{stack.region}:{stack.account}:repository/agentkeel-{self.agent_name}"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ItsOwnLogGroup",
+            actions=["logs:CreateLogGroup", "logs:DescribeLogStreams"],
+            resources=[f"arn:aws:logs:{stack.region}:{stack.account}:log-group:{RUNTIME_LOG_GROUPS}*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="NoResourceLevelPermission",
+            actions=["ecr:GetAuthorizationToken", "logs:DescribeLogGroups"],
+            resources=["*"],
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="ItsOwnLogsAndItsOwnKey",

@@ -354,9 +354,10 @@ def test_the_execution_role_may_make_what_the_construct_renders(template, kind):
 
 
 def test_the_execution_role_may_resolve_the_security_parameters(template, construct_template):
-    """Eight SSM-typed parameters: CloudFormation resolves them as this role."""
+    """Every SSM-typed parameter the construct reads is under the path the grant names (ten since B1)."""
     ssm_params = [p for p in construct_template["Parameters"].values() if p["Type"].startswith("AWS::SSM::")]
-    assert len(ssm_params) == 8
+    assert ssm_params
+    assert all(p["Default"].startswith("/agentkeel/security/") for p in ssm_params)
     reads = [s for s in role_statements(template, "ExecutionRole") if "ssm:GetParameters" in actions(s)]
     assert len(reads) == 1
     assert json.dumps(reads[0]["Resource"]).endswith(':parameter/agentkeel/security/*"]]}')
@@ -403,6 +404,47 @@ def test_every_iam_write_on_the_execution_role_is_on_the_agent_path(template):
         assert AGENT_PATH in json.dumps(s["Resource"]), f"{s.get('Sid')}: {sorted(writes)} off the agent path"
         if writes & {"iam:CreateRole", "iam:PutRolePolicy", "iam:AttachRolePolicy"}:
             assert "iam:PermissionsBoundary" in s["Condition"]["StringEquals"], s.get("Sid")
+
+
+# --- B1: the runtime can pull its image (M01 PR 3, ruling d amended) -------
+
+ECR_PULL = {"ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:GetAuthorizationToken"}
+
+
+def test_the_agent_boundary_allows_the_pull_and_no_ecr_write(template):
+    """A ceiling wide enough to pull, and no wider: an agent never pushes or deletes an image."""
+    agent = allowed(named(template, "agentkeel-boundary"))
+    assert ECR_PULL <= agent
+    assert {"logs:CreateLogGroup", "logs:DescribeLogStreams", "logs:DescribeLogGroups"} <= agent
+    assert not {a for a in agent if a.startswith("ecr:")} - ECR_PULL
+    # S6 still reads the same way: allowed by the ceiling, denied by the key policy.
+    assert "kms:GetKeyPolicy" in agent
+
+
+def endpoints(template: dict[str, Any]) -> list[dict[str, Any]]:
+    return [r["Properties"] for r in of_type(template, "AWS::EC2::VPCEndpoint").values()]
+
+
+def test_the_vpc_has_the_two_endpoints_an_image_pull_needs(template):
+    names = json.dumps([e["ServiceName"] for e in endpoints(template)])
+    assert "ecr.api" in names and "ecr.dkr" in names
+    interface = [e for e in endpoints(template) if e.get("VpcEndpointType") == "Interface"]
+    assert len(interface) == 5
+
+
+def test_both_are_published_for_the_construct(template):
+    published = {p["Properties"]["Name"] for p in of_type(template, "AWS::SSM::Parameter").values()}
+    assert {"/agentkeel/security/endpoint/ecr.api", "/agentkeel/security/endpoint/ecr.dkr"} <= published
+
+
+def test_the_s3_endpoint_reaches_outside_the_account_for_the_image_layers_only(template):
+    """The one statement not scoped to this account: GetObject on ECR's own layer bucket."""
+    gateways = [e for e in endpoints(template) if e.get("VpcEndpointType") == "Gateway"]
+    s3 = next(e for e in gateways if json.dumps(e["ServiceName"]).endswith('.s3"]]}'))
+    unscoped = [s for s in s3["PolicyDocument"]["Statement"] if "Condition" not in s]
+    assert len(unscoped) == 1
+    assert unscoped[0]["Action"] == "s3:GetObject"
+    assert unscoped[0]["Resource"] == "arn:aws:s3:::prod-us-west-2-starport-layer-bucket/*"
 
 
 # --- BLOCK F: what the deploy role may do (M01 PR 3) -----------------------

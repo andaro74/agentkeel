@@ -43,11 +43,11 @@
       ]
     },
     "endpoint_allowlist": {
-      "description": "Security (ruling d): AWS service names only at M01, one VPC endpoint each. The agent's security group egress allows these and nothing else; a hostname outside the enum is refused at synth. Arbitrary hostnames are M05.",
+      "description": "Security (ruling d, amended at M01 PR 3 to add ecr.api and ecr.dkr): AWS service names only at M01, one VPC endpoint each. The agent's security group egress allows these and nothing else; a hostname outside the enum is refused at synth. Arbitrary hostnames are M05.",
       "type": "array",
       "uniqueItems": true,
       "minItems": 1,
-      "items": {"enum": ["bedrock-runtime", "dynamodb", "kms", "logs", "s3"]}
+      "items": {"enum": ["bedrock-runtime", "dynamodb", "ecr.api", "ecr.dkr", "kms", "logs", "s3"]}
     },
     "seats": {
       "description": "Security: seat -> IdP group. Checked against real groups from M02, when the groups exist.",
