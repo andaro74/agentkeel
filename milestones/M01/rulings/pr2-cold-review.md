@@ -4,7 +4,7 @@
 # The four seat reports go in the PR body verbatim; they are not pasted
 # here. Product's key for this PR is `pr2.md`, the Threshold Owner's is
 # `pr2-threshold-owner.md`, both with the same `pr: 8`.
-ruling: DRAFT
+ruling: pr2-cold-review
 seat: Engineering
 authorises:
   # NOT .github/workflows/evals.yml, though this review's B1 is about it:
