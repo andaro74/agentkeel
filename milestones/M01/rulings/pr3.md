@@ -101,7 +101,7 @@ What it does not close is below.
   fired. **M02 plants the case**; until it does, no prose here calls this
   proven.
 
-## BLOCK F and item 7 — written, not yet deployed
+## BLOCK F and item 7 — deployed, read back, `refuse` deleted
 
 **The defect.** `agentkeel-cfn-exec` could create a role under
 `/agentkeel/agents/` and nothing else, and the construct makes a security
@@ -146,12 +146,13 @@ template in both directions: a resource type the construct renders with no
 grant fails, and so does a grant for a type it no longer renders. 16 of the
 new tests fail on the tree before this repair, and all pass after it.
 
-**What has not happened.** None of this is in the account. The bootstrap
-stack is redeployed by the human (R1), after reading `cdk diff`, and then
-read back with `aws iam simulate-principal-policy`, as ruling j did for the
-eval role. The table goes here. `deploy.yml`'s `refuse` job stays until both
-are done. A template is what exists today, and a template is not a grant
-AWS has honoured.
+**Where it stands.** The human (R1) redeployed the bootstrap stack twice,
+after reading `cdk diff` each time. The grants were read back from the
+account after each redeploy. The first read found three creates the account
+refused (below). The second read gave **42 of 42 as expected**. The `refuse`
+job was deleted after that, and only after that. **No deploy of
+`deploy.yml` has run.** The merge of this PR is its first run, and nothing
+here is proven until that run is in the record.
 
 **Unsure, for the Security seat** (from `security-reviewer` on this diff:
 2 BLOCK, 6 FINDING, 7 NOTE; the full report is in the PR body). None of
@@ -253,7 +254,7 @@ month at us-west-2 list price, before data.
   the runtime does not need them to answer. If a missing one ever stops the
   runtime, the deploy's load check will say so.
 
-## Read back from the account — the first read found two defects
+## Read back from the account — the first read found three defects
 
 The human redeployed `AgentkeelBootstrap` on 2026-09-21
 (`UPDATE_COMPLETE`, 14:06:18 UTC, no failed events). All ten
@@ -285,16 +286,77 @@ A probe found a third of the same kind: `ec2:CreateNetworkInterface` on
   list it for these two actions.
 
 `test_no_create_is_conditioned_on_a_key_the_new_resource_does_not_have_yet`
-holds all three. **The bootstrap stack is redeployed a second time for this,
-and the full table is read again after it.** The earlier caution was right:
-a template is not a grant AWS has honoured.
+holds all three. The earlier caution was right: a template is not a grant
+AWS has honoured.
+
+### The second read: 42 of 42 (2026-09-21)
+
+The human redeployed a second time (`UPDATE_COMPLETE`, 14:41:50 UTC). Then
+the same script read every row again, with a negative beside each grant: the
+wrong VPC, the wrong subnet, no boundary, the wrong service, a delete where
+only a write is granted. **0 mismatches.** The three rows the first read
+refused are now allowed, and their negatives are still refused.
+
+The boundary rows are read as a ceiling. No agent role exists until the first
+deploy, so these rows run `simulate-custom-policy` with an allow-all policy
+under `agentkeel-boundary`, and show what the ceiling lets through.
+
+| Principal | Action | Resource | Context | Decision | Expected |
+|---|---|---|---|---|---|
+| `agentkeel-cfn-exec` | `iam:CreateRole` | `iam::<acct>:role/agentkeel/agents/refagent-x` | iam:PermissionsBoundary=policy/agentkeel-boundary | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `iam:CreateRole` | `iam::<acct>:role/agentkeel/agents/refagent-x` | — | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `iam:CreateRole` | `iam::<acct>:role/not-an-agent` | iam:PermissionsBoundary=policy/agentkeel-boundary | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `iam:ListRolePolicies` | `iam::<acct>:role/agentkeel/agents/refagent-x` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `iam:PassRole` | `iam::<acct>:role/agentkeel/agents/refagent-x` | iam:PassedToService=bedrock-agentcore.amazonaws.com | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `iam:PassRole` | `iam::<acct>:role/agentkeel/agents/refagent-x` | iam:PassedToService=ec2.amazonaws.com | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `iam:CreateServiceLinkedRole` | `iam::<acct>:role/aws-service-role/network.bedrock-agentcore.amazonaws.com/AWSServiceRoleForBedrockAgentCoreNetwork` | iam:AWSServiceName=network.bedrock-agentcore.amazonaws.com | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `ssm:GetParameters` | `ssm:us-west-2:<acct>:parameter/agentkeel/security/vpc-id` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `ssm:GetParameters` | `ssm:us-west-2:<acct>:parameter/other/secret` | — | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `ec2:CreateSecurityGroup` | `security-group/* + vpc/vpc-0638596d59ee8f1b9` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `ec2:CreateSecurityGroup` | `security-group/* + vpc/vpc-other` | — | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `ec2:DeleteSecurityGroup` | `ec2:us-west-2:<acct>:security-group/sg-0` | ec2:Vpc=vpc/vpc-0638596d59ee8f1b9 | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `ec2:DeleteSecurityGroup` | `ec2:us-west-2:<acct>:security-group/sg-0` | ec2:Vpc=vpc/vpc-other | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `ec2:CreateNetworkInterface` | `network-interface/* + subnet/subnet-0 + security-group/sg-0` | ec2:Vpc=vpc/vpc-0638596d59ee8f1b9 | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `ec2:CreateNetworkInterface` | `network-interface/* + subnet/subnet-0 + security-group/sg-0` | ec2:Vpc=vpc/vpc-other | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `dynamodb:CreateTable` | `dynamodb:us-west-2:<acct>:table/agentkeel-refagent-rights` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `dynamodb:DeleteTable` | `dynamodb:us-west-2:<acct>:table/agentkeel-refagent-rights` | — | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `bedrock:CreateInferenceProfile` | `bedrock:us-west-2:<acct>:application-inference-profile/abc123` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `bedrock-agentcore:CreateAgentRuntime` | `*` | bedrock-agentcore:subnets=subnet-00008bbb7a11551a0/subnet-0f82c2f36bd203187 | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `bedrock-agentcore:CreateAgentRuntime` | `*` | bedrock-agentcore:subnets=subnet-00008bbb7a11551a0/subnet-elsewhere | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `bedrock-agentcore:CreateAgentRuntime` | `*` | — | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `bedrock-agentcore:GetAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/refagent-abc` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `kms:PutKeyPolicy` | `*` | — | explicitDeny | explicitDeny |
+| `agentkeel-cfn-exec` | `ec2:CreateInternetGateway` | `*` | — | explicitDeny | explicitDeny |
+| `agentkeel-deploy` | `ecr:GetAuthorizationToken` | `*` | — | **allowed** | allowed |
+| `agentkeel-deploy` | `ecr:PutImage` | `ecr:us-west-2:<acct>:repository/agentkeel-refagent` | — | **allowed** | allowed |
+| `agentkeel-deploy` | `ecr:BatchDeleteImage` | `ecr:us-west-2:<acct>:repository/agentkeel-refagent` | — | implicitDeny | implicitDeny |
+| `agentkeel-deploy` | `dynamodb:PutItem` | `dynamodb:us-west-2:<acct>:table/agentkeel-refagent-rights` | — | **allowed** | allowed |
+| `agentkeel-deploy` | `dynamodb:DeleteItem` | `dynamodb:us-west-2:<acct>:table/agentkeel-refagent-rights` | — | implicitDeny | implicitDeny |
+| `agentkeel-deploy` | `bedrock-agentcore:InvokeAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/refagent-abc` | — | **allowed** | allowed |
+| `agentkeel-deploy` | `bedrock-agentcore:InvokeAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/other-abc` | — | implicitDeny | implicitDeny |
+| `agentkeel-deploy` | `cloudformation:CreateChangeSet` | `cloudformation:us-west-2:<acct>:stack/agentkeel-refagent/x` | — | **allowed** | allowed |
+| `agentkeel-deploy` | `cloudformation:DescribeStacks` | `cloudformation:us-west-2:<acct>:stack/AgentkeelBootstrap/x` | — | implicitDeny | implicitDeny |
+| `agentkeel-deploy` | `iam:PassRole` | `iam::<acct>:role/agentkeel-cfn-exec` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `ecr:BatchGetImage` | `*` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `ecr:GetDownloadUrlForLayer` | `*` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `ecr:GetAuthorizationToken` | `*` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `logs:CreateLogGroup` | `*` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `ecr:PutImage` | `*` | — | implicitDeny | implicitDeny |
+| `agentkeel-boundary (ceiling)` | `ecr:BatchDeleteImage` | `*` | — | implicitDeny | implicitDeny |
+| `agentkeel-boundary (ceiling)` | `kms:GetKeyPolicy` | `*` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `kms:PutKeyPolicy` | `*` | — | explicitDeny | explicitDeny |
+
+What this table does not say: that CloudFormation and AgentCore make exactly
+these calls. The action lists come from `describe-type` and from the service
+reference, and a simulation reads IAM, not the service. The first run of
+`deploy.yml` is what reads the rest.
 
 ## Still to land in PR 3
 
 | # | Item | Seat |
 |---|---|---|
 | 1 | ~~The live ruleset `PUT` and re-export~~ — done, `5693447` | Security |
-| 2 | **BLOCK F**: grants written (above); redeploy, `simulate-principal-policy` table, then delete `deploy.yml`'s `refuse` job | Security |
+| 2 | ~~**BLOCK F**~~ — grants deployed, read back 42/42, `refuse` job deleted (above) | Security |
 | 3 | The first real deploy, and construct tenancy with it: claim 1's second half, the P3 exception named in ledger row 1 | Security |
 | 4 | **ADR-0007**: the envelope's mode field, plus region and model version (`schema.json` is `additionalProperties: false`) | Product, with Threshold Owner |
 | 5 | **BLOCK D**: SPEC/01 §5's wording for S8 takes the narrowing | Security |
