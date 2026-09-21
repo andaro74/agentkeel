@@ -13,6 +13,8 @@ authorises:
   - milestones/README.md
   - milestones/M01/README.md
   - milestones/M01/feasibility.md
+  # The explainer's draft. "What happened" stays empty until the close.
+  - docs/milestones/M01.md
   - milestones/M01/pr2-body-draft.md
   - milestones/M01/rulings/pr2.md
   - milestones/M01/runs/f1_1_laptop.yaml
