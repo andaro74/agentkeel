@@ -390,7 +390,7 @@ class _StackRules:
             # built none of its network configuration or its role.
             if not any(isinstance(scope, GovernedAgent) and node is scope.runtime for scope in node.node.scopes):
                 found.append(f"{node.node.path}: an {RUNTIME_TYPE} that is not a GovernedAgent's own runtime. "
-                             f"An agent exists on this platform only as an instance of the construct "
+                             f"An agent on this platform is an instance of the construct "
                              f"(SPEC/01 §2).")  # fmt: skip
         return found
 

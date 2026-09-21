@@ -13,6 +13,7 @@ authorises:
   - infra/ruleset/README.md
   - infra/bootstrap/app.py
   - infra/construct/governed_agent.py
+  - infra/construct/__init__.py
   - infra/construct/app.py
   - infra/construct/AwsSolutions--AgentkeelRefagent-NagReport.csv
   - infra/bootstrap/AwsSolutions--AgentkeelBootstrap-NagReport.csv
@@ -359,7 +360,7 @@ reference, and a simulation reads IAM, not the service. The first run of
 | 2 | ~~**BLOCK F**~~ — grants deployed, read back 42/42, `refuse` job deleted (above) | Security |
 | 3 | The first real deploy, and construct tenancy with it: claim 1's second half, the P3 exception named in ledger row 1 | Security |
 | 4 | **ADR-0007**: the envelope's mode field, plus region and model version (`schema.json` is `additionalProperties: false`) | Product, with Threshold Owner |
-| 5 | **BLOCK D**: SPEC/01 §5's wording for S8 takes the narrowing | Security |
+| 5 | ~~**BLOCK D**: SPEC/01 §5 takes the narrowing~~ — done: SPEC/01 §2 and §5 and the explainer, keyed in `pr3-product.md`. Security reworded `governed_agent.py`'s refusal and `infra/construct/__init__.py`'s docstring (whose "no role's policy grants it today" went stale in this PR). The S8 fixture's docstring keeps the old sentence: it is a planted seed | Security rules, Product keys the text |
 | 6 | ~~The two routes `tests/test_evals_workflow.py` did not cover~~ — covered, 7 cases, each broken on purpose (`pr3-engineering.md`) | Engineering |
 | 7 | ~~`deploy.yml:198` reads `--stack-name AgentkeelBootstrap`~~ — written (above); holds once `deploy.yml` runs | Security |
 
