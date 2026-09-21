@@ -3,15 +3,20 @@
 M00 PR 1 (ADR-0001 amendment 1 item 22): golden front matter, ruling front
 matter, and that every ordinary and trap golden cites a rights-table row and
 a clause that exist. M01 PR 1 (Security, M01 open item 29): the workflow
-file hash.
+file hash. M01 PR 2 (SPEC/01 §6): the manifest schema, and cdk-nag over
+both stacks.
 """
 
 from __future__ import annotations
 
+import csv
 import glob
 import hashlib
 import json
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -209,9 +214,103 @@ def check_workflow_hashes(root: Path) -> list[str]:
     return errors
 
 
+def check_manifests(root: Path) -> list[str]:
+    """Every agents/*/manifest.yaml validates against src/manifest/schema.json (M01 PR 2)."""
+    from src import manifest as manifest_module
+
+    paths = manifest_module.paths(root)
+    if not paths:
+        return ["agents/*/manifest.yaml: none found"]
+    errors = []
+    for path in paths:
+        rel = path.relative_to(root).as_posix()
+        try:
+            doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            errors.append(f"{rel}: not YAML: {exc}")
+            continue
+        errors += [f"{rel}: {error}" for error in manifest_module.schema_errors(doc)]
+    return errors
+
+
+# The two CDK apps, and where each one's committed NagReport lives. The
+# report in the tree is the one the synth here just wrote: a suppression a
+# reader can see, next to the code that suppressed it.
+STACKS = {
+    "AgentkeelBootstrap": "infra/bootstrap",
+    "AgentkeelRefagent": "infra/construct",
+}
+NAG_REPORT = "AwsSolutions--{stack}-NagReport.csv"
+
+
+def check_cdk_nag(root: Path) -> list[str]:
+    """Both stacks synthesise, cdk-nag finds nothing non-compliant, and the committed report matches.
+
+    cdk-nag runs as an aspect inside each app, so a Non-Compliant error
+    fails the synth and this check reads a non-zero exit. What this adds is
+    the report: `make validate` re-writes it and compares, so a suppression
+    cannot be added without the CSV beside it changing in the same commit.
+
+    Every suppression must name a seeded case (S3, S4, S5, S6, S8) or a
+    SPEC/01 §6 line. One that names neither is a finding, not a
+    suppression (Security, M01 PR 2), and this check fails on it.
+    """
+    errors: list[str] = []
+    for stack, folder in STACKS.items():
+        app = root / folder / "app.py"
+        if not app.is_file():
+            errors.append(f"{folder}/app.py: not in the tree")
+            continue
+        out = root / folder / "cdk.out"
+        done = subprocess.run(
+            [sys.executable, "-c", f"import runpy; runpy.run_path({str(app)!r}, run_name='__main__')"],
+            cwd=root, capture_output=True, text=True,
+            env={**os.environ, "PYTHONPATH": str(root), "CDK_OUTDIR": str(out)},
+        )  # fmt: skip
+        if done.returncode != 0:
+            tail = (done.stderr.strip().splitlines() or ["no output"])[-1]
+            errors.append(f"{folder}/app.py: synth failed: {tail}")
+            continue
+        written, committed = out / NAG_REPORT.format(stack=stack), root / folder / NAG_REPORT.format(stack=stack)
+        if not written.is_file():
+            errors.append(f"{folder}: the synth wrote no {written.name}; is cdk-nag still an aspect of the app?")
+            continue
+        errors += _nag_rows(written, f"{folder}/{written.name}")
+        if not committed.is_file():
+            errors.append(f"{folder}/{committed.name}: not committed. Copy the one the synth just wrote.")
+        elif _rows(committed) != _rows(written):
+            errors.append(f"{folder}/{committed.name}: not the report this synth wrote. Copy it and commit it.")
+    return errors
+
+
+def _rows(path: Path) -> list[dict[str, str]]:
+    with path.open(encoding="utf-8", newline="") as handle:
+        return sorted((dict(row) for row in csv.DictReader(handle)), key=lambda row: sorted(row.items()))
+
+
+def _nag_rows(path: Path, rel: str) -> list[str]:
+    """Nothing non-compliant, and every suppression names what it serves."""
+    errors = []
+    for row in _rows(path):
+        where = f"{rel}: {row['Rule ID']} on {row['Resource ID']}"
+        if row["Compliance"] == "Non-Compliant":
+            errors.append(f"{where}: non-compliant")
+        elif row["Compliance"] == "Suppressed" and not _names_its_case(row["Exception Reason"]):
+            errors.append(f"{where}: the suppression names no seeded case (S3, S4, S5, S6, S8) and no "
+                          f"SPEC/01 §6 line. That is a finding, not a suppression.")  # fmt: skip
+    return errors
+
+
+def _names_its_case(reason: str) -> bool:
+    """`seed S3`, not `the S3 gateway endpoint`: the service name is not the seed."""
+    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason)
+
+
 CHECKS = {
     "golden front matter": check_goldens,
     "golden citations exist in data/": check_golden_citations,
     "ruling front matter": check_rulings,
     "workflow-hash": check_workflow_hashes,
+    "manifest schema": check_manifests,
+    "cdk-nag, both stacks": check_cdk_nag,
 }

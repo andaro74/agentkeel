@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "boto3>=1.43.97",
+    "cryptography>=45",  # src/bundle/verify.py reads the signing certificate (M01 PR 2)
     "jsonschema>=4.26.0",
     "pydantic>=2.13.5",
     "pyyaml>=6.0.3",
@@ -24,6 +25,13 @@ infra = [
     "cdk-nag>=2.37,<3",
     "constructs>=10.8.1",
 ]
+
+# The seeded cases S3, S5 and S8 are synth refusals, and `make validate`
+# runs cdk-nag (M01 PR 2), so aws-cdk-lib is installed by `uv sync` in CI
+# as well as by `npx cdk` locally. Without this the three tests would pass
+# for the wrong reason: no aws_cdk, no synth, no refusal to read.
+[tool.uv]
+default-groups = ["dev", "infra"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

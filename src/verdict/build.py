@@ -240,6 +240,63 @@ def check_from_junit(path: Path, module: str, run_url: str | None) -> dict[str, 
     return {"status": "pass" if cases and not bad else "fail", "url": run_url}
 
 
+def check_from_cases(path: Path, names: str, run_url: str | None) -> dict[str, str]:
+    """pass when every named test ran and passed. A name with no case is a fail (SPEC/01 §4).
+
+    One falsifier is read from several tests in one module, and two
+    falsifiers are read from the same module: F1.1 from the S1, S2, S3 and
+    S8 tests, F1.2 from the S5 test. `--check-junit` reads a whole module,
+    which cannot tell those apart.
+    """
+    if not run_url:
+        raise Refused("a check needs the CI run URL (--run-url)")
+    wanted = [name for name in names.split(",") if name]
+    cases = {case.get("name"): case for case in ET.parse(path).getroot().iter("testcase")}
+    passed = all(
+        name in cases and not any(cases[name].find(tag) is not None for tag in ("failure", "error", "skipped"))
+        for name in wanted
+    )
+    return {"status": "pass" if wanted and passed else "fail", "url": run_url}
+
+
+def check_from_attempt(path: Path, run_url: str | None) -> dict[str, str]:
+    """pass when CloudTrail says every attempt in the observation was refused (ruling i).
+
+    The human makes the attempt and writes what AWS returned; this reads
+    the CI lookup of each request id. A human-written file feeds no check
+    by itself (SPEC/01 §4).
+    """
+    if not run_url:
+        raise Refused("a check needs the CI run URL (--run-url)")
+    seen = load_json(path)
+    attempts = seen.get("attempts") or []
+    refused = bool(attempts) and all(_refused_by_the_right_thing(attempt) for attempt in attempts)
+    return {"status": "pass" if refused else "fail", "url": run_url}
+
+
+def _refused_by_the_right_thing(attempt: dict[str, Any]) -> bool:
+    """AccessDenied, and where the run file says the denial must come from.
+
+    S6 grants the agent role `kms:GetKeyPolicy` in its own policy so that the
+    only thing left to refuse it is the key policy. A denial that named the
+    role's own policy would be the wrong control firing, and reading only the
+    error code could not tell the two apart.
+    """
+    if attempt.get("found") is not True or attempt.get("error_code") != "AccessDenied":
+        return False
+    wanted = attempt.get("message_must_contain")
+    return not wanted or wanted.lower() in (attempt.get("error_message") or "").lower()
+
+
+def both(checks: dict[str, dict[str, str]], falsifier: str, result: dict[str, str]) -> dict[str, dict[str, str]]:
+    """Add one source to a falsifier. Two sources pass only if both do (SPEC/01 §4, F1.1)."""
+    if falsifier not in checks:
+        return checks | {falsifier: result}
+    first = checks[falsifier]
+    status = "pass" if first["status"] == "pass" and result["status"] == "pass" else "fail"
+    return checks | {falsifier: {"status": status, "url": first["url"]}}
+
+
 def check_from_pr(path: Path) -> dict[str, str]:
     """pass when the check failed on the PR, the PR closed unmerged, and the check is required."""
     seen = load_json(path)
@@ -402,6 +459,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--history-dir", type=Path, default=HISTORY)
     parser.add_argument("--check-junit", nargs=3, action="append", default=[],
                         metavar=("ID", "MODULE", "JUNIT_XML"))  # fmt: skip
+    parser.add_argument("--check-cases", nargs=3, action="append", default=[],
+                        metavar=("ID", "NAMES", "JUNIT_XML"))  # fmt: skip
+    parser.add_argument("--check-attempt", nargs=2, action="append", default=[],
+                        metavar=("ID", "OBSERVATION"))  # fmt: skip
     parser.add_argument("--check-pr", nargs=2, action="append", default=[],
                         metavar=("ID", "OBSERVATION"))  # fmt: skip
     parser.add_argument("--run-url")
@@ -424,6 +485,10 @@ def main(argv: list[str] | None = None) -> int:
             cap = token_cap(thresholds)
             checks = {i: check_from_junit(Path(p), m, args.run_url) for i, m, p in args.check_junit}
             checks |= {i: check_from_pr(Path(p)) for i, p in args.check_pr}
+            for i, names, p in args.check_cases:
+                checks = both(checks, i, check_from_cases(Path(p), names, args.run_url))
+            for i, p in args.check_attempt:
+                checks = both(checks, i, check_from_attempt(Path(p), args.run_url))
             kinds = {g: golden["kind"] for g, golden in goldens.items()}
             history = replay_history.load(args.history_dir, exclude_commit=raw["commit"])
             if scope_of(raw, control) == "control":

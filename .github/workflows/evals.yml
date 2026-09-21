@@ -32,6 +32,14 @@
 # in M00's form (ADR-0004 amendment 2); it is gated and recorded like any
 # other.
 #
+# From M01 PR 2 the run also carries claim 1's checks (SPEC/01 §4):
+# F1_1 from the S1, S2, S3 and S8 tests and the CloudTrail lookup of S4's
+# request ids; F1_2 from the S5 test; F1_3 from the CloudTrail lookup of
+# S6's request id; F1_4 from the envelope's own goldens. A falsifier read
+# from two sources passes only if both do. The attempts are the human's,
+# made before this run; what this run reads is AWS's record of them
+# (`scripts/observe_attempt.py`, ruling i).
+#
 # What this does not do:
 # - stop someone with write access from editing this file, or from adding
 #   a workflow that assumes the same role. `validate` fails on a workflow
@@ -116,6 +124,14 @@ jobs:
         if: steps.current.outputs.measured_at == ''
         run: make validate
 
+      # `src/bundle/verify.py` skips the cosign check when cosign is not on
+      # the machine, and says so. Without this step S1 and S2 would still be
+      # refused — for the missing signature and for the digest — but the
+      # signature check itself would never run in the run that measures
+      # them. It is installed before pytest for that reason (M01 PR 2).
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+        if: steps.current.outputs.measured_at == ''
+
       # A failing test must reach the envelope as checks.F0_2 = fail, so the
       # job goes on and fails at the end.
       - name: pytest
@@ -152,11 +168,76 @@ jobs:
           role-duration-seconds: 900
           aws-region: us-west-2
 
+      # Item 18: one refused call on a denied action, and one through an
+      # unpinned profile. Neither has a seeded case (SPEC/01 §9), so this is
+      # a recorded probe, not a check: it prints what AWS said and does not
+      # decide the row. If either call succeeded, the Deny statement or the
+      # profile condition is not doing what infra/bootstrap says it does.
+      - name: The eval role refuses what it is denied
+        if: steps.current.outputs.measured_at == ''
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          echo "### The eval role's refusals (item 18)" >> "$GITHUB_STEP_SUMMARY"
+          for call in "iam list-roles --max-items 1" "bedrock-runtime converse --model-id anthropic.claude-sonnet-5 --messages '[{\"role\":\"user\",\"content\":[{\"text\":\"hi\"}]}]'"; do
+            out=$(eval "aws $call" 2>&1) && verdict="SUCCEEDED (expected AccessDenied)" || verdict="refused"
+            printf -- '- `aws %s`: %s\n' "$call" "$verdict" >> "$GITHUB_STEP_SUMMARY"
+            printf -- '  ```\n  %s\n  ```\n' "$(printf '%s' "$out" | head -c 400)" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      # Seeds S4 and S6 (ruling i). The human made the attempts; CloudTrail
+      # is asked whether each request id was refused. An attempt not yet made
+      # writes an observation that says so, and the check fails.
+      - name: Look up S4's and S6's request ids in CloudTrail
+        if: steps.current.outputs.measured_at == ''
+        run: |
+          set -euo pipefail
+          uv run python scripts/observe_attempt.py milestones/M01/runs/f1_1_laptop.yaml --out "$RUNNER_TEMP/s4.json"
+          uv run python scripts/observe_attempt.py milestones/M01/runs/f1_3_key_policy.yaml --out "$RUNNER_TEMP/s6.json"
+
+      # `shell: bash` is load-bearing, not style. GitHub's default for a
+      # `run:` is `bash -e {0}`, which does NOT set pipefail; only an
+      # explicit `shell: bash` adds `-o pipefail`. Without it the `| tee`
+      # below makes the step's exit status tee's, which is always 0, and
+      # `make evals` exiting non-zero on a RED or REJECTED gate is swallowed.
+      # That was the job's only way to fail on the gate's verdict when this
+      # path runs (`evals` is a required check, infra/ruleset/main.json). So
+      # between 442484f and its repair a RED envelope **would have** reported
+      # a green required check. No RED run occurred in that window: the
+      # protection was gone, the results were not wrong.
+      #
+      # Neither this step nor its job may carry `continue-on-error`, and the
+      # command may not end in `|| true`: each restores the hole with
+      # `shell: bash` still set. tests/test_evals_workflow.py injects all
+      # four and fails on each.
+      #
+      #   $ bash -ec 'false | tee /dev/null'; echo $?
+      #   0
+      #   $ bash -eo pipefail -c 'false | tee /dev/null'; echo $?
+      #   1
+      #
+      # tests/test_evals_workflow.py holds this and the record job's guard.
       - name: make evals
         if: steps.current.outputs.measured_at == ''
+        shell: bash
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: make evals F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit"
+        run: make evals F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
+
+      # Which refagent answered. The runner falls back to in-process when
+      # AGENTKEEL_RUNTIME_ARN is unset, and the envelope has no field for the
+      # mode until PR 3 adds one, so on `main` the summary carries it. A run
+      # on `main` that says `mode: runner` measured refagent in the runner,
+      # not refagent as the construct's tenant.
+      - name: Which refagent answered
+        if: always() && github.ref == 'refs/heads/main' && steps.current.outputs.measured_at == ''
+        run: |
+          mode=$(grep -m 1 '^mode: ' "$RUNNER_TEMP/evals.out" || echo "mode: not reported")
+          echo "### $mode" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${mode#mode: runner}" != "$mode" ]; then
+            echo "PR 2 measures refagent in runner mode; construct tenancy is PR 3's measurement." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # The gate's own exit code: 0 GREEN, 1 RED or UNMEASURED, 2 REJECTED.
       # A REJECTED envelope is not evidence and is not recorded (M01 item 9);
@@ -192,6 +273,17 @@ jobs:
           path: evals/history/${{ env.COMMIT }}.*
           if-no-files-found: error
           retention-days: 90
+
+      # When build REFUSES, no envelope is written and the artifact above does
+      # not run, so the raw observations — the only place a failed call's own
+      # error text lives — are lost with the runner. This keeps them.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always() && steps.current.outputs.measured_at == '' && steps.written.outputs.envelope != 'true'
+        with:
+          name: raw-${{ env.COMMIT }}
+          path: evals/history/${{ env.COMMIT }}.*raw.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Fail if pytest failed
         if: steps.pytest.outcome == 'failure'

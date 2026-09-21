@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "manifest.schema.json",
+  "title": "Agent manifest (SPEC/00 section 6; M01 scope, SPEC/01 section 10 and feasibility.md section 2.6)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "model", "judge_model_id", "guardrail", "endpoint_allowlist", "seats", "platform_version"],
+  "properties": {
+    "name": {
+      "description": "The agent's name. The bundle is agents/<name>/ and the runtime is named for it.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,30}$"
+    },
+    "model": {
+      "description": "Threshold Owner: the agent model id + version + region (SPEC/00 section 5). A-vs-A compares the pair at M04.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "profile", "region"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "version": {
+          "description": "null until Bedrock returns a version for the profile (ruling G, re-ruled at M01 PR 2 with the cap).",
+          "type": ["string", "null"]
+        },
+        "profile": {"type": "string", "pattern": "^us\\."},
+        "region": {"type": "string", "minLength": 1}
+      }
+    },
+    "judge_model_id": {
+      "description": "Threshold Owner. null until the judge is picked at M03 (R6).",
+      "type": ["string", "null"]
+    },
+    "guardrail": {
+      "description": "Rule Owner: the guardrail id and version. null until M03.",
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "version"],
+          "properties": {"id": {"type": "string"}, "version": {"type": "string"}}
+        }
+      ]
+    },
+    "endpoint_allowlist": {
+      "description": "Security (ruling d): AWS service names only at M01, one VPC endpoint each. The agent's security group egress allows these and nothing else; a hostname outside the enum is refused at synth. Arbitrary hostnames are M05.",
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {"enum": ["bedrock-runtime", "dynamodb", "kms", "logs", "s3"]}
+    },
+    "seats": {
+      "description": "Security: seat -> IdP group. Checked against real groups from M02, when the groups exist.",
+      "type": "object",
+      "additionalProperties": {"type": ["string", "null"]},
+      "propertyNames": {"enum": ["product", "rule-owner", "data-owner", "tool-owner", "threshold-owner", "security", "engineering"]}
+    },
+    "may_call": {
+      "description": "Tool Owner: the edges this agent may call, each <agent>@<major>. Both sides declare an edge (M02). Empty at M01: ratings-helper is cut to M02.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,30}@v[0-9]+$"}
+    },
+    "may_be_called_by": {
+      "description": "Tool Owner: the agents that may call this one. Same shape as may_call.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,30}@v[0-9]+$"}
+    },
+    "ceilings": {
+      "description": "Tool Owner: concurrency, per-edge rps, depth 2, fan-out 3 (SPEC/00 section 6). Read by validate from M02, when an edge exists.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "concurrency": {"type": "integer", "minimum": 1},
+        "rps_per_edge": {"type": "number", "minimum": 0},
+        "depth": {"type": "integer", "minimum": 1, "maximum": 2},
+        "fan_out": {"type": "integer", "minimum": 1, "maximum": 3}
+      }
+    },
+    "max_tokens_per_session": {"type": ["integer", "null"], "minimum": 1},
+    "daily_usd": {
+      "description": "Threshold Owner. The eval role's budget is separate and is Security's (ruling a).",
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "memory": {
+      "description": "Retention, ttl, per_user. null at M01: no memory is wired.",
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["retention_days", "ttl_days", "per_user"],
+          "properties": {
+            "retention_days": {"type": "integer", "minimum": 0},
+            "ttl_days": {"type": "integer", "minimum": 0},
+            "per_user": {"type": "boolean"}
+          }
+        }
+      ]
+    },
+    "data_class": {
+      "description": "Informational in the PoC; enforcement is deferred (SPEC/00 section 12).",
+      "enum": ["public", "internal", "confidential", null]
+    },
+    "deprecated_after": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "rollout": {"enum": ["all-at-once"]},
+    "platform_version": {
+      "description": "The pinned tag of the platform repo this bundle was built against.",
+      "type": "string",
+      "pattern": "^m[0-9]{2}$"
+    },
+    "pinned_roles": {
+      "description": "Threshold Owner: every other role's pinned id (baseline, swaps, deprecation plant, judge candidates), moved here from milestones/M00/README.md at M01 PR 1. Read by the milestone that names each role.",
+      "type": "object"
+    }
+  }
+}

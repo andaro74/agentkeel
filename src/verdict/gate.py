@@ -21,7 +21,20 @@ replay and read.
 What it rules on (SPEC/00 §5 `regression`, P7, R2, ADR-0004): RED on an
 `agent` result that has ever passed and now fails, on a silent plant among
 the `agent` results, on a failed check, and on a run over the token cap
-(Threshold Owner, M01 item 22). A golden that has never passed reports and
+(Threshold Owner, M01 item 22).
+
+**Which cap** (ruling m, `milestones/M01/feasibility.md` §2.6). The cap is
+read from `thresholds.yaml` **as it stood at the envelope's commit**
+(`git show <commit>:thresholds.yaml`), not from the working tree. The
+envelope does not record the cap — ADR-0004 has no amendment left — and a
+gate that read today's cap would re-rule an old envelope every time the
+Threshold Owner moved the number. A commit git cannot resolve falls back
+to the tree, and the gate says so.
+
+The pinned base card hash is read from the tree on purpose, and not this
+way. The base is frozen (ADR-0004 amendment 2): if it ever changes, every
+envelope that names the old one must be rejected loudly, which is what
+reading the tree does. A golden that has never passed reports and
 does not gate. A `control` result is the baseline's: it is reported, its
 drift is printed as a note, and it never blocks.
 
@@ -53,7 +66,14 @@ from src.verdict import (
     schema_errors,
 )
 
-__all__ = ["Rejected", "control_drift", "judge", "measured", "measured_at", "read", "rule", "schema_errors"]
+__all__ = ["Rejected", "cap_at", "control_drift", "judge", "measured", "measured_at", "read", "rule",
+           "schema_errors", "thresholds_at"]
+
+# What an agent envelope must carry from M01 (SPEC/01 §4). A check that is
+# absent is not a check that passed: the Makefile builds the list from
+# variables CI passes, and a run that forgot one would otherwise be read as
+# a run that measured the claim.
+CLAIM_1_CHECKS = ("F1_1", "F1_2", "F1_3", "F1_4")
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -68,6 +88,33 @@ class Rejected(Exception):
 def thresholds(path: Path = THRESHOLDS) -> dict[str, Any]:
     loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
     return loaded if isinstance(loaded, dict) else {}
+
+
+def thresholds_at(commit: str, root: Path = ROOT) -> tuple[dict[str, Any], str]:
+    """`thresholds.yaml` as it stood at `commit`, and where it was read (ruling m).
+
+    A later cap change must not re-rule an envelope that was written under
+    the old one. When git cannot resolve the commit — a test, a shallow
+    clone — the tree is used and the caller says so in the output.
+    """
+    done = subprocess.run(
+        ["git", "show", f"{commit}:thresholds.yaml"], cwd=root, capture_output=True, text=True
+    )
+    if done.returncode != 0:
+        return thresholds(root / "thresholds.yaml"), "the working tree"
+    loaded = yaml.safe_load(done.stdout)
+    return (loaded if isinstance(loaded, dict) else {}), f"{commit[:12]}, the envelope's own commit"
+
+
+def cap_at(commit: str, root: Path = ROOT) -> tuple[int, str]:
+    """The token cap that applied when this envelope was written."""
+    bars, where = thresholds_at(commit, root)
+    cap = (bars.get("cost_cap") or {}).get("tokens_per_run")
+    if not isinstance(cap, int) or isinstance(cap, bool) or cap <= 0:
+        # build refuses a missing cap; the gate does not read a deleted bar as "no cap" either
+        raise Rejected(f"thresholds.yaml cost_cap.tokens_per_run at {where} "
+                       f"must be a positive integer, got {cap!r}")  # fmt: skip
+    return cap, where
 
 
 def card_at(path: Path, ref: Any, root: Path, field: str) -> dict[str, Any]:
@@ -185,6 +232,12 @@ def judge(
             reasons.append("checks.F1_4 is missing from an agent envelope")
         elif said["status"] != mine_f1_4:
             reasons.append(f"envelope says F1_4 is {said['status']}, the gate reads {mine_f1_4}")
+        # An absent check is not a check that passed. `build` assembles the
+        # list from flags the Makefile passes, so a run that measured nothing
+        # would otherwise be read as a run that measured the claim and found
+        # it whole.
+        reasons += [f"checks.{name} is missing from an agent envelope"
+                    for name in CLAIM_1_CHECKS if name not in envelope["checks"]]  # fmt: skip
     reasons += [
         f"check {name} failed: {check['url']}"
         for name, check in sorted(envelope["checks"].items())
@@ -271,10 +324,7 @@ def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
     except ValueError as exc:  # a bad file in history: the gate cannot rule, which is not RED
         raise Rejected(f"history cannot be replayed: {exc}") from exc
     kinds = load_golden_kinds(GOLDENS)
-    cap = (thresholds().get("cost_cap") or {}).get("tokens_per_run")
-    if not isinstance(cap, int) or isinstance(cap, bool) or cap <= 0:
-        # build refuses a missing cap; the gate does not read a deleted bar as "no cap" either
-        raise Rejected(f"thresholds.yaml cost_cap.tokens_per_run must be a positive integer, got {cap!r}")
+    cap, _ = cap_at(envelope["commit"])
     return judge(envelope, kinds, history, plants.plant_ids(kinds, ROOT), cap)
 
 
@@ -344,6 +394,9 @@ def main(argv: list[str] | None = None) -> int:
     for reason in reasons:
         print(f"  {reason}")
     envelope = read(args.envelope)
+    # Which cap ruled this envelope, and where it was read (ruling m).
+    cap, where = cap_at(envelope["commit"])
+    print(f"  note: cost_cap {cap} read at {where}")
     history = replay_history.load(args.history_dir, exclude_commit=envelope["commit"])
     for golden_id in control_drift(envelope, history):
         print(f"  note: control {golden_id} has passed before and fails now; not gated (Finding F0.4)")

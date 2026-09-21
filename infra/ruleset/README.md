@@ -10,10 +10,13 @@ gh api repos/andaro74/agentkeel/rulesets            # the id: 23685206, name mai
 gh api repos/andaro74/agentkeel/rulesets/23685206 > infra/ruleset/main.json
 ```
 
-Exported 2026-09-19, at M01 PR 1, after the human set
-`allowed_merge_methods` to `["merge"]` (item 30); the export's
-`updated_at` is `2026-09-19T13:34:54.934-07:00`. (Git Bash turns a
-leading `/` into a Windows path, so the endpoint is written without one.) It is the evidence for
+Exported twice. First at M01 PR 1, after the human set
+`allowed_merge_methods` to `["merge"]` (item 30). Again at **M01 PR 2**,
+after the human made `evals` a required status check (ruling 3 at the PR 1
+merge, carried by ruling k): the export in the tree now lists both
+required contexts, `cold-review-ruling` and `evals`, and its `updated_at`
+is `2026-09-19T15:00:31.938-07:00`. (Git Bash turns a leading `/` into a
+Windows path, so the endpoint is written without one.) It is the evidence for
 two things, at that date and no later:
 
 - **Merges are merge commits.** `allowed_merge_methods` is `["merge"]`:
@@ -23,6 +26,10 @@ two things, at that date and no later:
   able to bypass the ruleset (P9). The F0.3 observer could not read this
   (M00 open items 7 and 15); this file says what it was on this date, and
   `checks.F0_3`'s URL says what was observed on the run it names.
+- **A RED `evals` run blocks the merge.** From the M01 PR 2 export,
+  `required_status_checks` lists `evals` as well as `cold-review-ruling`.
+  Before that, only `cold-review-ruling` was required, which the
+  `security-reviewer` report on M01 PR 1 raised.
 
 What this file does not do:
 

@@ -1,0 +1,110 @@
+# sign-fixture (M01 PR 2, ruling n). Security seat.
+# Authorised by SPEC/00-overview.md#8-M01 and milestones/M01/rulings/pr2.md.
+#
+# Seed S2 is S1's bundle with one byte of prompt.txt changed, and it carries
+# S1's signature (SPEC/01 §5). A keyless signature can only be made by CI, so
+# this workflow makes it once, on M01 PR 2, and commits it as
+# github-actions[bot] before src/bundle/ exists. After that S2 is refused for
+# its digest and S1 for having no signature at all.
+#
+# It signs the bundle ARCHIVE of tests/fixtures/bundles/unsigned/ (S1). The
+# archive recipe is inline below and is the one src/bundle/pack.py implements
+# in the next commit: files only, sorted by path, ustar, mode 0644, mtime 0,
+# uid/gid 0, empty uname/gname, CRLF normalised to LF. A test in PR 2 re-packs S1 and compares the
+# digest with the one inside this signature; if the recipe drifts, that test
+# fails, not the seed.
+#
+# It runs once: the "already signed?" step stops it when the bundle is there.
+# S1 stays unsigned, always.
+#
+# The certificate identity is the full URL form, as Fulcio issues it:
+# https://github.com/andaro74/agentkeel/.github/workflows/sign-fixture.yml@refs/pull/<n>/merge
+# (observed on run 35473261921, where a short form was refused). Ruling g's
+# deploy identity is the same shape:
+# https://github.com/andaro74/agentkeel/.github/workflows/deploy.yml@refs/heads/main
+#
+# What this does not do: sign anything that deploys. deploy.yml has its own
+# identity, and `verify` refuses this workflow's identity for a deploy
+# (ruling g).
+name: sign-fixture
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/sign-fixture.yml
+      - tests/fixtures/bundles/unsigned/**
+
+permissions: {}
+
+jobs:
+  sign:
+    # This branch only, never a fork: the commit is pushed to the PR's head.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.head.ref == 'm01-pr2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write # OIDC to Fulcio, keyless
+    env:
+      BRANCH: ${{ github.event.pull_request.head.ref }}
+      BUNDLE: tests/fixtures/bundles/altered/bundle.cosign.json
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Already signed?
+        id: signed
+        run: |
+          set -euo pipefail
+          if [ -f "$BUNDLE" ]; then
+            echo "::notice::$BUNDLE is already in the tree; S2 is signed once and never again."
+            echo "done=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pack S1, the bytes that get signed
+        if: steps.signed.outputs.done != 'true'
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, io, pathlib, tarfile
+          root = pathlib.Path("tests/fixtures/bundles/unsigned")
+          out = pathlib.Path("s1.tar")
+          with tarfile.open(out, "w", format=tarfile.USTAR_FORMAT) as tar:
+              for path in sorted(p for p in root.rglob("*") if p.is_file()):
+                  content = path.read_bytes().replace(b"\r\n", b"\n")  # the repo's line endings, not the checkout's
+                  info = tarfile.TarInfo(path.relative_to(root).as_posix())
+                  info.size = len(content)
+                  info.mode, info.mtime, info.uid, info.gid = 0o644, 0, 0, 0
+                  info.uname = info.gname = ""
+                  tar.addfile(info, io.BytesIO(content))
+          print("archive sha256", hashlib.sha256(out.read_bytes()).hexdigest())
+          PY
+
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+        if: steps.signed.outputs.done != 'true'
+
+      - name: Sign S1's archive, keyless
+        if: steps.signed.outputs.done != 'true'
+        run: |
+          set -euo pipefail
+          cosign sign-blob --yes --bundle "$BUNDLE" s1.tar
+          cosign verify-blob --bundle "$BUNDLE" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/sign-fixture.yml@$GITHUB_REF" \
+            s1.tar
+          rm s1.tar
+
+      - name: Commit the signature into S2
+        if: steps.signed.outputs.done != 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$BUNDLE"
+          git commit -m "sign-fixture: S1's signature, carried by seed S2" \
+            -m "Made by .github/workflows/sign-fixture.yml on $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. Over the archive of tests/fixtures/bundles/unsigned/ (S1). S2's own bytes differ by one, so verify refuses S2 for its digest. S1 keeps no signature."
+          git push origin "HEAD:refs/heads/$BRANCH"

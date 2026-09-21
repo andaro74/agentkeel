@@ -220,3 +220,13 @@ __marimo__/
 # agentkeel
 evals/local/
 cdk.out/
+# The Python template above ignores `MANIFEST`, and git matches it without
+# regard to case on Windows, which swallowed src/manifest/ whole (M01 PR 2).
+!src/manifest/
+!src/manifest/**
+src/manifest/__pycache__/
+
+# Bundles are packed and signed in CI; neither the archive nor the
+# signature is committed (ruling h).
+agents/*/dist/
+agents/*/bundle.cosign.json

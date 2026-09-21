@@ -171,17 +171,32 @@ None of it is in PR 1, except the F1.4 reading in `verdict.build` and
   - the developer role (§1), boundary on;
   - the eval role, absorbed from `infra/eval-role/` under a **new name**,
     with its Deny statement (item 33) and trust conditions as they stand;
-  - the permission boundary, on every role either stack synthesises,
-    applied stack-wide, with a synth test that fails on any role without
-    it;
+  - **two permission boundaries**, one per plane (ruling s,
+    `feasibility.md` §2.6). `agentkeel-boundary` is the agent plane's
+    allow-list, attached to roles under `/agentkeel/agents/` and to no
+    others; it is what S5 and S6 read, and it allows `kms:GetKeyPolicy`
+    so that the key policy is what refuses S6 (ruling t).
+    `agentkeel-deploy-boundary` is the deploy plane's deny-list, on every
+    role the bootstrap stack makes, so the execution role can create what
+    a deploy creates while R4 still holds. Every role either stack
+    synthesises carries one of the two, and a synth test fails on a role
+    with neither, on an agent-path role with the wrong one, and on a
+    deploy-plane role carrying the agent allow-list;
   - a VPC with no internet gateway, endpoints with policies scoped to the
     account, and the boundary denying internet and NAT gateway creation;
-  - one KMS key per agent. Its policy denies key-policy changes, grants
-    and deletion to every principal but a named Security principal, and
-    denies `kms:GetKeyPolicy` to agent roles, matched by role path;
-  - a Budgets action on the eval role at `daily_usd: 10` (Threshold
-    Owner's number). Budgets data lags by hours; until PR 2 the spend is
-    unbounded at the account quota.
+  - one KMS key per agent. Its policy denies key-policy changes, grants,
+    disabling and deletion to every role the platform creates, named one
+    by one, and denies `kms:GetKeyPolicy` to agent roles, matched by role
+    path. It does not deny them to the human with admin: KMS refuses to
+    create a key whose policy locks its own creator out of
+    `kms:PutKeyPolicy`, and SPEC/01 §1 already puts that principal in the
+    landing zone;
+  - two Budgets budgets on Bedrock spend (ruling a, amended at PR 2). The
+    daily one at `daily_usd: 10` notifies and stops nothing; the monthly
+    one carries the Deny action, because AWS Budgets Actions do not
+    support a daily budget. Budgets data lags by hours and the action's
+    own window is a month, so what is bounded is a month's spend plus one
+    refresh interval at the account quota.
   - Order (Security, item 20; ruling 4): the human deploys the bootstrap
     stack with admin during PR 2, before PR 2's first CI run, points
     `AWS_EVAL_ROLE_ARN` at the new eval role, and PR 2's CI runs; then
@@ -195,8 +210,8 @@ None of it is in PR 1, except the F1.4 reading in `verdict.build` and
   `0.0.0.0/0`); a Bedrock application inference profile per agent, for
   cost tagging. The boundary ARN is read from a Security-owned parameter,
   not from CDK context.
-- **refagent** (`agents/refagent/`): Sonnet 5 through
-  `us.anthropic.claude-sonnet-5`, us-west-2; the rights table in DynamoDB,
+- **refagent** (`agents/refagent/`): Sonnet 4.6 through
+  `us.anthropic.claude-sonnet-4-6`, us-west-2; the rights table in DynamoDB,
   loaded from `data/rights_table.json`; the tool
   `check_availability(title_id, territory, platform, date)` with a strict
   schema both ways; the knowledge base over `data/corpus/` (Data Owner);
@@ -268,25 +283,33 @@ FINDING carried with a seat, not a claim.
 - the Budgets action;
 - the eval role refusing a direct foundation-model call, and a call
   through an unpinned profile (item 18, a step in `evals.yml` at PR 2);
-- log and audit delivery to the security account.
+- log and audit delivery to the security account;
+- Gateway targets and Identity credential providers calling out with no
+  security group over them (ruling c, `feasibility.md` §2.6). Neither is
+  wired at M01, and both are deferred to M05.
 
-## 10. Cut list, in order, if the cap is threatened
+## 10. Cut list
 
-1. `ratings-helper` stub → M02, with the two-sided edge check.
-2. Log and audit delivery to the security account → M05, with the audit
-   bucket. M01 then touches the agent account only.
-3. The knowledge base over `data/corpus/` → M03, with corpus admission.
-   refagent answers from the table and the tool alone; F1.4 does not read
-   the corpus.
-4. The HITL branch → M07, where it becomes a Gateway tool anyway.
-5. The application inference profile per agent → M05.
+Cuts 1, 3 and 4 are **taken at open** (ruling SCOPE, `feasibility.md`
+§2.6), not held against the cap. Cut 2 stands as a cut if the cap is
+threatened. Cut 5 is not taken: the per-agent inference profile stays,
+and only the Budgets filter that would use it is M05 (ruling a).
+
+| # | Item | State at M01 open | Milestone |
+|---|---|---|---|
+| 1 | `ratings-helper` stub, and the two-sided edge | cut now | M02 |
+| 2 | Log and audit delivery to the security account | cuttable, in order, if the cap is threatened; M01 then touches the agent account only | M05 |
+| 3 | The knowledge base over `data/corpus/` | cut now; refagent answers from the table and the tool alone, and F1.4 does not read the corpus | M03 |
+| 4 | The HITL branch | cut now; it becomes a Gateway tool there anyway | M07 |
+| 5 | The application inference profile per agent | not cut; it stays at M01 | — (its Budgets filter: M05) |
 
 Never cut: any seeded case; cosign sign and verify; the signature check
 at load; the permission boundary; the deploy role's and the execution
 role's policies; the KMS key policy; the egress refusal; refagent's tool
-and the rights table (F1.4 reads them). Whether Gateway and Identity are
-never-cut at M01 is Product's to rule at PR 2 open (`product-spec-reviewer`
-finding 17).
+and the rights table (F1.4 reads them). Gateway and Identity are **not**
+never-cut at M01 (`product-spec-reviewer` finding 17, ruled at PR 2
+open): the construct declares both as props and wires neither. Identity's
+claim is M05's, Gateway's is M02's and M07's.
 
 ## 11. Not in M01
 

@@ -1,0 +1,59 @@
+# The lifecycle record for refagent's pinned model (cold review B4).
+#
+# Threshold Owner, M01 PR 2. `agents/refagent/manifest.yaml` pins
+# `anthropic.claude-sonnet-4-6` with `version: null`, and the cold review
+# asked why: it is the only unversioned Anthropic id in the file, and an
+# unversioned alias can be re-pointed by the provider with nothing in this
+# repo seeing it.
+#
+# This is the listing, run and committed rather than described. It does not
+# replace the call: `scripts/check_model_access.py` and the CI envelope
+# `a7419f47…` are what show the account may use the model. A listing says
+# the model exists in the region and nothing more — that reading is what
+# cost run 35529132275 (ruling p). This file answers a narrower question:
+# does Bedrock offer a versioned id for this model, and is it ACTIVE today.
+#
+# Date:    2026-09-20
+# Account: 581208540944
+# Region:  us-west-2
+
+$ aws bedrock list-foundation-models --region us-west-2 --by-provider anthropic \
+    --query 'modelSummaries[?modelId==`anthropic.claude-sonnet-4-6`].{id:modelId,lifecycle:modelLifecycle.status}' \
+    --output json
+
+[
+    {
+        "id": "anthropic.claude-sonnet-4-6",
+        "lifecycle": "ACTIVE"
+    }
+]
+
+# And the wider query, to show the absence is real and not an artefact of
+# matching on an exact string:
+
+$ aws bedrock list-foundation-models --region us-west-2 --by-provider anthropic \
+    --query 'modelSummaries[?contains(modelId, `sonnet-4-6`)].{id:modelId,lifecycle:modelLifecycle.status}' \
+    --output json
+
+[
+    {
+        "id": "anthropic.claude-sonnet-4-6",
+        "lifecycle": "ACTIVE"
+    }
+]
+
+# One id, no version suffix, ACTIVE. So `version: null` stands under ruling
+# G: Bedrock returns no version for this model, and the field records what
+# Bedrock returns rather than a value invented here. Compare the other
+# Anthropic pins in the manifest, which do carry dated suffixes because
+# Bedrock offers them: anthropic.claude-sonnet-4-5-20250929-v1:0,
+# anthropic.claude-haiku-4-5-20251001-v1:0,
+# anthropic.claude-sonnet-4-20250514-v1:0.
+#
+# What this does not settle, and the Threshold Owner says so rather than
+# leaving it: if Anthropic later re-points `anthropic.claude-sonnet-4-6` to
+# different weights, nothing here or in the envelope would show it, because
+# there is no version to compare. `deprecated_after` in the manifest has no
+# writer either. That is M04's problem — the milestone whose claim is that a
+# breaking swap goes RED — and re-running this listing is the cheapest thing
+# that would notice a lifecycle change before a run does.

@@ -96,7 +96,7 @@ Read: SPEC/01 (untracked draft), SPEC/00 §3–§10.3, milestones/README.md, mil
 
 **11. FINDING. SPEC/01 rules items that belong to the Threshold Owner (checks 7, 8).**
 - §7: "Cost is a recorded RED" (open.md #22), "The card's `region` is the request region" (#23), and the `m00` card hash "in `thresholds.yaml`" (#5).
-- §6: "Sonnet 5 through `us.anthropic.claude-sonnet-5`".
+- §6: "Sonnet 4.6 through `us.anthropic.claude-sonnet-4-6`".
 - What is wrong: each of these belongs to the Threshold Owner. Item 22 is dated "before M01 PR 1".
 - What would settle it: Threshold Owner ruling files cited from SPEC/01, not Product text.
 - Seat: Threshold Owner.
@@ -212,7 +212,7 @@ PR was committed.
 | 8 | Repaired. SPEC/01 §8 and the ledger row state what is expected, and that no count of refagent's passes is expected on empty history (P7). S1–S8 are seeded cases, not plants, and do not enter `plants_expected`; `make plants` lists them separately. |
 | 9 | Repaired with `platform-architect` BLOCK 3: the load check verifies the signature, outside the bundle's own code, on a digest-pinned image. Where the digest lives (the stack or the manifest; SPEC/00 §5 says "digest matches manifest") is **Unsure**: Security with Product, at M01 PR 2 open. |
 | 10 | Repaired. ADR-0003 amendment 1 and ADR-0004 amendment 2 are in this PR, with SPEC/00 §6's field list, in the commit before the F1.4 reader. |
-| 11 | Repaired by citation. Items 5, 22 and 23 are the Threshold Owner's rulings (§2.1, §6), carried in `rulings/pr1.md` with the Threshold Owner's key; SPEC/01 §7 names them as such. The Sonnet 5 pin is the Threshold Owner's, from the M00 table, now in `agents/refagent/manifest.yaml`. |
+| 11 | Repaired by citation. Items 5, 22 and 23 are the Threshold Owner's rulings (§2.1, §6), carried in `rulings/pr1.md` with the Threshold Owner's key; SPEC/01 §7 names them as such. The Sonnet 4.6 pin is the Threshold Owner's, from the M00 table, now in `agents/refagent/manifest.yaml`. |
 | 12 | Repaired. Items 1 and 6 were ruled before PR 1's first commit (§2.1). |
 | 13 | Repaired. SPEC/01 §6 lists each `validate` check with its milestone; the ledger header has the M01 PR 1 row. |
 | 14 | Repaired. SPEC/01 §5 names `platform-architect`, exercised on S3, S5 and S8 at PR 2. Its prompt is in this PR and it was run once on SPEC/01's design; its report is in the PR body. |
@@ -262,7 +262,71 @@ Added to the rulings above; they bind this PR.
 | D | Item 33: `s3:PutBucketPolicy` joins the Deny in this PR. Five actions, one deploy. "Exactly four" is superseded. | Security |
 | E | `cold-review-ruling` accepting a PR-carried ruling is known and by design at M00 and is not R9's line. Carried to M02 PR 1 with `ruling-cited`: `milestones/M02/open.md` item 1, with R9's sentence quoted. | Security |
 | F | S7: the PR body names its falsifier, its seed commit and the file that reads it here. If that reader is anything other than build.py's `pass = score and cites`, it moves out of this PR and S7 stays xfail strict. After the commits, the seed commit is checked out and `pytest` run; the failing tests and their reasons are pasted in §3. | Engineering |
-| G | The manifest's model `version` stays null until Bedrock returns a version for `us.anthropic.claude-sonnet-5`; re-ruled at PR 2 with the cap. | Threshold Owner |
+| G | The manifest's model `version` stays null until Bedrock returns a version for `us.anthropic.claude-sonnet-4-6`; re-ruled at PR 2 with the cap. | Threshold Owner |
+
+### 2.6 Rulings for M01 PR 2 open (2026-09-19, R1)
+
+Written before PR 2's first commit. They settle the lists under "For
+Security", "For Product" and the Threshold Owner's items in
+`milestones/M01/README.md`, and `product-spec-reviewer` findings 5, 9 and
+17. PR 2 is the measurement (P3).
+
+**SCOPE (Product).** Cuts 1, 3 and 4 of SPEC/01 §10 are taken **now**, at
+open, not when the cap is threatened: `ratings-helper` → M02; the
+knowledge base over `data/corpus/` → M03; the HITL branch → M07. Gateway
+and Identity are **not** never-cut at M01 (finding 17): the construct
+declares both as props and wires neither. Identity's claim is M05's
+(credentials only via Identity); Gateway's is M02's edge and M07's HITL
+tool. Never-cut stays as written in §10. refagent at M01 is Sonnet 4.6
+through `us.anthropic.claude-sonnet-4-6`, the rights table in DynamoDB, and
+the `check_availability` tool with its strict schema, inside
+`GovernedAgent`. F1.4 reads the table and the tool.
+
+**Security**
+
+| | Ruling |
+|---|---|
+| a′ | **Ruling a, amended 2026-09-20 (Security with the Threshold Owner).** AWS will not build what (a) asked for: a Budgets Action cannot hang off a daily budget — "AWS Budgets Actions don't support daily granularity budget for now" (Budgets, 400, on the deploy). So the two halves separate. `agentkeel-bedrock-daily` at `daily_usd: 10` **notifies** an address the human passes at deploy and stops nothing. `agentkeel-bedrock-monthly` carries the `APPLY_IAM_POLICY` Deny on `bedrock:Invoke*`, at 30 × the daily figure, which is the literal translation of what was ruled and not a number anybody chose. **The figure that was ruled and the figure that stops anything are no longer the same figure**, and the bound is a month, not a day: a run that spends the month's figure in an afternoon is stopped after it. The Threshold Owner re-rules the monthly number against measured spend — 54,250 tokens a run, about USD 0.23 on Sonnet 4.6's published rates (run 35532168520), so USD 300 is roughly 1,300 runs of headroom. `infra/bootstrap/README.md` and SPEC/01 §9 carry it as a control that has not fired. |
+| a | **Budgets action:** one budget, service = Amazon Bedrock, whole account, `daily_usd: 10`, action = attach a Deny on `bedrock:Invoke*` to the eval role. No per-agent filter at M01; the per-agent profile stays, and the filter is M05 with cost tagging. `infra/eval-role/README.md` (then `infra/bootstrap/`) states the lag as AWS gives it — Budgets data refreshes up to three times a day — and the worst case as "up to one refresh interval at the account quota". No invented figure. |
+| b | **Key policy:** agent roles are matched by path, `aws:PrincipalArn` `StringLike` `arn:aws:iam::<account>:role/agentkeel/agents/*`. Adding an agent is not a Security redeploy. Every role `GovernedAgent` makes is created under path `/agentkeel/agents/`. |
+| c | **Gateway targets and Identity providers with no security group:** deferred to M05, and listed in SPEC/01 §9 as a control with no seeded case at M01. They are not wired at M01 (SCOPE). |
+| d | **`endpoint_allowlist` at M01** holds AWS service names only, an enum in the manifest schema: `bedrock-runtime`, `dynamodb`, `kms`, `logs`, `s3`. Each maps to a VPC endpoint of the bootstrap VPC, and the agent security group's egress allows only those endpoints: interface endpoints by their security group, S3 and DynamoDB by gateway-endpoint prefix list. A hostname that is not one of the five is refused at synth. Arbitrary hostnames are M05. |
+| e | **S3 and DynamoDB are gateway endpoints**, with endpoint policies scoped to the account. SPEC/00 §8 M01's "interface endpoints only" is amended by **ADR-0006** (Security, one sentence: interface endpoints, plus gateway endpoints for S3 and DynamoDB), written in PR 2. |
+| f | **The new eval role** grants `bedrock-agentcore:InvokeAgentRuntime` on refagent's runtime ARN only, and keeps the two pinned profiles and the five-action Deny. Name: `agentkeel-evals`. Order: the human deploys `infra/bootstrap` with admin → points `AWS_EVAL_ROLE_ARN` at `agentkeel-evals` → attempts S4 and S6 → PR 2's first CI run → after PR 2 merges, the human runs `npx cdk destroy` in `infra/eval-role`. |
+| g | **cosign verify:** `--certificate-oidc-issuer https://token.actions.githubusercontent.com`, `--certificate-identity andaro74/agentkeel/.github/workflows/deploy.yml@refs/heads/main` for a deploy; and `verify` additionally reads the certificate's Source Repository Identifier extension (Fulcio OID `1.3.6.1.4.1.57264.1.15`) and refuses unless it is `1376369685`. On the PR run, `verify` accepts the PR run's identity for the measurement of S1 and S2 only, and says so in its output. |
+| h | **Where the signed digest lives** (finding 9, with Product): in the cosign bundle written beside the archive in CI (`agents/<name>/dist/`, not committed) and as a tag on the deployed runtime. The manifest carries no digest of itself. |
+| i | **Finding 5** is ruled in §2.5's ruling 4: the human attempts, CI looks the request id up in CloudTrail through `scripts/observe_attempt.py`, and that lookup writes `checks.F1_1` and `checks.F1_3`. |
+| j | **Redeploy record:** the `describe-stacks` line and the `simulate-principal-policy` table go in `infra/eval-role/README.md` under "Redeployed 2026-09-19 (items 14, 33)". One refused call on a denied action is the `evals.yml` probe step at PR 2 (item 18). |
+| k | **The re-export** of `infra/ruleset/main.json`, with `evals` as a required check, is PR 2's first Security commit. If the live ruleset still lists one check, stop and say so. (At the M01 PR 1 merge the live ruleset already listed both; the export in the tree is from before that change.) |
+
+| q | **The cdk-nag report is committed.** Both stacks' `NagReport` CSVs are committed beside their `app.py`, written by the same synth `make validate` runs; the check compares them and fails if they differ, so a suppression cannot be added without the report beside it changing in the same commit. |
+| r | **A suppression names what it serves.** A suppression on an IAM wildcard, a boundary rule or a key-policy rule names the seeded case (S3, S4, S5, S6 or S8) or the SPEC/01 §6 line that requires it. One that names neither is a finding, not a suppression: it comes out and the rule fails until a seat rules on it. `make validate` fails on a suppression that names neither. |
+| s | **Two boundaries, one per plane** (BLOCK B, `platform-architect` BLOCK 1 and `security-reviewer` on the same). `agentkeel-boundary` stays the **agent plane's allow-list** and is attached only to roles under `/agentkeel/agents/`. It is what S5 and S6 read. `agentkeel-deploy-boundary` is a new **deny-list** for the deploy plane — the CloudFormation execution role, the deploy role, the developer role, the eval role, the Budgets action role and the VPC flow-log role — `Allow *` with the escalation, erasure, key-policy and network-opening primitives denied. The bootstrap stack applies the deploy boundary stack-wide, because it creates no agent role; `GovernedAgent` attaches the agent boundary by ARN, from the Security-owned parameter. The execution role's `iam:PermissionsBoundary` condition keeps naming the **agent** boundary, so a role the deploy creates under the agent path is capped by the allow-list. Two corrections to the shape proposed: (1) the deny-list does **not** deny `iam:*`, which would cap the execution role's `iam:CreateRole` and the deploy role's `iam:PassRole` to nothing and leave BLOCK B exactly where it was; the escalation primitives are denied by name instead (`CreateUser`, `PutUserPolicy`, `AttachUserPolicy`, `CreateAccessKey`, `Put`/`DeleteRolePermissionsBoundary`, `CreatePolicyVersion`, `SetDefaultPolicyVersion`). (2) it does **not** deny `sts:AssumeRole`, because the developer role carries it and S4's first two attempts are the deploy role's **trust policy** refusing them; a boundary that refused the assume first would re-make the defect repaired in `c5bfdd1`, one level up. R4 holds through the key-policy denies (`kms:PutKeyPolicy`, `CreateGrant`, `ScheduleKeyDeletion`, `DisableKey`), which is what R4 names. |
+| t | **The agent boundary allows `kms:GetKeyPolicy`** (S6). An allow-list caps by omission, so taking the action out of the Deny at `c5bfdd1` was not enough: the boundary would still have been what refused S6, and F1.3 still a check that could not fail. The action is in the Allow now. A boundary is a ceiling, not a grant: no agent role's own policy grants it, and the key policy denies it by role path (ruling b). The one principal that ever holds it is the role the human makes for S6's attempt, and the key policy is then the only thing left to refuse. |
+
+**PR 2 mechanics (Product with Security).** The PR opens as a **draft**
+right after the Security setup commit, so `sign-fixture.yml` can run on
+the `pull_request` event. The S2 signature is the bot's commit and
+precedes `src/bundle/`. Row 1's measurement is the CI run on the head
+that is merged; earlier branch runs are recorded, not cited. Pushes are
+batched: one for the Security setup, one for the build (step 2), one
+after the human's attempts. The PR is undrafted only after the attempts
+are observed and the cold review is done.
+
+**Engineering**
+
+| | Ruling |
+|---|---|
+| l | **The agent runner** is `src/agent/run.py`, as the Makefile expects. On a PR it runs refagent's code in the runner; on `main` after the deploy it calls the deployed runtime. It writes raw observations only; `build` and `gate` are unchanged in role (P5). |
+| m | **The envelope does not record the cap** — no schema change, and ADR-0004 has no amendment left. Instead `gate` reads `thresholds.yaml` as it stood at the envelope's commit (`git show <commit>:thresholds.yaml`), so a later cap change cannot re-read an old envelope. Written into `gate.py`'s docstring and into `tests/test_gate.py`. |
+| n | **S2's signature** is PR 2's first commit. A Security workflow `sign-fixture.yml`, run once on the PR, `cosign sign-blob` keyless over S1's archive bytes, writes the bundle into `tests/fixtures/bundles/altered/` and commits as `github-actions[bot]`, before `src/bundle/` exists. S1 stays unsigned. `infra/workflows.sha256` is updated in the same PR. |
+
+**Threshold Owner**
+
+| | Ruling |
+|---|---|
+| o | `cost_cap.tokens_per_run` stays 150,000 until PR 2's first agent envelope is recorded; re-ruled in `rulings/pr2-threshold-owner.md` against that envelope's `tokens_in + tokens_out`. |
+| p | refagent's model `version` stays null; re-ruled with (o). |
 
 ## 3. The false state
 
@@ -330,7 +394,7 @@ dropped.
 | 11 | Engineering | Ruled with item 5: one envelope per commit, one subject; ADR-0004 amendment 2, item 2. |
 | 12 | Security | Signed: Security, 2026-09-19, on run 35412277571. `infra/eval-role/README.md`, `rulings/pr1.md`. "A second workflow file refused" carried: Security, **M01 PR 2**. |
 | 13 | Security | Re-dated to **M01 PR 2**, with the bootstrap stack (Budgets action at `daily_usd: 10`). |
-| 14 | Security | Built: `MODELS` gains `anthropic.claude-sonnet-5`. The human redeploys after this PR opens and before PR 2's first run. |
+| 14 | Security | Built: `MODELS` gains `anthropic.claude-sonnet-5`. The human redeploys after this PR opens and before PR 2's first run. **Superseded at PR 2 (ruling p):** the account cannot call Sonnet 5, so `MODELS` names `anthropic.claude-sonnet-4-6` in both `infra/eval-role/` and `infra/bootstrap/`. |
 | 15 | Security | Closed on the export (item 31). |
 | 16 | Security | Built: `evals.yml`'s header sentence replaced, before the hashes were computed. |
 | 17 | Security | Closed. The five `git ls-remote` results are in `rulings/pr1.md`. |

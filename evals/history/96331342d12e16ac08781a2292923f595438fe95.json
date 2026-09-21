@@ -1,0 +1,179 @@
+{
+  "commit": "96331342d12e16ac08781a2292923f595438fe95",
+  "tag": null,
+  "model_id": "us.anthropic.claude-sonnet-5",
+  "guardrail_version": null,
+  "judge_model_id": null,
+  "corpus_fingerprint": null,
+  "cache_state": "disabled",
+  "baseline_card_ref": {
+    "path": "evals/history/9407615dcde09308490f6699c21a18100bfedcd2.baseline-card.json",
+    "sha256": "b0219756cad63be67fb51aa4632dd015084840833341f15235fab4569adc3295"
+  },
+  "control_card_ref": {
+    "path": "evals/history/96331342d12e16ac08781a2292923f595438fe95.baseline-card.json",
+    "sha256": "9e73ab7c362141626eea8edf5645ba4d49799ac4d5e9248bf640e36dead7e0c4"
+  },
+  "tokens_in": 3512,
+  "goldens": {
+    "g-001": {
+      "kind": "ordinary",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-002": {
+      "kind": "ordinary",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-003": {
+      "kind": "ordinary",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-004": {
+      "kind": "ordinary",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-005": {
+      "kind": "ordinary",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-006": {
+      "kind": "ordinary",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-007": {
+      "kind": "ordinary",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-008": {
+      "kind": "ordinary",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-009": {
+      "kind": "ordinary",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-010": {
+      "kind": "trap",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-011": {
+      "kind": "trap",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-012": {
+      "kind": "trap",
+      "scope": "agent",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-013": {
+      "kind": "guardrail",
+      "scope": "agent",
+      "score": false,
+      "cites": null,
+      "pass": false
+    },
+    "g-014": {
+      "kind": "guardrail",
+      "scope": "agent",
+      "score": false,
+      "cites": null,
+      "pass": false
+    },
+    "g-015": {
+      "kind": "guardrail",
+      "scope": "agent",
+      "score": false,
+      "cites": null,
+      "pass": false
+    }
+  },
+  "regressed": [],
+  "fragile": [],
+  "never_passed": [
+    "g-001",
+    "g-002",
+    "g-003",
+    "g-004",
+    "g-005",
+    "g-006",
+    "g-007",
+    "g-008",
+    "g-009",
+    "g-010",
+    "g-011",
+    "g-012",
+    "g-013",
+    "g-014",
+    "g-015"
+  ],
+  "plants_expected": 0,
+  "plants_fired": 0,
+  "guardrail_hits": 0,
+  "p95_ms": 327,
+  "tokens_out": 2022,
+  "cost_usd": null,
+  "rejected_over_ceiling": null,
+  "alarm_latency_s": null,
+  "checks": {
+    "F0_2": {
+      "status": "pass",
+      "url": "https://github.com/andaro74/agentkeel/actions/runs/35529132275"
+    },
+    "F0_3": {
+      "status": "pass",
+      "url": "https://github.com/andaro74/agentkeel/actions/runs/35401176820/job/105781176255"
+    },
+    "F1_1": {
+      "status": "fail",
+      "url": "https://github.com/andaro74/agentkeel/actions/runs/35529132275"
+    },
+    "F1_2": {
+      "status": "pass",
+      "url": "https://github.com/andaro74/agentkeel/actions/runs/35529132275"
+    },
+    "F1_3": {
+      "status": "fail",
+      "url": "https://github.com/andaro74/agentkeel/actions/runs/35529132275"
+    },
+    "F1_4": {
+      "status": "fail",
+      "url": "https://github.com/andaro74/agentkeel/actions/runs/35529132275"
+    }
+  },
+  "verdict": "UNMEASURED"
+}

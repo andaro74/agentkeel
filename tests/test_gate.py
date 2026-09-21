@@ -88,7 +88,8 @@ def test_an_agent_cannot_call_itself_the_control(chain):
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(gate.Rejected, match="claim 1 is read on an agent envelope only"):
         gate.read(envelope_path)
-    del envelope["checks"]["F1_4"]  # and without its claim-1 check, its base is another commit's card
+    for name in gate.CLAIM_1_CHECKS:  # and without them, its base is another commit's card
+        envelope["checks"].pop(name, None)
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(gate.Rejected, match="baseline card is for 9407615"):
         gate.read(envelope_path)
@@ -252,7 +253,8 @@ def test_measured_is_what_the_ledger_cell_must_say(chain):
     envelope_path, _, _ = chain(right={"g-001"}, agent=True)
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
         "agent: traps 0/3; ordinary 1/9; guardrail 0/3; control: traps 0/3; ordinary 0/9; guardrail 0/3; "
-        f"never_passed 14; regressed 0; plants 0/0; F1_4 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
+        f"never_passed 14; regressed 0; plants 0/0; F1_1 pass {URL}; F1_2 pass {URL}; F1_3 pass {URL}; "
+        f"F1_4 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
     )
 
 
@@ -261,3 +263,16 @@ def test_a_bad_history_file_is_rejected_not_red(chain, capsys):
     (envelope_path.parent / f"{'b' * 40}.json").write_text("{}", encoding="utf-8")
     assert gate.main([str(envelope_path), "--history-dir", str(envelope_path.parent)]) == 2
     assert "history cannot be replayed" in capsys.readouterr().out
+
+
+def test_the_cap_is_the_one_that_stood_at_the_envelopes_commit():
+    """Ruling m: a later cap change does not re-rule an old envelope.
+
+    `55dadb2` is M00's last envelope commit. `thresholds.yaml` said 20000
+    there and says 150000 in the tree; the gate reads 20000 for it.
+    """
+    m00 = "55dadb2f221e60036bdba0b01fdb6eff025d74bc"
+    assert gate.cap_at(m00) == (20000, "55dadb2f221e, the envelope's own commit")
+    assert gate.thresholds(gate.THRESHOLDS)["cost_cap"]["tokens_per_run"] == 150000
+    # A commit git cannot resolve falls back to the tree, and says so.
+    assert gate.cap_at("a" * 40) == (150000, "the working tree")

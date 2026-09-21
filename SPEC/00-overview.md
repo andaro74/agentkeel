@@ -13,7 +13,9 @@ amendment 2: one subject per envelope, `control_card_ref`, `tokens_in`,
 F1.4, over the cap is RED; M01 PR 1) ·
 ADR-0002 (the baseline is frozen at tag `m00`; M00 PR 3) · ADR-0005
 (the milestone video is recorded at the tag; M00 PR 3; with amendment 1:
-it is committed in the next milestone's PR 1; M01 PR 1)
+it is committed in the next milestone's PR 1; M01 PR 1) · ADR-0006
+(the platform VPC has gateway endpoints for S3 and DynamoDB as well as
+interface endpoints; §8 M01; M01 PR 2)
 
 ## 1. What this is
 
@@ -345,7 +347,8 @@ row 0 measured value in `milestones/README.md`.
 ### M01 — Signed bundle, construct, first tenant
 Build: manifest schema; cosign in CI; **bootstrap stack** (GitHub OIDC
 provider, deploy role scoped to repo and branch, permission boundary,
-VPC with interface endpoints only, KMS key with Security-owned policy,
+VPC with interface endpoints, and gateway endpoints for S3 and DynamoDB
+(ADR-0006), KMS key with Security-owned policy,
 log and audit delivery to the security account, Budgets alarm);
 `GovernedAgent` construct (AgentCore Runtime + Gateway + Identity,
 boundary applied, Bedrock application inference profile per agent for
@@ -534,15 +537,34 @@ for real IP at M01 by hand; `legal-compliance` re-checks at M07.
   window_start, window_end, exclusive, holdback_until, clearance_expiry,
   embargo_lift_local`.
 - **Tool (strict schema)** — `check_availability(title_id, territory,
-  platform, date) -> {available, exclusive, constraints[], table_row,
-  clause_id, confidence}`; `additionalProperties: false` both ways.
+  platform, date) -> {found, row, clause_candidates, source}`. The tool
+  returns the governing row and the clauses that row can be read under. It
+  does not decide the answer. `additionalProperties: false` both ways.
+- **Answer shape** — the agent composes `{available, exclusive,
+  constraints[], table_row, clause_id}` from the row it was given and the
+  clause it chose. F1.4 reads `table_row` and `clause_id` here, not from
+  the tool. This is one decision, not two names for one thing: a tool that
+  returned `available` and `clause_id` would decide, the model would relay,
+  and F1.4 would measure a table lookup rather than the agent.
+  **`confidence`: M07 (HITL cut from M01 at open).** Until then no answer
+  carries one and nothing reads one.
+
+  Amended at M01 PR 2 (`milestones/M01/rulings/pr2.md`, BLOCK A). This
+  section previously gave the answer's fields as the tool's return and
+  listed `confidence` among them; the tool has returned the row since it
+  was written, and `confidence` has never existed in the repo.
 - **HITL** — confidence below 0.7, or any answer that would authorise a
   first-window release, refuses and mints a resume token for the Data
-  Owner seat. Local branch in M01; Gateway tool in M07.
+  Owner seat. **M07 (HITL cut from M01 at open).** The rule stands as the
+  rule; what changed is when it is built. It was "local branch in M01;
+  Gateway tool in M07", and M01 took the cut at open (cuts 1, 3 and 4),
+  which this section did not record until M01 PR 2.
 - **Declared call** — `refagent → ratings-helper@v1`, a stub agent that
   returns `{rating, required_cuts[]}` from a 12-row table. Exercises the
-  two-sided edge, budget headers, chain identity and the graph diff from
-  M01.
+  two-sided edge, budget headers, chain identity and the graph diff.
+  **M02 (cut from M01 at open; `may_call: []` until then).** The cut is
+  SPEC/01 §10's first, and this section did not record it until M01 PR 2;
+  `agents/ratings-helper/` does not exist in the tree.
 - **Guardrail** — denied topic: plot or synopsis of the embargoed title;
   PII: talent contact details present in the license; blocked intent:
   deal terms requested for a third party.
