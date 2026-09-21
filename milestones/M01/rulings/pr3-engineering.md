@@ -11,6 +11,7 @@ seat: Engineering
 authorises:
   - tests/test_evals_workflow.py
   - tests/test_bootstrap.py
+  - tests/test_construct.py
   - milestones/M01/rulings/pr3-engineering.md
 evidence:
   - milestones/M01/rulings/pr3.md
@@ -90,6 +91,19 @@ only by features the template does not use. They are copied into the test,
 not fetched by it (`security-reviewer` F2). So a change on AWS's side, or a
 feature added to the construct, shows up as a failed deploy and not as a
 red test until someone re-reads `describe-type`.
+
+## B2: `tests/test_construct.py`, four added
+
+These tests read the rendered template:
+- the role's invoke is on the profile's `InferenceProfileArn`, not on an ARN
+  built from its name;
+- the runtime's `AGENTKEEL_MODEL_PROFILE` is that same ARN;
+- the foundation model is reachable only with `bedrock:InferenceProfileArn`
+  equal to it;
+- no `bedrock:Converse`.
+
+All four fail on the construct at `cb94995`. They cannot say whether Bedrock
+honours the grant; only a call from the runtime can.
 
 ## One thing a reader should know about these tests
 

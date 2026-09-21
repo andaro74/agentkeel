@@ -12,6 +12,7 @@ authorises:
   - infra/ruleset/main.json
   - infra/ruleset/README.md
   - infra/bootstrap/app.py
+  - infra/construct/governed_agent.py
   - infra/bootstrap/AwsSolutions--AgentkeelBootstrap-NagReport.csv
   - .github/workflows/deploy.yml
   - milestones/M01/rulings/pr3.md
@@ -162,11 +163,7 @@ construct, not cfn-exec:
    says both still fire. F6 is the same question on the network side: the
    VPC has no ECR endpoints, and it is not known whether AgentCore pulls
    through it.
-2. **B2: the agent cannot call its model.** `governed_agent.py` grants invoke
-   on `application-inference-profile/agentkeel-refagent`, but AWS gives an
-   application profile a generated id, not its name. The runtime is also
-   pointed at the system profile, which the role does not grant. The stack
-   would deploy and the load check would fail.
+2. ~~**B2: the agent cannot call its model.**~~ Repaired below.
 3. **The five `vpc-lattice` actions are on `*`.** They are the Runtime
    create handler's VPC-mode calls, and the handler does not say which
    resources they name.
@@ -177,6 +174,30 @@ construct, not cfn-exec:
 5. **F4: nothing constrains an agent-path role's trust policy.** A template
    merged to `main` could make one that something other than AgentCore can
    assume. The fix is for S5's synth check to also read the principal.
+
+## B2 — the agent could not call its model (`security-reviewer`, this PR)
+
+**The defect.** `GovernedAgent` granted invoke on
+`application-inference-profile/agentkeel-refagent`. AWS gives an
+application profile a generated id, so that ARN named nothing. The runtime
+was also handed `us.anthropic.claude-sonnet-4-6`, the system profile, which
+the role was never granted. The stack would have deployed, and every call
+the load check made would have been refused.
+
+**The repair, in `infra/construct/governed_agent.py`.**
+- The role grants invoke on the ARN CloudFormation returns for the profile
+  (`attr_inference_profile_arn`). The runtime is given that same ARN.
+- The foundation model is granted in the three regions a `us.` profile
+  routes to, conditioned on `bedrock:InferenceProfileArn` being the agent's
+  own profile. So the model is reachable only through the profile.
+- `bedrock:Converse` is dropped: it is not an IAM action.
+
+`tests/test_construct.py` has four new tests. All four fail on the construct
+before the repair, and pass after it. None of this is observed until a
+runtime answers a call.
+
+**No redeploy of the bootstrap stack is needed for B2.** It lands with the
+agent stack when `deploy.yml` first runs.
 
 ## Still to land in PR 3
 

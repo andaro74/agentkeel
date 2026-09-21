@@ -159,3 +159,47 @@ def test_a_rule_to_an_approved_endpoint_on_a_wider_port_range_is_refused():
     assert "udp 443-443" in _egress_refusal({**exact, "ipProtocol": "udp"}, [approved])
     # an absent destination is 0.0.0.0/0 (SPEC/01 §6)
     assert "no destination" in _egress_refusal({"ipProtocol": "tcp", "toPort": 443}, [approved])
+
+
+# --- B2 (M01 PR 3): the agent can call the model it is given ---------------
+#
+# The role named `application-inference-profile/agentkeel-refagent`, which
+# is no ARN AWS assigns, and the runtime was handed the system profile,
+# which the role was never granted. The stack would have deployed and every
+# call would have been refused. These read the rendered template.
+
+
+def agent_statements(template: dict) -> list[dict]:
+    policy = next(r for r in template["Resources"].values() if r["Type"] == "AWS::IAM::Policy")
+    return policy["Properties"]["PolicyDocument"]["Statement"]
+
+
+def profile_arn(template: dict) -> dict:
+    logical = next(k for k, r in template["Resources"].items()
+                   if r["Type"] == "AWS::Bedrock::ApplicationInferenceProfile")  # fmt: skip
+    return {"Fn::GetAtt": [logical, "InferenceProfileArn"]}
+
+
+def test_the_role_may_call_the_profile_aws_actually_made(template):
+    invoke = [s for s in agent_statements(template) if "bedrock:InvokeModel" in s["Action"] and "Condition" not in s]
+    assert len(invoke) == 1
+    assert invoke[0]["Resource"] == profile_arn(template), "a profile ARN built from its name names nothing"
+
+
+def test_the_runtime_is_given_the_profile_its_role_may_call(template):
+    runtime = next(r for r in template["Resources"].values() if r["Type"] == "AWS::BedrockAgentCore::Runtime")
+    assert runtime["Properties"]["EnvironmentVariables"]["AGENTKEEL_MODEL_PROFILE"] == profile_arn(template)
+
+
+def test_the_model_is_reachable_only_through_the_agents_own_profile(template):
+    direct = [s for s in agent_statements(template)
+              if "bedrock:InvokeModel" in s["Action"] and "foundation-model" in json.dumps(s["Resource"])]  # fmt: skip
+    assert len(direct) == 1
+    assert direct[0]["Condition"] == {"StringEquals": {"bedrock:InferenceProfileArn": profile_arn(template)}}
+    assert all(arn.endswith("::foundation-model/anthropic.claude-sonnet-4-6") for arn in direct[0]["Resource"])
+
+
+def test_no_action_the_role_names_is_one_iam_does_not_have(template):
+    """`bedrock:Converse` is not an IAM action; Converse is authorised as InvokeModel."""
+    named = {a for s in agent_statements(template) for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])}
+    assert "bedrock:Converse" not in named

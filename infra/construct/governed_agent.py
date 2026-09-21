@@ -24,6 +24,11 @@ ROOT = manifest_module.ROOT
 RUNTIME_TYPE = agentcore.CfnRuntime.CFN_RESOURCE_TYPE_NAME
 AGENT_ROLE_PATH = "/agentkeel/agents/"  # the key policy matches agent roles by path (ruling b)
 PORT = 443
+INVOKE = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+# Where a `us.` system profile routes, as the eval role has it
+# (infra/bootstrap/app.py, PROFILE_REGIONS). Repeated rather than imported:
+# the two stacks do not import each other.
+PROFILE_REGIONS = ("us-east-1", "us-east-2", "us-west-2")
 
 # Security-owned parameters. The bootstrap stack writes all but the two
 # prefix lists, which AWS gives no CloudFormation attribute for; the human
@@ -92,8 +97,8 @@ class GovernedAgent(Construct):
         self.boundary_arn = _parameter(self, "Boundary", BOUNDARY_PARAM)
         self.security_group = self._security_group(rules)
         self.rights_table = self._rights_table()
+        self.profile = self._inference_profile()  # before the role: the role names its ARN
         self.role = self._role(role, rules)
-        self.profile = self._inference_profile()
         self.runtime = self._runtime(image_digest or UNPINNED)
 
     # --- the network -------------------------------------------------------
@@ -157,11 +162,31 @@ class GovernedAgent(Construct):
                 self, "BoundaryPolicy", self.boundary_arn),
             description=f"agentkeel {self.agent_name}: what the runtime runs as, inside the boundary.",
         )  # fmt: skip
-        profile_arn = self._profile_arn()
+        # B2 (M01 PR 3). This used to name the profile by
+        # `application-inference-profile/agentkeel-<name>`, but AWS gives an
+        # application profile a generated id, so that ARN named nothing, and
+        # the runtime was pointed at the system profile, which the role was
+        # never granted. Now the role names the ARN CloudFormation returns,
+        # and the runtime is given the same one (below).
+        #
+        # A call through the profile is authorised twice: on the profile, and
+        # on the foundation model in whichever region the source profile
+        # routes to. The second is conditioned on this profile, so the model
+        # is reachable through it and not directly. `bedrock:Converse` was
+        # listed here and is not an IAM action; Converse is authorised as
+        # InvokeModel.
+        profile_arn = self.profile.attr_inference_profile_arn
         role.add_to_policy(iam.PolicyStatement(
             sid="InvokeItsOwnProfileOnly",
-            actions=["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream", "bedrock:Converse"],
+            actions=INVOKE,
             resources=[profile_arn],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="TheModelOnlyThroughItsOwnProfile",
+            actions=INVOKE,
+            resources=[f"arn:aws:bedrock:{region}::foundation-model/{self._foundation_model()}"
+                       for region in PROFILE_REGIONS],
+            conditions={"StringEquals": {"bedrock:InferenceProfileArn": profile_arn}},
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="ReadTheRightsTableAndNeverWriteIt",
@@ -178,10 +203,13 @@ class GovernedAgent(Construct):
 
     # --- the model ---------------------------------------------------------
 
-    def _profile_arn(self) -> str:
-        stack = cdk.Stack.of(self)
-        return (f"arn:aws:bedrock:{stack.region}:{stack.account}:application-inference-profile/"
-                f"agentkeel-{self.agent_name}")  # fmt: skip
+    def _foundation_model(self) -> str:
+        """`us.anthropic.claude-sonnet-4-6` -> `anthropic.claude-sonnet-4-6`: the model the profile routes to."""
+        profile = self.manifest["model"]["profile"]
+        prefix, _, model = profile.partition(".")
+        if prefix != "us" or not model:
+            raise ValueError(f"{profile}: the construct knows the us. profile's regions only ({PROFILE_REGIONS})")
+        return model
 
     def _inference_profile(self) -> bedrock.CfnApplicationInferenceProfile:
         """One profile per agent, so spend carries the agent's tag (SPEC/01 §6, ruling a)."""
@@ -218,7 +246,9 @@ class GovernedAgent(Construct):
             ),
             environment_variables={
                 "AGENTKEEL_BUNDLE": self.bundle,
-                "AGENTKEEL_MODEL_PROFILE": self.manifest["model"]["profile"],
+                # The agent's own profile, which its role may call, not the
+                # system profile it copies from, which its role may not (B2).
+                "AGENTKEEL_MODEL_PROFILE": self.profile.attr_inference_profile_arn,
                 "AGENTKEEL_RIGHTS_TABLE": self.rights_table.table_name,
             },
         )  # fmt: skip
