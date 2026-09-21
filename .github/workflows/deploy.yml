@@ -185,6 +185,12 @@ jobs:
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "image $REGISTRY/$IMAGE@$digest" >> "$GITHUB_STEP_SUMMARY"
 
+      # The execution role by its fixed name (item 7, M01 PR 3). This step
+      # used to read it from `describe-stacks --stack-name AgentkeelBootstrap`,
+      # but the deploy role may describe `stack/agentkeel-*/*` only, and IAM
+      # ARN matching is case-sensitive, so the call would have been refused.
+      # get-caller-identity needs no grant, and the name is the one the
+      # deploy role's PassRole already names.
       - name: Deploy refagent's stack
         env:
           AGENTKEEL_IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
@@ -195,8 +201,7 @@ jobs:
             --stack-name agentkeel-refagent \
             --template-file "infra/construct/cdk.out/$STACK.template.json" \
             --capabilities CAPABILITY_NAMED_IAM \
-            --role-arn "$(aws cloudformation describe-stacks --stack-name AgentkeelBootstrap \
-              --query "Stacks[0].Outputs[?OutputKey=='ExecutionRoleArn'].OutputValue" --output text)" \
+            --role-arn "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/agentkeel-cfn-exec" \
             --no-fail-on-empty-changeset
 
       - name: Load the rights table

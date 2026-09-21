@@ -6,7 +6,8 @@
 # evals.yml gained the item 18 probe and the S4/S6 CloudTrail lookups.
 # Rewritten again at M01 PR 2 when deploy.yml took the BLOCK F refusal,
 # and once more when evals.yml took `shell: bash` (cold review B1).
+# Rewritten at M01 PR 3 when deploy.yml stopped describing AgentkeelBootstrap (item 7).
 0d938815e7d3756e05659beb95a82f490b521a183bf34f9584cd98874cf36567  .github/workflows/cold-review-ruling.yml
-f0e491db7d3304f51921fb5b6266adc3e66ab6a2b0241a929c9ed813dd19466d  .github/workflows/deploy.yml
+e72435b88374b920c512be835960ffb564a188871d9272aac61a5d7e8e907583  .github/workflows/deploy.yml
 f1f1f283f6ea772c46f149914b028424dcacb5d460fa750730fd7210b92991f6  .github/workflows/evals.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml
