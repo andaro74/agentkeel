@@ -13,6 +13,8 @@ authorises:
   - infra/ruleset/README.md
   - infra/bootstrap/app.py
   - infra/construct/governed_agent.py
+  - infra/construct/app.py
+  - infra/construct/AwsSolutions--AgentkeelRefagent-NagReport.csv
   - infra/bootstrap/AwsSolutions--AgentkeelBootstrap-NagReport.csv
   - .github/workflows/deploy.yml
   - milestones/M01/rulings/pr3.md
@@ -156,13 +158,8 @@ AWS has honoured.
 these is repaired here, because each changes the agent's ceiling or the
 construct, not cfn-exec:
 
-1. **B1: the runtime probably cannot pull its image.** Neither the agent
-   role nor `agentkeel-boundary` allows `ecr:BatchGetImage`,
-   `ecr:GetDownloadUrlForLayer` or `ecr:GetAuthorizationToken`. Adding them
-   widens the boundary that seeds S5 and S6 read, so it needs a ruling that
-   says both still fire. F6 is the same question on the network side: the
-   VPC has no ECR endpoints, and it is not known whether AgentCore pulls
-   through it.
+1. ~~**B1: the runtime probably cannot pull its image.**~~ Ruled and
+   repaired below, with F5 and F6.
 2. ~~**B2: the agent cannot call its model.**~~ Repaired below.
 3. **The five `vpc-lattice` actions are on `*`.** They are the Runtime
    create handler's VPC-mode calls, and the handler does not say which
@@ -198,6 +195,63 @@ runtime answers a call.
 
 **No redeploy of the bootstrap stack is needed for B2.** It lands with the
 agent stack when `deploy.yml` first runs.
+
+## B1 — the runtime could not pull its own image; ruling d amended
+
+**The defect.** AWS's documentation settles two facts
+([runtime permissions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html),
+[VPC mode](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-vpc.html),
+read 2026-09-21):
+- the runtime pulls its image **as its own execution role**;
+- in a VPC with no internet access, `ecr.api` and `ecr.dkr` interface
+  endpoints are **required**, and so is the S3 gateway endpoint for the image
+  layers.
+
+Against that, the platform as built fails in four places:
+- the agent boundary allows no `ecr:*` read and no `logs:CreateLogGroup`;
+- the agent role grants neither;
+- the VPC has no ECR endpoint;
+- the S3 endpoint's policy allows only this account's buckets, and the layers
+  live in an AWS-owned bucket.
+
+The fourth was not in `security-reviewer`'s report. It came from the
+documentation.
+
+**Ruling d, amended (Security, 2026-09-21).** `endpoint_allowlist` holds
+AWS service names only. The enum is now **seven**: `bedrock-runtime`,
+`dynamodb`, `ecr.api`, `ecr.dkr`, `kms`, `logs`, `s3`. The two new names are
+interface endpoints of the bootstrap VPC, reached by their security groups
+like the other three. Everything else in ruling d stands. The alternative —
+the platform adding ECR egress that the manifest does not list — is ruled
+out. It would give refagent's own stack "egress not in the manifest", the
+words of F1.1's falsifier, and that falsifier is not reworded after its
+plant. **A manifest without `ecr.api` and `ecr.dkr` is refused at synth**: a
+container agent cannot pull its image without them, and a refusal before the
+deploy says why, where a failed pull after it would not.
+
+**The repair:**
+
+| | Change | Where |
+|---|---|---|
+| a | `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`, `ecr:GetAuthorizationToken`, `logs:CreateLogGroup`, `logs:DescribeLogStreams`, `logs:DescribeLogGroups` added to the agent allow-list. No ECR write. `kms:GetKeyPolicy` stays allowed and the key policy still denies it (S6); a role without the boundary is still refused at synth (S5). | `agentkeel-boundary` |
+| b | The same grants on the agent role: pull on `repository/agentkeel-<name>` only, the log group under `/aws/bedrock-agentcore/runtimes/` | `governed_agent.py` |
+| c | Interface endpoints `ecr.api` and `ecr.dkr`, each publishing its security group as a parameter, as the other three do | bootstrap VPC |
+| d | The S3 gateway endpoint also allows `s3:GetObject` on `prod-us-west-2-starport-layer-bucket/*`, the regional ECR layer bucket, and nothing else outside the account | bootstrap VPC |
+| e | Schema enum 5 → 7; refagent lists both; the construct refuses a manifest without them | `src/manifest/schema.json`, `agents/refagent/manifest.yaml`, `governed_agent.py` |
+
+**What this costs.** Two interface endpoints in two AZs: about USD 29 a
+month at us-west-2 list price, before data.
+
+**What it leaves open.**
+- It is not known yet whether the pull runs through the runtime's network
+  interface, and so through its security group. If it does not, e's egress
+  rules are unused, and a to d still matter. The first deploy settles it.
+- `docs/adr/ADR-0006` says "the five names". It is now seven, and that ADR
+  is Product's to amend.
+- AWS's example execution role also grants X-Ray and
+  `cloudwatch:PutMetricData`. Both are left out: they carry telemetry, and
+  the runtime does not need them to answer. If a missing one ever stops the
+  runtime, the deploy's load check will say so.
 
 ## Still to land in PR 3
 
