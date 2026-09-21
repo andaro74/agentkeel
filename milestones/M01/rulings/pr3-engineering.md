@@ -43,11 +43,9 @@ its command does not end in `|| true` or its kin, there is exactly one such
 step, the `record` job still refuses a REJECTED envelope, and one test
 *runs* both bash invocations rather than asserting the claim from memory.
 
-**Two routes are still not covered, and are item 6 of `pr3.md`'s list.** A
-step whose `if:` is edited to something never true is skipped, and a skipped
-step fails nothing; these tests do not read the step's `if:`. And the
-`Makefile` could lose `exit $code`, which lives in another file. The claim
-these ten tests support is exact and narrow:
+**Item 6 of `pr3.md`'s list closed the two routes these ten did not cover.**
+The seven cases are below. The claim the file now supports is still exact and
+narrow:
 
 > the known ways to make the eval job stop failing on a RED gate, and the
 > known ways to make the credential-free job stop running, are each refused.
@@ -56,6 +54,35 @@ It is **not** "the job cannot be made to pass a RED envelope". PR 2's cold
 review found three checks written narrower than their own titles, all in
 this file's ancestry; the line above is written so this one cannot join
 them.
+
+## Item 6: the two routes, `tests/test_evals_workflow.py` 10 to 17
+
+| Test | What breaks it |
+|---|---|
+| `test_every_run_of_the_eval_job_is_either_measured_or_gated` | the `make evals` step's or the recorded-gate step's `if:` changed from exact complements on `measured_at` (`if: false`, a misspelt output); the recorded path no longer running the gate; an `if:` on the step that writes `measured_at` |
+| `test_the_makefile_exits_with_the_gates_code` (6) | the rendered recipe turning the gate's 1 or 2 into anything else, in both chain variants |
+
+The Makefile test reads behaviour, not text. `make -n` renders the recipe as
+`make evals` would run it; the gate call is swapped for `(exit N)`, and the
+line runs in `sh`, as make runs it. It skips where GNU make is absent, and
+`ubuntu-latest` has it.
+
+**Broken on purpose, in a worktree at `4095aa4`:**
+
+| Mutation | Result |
+|---|---|
+| `exit $$code` → `true` | 4 cases fail (codes 1 and 2, both variants) |
+| `exit $$code` → `exit 0` | 4 cases fail |
+| the `make evals` step's `if:` → `false` | the complement test fails |
+| the recorded gate's `if:` output name misspelt | the complement test fails |
+
+**Still not covered:**
+- a step added after `make evals` that removes or rewrites the envelope
+  before `record` reads it is a different route, and nothing here reads it;
+- the complement test holds these two steps, not every step a later edit
+  could add;
+- a PR that edits a test and the file it guards in one commit still passes
+  (M02, `workflow-hash`'s own caveat).
 
 ## BLOCK F and item 7: `tests/test_bootstrap.py`, 17 cases to 38
 
@@ -67,7 +94,7 @@ synthesised in the test, and `deploy.yml`'s own text.
 |---|---|
 | `test_every_resource_type_the_construct_renders_is_one_the_grant_knows` | a resource type added to `GovernedAgent` with no row in the grant table, or a row for one it no longer renders |
 | `test_the_execution_role_may_make_what_the_construct_renders` (7) | a create, read or rollback action missing for any one type |
-| `test_the_execution_role_may_resolve_the_security_parameters` | the construct's SSM parameter count changing, or `ssm:GetParameters` leaving `/agentkeel/security/*` |
+| `test_the_execution_role_may_resolve_the_security_parameters` | a parameter the construct reads outside `/agentkeel/security/`, or `ssm:GetParameters` leaving that path |
 | `test_the_execution_role_grants_no_service_wildcard_and_no_delete_of_the_table` | any `svc:*`, `DeleteTable`, or a write to the table's items |
 | `test_the_execution_role_makes_security_groups_in_the_platform_vpc_only` | the `ec2:Vpc` condition dropped |
 | `test_the_execution_role_passes_an_agent_role_to_agentcore_only` | `iam:PassedToService` dropped, or PassRole off the agent path |
@@ -148,7 +175,7 @@ as evidence that this guard held.
 ## What a reader can run
 
 ```bash
-uv run pytest tests/test_evals_workflow.py -q      # 10 passed
+uv run pytest tests/test_evals_workflow.py -q      # 17 passed
 
 # Break it on purpose. Each of these must turn one test red.
 # (Restore the file afterwards: `git checkout -- .github/workflows/evals.yml`)

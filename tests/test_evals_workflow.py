@@ -167,3 +167,69 @@ def test_the_record_job_still_refuses_an_envelope_the_gate_rejected(workflow):
         "the record job must commit only for GREEN (0) and RED/UNMEASURED (1); "
         "a REJECTED envelope (2) is not evidence"
     )
+
+
+# --- item 6 (M01 PR 3): the two routes the tests above did not cover ---------
+#
+# A skipped step fails nothing, and the Makefile is a second file. Either route
+# made the required check green on a RED envelope with every test above green.
+
+
+def step_named(workflow: dict[str, Any], name: str) -> dict[str, Any]:
+    found = [s for s in workflow["jobs"]["evals"]["steps"] if s.get("name") == name]
+    assert len(found) == 1, f"evals has {len(found)} steps named {name!r}"
+    return found[0]
+
+
+def condition(step: dict[str, Any]) -> str:
+    return " ".join(str(step.get("if", "")).split())
+
+
+def test_every_run_of_the_eval_job_is_either_measured_or_gated(workflow):
+    """Route 1: a step `if:` edited to something never true.
+
+    The job splits on one output: a tree not yet measured runs `make evals`, a
+    tree already measured gates the envelope on record. The two conditions are
+    held to exact complements of each other, so neither can be edited to never
+    run without this failing — `if: false`, a misspelt output, `== 'never'`.
+    That is narrower than "the job always gates", and says so: it holds these
+    two steps, not every step a later edit could add.
+    """
+    measure = measuring_steps(workflow)[0]
+    recorded = step_named(workflow, "Gate the recorded envelope")
+    assert condition(measure) == "steps.current.outputs.measured_at == ''"
+    assert condition(recorded) == "steps.current.outputs.measured_at != ''"
+    assert "verdict.gate" in str(recorded.get("run", "")), "the recorded path no longer runs the gate"
+    # The output they split on is always written: its step has no `if:` of its own.
+    producer = [s for s in workflow["jobs"]["evals"]["steps"] if s.get("id") == "current"]
+    assert len(producer) == 1 and "if" not in producer[0]
+    assert "measured_at" in str(producer[0].get("run", ""))
+
+
+@pytest.mark.parametrize("variant", [{"AGENT_RUNNER": ""}, {"AGENT_RUNNER": "src/agent/run.py", "GATE_EXIT": "x"}],
+                         ids=["control-only", "with-agent"])  # fmt: skip
+@pytest.mark.parametrize("gate_exit", [0, 1, 2])
+def test_the_makefile_exits_with_the_gates_code(variant, gate_exit):
+    """Route 2: the Makefile losing `exit $$code`.
+
+    Behaviour, not text: `make -n` renders the recipe exactly as `make evals`
+    would run it, the gate is swapped for a command exiting `gate_exit`, and
+    the line runs in `sh` as make runs it. Every code must come out unchanged:
+    a RED (1) or REJECTED (2) that came out 0 would pass the required check.
+    """
+    import shutil
+    import subprocess
+
+    if shutil.which("make") is None:
+        pytest.skip("GNU make is not on this machine")
+    rendered = subprocess.run(
+        ["make", "-n", "evals-local", *(f"{k}={v}" for k, v in variant.items())],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    ).stdout  # fmt: skip
+    lines = [line for line in rendered.splitlines() if "src.verdict.gate" in line]
+    assert len(lines) == 1, rendered
+    gate_call = lines[0].split(";")[0]
+    assert "src.verdict.gate" in gate_call, "the gate is no longer the first command on its line"
+    line = lines[0].replace(gate_call, f"(exit {gate_exit})", 1).replace('"x"', "/dev/null")
+    ran = subprocess.run(["sh", "-c", line], cwd=ROOT, check=False)
+    assert ran.returncode == gate_exit, f"the recipe turned the gate's {gate_exit} into {ran.returncode}: {lines[0]}"

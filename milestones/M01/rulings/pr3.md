@@ -360,7 +360,7 @@ reference, and a simulation reads IAM, not the service. The first run of
 | 3 | The first real deploy, and construct tenancy with it: claim 1's second half, the P3 exception named in ledger row 1 | Security |
 | 4 | **ADR-0007**: the envelope's mode field, plus region and model version (`schema.json` is `additionalProperties: false`) | Product, with Threshold Owner |
 | 5 | **BLOCK D**: SPEC/01 §5's wording for S8 takes the narrowing | Security |
-| 6 | The two routes `tests/test_evals_workflow.py` does not cover: a step `if:` edited to never-true, and the `Makefile` losing `exit $code` | Engineering |
+| 6 | ~~The two routes `tests/test_evals_workflow.py` did not cover~~ — covered, 7 cases, each broken on purpose (`pr3-engineering.md`) | Engineering |
 | 7 | ~~`deploy.yml:198` reads `--stack-name AgentkeelBootstrap`~~ — written (above); holds once `deploy.yml` runs | Security |
 
 PR 4 must close the milestone. There is no fifth PR; if this list will not
