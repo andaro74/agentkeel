@@ -6,7 +6,11 @@
 # its server) and boto3. What is not: data/, so nothing in the image can
 # answer from a copy of the rights table. The deployed runtime reads the
 # table through the VPC's gateway endpoint or it does not answer.
-FROM public.ecr.aws/docker/library/python:3.14-slim
+#
+# arm64, pinned here and not left to the machine that builds it: AgentCore
+# Runtime runs arm64 images only (M02 PR 2). deploy.yml builds on an arm64
+# runner and refuses any other architecture before it pushes.
+FROM --platform=linux/arm64 public.ecr.aws/docker/library/python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app

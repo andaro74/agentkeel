@@ -43,6 +43,6 @@ def test_the_build_step_reads_the_architecture_before_it_pushes_or_reuses():
     workflow = yaml.safe_load(DEPLOY.read_text(encoding="utf-8"))
     build = next(s for s in workflow["jobs"]["deploy"]["steps"] if s.get("id") == "image")
     script = build["run"]
-    # Both branches: the fresh build, and the image already under this tag.
-    assert script.count("{{.Architecture}}") >= 2, "both the push and the reuse branch read the architecture"
-    assert "arm64" in script
+    # One reader, called from both branches: the fresh build, and the image already under this tag.
+    assert "{{.Architecture}}" in script and '"arm64"' in script
+    assert script.count('refuse_unless_arm64 "') >= 2, "both the push and the reuse branch read the architecture"
