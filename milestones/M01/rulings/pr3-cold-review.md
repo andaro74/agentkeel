@@ -3,7 +3,7 @@
 # Engineering's ("that it works"); the seats' own keys for the paths the
 # repairs touch are in pr3.md (Security), pr3-engineering.md (Engineering),
 # pr3-product.md (Product) and pr3-threshold-owner.md (Threshold Owner).
-ruling: DRAFT
+ruling: pr3-cold-review
 seat: Engineering
 authorises:
   - milestones/M01/rulings/pr3-cold-review.md
