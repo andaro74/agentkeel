@@ -370,9 +370,12 @@ Build: CODEOWNERS routing; `ruling-cited`; `two-key`; computed semver
 (schema/edge change = major); edges declared both sides; cycle and
 ceiling check on the org graph; `bypass_actors: []`; workflow-hash check
 in `validate`.
-Seeded: threshold relaxed without a ruling; golden edited to green a
-build; one-sided edge; owner tries to bypass a red check; a golden id
-renamed.
+Seeded: threshold relaxed with one key (ruled at M02 PR 1 from "without
+a ruling": a change with no ruling is refused by `ruling-cited` whatever
+it changes, so it would not read `two-key`; SPEC/02 §5 S1 carries one
+Threshold Owner ruling, and a second form two files from that one seat);
+golden edited to green a build; one-sided edge; owner tries to bypass a
+red check; a golden id renamed.
 Falsifiers: F2.1 any of the five merges. F2.2 the three-doors demo
 (Door 1 blocked by gate, Door 2 merged properly, Door 3 blocked by two
 gates) is not reproducible from the PR record.

@@ -86,7 +86,7 @@ the diff; you do not merge.
 | `evals/goldens/**`, `data/**` | Data Owner | `ruling-cited`, `two-key` on retire |
 | `tools/**`, `agents/*/tools/**`, `may_call`, `may_be_called_by` | Tool Owner | `ruling-cited`, computed semver |
 | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region | Threshold Owner | `two-key` on any downward move |
-| `.github/workflows/**`, `infra/**` (incl. `infra/bootstrap/**`, `infra/construct/**`), key policy, cosign identity, seats → groups in a manifest | Security | `ruling-cited`, `security-reviewer` |
+| `.github/workflows/**`, `.github/CODEOWNERS` (ADR-0003 amendment 2), `infra/**` (incl. `infra/bootstrap/**`, `infra/construct/**`), key policy, cosign identity, seats → groups in a manifest | Security | `ruling-cited`, `security-reviewer` |
 | `src/**`, `scripts/**`, `tests/**`, `Makefile`, `pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`, `.gitattributes`, `agents/<name>/**` (but for the rows above and the manifest fields their seats own), `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | Engineering | `cold-review-ruling`; `two-key` on a human commit to `evals/history/**` |
 | `.claude/agents/<name>.md` | the seat in its `seat:` front matter | `ruling-cited` |
 

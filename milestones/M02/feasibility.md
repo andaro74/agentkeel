@@ -98,7 +98,23 @@ its own seed.
 | 14 | Product | F2.2 Door 3 now says two gates. SPEC/02 §6 says `ruling-cited` on `.github/workflows/**` and `infra/**` needs a Security ruling covering a workflow and its hash together (row 7's first half); §8 and §10 say the second half, hashing what a workflow runs, is M05's. |
 | 15 | Product | §6 below. PR 1 carries rows 1, 2, 8, 9, 14 (with 2), 17, 21, 22; the rest are re-dated with a seat. |
 
-### 2.4 Rulings for M02 PR 2 open
+### 2.4 The two seat reports on this PR (in the PR body verbatim)
+
+Both open with the line the amended `/cold-review` requires, and both
+read the diff. `security-reviewer`: 0 BLOCK, 5 FINDING, 13 NOTE.
+`engineering-cold-reviewer`: 0 BLOCK, 5 FINDING, 5 NOTE, with its draft
+and the status of every item in `rulings/pr1-cold-review.md`.
+
+From the security report, taken now: `ruling-cited` reads CODEOWNERS
+from the base ref (SPEC/02 §6); a customer key for the rights table is
+a change to R4's deny, not a construct edit (open.md row 24, M05);
+ADR-0008 says which of its checks exist at its date. Carried to PR 2
+open for Security (`milestones/M02/README.md`, "For the seats"): which
+ruleset fields the live compare reads; the order of the ruleset edit and
+the export; which job does the compare and with which token; `gates.yml`
+with no fork condition; the rule-suites API and `administration:read`.
+
+### 2.5 Rulings for M02 PR 2 open
 
 Named in `milestones/M02/README.md`, "For the seats, at M02 PR 2 open".
 Each is a decision a seat makes before PR 2's first commit; none is made

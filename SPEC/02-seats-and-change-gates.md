@@ -62,7 +62,9 @@ files, and nothing here pretends otherwise.
   file's `evidence:`. An ADR is evidence, never a ruling on its own.
 - **Covers.** A ruling covers a changed path when `seat:` is that path's
   CODEOWNERS owner, one of its `authorises:` globs matches the path, and
-  `pr:` is this PR's number.
+  `pr:` is this PR's number. **A ruling file with this PR's `pr:` covers
+  itself**, whatever its `seat:`, or every PR would need a Product key to
+  add the file that names its own seat (cold review of PR 1, F1).
 - **Relaxation.** Any of: a bar in `thresholds.yaml` moved in the
   direction its own `relaxes:` field names; a golden's `retired` set from
   null; a golden's `expected` changed on an id that has ever passed in
@@ -228,8 +230,12 @@ None of it is in PR 1.
   enforcement.
 - **`src/gates/ruling_cited.py`** (Engineering), run by `gates.yml`
   (Security) on every PR as the required check `ruling-cited`: for every
-  path in `git diff base...merge-ref`, the CODEOWNERS owner; for every
-  seat-owned path, a ruling file in the merge ref that covers it. Paths
+  path in `git diff base...merge-ref`, the CODEOWNERS owner **read from
+  the base ref**, never from the PR, so a PR cannot move a path to a seat
+  whose ruling it carries; a change to `.github/CODEOWNERS` itself is
+  covered only by a `seat: Security` ruling under the base's table
+  (`security-reviewer` on PR 1, §2). For every seat-owned path, a ruling
+  file in the merge ref that covers it. Paths
   under `evals/history/**` by `github-actions[bot]` are exempt. Exit 1
   with every uncovered path listed, never the first; the list is in the
   job log, which `observe_pr.py` reads. A PR that edits a workflow and

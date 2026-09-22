@@ -19,8 +19,16 @@
 # not, attempt 1 rests on the PR's unmerged state and the human's output,
 # and feasibility.md says so.
 #
-# Each observed entry: what, at (ISO 8601, UTC), and the fields its attempt
-# names.
+# Each observed entry carries: what; at (ISO 8601, UTC); the human's own
+# output as `message`. Attempt 1 also: `result` (refused | merged),
+# `request_url`. Attempt 2 also: `validate_result` (RED | GREEN) while the
+# actor was listed, `bypass_actors_after` (the list after the restore, must
+# be []), `updated_at_before`, `updated_at_during`, `updated_at_after`.
+#
+# `tests/test_m02_seeds.py::test_s4_the_owner_was_refused` reads these
+# entries and the export's bypass_actors. It is the weaker witness of the
+# two SPEC/02 §4 names: it passes on what the human typed. checks.F2_1
+# passes only if PR 3's API lookup agrees with it.
 seed: S4
 falsifier: F2.1, F2.2 Door 3
 principal: the repository owner, andaro74, with admin on andaro74/agentkeel

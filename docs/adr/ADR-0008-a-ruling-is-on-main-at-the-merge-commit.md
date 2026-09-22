@@ -36,8 +36,9 @@ seat-owned path, `milestones/**`, and need a ruling before it.
    diff reaches `main` by any other commit (`allowed_merge_methods:
    ["merge"]`, `infra/ruleset/main.json`).
 2. **`cold-review-ruling`, `ruling-cited` and `two-key` read the PR's
-   merge ref.** A ruling the PR carries counts. What the gate checks
-   about it is what makes it a ruling and not a note: `seat:` is the
+   merge ref.** A ruling the PR carries counts. At this ADR's date only
+   `cold-review-ruling` exists and it checks `pr:` alone; from M02 PR 2
+   what the gates check is what makes it a ruling and not a note: `seat:` is the
    CODEOWNERS owner of every path it authorises; `authorises:` covers
    every seat-owned path in the diff; a relaxation has a second file from
    a distinct seat with the same `pr:`; the file is under `milestones/**`

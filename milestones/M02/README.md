@@ -68,7 +68,16 @@ Written at M02 PR 1 open. The row in `milestones/README.md` is the one
   on a fork PR (row 11); whether the rule-suites API records a refused
   `--admin` merge (finding 3), read at the attempt; destroy
   `AgentkeelM00EvalRole` so PR 2 can remove `infra/eval-role/` (row 16);
-  read the first successful deploy (row 10).
+  read the first successful deploy (row 10). From the
+  `security-reviewer` report on PR 1 (PR body): (a) which ruleset fields
+  `validate`'s live-vs-export compare reads (`enforcement`, `conditions`,
+  `rules`, `bypass_actors`; not `updated_at`, `node_id`, `_links`), or
+  S4 attempt 2 leaves it RED after `bypass_actors` is restored; (b) the
+  order of the ruleset edit and the export, or `checks` is red on every
+  branch between them for a reason that is not the seed, and S3's and
+  S5's expected check proves nothing; (c) which job does the live compare
+  and with which token, and that `gates.yml` has no fork condition;
+  (d) `ruling_cited.py` reads CODEOWNERS from the base ref (SPEC/02 §6).
 - **Threshold Owner:** `relaxes:` on every bar in `thresholds.yaml`; the
   cap against 54,156 measured; `max_tokens_per_session` and `daily_usd`
   (row 18); and, before the seed PRs are opened, that five seed PRs each
