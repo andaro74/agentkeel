@@ -236,3 +236,15 @@ def test_no_action_the_role_names_is_one_iam_does_not_have(template):
     """`bedrock:Converse` is not an IAM action; Converse is authorised as InvokeModel."""
     named = {a for s in agent_statements(template) for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])}
     assert "bedrock:Converse" not in named
+
+
+def test_the_roles_logs_and_key_are_its_own_not_the_accounts(template):
+    """PR 3 security-reviewer F6: both were on `*`, which reached any key whose policy delegates to IAM."""
+    stmts = {s.get("Sid"): s for s in agent_statements(template)}
+    streams = stmts["ItsOwnLogStreams"]
+    assert ":log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*" in json.dumps(streams["Resource"])
+    key = stmts["ItsOwnKeyByAlias"]
+    assert key["Condition"] == {"ForAnyValue:StringEquals": {"kms:ResourceAliases": "alias/agentkeel-refagent"}}
+    assert not [s for s in agent_statements(template) if s["Resource"] == "*"
+                and {"kms:Decrypt", "logs:PutLogEvents"} & set(s["Action"] if isinstance(s["Action"], list)
+                                                              else [s["Action"]])]  # fmt: skip

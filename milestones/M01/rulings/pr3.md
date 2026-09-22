@@ -118,7 +118,7 @@ per resource type `GovernedAgent` renders, and nothing for a type it does
 not render: security groups only in the platform VPC (`ec2:Vpc`), the table
 with no `DeleteTable` (it is RETAIN), `iam:PassRole` on the agent path to
 `bedrock-agentcore.amazonaws.com` only, `ssm:GetParameters` on
-`/agentkeel/security/*` for the eight parameters CloudFormation resolves, and
+`/agentkeel/security/*` for the parameters CloudFormation resolves (ten since B1), and
 AgentCore's network service-linked role by service name. The deploy role gets
 what each step of `deploy.yml` calls: `ecr:GetAuthorizationToken`, the push
 actions on `repository/agentkeel-*`, `dynamodb:PutItem` and `DescribeTable`
@@ -392,7 +392,7 @@ correct: no refagent stack exists until this PR merges.
 |---|---|---|
 | 1 | ~~The live ruleset `PUT` and re-export~~ — done, `5693447` | Security |
 | 2 | ~~**BLOCK F**~~ — grants deployed, read back 42/42, `refuse` job deleted (above) | Security |
-| 3 | The first real deploy, and construct tenancy with it: claim 1's second half, the P3 exception named in ledger row 1 | Security |
+| 3 | **The first real deploy is this PR's merge.** Construct tenancy is *read* at M01 PR 4's run, not in PR 3 (ADR-0007, P2; ledger row 1). What PR 3 lands is the machinery: the envelope's `mode`, the digest match, and the gate reading row 1 as UNMEASURED on any envelope that did not run in the runtime | Security |
 | 4 | **ADR-0007**: the envelope's mode field, plus region and model version (`schema.json` is `additionalProperties: false`) | Product, with Threshold Owner |
 | 5 | ~~**BLOCK D**: SPEC/01 §5 takes the narrowing~~ — done: SPEC/01 §2 and §5 and the explainer, keyed in `pr3-product.md`. Security reworded `governed_agent.py`'s refusal and `infra/construct/__init__.py`'s docstring (whose "no role's policy grants it today" went stale in this PR). The S8 fixture's docstring keeps the old sentence: it is a planted seed | Security rules, Product keys the text |
 | 6 | ~~The two routes `tests/test_evals_workflow.py` did not cover~~ — covered, 7 cases, each broken on purpose (`pr3-engineering.md`) | Engineering |

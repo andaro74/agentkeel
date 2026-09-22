@@ -222,10 +222,21 @@ class GovernedAgent(Construct):
             actions=["ecr:GetAuthorizationToken", "logs:DescribeLogGroups"],
             resources=["*"],
         ))  # fmt: skip
+        # These two were one statement on `*` (PR 3 security-reviewer, F6). The
+        # log streams are the runtime's own, under AgentCore's prefix. The key
+        # is this agent's, named by its alias: `*` reached any key in the
+        # account whose policy delegates to IAM. The alias is the bootstrap
+        # stack's (`alias/agentkeel-<name>`), which names one key per agent.
         role.add_to_policy(iam.PolicyStatement(
-            sid="ItsOwnLogsAndItsOwnKey",
-            actions=["logs:CreateLogStream", "logs:PutLogEvents", "kms:Decrypt", "kms:GenerateDataKey"],
-            resources=["*"],
+            sid="ItsOwnLogStreams",
+            actions=["logs:CreateLogStream", "logs:PutLogEvents"],
+            resources=[f"arn:aws:logs:{stack.region}:{stack.account}:log-group:{RUNTIME_LOG_GROUPS}*:log-stream:*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ItsOwnKeyByAlias",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[f"arn:aws:kms:{stack.region}:{stack.account}:key/*"],
+            conditions={"ForAnyValue:StringEquals": {"kms:ResourceAliases": f"alias/agentkeel-{self.agent_name}"}},
         ))  # fmt: skip
         rules.own_role(role, self.boundary_arn, given=False)
         return role

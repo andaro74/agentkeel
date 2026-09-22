@@ -242,7 +242,7 @@ jobs:
           uv run python scripts/observe_attempt.py milestones/M01/runs/f1_3_key_policy.yaml --out "$RUNNER_TEMP/s6.json"
 
       # ADR-0007, P1 (Option B). refagent is measured in the deployed runtime
-      # only when the runtime runs this tree's bytes: the bundle digest this
+      # only when the runtime runs this tree's bundle: the bundle digest this
       # tree packs to is among the tags of the image the runtime pins. Then
       # `make evals` gets the runtime's ARN, and the envelope says `mode:
       # runtime`. Otherwise it gets none, the run measures in the runner, and

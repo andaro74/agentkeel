@@ -160,9 +160,22 @@ jobs:
           # built from carry the same name. The repository is tag-immutable,
           # so this tag can be written once.
           tag="$TAG"
-          docker build -f "$BUNDLE/Dockerfile" -t "$REGISTRY/$IMAGE:$tag" .
-          docker push "$REGISTRY/$IMAGE:$tag"
-          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$REGISTRY/$IMAGE:$tag" | cut -d@ -f2)
+          # A rerun of the same bundle — a retry after a failed deploy, or a
+          # construct-only change — finds its tag already pushed, and a
+          # tag-immutable repository refuses a second push under it. The
+          # image already there is the one built for these bundle bytes, so
+          # it is reused by digest (PR 3 security-reviewer, F3). Reading it
+          # takes ecr:BatchGetImage, which the deploy role already has.
+          existing=$(aws ecr batch-get-image --repository-name "$IMAGE" --image-ids imageTag="$tag" \
+            --query 'images[0].imageId.imageDigest' --output text)
+          if [ -n "$existing" ] && [ "$existing" != "None" ]; then
+            digest="$existing"
+            echo "image $REGISTRY/$IMAGE:$tag exists; reusing $digest" >> "$GITHUB_STEP_SUMMARY"
+          else
+            docker build -f "$BUNDLE/Dockerfile" -t "$REGISTRY/$IMAGE:$tag" .
+            docker push "$REGISTRY/$IMAGE:$tag"
+            digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$REGISTRY/$IMAGE:$tag" | cut -d@ -f2)
+          fi
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "image $REGISTRY/$IMAGE@$digest" >> "$GITHUB_STEP_SUMMARY"
 

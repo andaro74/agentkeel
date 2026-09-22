@@ -489,6 +489,7 @@ DEPLOY_YML = ROOT / ".github" / "workflows" / "deploy.yml"
 # deploy.yml's steps, and what each calls as the deploy role.
 DEPLOY_STEPS = {
     "amazon-ecr-login": {"ecr:GetAuthorizationToken"},
+    "reuse an image already pushed under this tag": {"ecr:BatchGetImage"},
     "docker push": {"ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
                     "ecr:CompleteLayerUpload", "ecr:PutImage"},
     "cloudformation deploy": {"cloudformation:CreateChangeSet", "cloudformation:ExecuteChangeSet",

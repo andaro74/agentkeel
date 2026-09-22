@@ -325,7 +325,7 @@ class BootstrapStack(cdk.Stack):
 
         | Construct resource | Grant |
         |---|---|
-        | 8 `AWS::SSM::Parameter::Value` | `ssm:GetParameters`, `/agentkeel/security/*` |
+        | 10 `AWS::SSM::Parameter::Value` | `ssm:GetParameters`, `/agentkeel/security/*` |
         | `AWS::EC2::SecurityGroup`, 2 `SecurityGroupEgress` | create, egress, delete, in this VPC only |
         | `AWS::DynamoDB::Table` | create, describe, PITR, tags; no delete (RETAIN) |
         | `AWS::IAM::Role`, `AWS::IAM::Policy` | under `/agentkeel/agents/`, boundary-conditioned |
