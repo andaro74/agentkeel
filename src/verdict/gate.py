@@ -456,11 +456,12 @@ def print_plants() -> int:
         print("not plants until their enforcing control is in the repo (SPEC/00 section 5):")
         print("  " + " ".join(waiting))
     print(f"last run: {path.relative_to(ROOT).as_posix() if path else 'no CI-written envelope yet'}")
-    print("seeded cases (SPEC/01 section 5; not plants, not in plants_expected):")
-    for seed, (falsifier, planted, reader) in plants.SEEDS.items():
-        state = "in the tree" if (ROOT / reader).exists() else "not in the tree yet"
-        print(f"  {seed} {falsifier} {planted}")
-        print(f"         reader {reader}: {state}")
+    for section, seeds in plants.SEEDS_BY_MILESTONE:
+        print(f"seeded cases ({section}; not plants, not in plants_expected):")
+        for seed, (falsifier, planted, reader) in seeds.items():
+            state = "in the tree" if (ROOT / reader).exists() else "not in the tree yet"
+            print(f"  {seed} {falsifier} {planted}")
+            print(f"         reader {reader}: {state}")
     return 0
 
 

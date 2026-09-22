@@ -144,13 +144,23 @@ class GovernedAgent(Construct):
         Loaded from `data/rights_table.json` by `scripts/load_rights_table.py`
         after the deploy. The agent may read it and may not write it: the
         role grants GetItem, Query and Scan, and nothing else.
+
+        Encryption is `DEFAULT`, the DynamoDB-owned key (M02 open.md row 9,
+        Security). It was `AWS_MANAGED`, the `aws/dynamodb` key, and the
+        first deploy failed at CREATE on it: the DynamoDB handler calls
+        `kms:CreateGrant` for that key, and `agentkeel-deploy-boundary`
+        denies it on every key (R4). `DEFAULT` makes no KMS call, so R4 is
+        left as it is. `tests/test_bootstrap.py` reads such a collision
+        before a deploy does. The table holds the fictional rights table,
+        which is in the repo in clear (`data/rights_table.json`); a
+        customer key for it is M05's containment work, not M02's.
         """
         return dynamodb.Table(
             self, "RightsTable",
             table_name=f"agentkeel-{self.agent_name}-rights",
             partition_key=dynamodb.Attribute(name="table_row", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
-            encryption=dynamodb.TableEncryption.AWS_MANAGED,
+            encryption=dynamodb.TableEncryption.DEFAULT,
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True),
             removal_policy=cdk.RemovalPolicy.RETAIN,

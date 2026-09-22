@@ -369,6 +369,65 @@ def test_the_execution_role_may_make_what_the_construct_renders(template, kind):
     assert NEEDED_BY_TYPE[kind] <= granted, f"{kind}: missing {sorted(NEEDED_BY_TYPE[kind] - granted)}"
 
 
+# --- what a handler calls only when a property asks for it -----------------
+# NEEDED_BY_TYPE leaves out the calls "only a feature the template does not
+# use makes". The first deploy (run 35683865472, 2026-09-22; M02 open.md
+# row 9) showed the template used one: `TableEncryption.AWS_MANAGED` renders
+# `SSESpecification: {SSEEnabled: true}` with no key id, which is the
+# `aws/dynamodb` key, and the DynamoDB handler calls `kms:CreateGrant` on it.
+# `agentkeel-deploy-boundary` denies that on every key (R4), so the table
+# failed at CREATE, after the change set, and the stack rolled back. The
+# refusal came from a deny that is meant to be there; what was wrong was a
+# resource that needed it. This table names such calls per property, so the
+# collision is read here, before a deploy, and never again at CREATE.
+#
+# Each row: resource type, a predicate on the rendered Properties, and the
+# actions the handler then needs on top of NEEDED_BY_TYPE. From the same
+# `describe-type` handler permissions as NEEDED_BY_TYPE.
+NEEDED_BY_PROPERTY: list[tuple[str, Any, set[str]]] = [
+    ("AWS::DynamoDB::Table",
+     lambda p: p.get("SSESpecification", {}).get("SSEEnabled") is True,
+     {"kms:CreateGrant", "kms:DescribeKey", "kms:ListAliases"}),
+    ("AWS::DynamoDB::Table",
+     lambda p: "KinesisStreamSpecification" in p,
+     {"kinesis:DescribeStream", "kinesis:PutRecords", "dynamodb:EnableKinesisStreamingDestination"}),
+    ("AWS::DynamoDB::Table",
+     lambda p: "ImportSourceSpecification" in p,
+     {"dynamodb:ImportTable", "dynamodb:DescribeImport", "s3:GetObject", "s3:ListBucket"}),
+]  # fmt: skip
+
+
+def handler_needs(resource: dict[str, Any]) -> set[str]:
+    needs = set(NEEDED_BY_TYPE.get(resource["Type"], set()))
+    properties = resource.get("Properties", {})
+    for kind, when, extra in NEEDED_BY_PROPERTY:
+        if resource["Type"] == kind and when(properties):
+            needs |= extra
+    return needs
+
+
+def test_no_construct_resource_needs_an_action_the_deploy_boundary_denies(template, construct_template):
+    """The deploy boundary is a deny-list on the execution role, and a deny wins over the grant.
+
+    A resource whose handler needs a denied action is not refused at synth, at
+    `cdk diff` or at the change set; it fails at CREATE, as the rights table
+    did on 2026-09-22 (`kms:CreateGrant`, run 35683865472). That is R4 holding
+    against our own template. This test reads the collision before a deploy
+    does. It is not a grant check: `test_the_execution_role_may_make_what_the_construct_renders`
+    is, and a granted action the boundary denies is still denied.
+    """
+    deny = denied(named(template, "agentkeel-deploy-boundary"))
+    collisions: dict[str, list[str]] = {}
+    for logical, resource in construct_template["Resources"].items():
+        hit = sorted(a for a in handler_needs(resource) if any(fnmatch.fnmatch(a, d) for d in deny))
+        if hit:
+            collisions[logical] = hit
+    assert not collisions, (
+        f"the deploy boundary denies what these resources' handlers call, so CREATE fails after the change set: "
+        f"{collisions}"
+    )
+
+
 def test_the_execution_role_may_resolve_the_security_parameters(template, construct_template):
     """Every SSM-typed parameter the construct reads is under the path the grant names (ten since B1)."""
     ssm_params = [p for p in construct_template["Parameters"].values() if p["Type"].startswith("AWS::SSM::")]

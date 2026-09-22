@@ -57,3 +57,37 @@ The four `construct/` files import `infra.construct`, which does not exist
 until M01 PR 2. `pytest` does not collect them. If the construct's API
 names differ when it lands, PR 2 changes the call and never what is added
 or handed in.
+
+## M02 (SPEC/02 §5)
+
+Committed at M02 PR 1, one commit per seed, each with its test in
+`tests/test_m02_seeds.py`, before any code that reads them. Each test is
+`xfail(strict=True)` until its reader lands at PR 2, and `strict` is what
+makes a marker come off in the commit that lands the reader.
+
+A seed here is a **diff**, not a file: a unified patch against the tree
+at PR 1's base, under `m02/`, applied to a throwaway worktree by the test
+and, after PR 2 merges, to a branch by the human to open the seed PR
+(`milestones/M02/runs/f2_1_seed_prs.yaml`). The patches are `-text` in
+`.gitattributes` so a Windows checkout keeps them LF and `git apply`
+matches. If a base file changes before PR 2 so a patch no longer applies,
+PR 2's first commit re-plants it, still before its reader.
+
+| Seed | File | What is wrong with it |
+|---|---|---|
+| S1 | `m02/s1-one-key.patch` | `thresholds.yaml` `cost_cap.tokens_per_run` 150000 → 300000, an upward move, with **one** ruling file (`seat: Threshold Owner`, `pr: 0`) covering the path. `ruling-cited` is satisfied; only `two-key` can refuse it |
+| S1 | `m02/s1-two-files-one-seat.patch` | the same move with two ruling files, both Threshold Owner. Two files are not two seats |
+| S2 | `m02/s2-golden-greened.patch` | `g-010`'s `expected.answer_fields.available` false → true and `constraints` emptied, so the trap rewards the answer it was written to catch. No ruling. `g-010` has passed in agent history |
+| S3 | `m02/s3-one-sided-edge.patch` | `may_call: [ratings-helper@v1]` in refagent's manifest; nothing says `ratings-helper` may be called by refagent. No ruling |
+| S5 | `m02/s5-golden-renamed.patch` | `g-005.yaml` deleted, `g-099.yaml` added with the same content and `id: g-099`; `retired` untouched. No ruling. Passes today's `validate` |
+
+The two ruling files inside S1's patches carry `pr: 0`; the human sets the
+seed PR's number when opening it, and the run file records that edit.
+They exist only in the patches and on the seed branches, never on `main`.
+**`g-099` is burned**: no golden ever gets that id (R11).
+
+S4 is an attempt against GitHub, not a file that can be read here. It is
+described in `milestones/M02/runs/f2_1_bypass.yaml` and is made by the
+human, as the repository owner, after M02 PR 2 merges and before PR 3's
+first CI run; PR 3's run looks it up (`scripts/observe_pr.py`). Its
+`observed:` is null at PR 1.

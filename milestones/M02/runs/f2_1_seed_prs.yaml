@@ -1,0 +1,29 @@
+# The seed PRs (SPEC/02 §5.1). Opened by the human from `main` after M02
+# PR 2 merges and before PR 3's first CI run, one per seed patch under
+# tests/fixtures/m02/, each expected to show its required check red naming
+# the seed's path, and the merge refused. Closed unmerged after the
+# refusal is recorded; the branch is kept. PR 3's CI run looks each
+# number up (`scripts/observe_pr.py`): the check-run conclusions on the
+# head sha, the job log's uncovered-path list, the merge state.
+seeds:
+  - seed: S1 one key
+    patch: tests/fixtures/m02/s1-one-key.patch
+    expected_check: two-key
+    expected_path: thresholds.yaml
+  - seed: S1 two files, one seat
+    patch: tests/fixtures/m02/s1-two-files-one-seat.patch
+    expected_check: two-key
+    expected_path: thresholds.yaml
+  - seed: S2
+    patch: tests/fixtures/m02/s2-golden-greened.patch
+    expected_check: ruling-cited
+    expected_path: evals/goldens/v1/g-010.yaml
+  - seed: S3
+    patch: tests/fixtures/m02/s3-one-sided-edge.patch
+    expected_check: checks
+    expected_path: agents/refagent/manifest.yaml
+  - seed: S5
+    patch: tests/fixtures/m02/s5-golden-renamed.patch
+    expected_check: checks
+    expected_path: evals/goldens/v1/g-005.yaml
+observed: null

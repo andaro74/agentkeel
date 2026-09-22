@@ -1,0 +1,45 @@
+# Seed S4 (SPEC/02 §5, F2.1 and F2.2 Door 3): the repository owner tries
+# to bypass a red required check. Two attempts, made by the human as the
+# owner of andaro74/agentkeel, after M02 PR 2 merges and before PR 3's first
+# CI run (SPEC/02 §5.1). The human fills `observed` from what GitHub
+# returned, keeping their own output (open.md row 17); PR 3's CI run then
+# looks each attempt up (`scripts/observe_pr.py`), and that lookup is what
+# writes `checks.F2_1` and `checks.F2_2`. A human-written file feeds no
+# check by itself.
+#
+# Door 3 is two gates (SPEC/00 §8 M02). The first refuses the merge: the
+# `main` ruleset has `bypass_actors: []` and three required checks, so
+# `gh pr merge --admin` is refused for the owner too. The second refuses
+# the ruleset that would have allowed it: `validate` diffs the live ruleset
+# against infra/ruleset/main.json and fails on any difference and on any
+# non-empty `bypass_actors`.
+#
+# Whether GitHub's rule-suites API records a refused merge is read at the
+# attempt, not assumed here (product-spec-reviewer finding 3). If it does
+# not, attempt 1 rests on the PR's unmerged state and the human's output,
+# and feasibility.md says so.
+#
+# Each observed entry carries: what; at (ISO 8601, UTC); the human's own
+# output as `message`. Attempt 1 also: `result` (refused | merged),
+# `request_url`. Attempt 2 also: `validate_result` (RED | GREEN) while the
+# actor was listed, `bypass_actors_after` (the list after the restore, must
+# be []), `updated_at_before`, `updated_at_during`, `updated_at_after`.
+#
+# `tests/test_m02_seeds.py::test_s4_the_owner_was_refused` reads these
+# entries and the export's bypass_actors. It is the weaker witness of the
+# two SPEC/02 §4 names: it passes on what the human typed. checks.F2_1
+# passes only if PR 3's API lookup agrees with it.
+seed: S4
+falsifier: F2.1, F2.2 Door 3
+principal: the repository owner, andaro74, with admin on andaro74/agentkeel
+attempts:
+  - what: merge seed S1's PR while its two-key check is red
+    command: gh pr merge <S1 PR number> --merge --admin
+    refused_when: GitHub refuses the merge; the message names a required status check
+    message_must_contain: required status check
+    api_record: GET /repos/andaro74/agentkeel/rulesets/rule-suites?ref=main&actor_name=andaro74&rule_suite_result=fail
+  - what: add the owner to bypass_actors on the live main ruleset, run validate, remove them
+    command: gh api -X PUT repos/andaro74/agentkeel/rulesets/23685206 --input <ruleset with bypass_actors set>; make validate; then the same PUT with bypass_actors []
+    refused_when: validate is RED on the live-vs-export diff while the actor is listed, and green again after
+    record: the ruleset's updated_at before, during and after; validate's output both times
+observed: null

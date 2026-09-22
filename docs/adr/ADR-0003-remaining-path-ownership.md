@@ -11,7 +11,7 @@ authorises:
   - Rule Owner   # amendment 1: agents/*/rules/**, guardrail id and version in a manifest
   - Tool Owner   # amendment 1: agents/*/tools/**, may_call and may_be_called_by in a manifest
   - Threshold Owner  # amendment 1: model and judge ids in a manifest
-amendments: 1
+amendments: 2
 ---
 
 # ADR-0003 — Remaining path ownership; F0.1 is a finding
@@ -97,3 +97,22 @@ exists. Ruled for M01 PR 1 (`milestones/M01/rulings/pr1.md`).
   moves.
 
 This is ADR-0003's first amendment. One is left.
+
+## Amendment 2 (M02 PR 1, 2026-09-22): `.github/CODEOWNERS` is Security's
+
+Security.
+
+M02 builds CODEOWNERS routing (SPEC/00 §8 M02) and `.github/CODEOWNERS`
+matched no row of §5: Security's row named `.github/workflows/**` and
+nothing else under `.github/`, and §5 says a file no seat owns is
+deleted (`product-spec-reviewer` finding 7 on SPEC/02). It is routing,
+as `infra/ruleset/main.json` is, and the seat that owns the ruleset owns
+it: **`.github/CODEOWNERS` → Security.** §5's Security row is amended to
+name it. `validate` at M02 PR 2 reads it as the machine form of §5's
+table (SPEC/02 §2, §6).
+
+`tests/fixtures/m02/**`, where M02's seeds live, is `tests/**` and needs
+no line: Engineering's already.
+
+This is ADR-0003's second amendment, and its last. A third change to
+path ownership is a new ADR.
