@@ -56,7 +56,6 @@ def seeded(request):
 # --- S1: a relaxation with one key, and with two files from one seat -----
 
 
-@pytest.mark.xfail(strict=True, reason="src/gates/two_key.py lands at M02 PR 2")
 def test_s1_one_key_on_a_relaxation_is_refused(seeded):
     """ruling-cited is satisfied by the Threshold Owner's file; only two-key can refuse this."""
     from src.gates import ruling_cited, two_key
@@ -68,7 +67,6 @@ def test_s1_one_key_on_a_relaxation_is_refused(seeded):
     assert "1 seat" in refusal or "one seat" in refusal
 
 
-@pytest.mark.xfail(strict=True, reason="src/gates/two_key.py lands at M02 PR 2")
 def test_s1_two_files_from_one_seat_are_one_key(seeded):
     """Two ruling files, both Threshold Owner: the gate counts seats, not files."""
     from src.gates import two_key
@@ -82,7 +80,6 @@ def test_s1_two_files_from_one_seat_are_one_key(seeded):
 # --- S2: a golden edited so the trap rewards what it was written to catch --
 
 
-@pytest.mark.xfail(strict=True, reason="src/gates/ruling_cited.py and two_key.py land at M02 PR 2")
 def test_s2_a_golden_edited_to_green_a_build_is_refused(seeded):
     """No ruling at all, so ruling-cited refuses it; and `expected` moved on an id with a pass in
     history, so two-key refuses it too. Both must name the golden."""
