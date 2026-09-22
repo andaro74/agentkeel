@@ -8,6 +8,9 @@ seat: Product
 authorises:
   - SPEC/01-signed-bundle.md
   - docs/milestones/M01.md
+  - docs/adr/ADR-0007-the-envelope-says-where-the-agent-ran.md
+  - milestones/README.md
+  - milestones/M01/README.md
   - milestones/M01/rulings/pr3-product.md
 evidence:
   - SPEC/00-overview.md#8-M01
@@ -60,3 +63,25 @@ plane's `CreateAgentRuntime` to the platform VPC's subnets. That limits
 *where* a runtime can be made, not *who* built it. `pr2.md` warned that D's
 narrowing must not lean on the deploy plane's old inability to make a
 runtime. It leans on this new condition only for what the condition says.
+
+## ADR-0007, P1 and P2 (item 4)
+
+**P1, ruled: Option B.** A pull request's run measures refagent in the
+deployed runtime when the tree's bundle digest matches the runtime's image,
+and in the runner otherwise, and the envelope says which. One evidence path:
+`build.py`, then `record`, then `evals/history/`. Option A would have been a
+second, artifact-only path for the one claim that matters most.
+
+**The condition on P1:** the fallback is never silent. If the match cannot
+run, the envelope says `mode: runner`, and the run's job summary says why.
+The envelope itself carries no reason field.
+
+**P2, ruled: the Expected cell of ledger row 1**, in `milestones/README.md`
+and `milestones/M01/README.md`, now says construct tenancy is read at M01
+PR 4's run. It used to say PR 3's. The Expected cell is Product's and is not
+a falsifier, and the falsifiers do not change. `make ledger-plain` was run:
+the generated page carries no Expected column, so it did not change.
+
+**Why this is not "the machinery in the last PR":** the fields, the gate's
+checks and the digest match all land in PR 3. PR 4, the close, runs them and
+changes no refagent byte, so its bundle digest is the deployed one.
