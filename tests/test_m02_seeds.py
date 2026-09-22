@@ -92,3 +92,16 @@ def test_s2_a_golden_edited_to_green_a_build_is_refused(seeded):
     assert cited is not None and "evals/goldens/v1/g-010.yaml" in cited and "Data Owner" in cited
     keys = two_key.refusal(tree, base=ROOT, pr=0)
     assert keys is not None and "g-010" in keys and "expected" in keys
+
+
+# --- S3: an edge declared on one side only ------------------------------
+
+
+@pytest.mark.xfail(strict=True, reason="validate's edge check lands at M02 PR 2")
+def test_s3_a_one_sided_edge_is_refused(seeded):
+    """refagent says it may call ratings-helper@v1; no manifest says ratings-helper may be called."""
+    from src.validate import checks
+
+    tree = seeded("s3-one-sided-edge.patch")
+    errors = checks.check_edges(tree)
+    assert any("ratings-helper@v1" in e and "may_be_called_by" in e for e in errors), errors
