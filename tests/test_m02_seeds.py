@@ -10,8 +10,8 @@ commit that lands the reader. A seed cannot start passing without
 somebody saying so.
 
 The readers, none of which exist at M02 PR 1: `src/gates/two_key.py` (S1),
-`src/gates/ruling_cited.py` (S2, S3, S5), `validate`'s edge and golden-id
-checks (S3, S5), and for S4 the human's attempts against the `main`
+`src/gates/ruling_cited.py` (S2, S3, S5), `src/validate/edges.py` and
+`src/validate/golden_ids.py` under `validate` (S3, S5), and for S4 the human's attempts against the `main`
 ruleset, recorded in milestones/M02/runs/f2_1_bypass.yaml and looked up by
 `scripts/observe_pr.py` at PR 3. The API names below are what PR 2 must
 provide; if they land under other names, PR 2 changes the call and never
@@ -43,8 +43,8 @@ def seeded(request):
         tree = Path(tempfile.mkdtemp()) / "tree"
         subprocess.run(["git", "worktree", "add", "--detach", str(tree), "HEAD"],
                        cwd=ROOT, check=True, capture_output=True)  # fmt: skip
+        trees.append(tree)  # before apply, so a patch that no longer applies is still cleaned up
         subprocess.run(["git", "apply", str(FIXTURES / patch)], cwd=tree, check=True, capture_output=True)
-        trees.append(tree)
         return tree
 
     yield apply
@@ -101,10 +101,10 @@ def test_s2_a_golden_edited_to_green_a_build_is_refused(seeded):
 @pytest.mark.xfail(strict=True, reason="validate's edge check lands at M02 PR 2")
 def test_s3_a_one_sided_edge_is_refused(seeded):
     """refagent says it may call ratings-helper@v1; no manifest says ratings-helper may be called."""
-    from src.validate import checks
+    from src.validate import edges
 
     tree = seeded("s3-one-sided-edge.patch")
-    errors = checks.check_edges(tree)
+    errors = edges.check(tree)
     assert any("ratings-helper@v1" in e and "may_be_called_by" in e for e in errors), errors
 
 
@@ -115,13 +115,16 @@ def test_s3_a_one_sided_edge_is_refused(seeded):
 def test_s4_the_owner_was_refused():
     """Two attempts against GitHub, recorded by the human and looked up by CI at PR 3.
     Door 3 is two gates: the ruleset refuses the merge, and validate refuses the ruleset
-    that would have allowed it."""
+    that would have allowed it. This test reads what the human typed and the export on
+    main; it is the weaker witness, and checks.F2_1 passes only if the API lookup at
+    PR 3 agrees (SPEC/02 section 4). The observed keys are listed in the run file."""
     run = yaml.safe_load((RUNS / "f2_1_bypass.yaml").read_text(encoding="utf-8"))
     observed = run["observed"]
     assert observed is not None, "the attempts have not been made"
     assert len(observed) == len(run["attempts"]), "every attempt is made, not some"
     merge, ruleset = observed
-    assert merge["result"] == "refused" and merge["message_must_contain"] in merge["message"]
+    assert merge["result"] == "refused"
+    assert run["attempts"][0]["message_must_contain"] in merge["message"]
     assert ruleset["validate_result"] == "RED" and ruleset["bypass_actors_after"] == []
     export = json.loads((ROOT / "infra" / "ruleset" / "main.json").read_text(encoding="utf-8"))
     assert export["bypass_actors"] == [], "the export on main must say nobody bypasses"
@@ -135,10 +138,10 @@ def test_s5_a_renamed_golden_id_is_refused(seeded):
     """g-005 disappears and g-099 appears with its content; retired is untouched. Today's validate
     passes it: the id matches the file name and nothing is duplicated. The reader compares to main."""
     from src.gates import ruling_cited
-    from src.validate import checks
+    from src.validate import golden_ids
 
     tree = seeded("s5-golden-renamed.patch")
-    errors = checks.check_golden_ids_against(tree, base=ROOT)
+    errors = golden_ids.check(tree, base=ROOT)
     assert any("g-005" in e and "retired" in e for e in errors), errors
     cited = ruling_cited.refusal(tree, base=ROOT, pr=0)
     assert cited is not None and "g-099.yaml" in cited
