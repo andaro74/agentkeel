@@ -12,7 +12,12 @@
 # Both rewritten after the PR 3 cold review: deploy.yml reuses an existing image (F3), evals.yml wording.
 # deploy.yml rewritten at M02 PR 2: the deploy job on an arm64 runner, and the build step
 # refusing any image that is not arm64 (AgentCore Runtime runs arm64 only; runs 35734541276).
+# gates.yml added at M02 PR 2 (ruling-cited, two-key), and evals.yml gained GITHUB_TOKEN on
+# make validate. Both were committed unlisted first (0e78ef8) so that this check refusing a
+# second workflow file could be observed (open.md row 16, milestones/M02/runs/row16_second_workflow.yaml).
+# From this PR, editing a workflow and this file together needs a Security ruling (ruling-cited on infra/**).
 0d938815e7d3756e05659beb95a82f490b521a183bf34f9584cd98874cf36567  .github/workflows/cold-review-ruling.yml
 c1957b9cf7d8e68a3da10631fac98cc2bc1b5d6045fa09167f76aa87a3a2b8c4  .github/workflows/deploy.yml
-0f98f3be7488222ded087b492e65fcda431cc7554cef350071ac2adb9c952c98  .github/workflows/evals.yml
+9c47851b74b0c4ebd91ba011da5e5cd738944de89f5b9ab43ae4447bf1da07bd  .github/workflows/evals.yml
+7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml
