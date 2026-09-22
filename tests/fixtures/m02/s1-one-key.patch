@@ -1,0 +1,39 @@
+diff --git a/milestones/M02/rulings/seed-s1-threshold-owner.md b/milestones/M02/rulings/seed-s1-threshold-owner.md
+new file mode 100644
+index 0000000..adbc7a2
+--- /dev/null
++++ b/milestones/M02/rulings/seed-s1-threshold-owner.md
+@@ -0,0 +1,20 @@
++---
++# Seed S1 (SPEC/02 §5), the one-key form. This file exists only inside
++# tests/fixtures/m02/s1-one-key.patch and on the seed's branch; it is never
++# on main. `pr:` is set to the seed PR's number when the human opens it.
++ruling: seed-s1-threshold-owner
++seat: Threshold Owner
++authorises:
++  - thresholds.yaml
++evidence:
++  - SPEC/02-seats-and-change-gates.md#5-the-seeded-cases
++pr: 0
++---
++
++# Seed S1: one key on a relaxation
++
++`cost_cap.tokens_per_run` moves from 150000 to 300000. Upward relaxes it
++(`thresholds.yaml`, "Relaxes upward"). This file is the Threshold Owner's
++key and it is the only one: no second file from a second seat exists on
++this branch. `ruling-cited` is satisfied by this file. Only `two-key` can
++refuse the change, and it must.
+diff --git a/thresholds.yaml b/thresholds.yaml
+index 7279f12..9b42e63 100644
+--- a/thresholds.yaml
++++ b/thresholds.yaml
+@@ -17,7 +17,7 @@
+ # envelope over the cap is written RED by verdict.build and read RED by
+ # verdict.gate (item 22), whichever its subject.
+ cost_cap:
+-  tokens_per_run: 150000
++  tokens_per_run: 300000
+ 
+ # The base every later number is a delta against: the baseline card at tag
+ # m00, the one row 0 cites (evals/history/9407615….json), not the last card
