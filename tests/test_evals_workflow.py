@@ -206,6 +206,22 @@ def test_every_run_of_the_eval_job_is_either_measured_or_gated(workflow):
     assert "measured_at" in str(producer[0].get("run", ""))
 
 
+def test_the_runtime_arn_comes_only_from_the_digest_match(workflow):
+    """ADR-0007, P1. `make evals` measures in the runtime only on the ARN the match wrote;
+    the match runs on every measuring run, before `make evals`, under the same condition."""
+    steps_ = workflow["jobs"]["evals"]["steps"]
+    match = [i for i, s in enumerate(steps_) if s.get("id") == "runtime"]
+    measure = [i for i, s in enumerate(steps_) if s is measuring_steps(workflow)[0]]
+    assert len(match) == 1 and match[0] < measure[0]
+    assert condition(steps_[match[0]]) == condition(steps_[measure[0]])
+    assert "scripts/runtime_for_tree.py" in steps_[match[0]]["run"]
+    assert "GITHUB_STEP_SUMMARY" in steps_[match[0]]["run"], "the reason must reach the reader (condition on P1)"
+    env = steps_[measure[0]].get("env", {})
+    assert env.get("AGENTKEEL_RUNTIME_ARN") == "${{ steps.runtime.outputs.arn }}"
+    others = [s for s in steps(workflow) if "AGENTKEEL_RUNTIME_ARN" in str(s.get("env", {})) + str(s.get("run", ""))]
+    assert others == [steps_[measure[0]]], "no other step may set the runtime a run measures"
+
+
 @pytest.mark.parametrize("variant", [{"AGENT_RUNNER": ""}, {"AGENT_RUNNER": "src/agent/run.py", "GATE_EXIT": "x"}],
                          ids=["control-only", "with-agent"])  # fmt: skip
 @pytest.mark.parametrize("gate_exit", [0, 1, 2])

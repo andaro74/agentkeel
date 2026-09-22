@@ -31,11 +31,11 @@ def rewrite(path: Path, **fields) -> Path:
 def test_every_envelope_in_history_still_validates_and_replays():
     """The fields are versioned, not required outright: 23 envelopes of evidence are not rewritten."""
     paths = replay_history.envelope_paths(ROOT / "evals" / "history")
-    assert paths
-    for path in paths:
-        envelope = json.loads(path.read_text(encoding="utf-8"))
-        assert "schema_version" not in envelope, f"{path.name} predates ADR-0007"
-        assert schema_errors(envelope) == [], path.name
+    envelopes = {path.name: json.loads(path.read_text(encoding="utf-8")) for path in paths}
+    for name, envelope in envelopes.items():
+        assert schema_errors(envelope) == [], name
+    # The 23 written before ADR-0007 are version 1, and they are not rewritten.
+    assert sum("schema_version" not in e for e in envelopes.values()) >= 23
     replay_history.load(ROOT / "evals" / "history")
 
 

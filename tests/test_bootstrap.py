@@ -183,6 +183,22 @@ def test_the_eval_role_may_not_change_what_cloudtrail_says(template):
         )
 
 
+def test_the_eval_role_may_read_which_bytes_the_runtime_runs_and_nothing_more(template):
+    """ADR-0007, P1: three reads, on refagent alone, and no write among them."""
+    reads = {"cloudformation:DescribeStacks": "stack/agentkeel-refagent/*",
+             "bedrock-agentcore:GetAgentRuntime": "runtime/refagent*",
+             "ecr:DescribeImages": "repository/agentkeel-refagent"}  # fmt: skip
+    statements_ = eval_role_policy(template)
+    for action, resource in reads.items():
+        granting = [s for s in statements_ if s["Effect"] == "Allow" and action in actions(s)]
+        assert len(granting) == 1, action
+        assert json.dumps(granting[0]["Resource"]).endswith(f':{resource}"]]}}'), action
+    allowed_here = {a for s in statements_ if s["Effect"] == "Allow" for a in actions(s)}
+    assert not {a for a in allowed_here if a.startswith(("cloudformation:", "ecr:"))} - set(reads)
+    assert not {a for a in allowed_here if a.startswith("bedrock-agentcore:")} - {
+        "bedrock-agentcore:GetAgentRuntime", "bedrock-agentcore:InvokeAgentRuntime"}
+
+
 # --- the key policy --------------------------------------------------------
 
 

@@ -25,7 +25,8 @@ What it makes:
   (SPEC/01 §1). It may read, and may not deploy;
 - the **eval role** `agentkeel-evals`, absorbed from `infra/eval-role/`
   (ruling f): the two pinned profiles, the five-action Deny,
-  `bedrock-agentcore:InvokeAgentRuntime` on refagent's runtime only;
+  `bedrock-agentcore:InvokeAgentRuntime` on refagent's runtime only, and
+  three reads of which bytes that runtime runs (ADR-0007, P1);
 - a **VPC with no internet gateway and no NAT**: interface endpoints for
   bedrock-runtime, kms, logs, ecr.api and ecr.dkr, gateway endpoints for s3
   and dynamodb (ruling e, ADR-0006), each with a policy scoped to this
@@ -648,6 +649,26 @@ class BootstrapStack(cdk.Stack):
             actions=["bedrock-agentcore:InvokeAgentRuntime"],
             resources=[f"arn:aws:bedrock-agentcore:{REGION}:{self.account}:runtime/refagent*"],
         ))  # fmt: skip
+        # ADR-0007, P1 (Option B): which bytes the deployed runtime runs, so a
+        # pull request's run measures in the runtime only when they are the
+        # tree's (`scripts/runtime_for_tree.py`). Three reads, each on refagent
+        # alone: the stack's RuntimeArn output, the image digest the runtime
+        # pins, and that image's tags. Nothing here can change what it reads.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadWhichBytesTheRuntimeRuns",
+            actions=["cloudformation:DescribeStacks"],
+            resources=[f"arn:aws:cloudformation:{REGION}:{self.account}:stack/agentkeel-refagent/*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadTheRuntimesImage",
+            actions=["bedrock-agentcore:GetAgentRuntime"],
+            resources=[f"arn:aws:bedrock-agentcore:{REGION}:{self.account}:runtime/refagent*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadTheImagesTags",
+            actions=["ecr:DescribeImages"],
+            resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel-refagent"],
+        ))  # fmt: skip
         # Ruling i: the human makes S4's and S6's attempts, and this role asks
         # CloudTrail whether AWS refused each request id
         # (`scripts/observe_attempt.py`). Without this the instrument cannot
@@ -967,6 +988,8 @@ SUPPRESSIONS = {
         "cloudtrail:LookupEvents is on * because CloudTrail takes no resource-level condition for it, "
         "and ruling i has this role ask CloudTrail whether the human's attempts were refused. It is the "
         "only cloudtrail action granted, so the instrument may read the record and may not change it. "
+        "ADR-0007 (P1): stack/agentkeel-refagent/* is the stack id suffix AWS appends, and runtime/refagent* "
+        "the versioned name; DescribeStacks, GetAgentRuntime and ecr:DescribeImages are reads on refagent alone. "
         f"{CEILING}"
     ),
 }

@@ -23,6 +23,8 @@ authorises:
   - tests/test_gate.py
   - tests/test_m01_seeds.py
   - tests/test_adr0007.py
+  - scripts/runtime_for_tree.py
+  - tests/test_runtime_for_tree.py
   - milestones/M01/rulings/pr3-engineering.md
 evidence:
   - milestones/M01/rulings/pr3.md
@@ -200,6 +202,34 @@ byte for byte.
   `mode runner`.
 - `test_adr0007.py`, 15 cases, including two where build writes and the gate
   refuses (P5).
+
+## ADR-0007, step 2: the digest match
+
+**`scripts/runtime_for_tree.py`** decides whether a run measures refagent in
+the deployed runtime. It packs `agents/refagent` exactly as `deploy.yml`
+does, then reads three things: the stack's `RuntimeArn`, the image digest
+the runtime pins, and that image's tags. It writes the ARN only when the
+tree's bundle digest is among the tags. It never fails the job. Any miss or
+refused call is a reason, printed and written to the job summary.
+
+Run against the account on 2026-09-21, before any deploy: `runner: the
+deployed runtime could not be read (... Stack with id agentkeel-refagent does
+not exist)`, exit 0. That is the correct answer today.
+
+**Tests:**
+- `tests/test_runtime_for_tree.py` (7): the digest equals what
+  `python -m src.bundle.pack` prints, which is what `deploy.yml` tags the
+  image with; a match, other bytes, and three failed lookups; the output and
+  the summary.
+- `test_the_runtime_arn_comes_only_from_the_digest_match`, in
+  `test_evals_workflow.py`: the match runs before `make evals`, under the
+  same condition. It writes to the summary. No other step sets
+  `AGENTKEEL_RUNTIME_ARN`.
+- `test_the_eval_role_may_read_which_bytes_the_runtime_runs_and_nothing_more`,
+  in `test_bootstrap.py`.
+
+**What they cannot say:** that the runtime answers. PR 4's run is where that
+is first read.
 
 ## One thing a reader should know about these tests
 

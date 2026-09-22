@@ -352,6 +352,25 @@ these calls. The action lists come from `describe-type` and from the service
 reference, and a simulation reads IAM, not the service. The first run of
 `deploy.yml` is what reads the rest.
 
+## ADR-0007, P1: the workflow and the eval role (Security's half)
+
+Product ruled P1 as Option B, and this is the part on Security's paths.
+- **`evals.yml`** gains a step, before `make evals` and under the same
+  condition. It runs `scripts/runtime_for_tree.py` and hands `make evals`
+  the runtime's ARN only when the deployed image carries this tree's bundle
+  digest. "Which refagent answered" now reports on every measuring run, not
+  only on `main`. `infra/workflows.sha256` is rehashed.
+- **The eval role** gains three reads, each on refagent alone:
+  `cloudformation:DescribeStacks` on `stack/agentkeel-refagent/*`,
+  `bedrock-agentcore:GetAgentRuntime` on `runtime/refagent*`, and
+  `ecr:DescribeImages` on `repository/agentkeel-refagent`. None of them can
+  change what it reads.
+
+**Not yet in the account.** It needs the third bootstrap redeploy, after
+`cdk diff`, and a read-back like BLOCK F's. Until then the step writes
+`runner: … could not be read`, which is also what it writes today, because
+no refagent stack exists.
+
 ## Still to land in PR 3
 
 | # | Item | Seat |

@@ -101,9 +101,12 @@ Two ways to do that, and they are exclusive:
     exception from "PR 3" to "PR 4's run". The machinery still lands in
     PR 3, so no machinery is built in the last PR. But the ledger's Expected
     cell has to say PR 4's run, not PR 3's.
-  - *Needs:* two read grants for the eval role, and a bootstrap redeploy.
-    The runtime pins the *image* digest, and the bundle digest is the
-    image's *tag*, so matching them takes both reads:
+  - *Needs:* three read grants for the eval role, and a bootstrap
+    redeploy. The runtime pins the *image* digest, and the bundle digest is
+    the image's *tag*, so matching them takes all three reads (the draft
+    said two; the runtime's ARN has to be found first):
+    - `cloudformation:DescribeStacks` on `stack/agentkeel-refagent/*`, for
+      the runtime's ARN;
     - `bedrock-agentcore:GetAgentRuntime` on `runtime/refagent*`, for the
       image digest the runtime runs;
     - `ecr:DescribeImages` on `repository/agentkeel-refagent`, for that
