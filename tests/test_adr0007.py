@@ -144,7 +144,7 @@ def test_row_1_cannot_close_green_on_a_runner_envelope():
     from src import ledger
 
     cell = gate.measured_at(B3A4969, HISTORY, milestone="M01")
-    assert "is not the verdict" in ledger.check_measured({"#": "1", "M": "M01", "Measured": cell,
+    assert "GREEN beside an UNMEASURED reading" in ledger.check_measured({"#": "1", "M": "M01", "Measured": cell,
                                                           "State": "GREEN"}, HISTORY)  # fmt: skip
     assert ledger.check_measured({"#": "1", "M": "M01", "Measured": cell, "State": "OPEN"}, HISTORY) is None
 

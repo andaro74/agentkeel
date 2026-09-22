@@ -115,3 +115,15 @@ def test_ledger_sides_with_the_gate_not_with_build(chain, past, goldens):
     # the cell cites the envelope by commit; put the envelope where the ledger looks
     (history_dir / envelope_path.name).write_text(envelope_path.read_text(encoding="utf-8"), encoding="utf-8")
     assert "differs from the envelope" in ledger.check_measured(row(green_cell, "GREEN"), history_dir)
+
+
+def test_a_row_read_as_unmeasured_closes_red_and_never_green():
+    """SPEC/00 section 7 (M01 PR 4). Row 1's cell reads UNMEASURED: the second half of
+    claim 1 was never read in the runtime. RED may stand beside it; GREEN may not."""
+    history = gate.HISTORY
+    envelope = history / "e97125e970ccfc6d044612eb006cdbdbcdb99337.json"
+    cell = gate.measured_at(envelope, history, milestone="M01")
+    assert "; UNMEASURED; " in cell
+    as_row = {"#": "1", "M": "M01", "Measured": cell}
+    assert ledger.check_measured({**as_row, "State": "RED"}, history) is None
+    assert "GREEN beside an UNMEASURED reading" in ledger.check_measured({**as_row, "State": "GREEN"}, history)
