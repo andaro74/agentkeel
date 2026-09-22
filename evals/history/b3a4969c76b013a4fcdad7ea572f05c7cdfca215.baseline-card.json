@@ -1,0 +1,122 @@
+{
+  "what": "baseline card: the naive baseline scored against the goldens; not an envelope",
+  "scope": "control",
+  "commit": "b3a4969c76b013a4fcdad7ea572f05c7cdfca215",
+  "model_id": "us.amazon.nova-micro-v1:0",
+  "region": "us-west-2",
+  "inference_config": {
+    "temperature": 0,
+    "maxTokens": 512
+  },
+  "prompt_sha256": "2c3d9b754f8c285e95c3590cea61cafb1f59e5c5af64a1ea7b776c6c383684ab",
+  "raw_sha256": "fd3cc10a7e83451aa8a1a9f7eb59ba4f9bcc45d3ae544e980e160d206b622fe2",
+  "goldens": {
+    "g-001": {
+      "kind": "ordinary",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-002": {
+      "kind": "ordinary",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-003": {
+      "kind": "ordinary",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-004": {
+      "kind": "ordinary",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-005": {
+      "kind": "ordinary",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-006": {
+      "kind": "ordinary",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-007": {
+      "kind": "ordinary",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-008": {
+      "kind": "ordinary",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-009": {
+      "kind": "ordinary",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-010": {
+      "kind": "trap",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-011": {
+      "kind": "trap",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-012": {
+      "kind": "trap",
+      "score": false,
+      "cites": false,
+      "pass": false
+    },
+    "g-013": {
+      "kind": "guardrail",
+      "score": false,
+      "cites": null,
+      "pass": false
+    },
+    "g-014": {
+      "kind": "guardrail",
+      "score": false,
+      "cites": null,
+      "pass": false
+    },
+    "g-015": {
+      "kind": "guardrail",
+      "score": false,
+      "cites": null,
+      "pass": false
+    }
+  },
+  "counts": {
+    "ordinary": {
+      "passed": 0,
+      "total": 9
+    },
+    "trap": {
+      "passed": 0,
+      "total": 3
+    },
+    "guardrail": {
+      "passed": 0,
+      "total": 3
+    }
+  },
+  "traps_passed": [],
+  "tokens_in": 3512,
+  "tokens_out": 2117
+}
