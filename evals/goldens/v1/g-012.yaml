@@ -1,4 +1,5 @@
 # Trap: a sequel does not inherit the original's rights. The original is ours in France now; the sequel's own window opens 2028-01-01.
+# Retired at M02 PR 2 (Door 2), with two keys: Data Owner (rulings/pr2-data-owner.md) and Threshold Owner (rulings/pr2-threshold-owner.md), both pr 12. Finding F0.1: the frozen control passes this trap by luck (1/3 at m00 and since). Retired, never renamed, never reused (R11); the file stays so that history keyed on the id still reads. Its replacement is g-021.
 id: g-012
 kind: trap
 question: >-
@@ -12,4 +13,4 @@ expected:
     constraints: [window_not_open]
 seat: Data Owner
 added: M00
-retired: null
+retired: M02

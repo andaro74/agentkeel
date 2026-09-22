@@ -1,0 +1,15 @@
+# Trap: a sequel does not inherit the original's rights. We hold the original on SVOD in the US; the table has no US SVOD row for the sequel at all, so there is nothing to publish under, and the code names why. The frozen control cannot emit `sequel_no_inherit`, so this never passes (P7); it replaces g-012, retired at M02 PR 2 (Door 2).
+id: g-021
+kind: trap
+question: >-
+  We hold exclusive SVOD rights to 'Brackenfield Nine' in the US through January 2027. Can we publish the sequel, 'Brackenfield Nine: The Tenth', on SVOD in the US on 2026-12-01?
+expected:
+  table_row: r-011
+  clause_id: ML-2.3
+  answer_fields:
+    available: false
+    exclusive: false
+    constraints: [sequel_no_inherit]
+seat: Data Owner
+added: M02
+retired: null
