@@ -25,6 +25,8 @@ authorises:
   - tests/test_adr0007.py
   - scripts/runtime_for_tree.py
   - tests/test_runtime_for_tree.py
+  - src/ledger.py
+  - scripts/read_back_grants.py
   - milestones/M01/rulings/pr3-engineering.md
 evidence:
   - milestones/M01/rulings/pr3.md

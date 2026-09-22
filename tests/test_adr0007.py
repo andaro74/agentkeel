@@ -123,3 +123,66 @@ def test_the_ledger_cell_names_the_mode_only_on_version_2(chain):
     v1 = {k: v for k, v in envelope.items()
           if k not in ("schema_version", "mode", "runtime_arn", "region", "model_version")}  # fmt: skip
     assert "mode" not in gate.measured(v1, "GREEN")
+
+
+# --- PR 3 cold review: B1, F2, and the pin's id -------------------------------
+
+HISTORY = ROOT / "evals" / "history"
+B3A4969 = HISTORY / "b3a4969c76b013a4fcdad7ea572f05c7cdfca215.json"
+
+
+def test_row_1_is_unmeasured_on_the_real_runner_envelope():
+    """B1. b3a4969c ran in the runner and its own verdict is GREEN; row 1's reading of it is not."""
+    assert "; GREEN; " in gate.measured_at(B3A4969, HISTORY)
+    cell = gate.measured_at(B3A4969, HISTORY, milestone="M01")
+    assert "not read in the runtime (mode runner)" in cell
+    assert "; UNMEASURED; " in cell and "; GREEN; " not in cell
+
+
+def test_row_1_cannot_close_green_on_a_runner_envelope():
+    """The ledger check refuses a GREEN state beside the cell the gate now writes."""
+    from src import ledger
+
+    cell = gate.measured_at(B3A4969, HISTORY, milestone="M01")
+    assert "is not the verdict" in ledger.check_measured({"#": "1", "M": "M01", "Measured": cell,
+                                                          "State": "GREEN"}, HISTORY)  # fmt: skip
+    assert ledger.check_measured({"#": "1", "M": "M01", "Measured": cell, "State": "OPEN"}, HISTORY) is None
+
+
+def test_a_runtime_envelope_reads_row_1(chain):
+    path = chain(agent=True, mode="runtime", runtime_arn=RUNTIME_ARN)[0]
+    cell = gate.measured_at(path, path.parent, milestone="M01")
+    assert "not read in the runtime" not in cell and "mode runtime" in cell
+
+
+def test_a_version_1_agent_envelope_after_adr_0007_is_rejected(chain):
+    """F2. Dropping all five fields must not skip the checks they carry."""
+    path = chain(agent=True)[0]
+    envelope = json.loads(path.read_text(encoding="utf-8"))
+    for field in ("schema_version", "mode", "runtime_arn", "region", "model_version"):
+        envelope.pop(field)
+    path.write_text(json.dumps(envelope), encoding="utf-8")
+    assert schema_errors(envelope) == []  # it validates: the gate is what refuses it
+    with pytest.raises(gate.Rejected, match="without schema_version, for a commit that is not before ADR-0007"):
+        gate.read(path)
+
+
+def test_the_version_1_envelopes_in_history_are_all_before_adr_0007():
+    for path in replay_history.envelope_paths(HISTORY):
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+        if "schema_version" not in envelope:
+            assert gate.before_adr_0007(envelope["commit"]), path.name
+
+
+def test_a_pin_whose_id_and_profile_disagree_is_rejected(chain, monkeypatch):
+    """threshold-owner F2: the envelope carries the profile, so the id is checked against it."""
+    path = chain(agent=True)[0]
+    real = gate.manifest_at
+
+    def edited(commit, bundle, root=ROOT):
+        manifest, where = real(commit, bundle, root)
+        return {**manifest, "model": {**manifest["model"], "id": "anthropic.claude-opus-5"}}, where
+
+    monkeypatch.setattr(gate, "manifest_at", edited)
+    with pytest.raises(gate.Rejected, match="the pin disagrees with itself"):
+        gate.read(path)

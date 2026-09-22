@@ -57,7 +57,7 @@ def check_measured(row: dict[str, str], history_dir: Path) -> str | None:
     if not cited:
         return f"row {row['#']}: Measured names no envelope"
     try:
-        expected = gate.measured_at(history_dir / f"{cited[1]}.json", history_dir)
+        expected = gate.measured_at(history_dir / f"{cited[1]}.json", history_dir, milestone=row.get("M"))
     except gate.Rejected as rejection:
         return f"row {row['#']}: {rejection}"
     if cell != expected:

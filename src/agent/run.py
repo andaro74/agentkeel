@@ -8,18 +8,19 @@ This is a runner. It reads each golden's id, kind and question, never its
 
 Two modes, and the raw file says which one ran (`where`):
 
-- **in the runner** (a PR). refagent's code runs here, against the pinned
-  inference profile. This is what M01 PR 2 measures: the agent stack is
-  deployed from `main`, so on a PR there is no runtime to call yet.
-- **the deployed runtime** (`main`, after the deploy). `AGENTKEEL_RUNTIME_ARN`
-  names it and the runner calls `InvokeAgentRuntime`, which is the one
-  action the eval role holds on it (ruling f).
+- **in the runner.** refagent's code runs here, against the pinned
+  inference profile. This is a pull request's mode whenever the deployed
+  runtime does not run the tree's bundle.
+- **the deployed runtime.** `AGENTKEEL_RUNTIME_ARN` names it, and the runner
+  calls `InvokeAgentRuntime` (ruling f). `evals.yml` sets it only when
+  `scripts/runtime_for_tree.py` finds the tree's bundle digest among the
+  runtime image's tags (ADR-0007, P1).
 
 The first line this prints is `mode: runner (AGENTKEEL_RUNTIME_ARN unset)`
 or `mode: runtime <arn>`, because the fallback used to be silent and the
-envelope cannot tell the two apart. M01 PR 2 measures runner mode only;
-construct tenancy is PR 3's measurement, and the envelope field that would
-record the mode is PR 3's too (a schema change, so a new ADR).
+envelope could not tell the two apart. From ADR-0007 it can: this raw file
+carries `mode`, `runtime_arn` and `bundle`, and `verdict.build` copies them
+into the envelope. Construct tenancy is read at M01 PR 4's run (ledger row 1).
 
 The model id, the profile and the region come from
 `agents/refagent/manifest.yaml`, not from here: the Threshold Owner owns

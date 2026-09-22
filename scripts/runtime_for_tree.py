@@ -1,4 +1,4 @@
-"""Which deployed runtime, if any, runs this tree's refagent bytes (ADR-0007, P1: Option B).
+"""Which deployed runtime, if any, runs this tree's refagent bundle (ADR-0007, P1: Option B).
 
     python scripts/runtime_for_tree.py [--github-output FILE] [--summary FILE]
 
@@ -15,10 +15,17 @@ runtime runs the same bytes as this tree. Otherwise the envelope would say
 
 On a match it writes `arn=<runtime ARN>`. On anything else — no stack, other
 bytes, a refused call — it writes `arn=` and the reason. The run then
-measures in the runner, and the envelope says `mode: runner`. **It never
-fails the job, and it is never silent** (the condition on P1): the reason
-goes to stdout and to the job summary, because the envelope has no field
-for it.
+measures in the runner, and the envelope says `mode: runner`. **Every
+lookup failure exits 0 with its reason, and it is never silent** (the
+condition on P1): the reason goes to stdout and to the job summary, because
+the envelope has no field for it. An import error is outside that promise:
+it fails the step, which is loud, not silent.
+
+**What a match proves, and what it does not.** It proves the runtime's image
+was built from this tree's *bundle*. It does not prove the image is
+reproducible: the Dockerfile's base image is pinned by tag and its packages by
+range, and `agents/__init__.py` is copied in from outside the bundle. That is
+recorded for M02 (PR 3 security-reviewer F3, cold review N3).
 
 What it does not do: prove the runtime answered. That is the run itself,
 whose envelope says `runtime` only if this found a match and the calls were
