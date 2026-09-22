@@ -366,10 +366,25 @@ Product ruled P1 as Option B, and this is the part on Security's paths.
   `ecr:DescribeImages` on `repository/agentkeel-refagent`. None of them can
   change what it reads.
 
-**Not yet in the account.** It needs the third bootstrap redeploy, after
-`cdk diff`, and a read-back like BLOCK F's. Until then the step writes
-`runner: … could not be read`, which is also what it writes today, because
-no refagent stack exists.
+**In the account.** The human redeployed a third time, after `cdk diff`
+showed only these three reads (`UPDATE_COMPLETE`, 2026-09-22 00:45:44
+UTC). The same read-back script ran again, now 50 rows: **50 of 50 as
+expected**. BLOCK F's 42 rows are unchanged, and the eval role's are these:
+
+| Principal | Action | Resource | Context | Decision | Expected |
+|---|---|---|---|---|---|
+| `agentkeel-evals` | `cloudformation:DescribeStacks` | `cloudformation:us-west-2:<acct>:stack/agentkeel-refagent/x` | — | **allowed** | allowed |
+| `agentkeel-evals` | `cloudformation:DescribeStacks` | `cloudformation:us-west-2:<acct>:stack/AgentkeelBootstrap/x` | — | implicitDeny | implicitDeny |
+| `agentkeel-evals` | `bedrock-agentcore:GetAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/refagent-abc` | — | **allowed** | allowed |
+| `agentkeel-evals` | `bedrock-agentcore:GetAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/other-abc` | — | implicitDeny | implicitDeny |
+| `agentkeel-evals` | `bedrock-agentcore:UpdateAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/refagent-abc` | — | implicitDeny | implicitDeny |
+| `agentkeel-evals` | `ecr:DescribeImages` | `ecr:us-west-2:<acct>:repository/agentkeel-refagent` | — | **allowed** | allowed |
+| `agentkeel-evals` | `ecr:PutImage` | `ecr:us-west-2:<acct>:repository/agentkeel-refagent` | — | implicitDeny | implicitDeny |
+| `agentkeel-evals` | `bedrock-agentcore:InvokeAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/refagent-abc` | — | **allowed** | allowed |
+
+`scripts/runtime_for_tree.py`, run straight after the redeploy, still
+answers `runner: … Stack with id agentkeel-refagent does not exist`. That is
+correct: no refagent stack exists until this PR merges.
 
 ## Still to land in PR 3
 
