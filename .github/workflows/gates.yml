@@ -1,0 +1,73 @@
+# gates (SPEC/00 §5 `ruling-cited` and `two-key`; SPEC/02 §6). Security seat.
+# Authorised by SPEC/00-overview.md#8-M02 and milestones/M02/rulings/pr2-security.md.
+# Its hash is listed in infra/workflows.sha256, which `make validate` reads.
+#
+# Two jobs, one per required check, named for the contexts the human adds
+# to the main ruleset after M02 PR 2 merges (SPEC/02 §5.1), not before: a
+# required context nothing reports pins every open PR at "Expected".
+#
+# Both run on every pull request, a fork's included: there is no `if:`,
+# because a skipped required check counts as satisfied (evals.yml, BLOCK C),
+# and neither job needs a secret or an OIDC token. The checkout is the PR's
+# merge ref, main plus this PR (ADR-0008), with full history, so that the
+# base sha resolves and the bot's authorship under evals/history/ can be
+# read. `.github/CODEOWNERS` is read from the base sha, never from the PR
+# (SPEC/02 §6). Each gate prints every refused path, never the first alone;
+# scripts/observe_pr.py reads those lines from this job's log at M02 PR 3.
+#
+# What this does not do: judge a ruling, or stop someone with write access
+# from editing this file. `ruling-cited` on .github/workflows/** and
+# infra/workflows.sha256 is what refuses that edit without a Security ruling
+# (open.md row 7, first half), and this file is one of the paths it reads.
+name: gates
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  ruling-cited:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen --no-group infra
+
+      - name: Every seat-owned path in the diff is covered by a ruling with this PR's number
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          PR: ${{ github.event.pull_request.number }}
+        run: uv run python -m src.gates.ruling_cited --base "$BASE" --pr "$PR"
+
+  two-key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen --no-group infra
+
+      - name: Every relaxation in the diff has rulings from two distinct seats
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          PR: ${{ github.event.pull_request.number }}
+        run: uv run python -m src.gates.two_key --base "$BASE" --pr "$PR"

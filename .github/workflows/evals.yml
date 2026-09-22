@@ -98,7 +98,13 @@ jobs:
       - name: Install
         run: uv sync --frozen
 
+      # GITHUB_TOKEN is for `validate`'s two API reads from M02 PR 2, the
+      # live ruleset and the CODEOWNERS logins: both answer without a token
+      # on a public repository, and the token spares the unauthenticated rate
+      # limit shared by every runner. Read-only; a fork's token is read-only too.
       - name: make validate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: make validate
 
       # Same reason as in `evals`: without cosign the signature check never
@@ -168,6 +174,8 @@ jobs:
 
       - name: make validate
         if: steps.current.outputs.measured_at == ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: make validate
 
       # `src/bundle/verify.py` skips the cosign check when cosign is not on
