@@ -17,6 +17,7 @@ being filled (SPEC/00 §10.3).
 | M | Recorded at | Shows | State |
 |---|---|---|---|
 | M00 | tag `m00`, commit `cfbd8ba`, 2026-09-19 | trap `g-012` and its answer; `make evals-local` losing, live; the seed commit `f9f1342` with no `src/verdict/`; `verdict.gate` on `tests/fixtures/hand_written_envelope_no_baseline_card_ref.json` exiting 2, REJECTED; row 0 before and after the close; `make ledger` exiting 0; `tests/test_baseline_frozen.py`, 9 passed | recorded, 4:16 |
+| M01 | to be recorded on `main` at tag `m01`, after the close PR merges; committed in M02 PR 1 (ADR-0005 amendment 1) | S1 and S2 refused by `verify`, each with its planted reason; S3, S5 and S8 refused at synth; the S4 and S6 refusals in CloudTrail; the uncited answers turning the result RED; row 1 reading UNMEASURED on the runner envelope, and `make ledger` refusing GREEN beside it; the failed first deploy, `kms:CreateGrant` refused by the deploy boundary | not recorded |
 
 M00's video was recorded on `main` at tag `m00`, after the close PR
 merged, and committed in M00 PR 4 (ADR-0005). The live `make evals-local`

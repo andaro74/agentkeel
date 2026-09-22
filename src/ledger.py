@@ -62,6 +62,13 @@ def check_measured(row: dict[str, str], history_dir: Path) -> str | None:
         return f"row {row['#']}: {rejection}"
     if cell != expected:
         return f"row {row['#']}: Measured differs from the envelope.\n  ledger:   {cell}\n  envelope: {expected}"
+    if "; UNMEASURED; " in cell:
+        # SPEC/00 section 7, as for an empty cell above: a milestone that closes
+        # without a measurement is RED, never GREEN. A cell the gate reads as
+        # UNMEASURED (a claim read in the runtime, from an envelope that did not
+        # run there: M01 PR 3 cold review, B1) is that case, so RED may stand
+        # beside it and GREEN may not (M01 PR 4).
+        return f"row {row['#']}: State GREEN beside an UNMEASURED reading" if state == "GREEN" else None
     if state in ("GREEN", "RED") and f"; {state}; " not in cell:
         return f"row {row['#']}: State {state} is not the verdict in the Measured cell"
     return None
@@ -120,6 +127,11 @@ def main(argv: list[str] | None = None) -> int:
     if path := gate.latest(args.history_dir):
         try:
             print(f"\nlatest CI-written envelope reads:\n    {gate.measured_at(path, args.history_dir)}")
+            # The line a close copies must be the row's reading, not the envelope's
+            # alone: for a row read in the runtime they differ (M01 PR 4).
+            for milestone in sorted(gate.READ_IN_THE_RUNTIME):
+                print(f"as row {milestone} reads it:\n    "
+                      f"{gate.measured_at(path, args.history_dir, milestone=milestone)}")
         except gate.Rejected as rejection:
             problems.append(str(rejection))
     else:
