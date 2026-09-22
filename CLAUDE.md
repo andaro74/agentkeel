@@ -129,7 +129,7 @@ src/baseline/         frozen control
 src/verdict/          schema.json, build.py, gate.py, replay_history
 agents/refagent/      the reference agent (title availability): manifest.yaml,
                       prompt.txt, tools/, rules/ (ADR-0003 amendment 1)
-agents/ratings-helper/
+agents/ratings-helper/  manifest-only stub from M02 PR 2 (cut from M01 at open); code at M07
 evals/goldens/v1/     g-NNN.yaml, immutable ids
 evals/history/        CI-written envelopes (evidence)
 evals/local/          your runs (not evidence)

@@ -102,7 +102,7 @@ P11. **Only CI-written envelopes are evidence.** A local run
 | Data Owner | what CORRECT means | `evals/goldens/**`, `data/**` (slate, rights table, clause index, corpus), rulings on FRAGILE, corpus admission | weaken a golden to green a build |
 | Tool Owner | tool and edge contracts | `tools/**` and `agents/*/tools/**` schemas, `may_call`, `may_be_called_by` | change a schema without a major bump |
 | Threshold Owner | the bars, and which models are measured | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region (A-vs-A compares the pair) | move a bar without two keys |
-| Security | what tooling and infra MAY DO | platform repo: workflows, construct (`infra/construct/**`), bootstrap stack (`infra/bootstrap/**`), the rest of `infra/**`, KMS key policy, cosign identity, security account; seats → groups in a manifest | define scope |
+| Security | what tooling and infra MAY DO | platform repo: workflows, `.github/CODEOWNERS` (ADR-0003 amendment 2), construct (`infra/construct/**`), bootstrap stack (`infra/bootstrap/**`), the rest of `infra/**`, KMS key policy, cosign identity, security account; seats → groups in a manifest | define scope |
 | Engineering | that it works | `src/**`, `scripts/**`, `Makefile`, root config (`pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`, `.gitattributes`), `tests/**`, `agents/<name>/**` but for the fields and folders other seats own (ADR-0003 amendment 1), `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | self-approve any of the above |
 | (the seat named in its front matter) | its own routing | `.claude/agents/<name>.md` | rule; write to any seat-owned path |
 
@@ -135,8 +135,9 @@ approval. The mechanical gates are, exhaustively:
   groups, CODEOWNERS ↔ manifest, edges two-sided, no cycles, ceilings
   within bounds, cdk-nag, workflow file hash unchanged;
 - `signature` — bundle cosign-verified, digest matches manifest;
-- `ruling-cited` — a PR touching a seat-owned path cites a ruling on
-  `main` whose `authorises:` matches that path. SPEC/00 §8 MNN is
+- `ruling-cited` — a PR touching a seat-owned path cites a ruling in
+  the PR's merge ref, on `main` at the merge commit (ADR-0008), whose
+  `authorises:` matches that path. SPEC/00 §8 MNN is
   itself the ruling for that milestone's build paths; a PR cites it as
   `SPEC/00-overview.md#8-MNN`;
 - `two-key` — a diff that relaxes a threshold, retires a rule or golden,
@@ -739,7 +740,8 @@ not check recordings.
 - **R8 — subagents by need.** See §5.1.
 - **R9 — cold review from the start.** The ruling file is written for
   every PR; the required check `cold-review-ruling` enforces it from M00
-  PR 2. No PR in this repo merges before its ruling file is on `main`.
+  PR 2. No PR in this repo merges without its ruling file in the merge
+  commit (ADR-0008; it was "before its ruling file is on `main`").
 - **R10 — N is ten minutes.** The detection bar in claims 5 and 8. Chosen
   for CloudTrail and Flow Log delivery latency; changing it is a
   Threshold Owner ruling with two keys if it moves up.
