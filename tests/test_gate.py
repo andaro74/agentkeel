@@ -247,12 +247,12 @@ def test_a_dropped_golden_is_red(chain):
 def test_measured_is_what_the_ledger_cell_must_say(chain):
     envelope_path, _, _ = chain(right={"g-001", "g-012"})
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
-        "control: traps 1/3 (g-012); ordinary 1/9; guardrail 0/3; never_passed 13; regressed 0; "
+        "control: traps 1/3 (g-012); ordinary 1/9; guardrail 0/3; mode control; never_passed 13; regressed 0; "
         f"plants 0/0; GREEN; envelope `{'a' * 40}`"
     )
     envelope_path, _, _ = chain(right={"g-001"}, agent=True)
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
-        "agent: traps 0/3; ordinary 1/9; guardrail 0/3; control: traps 0/3; ordinary 0/9; guardrail 0/3; "
+        "agent: traps 0/3; ordinary 1/9; guardrail 0/3; control: traps 0/3; ordinary 0/9; guardrail 0/3; mode runner; "
         f"never_passed 14; regressed 0; plants 0/0; F1_1 pass {URL}; F1_2 pass {URL}; F1_3 pass {URL}; "
         f"F1_4 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
     )

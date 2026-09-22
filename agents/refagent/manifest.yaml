@@ -49,10 +49,14 @@ guardrail: null
 # outside the enum is refused at synth. Arbitrary hostnames are M05.
 # bedrock-runtime: Converse. dynamodb: the rights table. kms: the agent's
 # key. logs: its own log group. s3: the gateway endpoint, for nothing at M01
-# but the runtime's own image layers.
+# but the runtime's own image layers. ecr.api, ecr.dkr: the image pull itself
+# (ruling d, amended at M01 PR 3); the construct refuses a manifest without
+# them.
 endpoint_allowlist:
   - bedrock-runtime
   - dynamodb
+  - ecr.api
+  - ecr.dkr
   - kms
   - logs
   - s3

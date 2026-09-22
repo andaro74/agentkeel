@@ -88,13 +88,13 @@ def test_the_runtime_is_in_the_vpc_and_the_egress_is_the_manifests(template):
 
     groups = [r for r in resources if r["Type"] == "AWS::EC2::SecurityGroup"]
     assert len(groups) == 1
-    # Five endpoints in the manifest, five rules. CDK renders a prefix-list
+    # Seven endpoints in the manifest, seven rules. CDK renders a prefix-list
     # rule as its own resource and a security-group one inline, so the count
     # is over both forms: s3 and dynamodb are gateway endpoints (ADR-0006).
     inline = groups[0]["Properties"]["SecurityGroupEgress"]
     apart = [r["Properties"] for r in resources if r["Type"] == "AWS::EC2::SecurityGroupEgress"]
     egress = inline + apart
-    assert (len(inline), len(apart)) == (3, 2)
+    assert (len(inline), len(apart)) == (5, 2)  # ecr.api and ecr.dkr since M01 PR 3 (ruling d, amended)
     assert all(rule["ToPort"] == 443 and rule["IpProtocol"] == "tcp" for rule in egress)
     assert not any("CidrIp" in rule or "CidrIpv6" in rule for rule in egress)
     assert all("DestinationPrefixListId" in rule for rule in apart)
@@ -159,3 +159,92 @@ def test_a_rule_to_an_approved_endpoint_on_a_wider_port_range_is_refused():
     assert "udp 443-443" in _egress_refusal({**exact, "ipProtocol": "udp"}, [approved])
     # an absent destination is 0.0.0.0/0 (SPEC/01 §6)
     assert "no destination" in _egress_refusal({"ipProtocol": "tcp", "toPort": 443}, [approved])
+
+
+# --- B2 (M01 PR 3): the agent can call the model it is given ---------------
+#
+# The role named `application-inference-profile/agentkeel-refagent`, which
+# is no ARN AWS assigns, and the runtime was handed the system profile,
+# which the role was never granted. The stack would have deployed and every
+# call would have been refused. These read the rendered template.
+
+
+def agent_statements(template: dict) -> list[dict]:
+    policy = next(r for r in template["Resources"].values() if r["Type"] == "AWS::IAM::Policy")
+    return policy["Properties"]["PolicyDocument"]["Statement"]
+
+
+def profile_arn(template: dict) -> dict:
+    logical = next(k for k, r in template["Resources"].items()
+                   if r["Type"] == "AWS::Bedrock::ApplicationInferenceProfile")  # fmt: skip
+    return {"Fn::GetAtt": [logical, "InferenceProfileArn"]}
+
+
+def test_the_role_may_call_the_profile_aws_actually_made(template):
+    invoke = [s for s in agent_statements(template) if "bedrock:InvokeModel" in s["Action"] and "Condition" not in s]
+    assert len(invoke) == 1
+    assert invoke[0]["Resource"] == profile_arn(template), "a profile ARN built from its name names nothing"
+
+
+def test_the_runtime_is_given_the_profile_its_role_may_call(template):
+    runtime = next(r for r in template["Resources"].values() if r["Type"] == "AWS::BedrockAgentCore::Runtime")
+    assert runtime["Properties"]["EnvironmentVariables"]["AGENTKEEL_MODEL_PROFILE"] == profile_arn(template)
+
+
+def test_the_model_is_reachable_only_through_the_agents_own_profile(template):
+    direct = [s for s in agent_statements(template)
+              if "bedrock:InvokeModel" in s["Action"] and "foundation-model" in json.dumps(s["Resource"])]  # fmt: skip
+    assert len(direct) == 1
+    assert direct[0]["Condition"] == {"StringEquals": {"bedrock:InferenceProfileArn": profile_arn(template)}}
+    assert all(arn.endswith("::foundation-model/anthropic.claude-sonnet-4-6") for arn in direct[0]["Resource"])
+
+
+# --- B1 (M01 PR 3): the runtime can pull its own image -----------------------
+
+
+def test_a_manifest_without_the_image_pull_endpoints_is_refused_at_synth(tmp_path):
+    """Ruling d, amended. refagent's own manifest, less the two lines: the manifest
+    an agent written before the amendment would have. It is still schema-valid."""
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    manifest = (ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8")
+    trimmed = "\n".join(line for line in manifest.splitlines() if line not in ("  - ecr.api", "  - ecr.dkr"))
+    assert trimmed != manifest
+    (bundle / "manifest.yaml").write_text(trimmed, encoding="utf-8")
+    refusal = synth_refusal(app(tmp_path, f'GovernedAgent(stack, "R", bundle={str(bundle)!r})'))
+    assert refusal is not None
+    assert "endpoint_allowlist lacks ecr.api, ecr.dkr" in refusal
+
+
+def test_the_role_pulls_its_own_image_read_only(template):
+    pulls = [s for s in agent_statements(template) if "ecr:BatchGetImage" in s["Action"]]
+    assert len(pulls) == 1
+    assert set(pulls[0]["Action"]) == {"ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"}
+    assert json.dumps(pulls[0]["Resource"]).endswith(':repository/agentkeel-refagent"]]}')
+    named = {a for s in agent_statements(template) for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])}
+    assert not {a for a in named if a.startswith("ecr:")} - {"ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer",
+                                                              "ecr:GetAuthorizationToken"}  # fmt: skip
+
+
+def test_the_role_makes_its_log_group_under_agentcores_prefix_only(template):
+    groups = [s for s in agent_statements(template) if "logs:CreateLogGroup" in s["Action"]]
+    assert len(groups) == 1
+    assert ":log-group:/aws/bedrock-agentcore/runtimes/*" in json.dumps(groups[0]["Resource"])
+
+
+def test_no_action_the_role_names_is_one_iam_does_not_have(template):
+    """`bedrock:Converse` is not an IAM action; Converse is authorised as InvokeModel."""
+    named = {a for s in agent_statements(template) for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])}
+    assert "bedrock:Converse" not in named
+
+
+def test_the_roles_logs_and_key_are_its_own_not_the_accounts(template):
+    """PR 3 security-reviewer F6: both were on `*`, which reached any key whose policy delegates to IAM."""
+    stmts = {s.get("Sid"): s for s in agent_statements(template)}
+    streams = stmts["ItsOwnLogStreams"]
+    assert ":log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*" in json.dumps(streams["Resource"])
+    key = stmts["ItsOwnKeyByAlias"]
+    assert key["Condition"] == {"ForAnyValue:StringEquals": {"kms:ResourceAliases": "alias/agentkeel-refagent"}}
+    assert not [s for s in agent_statements(template) if s["Resource"] == "*"
+                and {"kms:Decrypt", "logs:PutLogEvents"} & set(s["Action"] if isinstance(s["Action"], list)
+                                                              else [s["Action"]])]  # fmt: skip

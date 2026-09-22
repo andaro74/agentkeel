@@ -18,8 +18,10 @@ Synthesised here rather than read from `cdk.out`, for the same reason as
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -181,6 +183,22 @@ def test_the_eval_role_may_not_change_what_cloudtrail_says(template):
         )
 
 
+def test_the_eval_role_may_read_which_bytes_the_runtime_runs_and_nothing_more(template):
+    """ADR-0007, P1: three reads, on refagent alone, and no write among them."""
+    reads = {"cloudformation:DescribeStacks": "stack/agentkeel-refagent/*",
+             "bedrock-agentcore:GetAgentRuntime": "runtime/refagent*",
+             "ecr:DescribeImages": "repository/agentkeel-refagent"}  # fmt: skip
+    statements_ = eval_role_policy(template)
+    for action, resource in reads.items():
+        granting = [s for s in statements_ if s["Effect"] == "Allow" and action in actions(s)]
+        assert len(granting) == 1, action
+        assert json.dumps(granting[0]["Resource"]).endswith(f':{resource}"]]}}'), action
+    allowed_here = {a for s in statements_ if s["Effect"] == "Allow" for a in actions(s)}
+    assert not {a for a in allowed_here if a.startswith(("cloudformation:", "ecr:"))} - set(reads)
+    assert not {a for a in allowed_here if a.startswith("bedrock-agentcore:")} - {
+        "bedrock-agentcore:GetAgentRuntime", "bedrock-agentcore:InvokeAgentRuntime"}
+
+
 # --- the key policy --------------------------------------------------------
 
 
@@ -263,3 +281,263 @@ def test_both_budgets_count_bedrock_and_nothing_else(template):
     for budget in of_type(template, "AWS::Budgets::Budget").values():
         assert budget["Properties"]["Budget"]["CostFilters"] == {"Service": ["Amazon Bedrock"]}
         assert budget["Properties"]["Budget"]["BudgetType"] == "COST"
+
+
+# --- BLOCK F: what the execution role may make (M01 PR 3) -------------------
+#
+# Until PR 3 its whole grant was iam:CreateRole, PutRolePolicy and
+# AttachRolePolicy under the agent path. The construct makes a security
+# group, a table, a profile and a runtime, so the first deploy would have
+# failed on its first non-IAM resource. These tests hold the grant to the
+# construct's own template in both directions: every type it renders is
+# covered, and nothing is granted that no type needs.
+
+CONSTRUCT_APP = ROOT / "infra" / "construct" / "app.py"
+
+# What CloudFormation calls to create, read and delete each resource type
+# refagent's stack renders: the handler permissions AWS publishes, from
+# `aws cloudformation describe-type --type RESOURCE --type-name <T>`, read
+# 2026-09-21, less the calls only a feature the template does not use makes
+# (Kinesis streaming, table import, replicas, a customer key, S3 code
+# artifacts, capacity providers). The key set must equal the template's types.
+NEEDED_BY_TYPE = {
+    "AWS::EC2::SecurityGroup": {"ec2:CreateSecurityGroup", "ec2:DescribeSecurityGroups", "ec2:RevokeSecurityGroupEgress",
+                                "ec2:AuthorizeSecurityGroupEgress", "ec2:CreateTags", "ec2:DeleteSecurityGroup",
+                                "ec2:DescribeInstances"},
+    "AWS::EC2::SecurityGroupEgress": {"ec2:AuthorizeSecurityGroupEgress", "ec2:RevokeSecurityGroupEgress",
+                                      "ec2:DescribeSecurityGroupRules"},
+    "AWS::DynamoDB::Table": {"dynamodb:CreateTable", "dynamodb:DescribeTable", "dynamodb:DescribeTimeToLive",
+                             "dynamodb:UpdateContinuousBackups", "dynamodb:DescribeContinuousBackups",
+                             "dynamodb:DescribeContributorInsights", "dynamodb:DescribeKinesisStreamingDestination",
+                             "dynamodb:ListTagsOfResource", "dynamodb:GetResourcePolicy"},
+    "AWS::IAM::Role": {"iam:CreateRole", "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:TagRole", "iam:UntagRole",
+                       "iam:GetRole", "iam:ListAttachedRolePolicies", "iam:ListRolePolicies", "iam:DeleteRole",
+                       "iam:DetachRolePolicy", "iam:DeleteRolePolicy"},
+    "AWS::IAM::Policy": {"iam:GetRolePolicy", "iam:PutRolePolicy", "iam:DeleteRolePolicy"},
+    "AWS::Bedrock::ApplicationInferenceProfile": {"bedrock:CreateInferenceProfile", "bedrock:GetInferenceProfile",
+                                                  "bedrock:TagResource", "bedrock:ListTagsForResource",
+                                                  "bedrock:DeleteInferenceProfile"},
+    "AWS::BedrockAgentCore::Runtime": {"bedrock-agentcore:CreateAgentRuntime", "bedrock-agentcore:CreateAgentRuntimeEndpoint",
+                                       "bedrock-agentcore:GetAgentRuntime", "bedrock-agentcore:GetAgentRuntimeEndpoint",
+                                       "bedrock-agentcore:CreateWorkloadIdentity", "bedrock-agentcore:TagResource",
+                                       "bedrock-agentcore:ListTagsForResource", "iam:CreateServiceLinkedRole",
+                                       "iam:PassRole", "vpc-lattice:GetResourceConfiguration",
+                                       "vpc-lattice:CreateServiceNetworkResourceAssociation",
+                                       "vpc-lattice:GetServiceNetworkResourceAssociation",
+                                       "vpc-lattice:ListServiceNetworkResourceAssociations",
+                                       "vpc-lattice:AssociateViaAWSService", "ec2:DescribeVpcs", "ec2:DescribeSubnets",
+                                       "ec2:DescribeSecurityGroups", "ec2:CreateNetworkInterface",
+                                       "bedrock-agentcore:DeleteAgentRuntime", "bedrock-agentcore:DeleteAgentRuntimeEndpoint",
+                                       "bedrock-agentcore:DeleteWorkloadIdentity"},
+}  # fmt: skip
+
+
+@pytest.fixture(scope="module")
+def construct_template(tmp_path_factory) -> dict[str, Any]:
+    out = tmp_path_factory.mktemp("construct")
+    done = subprocess.run(
+        [sys.executable, str(CONSTRUCT_APP)], cwd=ROOT, capture_output=True, text=True, check=False,
+        env={**os.environ, "PYTHONPATH": str(ROOT), "CDK_OUTDIR": str(out)},
+    )  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    return json.loads((out / "AgentkeelRefagent.template.json").read_text(encoding="utf-8"))
+
+
+def role_statements(template: dict[str, Any], role_logical_prefix: str) -> list[dict[str, Any]]:
+    for logical, policy in of_type(template, "AWS::IAM::Policy").items():
+        if logical.startswith(role_logical_prefix):
+            return policy["Properties"]["PolicyDocument"]["Statement"]
+    raise AssertionError(f"no policy on {role_logical_prefix}")
+
+
+def allowed_actions(statements_: list[dict[str, Any]]) -> set[str]:
+    return {a for s in statements_ if s["Effect"] == "Allow" for a in actions(s)}
+
+
+def test_every_resource_type_the_construct_renders_is_one_the_grant_knows(construct_template):
+    """A new resource in GovernedAgent must come with its grant, or this fails before the deploy does."""
+    rendered = {r["Type"] for r in construct_template["Resources"].values()}
+    assert rendered == set(NEEDED_BY_TYPE), (
+        f"the construct renders {sorted(rendered - set(NEEDED_BY_TYPE))} with no grant on agentkeel-cfn-exec, "
+        f"or the grant covers {sorted(set(NEEDED_BY_TYPE) - rendered)} that it no longer renders"
+    )
+
+
+@pytest.mark.parametrize("kind", sorted(NEEDED_BY_TYPE))
+def test_the_execution_role_may_make_what_the_construct_renders(template, kind):
+    granted = allowed_actions(role_statements(template, "ExecutionRole"))
+    assert NEEDED_BY_TYPE[kind] <= granted, f"{kind}: missing {sorted(NEEDED_BY_TYPE[kind] - granted)}"
+
+
+def test_the_execution_role_may_resolve_the_security_parameters(template, construct_template):
+    """Every SSM-typed parameter the construct reads is under the path the grant names (ten since B1)."""
+    ssm_params = [p for p in construct_template["Parameters"].values() if p["Type"].startswith("AWS::SSM::")]
+    assert ssm_params
+    assert all(p["Default"].startswith("/agentkeel/security/") for p in ssm_params)
+    reads = [s for s in role_statements(template, "ExecutionRole") if "ssm:GetParameters" in actions(s)]
+    assert len(reads) == 1
+    assert json.dumps(reads[0]["Resource"]).endswith(':parameter/agentkeel/security/*"]]}')
+
+
+def test_the_execution_role_grants_no_service_wildcard_and_no_delete_of_the_table(template):
+    granted = allowed_actions(role_statements(template, "ExecutionRole"))
+    assert not any(a == "*" or a.endswith(":*") for a in granted), "a service wildcard is not what the construct makes"
+    # The table is RETAIN: CloudFormation never calls DeleteTable, so it is not granted.
+    assert "dynamodb:DeleteTable" not in granted
+    assert not {"dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:BatchWriteItem"} & granted, (
+        "the execution role makes the table; loading it is the deploy role's"
+    )
+
+
+def test_the_execution_role_makes_security_groups_in_the_platform_vpc_only(template):
+    groups = [s for s in role_statements(template, "ExecutionRole")
+              if "ec2:DeleteSecurityGroup" in actions(s)]  # fmt: skip
+    assert len(groups) == 1
+    assert "security-group/*" in json.dumps(groups[0]["Resource"])
+    assert "Vpc" in json.dumps(groups[0]["Condition"]["ArnEquals"]["ec2:Vpc"])  # this stack's VPC, by Ref
+
+
+def test_no_create_is_conditioned_on_a_key_the_new_resource_does_not_have_yet(template):
+    """Read on the deployed role, not in the template: ec2:Vpc on the new security group and the
+    new interface, and runtime/* for CreateAgentRuntime, each refused the create (M01 PR 3)."""
+    for s in role_statements(template, "ExecutionRole"):
+        if s["Effect"] != "Allow":
+            continue
+        resources = json.dumps(s["Resource"])
+        if "ec2:CreateSecurityGroup" in actions(s):
+            assert "Condition" not in s, "a new group has no ec2:Vpc: the VPC resource holds the create"
+            assert "vpc/" in resources and "Ref" in resources  # this stack's VPC, and no other
+        if "ec2:CreateNetworkInterface" in actions(s) and "network-interface/" in resources:
+            assert "Condition" not in s, "a new interface has no ec2:Vpc: the subnet and group hold the create"
+    runtime = [s for s in role_statements(template, "ExecutionRole") if "bedrock-agentcore:CreateAgentRuntime" in actions(s)]
+    assert len(runtime) == 1
+    assert runtime[0]["Resource"] == "*", "CreateAgentRuntime takes no resource-level permission"
+    assert "bedrock-agentcore:subnets" in runtime[0]["Condition"]["ForAllValues:StringEquals"]
+    assert runtime[0]["Condition"]["Null"] == {"bedrock-agentcore:subnets": "false"}
+
+
+def test_the_execution_role_passes_an_agent_role_to_agentcore_only(template):
+    passes = [s for s in role_statements(template, "ExecutionRole") if "iam:PassRole" in actions(s)]
+    assert len(passes) == 1
+    assert passes[0]["Condition"] == {"StringEquals": {"iam:PassedToService": "bedrock-agentcore.amazonaws.com"}}
+    assert AGENT_PATH in json.dumps(passes[0]["Resource"])
+
+
+def test_every_iam_write_on_the_execution_role_is_on_the_agent_path(template):
+    """Nothing writes IAM outside /agentkeel/agents/, except the one service-linked
+    role AgentCore's VPC mode needs, by service name; creating a role stays
+    conditioned on the agent boundary."""
+    for s in role_statements(template, "ExecutionRole"):
+        if s["Effect"] != "Allow":
+            continue
+        writes = {a for a in actions(s) if a.startswith("iam:") and not a.startswith("iam:Get")}
+        if not writes:
+            continue
+        if writes == {"iam:CreateServiceLinkedRole"}:
+            assert s["Condition"]["StringEquals"]["iam:AWSServiceName"] == "network.bedrock-agentcore.amazonaws.com"
+            continue
+        assert AGENT_PATH in json.dumps(s["Resource"]), f"{s.get('Sid')}: {sorted(writes)} off the agent path"
+        if writes & {"iam:CreateRole", "iam:PutRolePolicy", "iam:AttachRolePolicy"}:
+            assert "iam:PermissionsBoundary" in s["Condition"]["StringEquals"], s.get("Sid")
+
+
+# --- B1: the runtime can pull its image (M01 PR 3, ruling d amended) -------
+
+ECR_PULL = {"ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:GetAuthorizationToken"}
+
+
+def test_the_agent_boundary_allows_the_pull_and_no_ecr_write(template):
+    """A ceiling wide enough to pull, and no wider: an agent never pushes or deletes an image."""
+    agent = allowed(named(template, "agentkeel-boundary"))
+    assert ECR_PULL <= agent
+    assert {"logs:CreateLogGroup", "logs:DescribeLogStreams", "logs:DescribeLogGroups"} <= agent
+    assert not {a for a in agent if a.startswith("ecr:")} - ECR_PULL
+    # S6 still reads the same way: allowed by the ceiling, denied by the key policy.
+    assert "kms:GetKeyPolicy" in agent
+
+
+def endpoints(template: dict[str, Any]) -> list[dict[str, Any]]:
+    return [r["Properties"] for r in of_type(template, "AWS::EC2::VPCEndpoint").values()]
+
+
+def test_the_vpc_has_the_two_endpoints_an_image_pull_needs(template):
+    names = json.dumps([e["ServiceName"] for e in endpoints(template)])
+    assert "ecr.api" in names and "ecr.dkr" in names
+    interface = [e for e in endpoints(template) if e.get("VpcEndpointType") == "Interface"]
+    assert len(interface) == 5
+
+
+def test_both_are_published_for_the_construct(template):
+    published = {p["Properties"]["Name"] for p in of_type(template, "AWS::SSM::Parameter").values()}
+    assert {"/agentkeel/security/endpoint/ecr.api", "/agentkeel/security/endpoint/ecr.dkr"} <= published
+
+
+def test_the_s3_endpoint_reaches_outside_the_account_for_the_image_layers_only(template):
+    """The one statement not scoped to this account: GetObject on ECR's own layer bucket."""
+    gateways = [e for e in endpoints(template) if e.get("VpcEndpointType") == "Gateway"]
+    s3 = next(e for e in gateways if json.dumps(e["ServiceName"]).endswith('.s3"]]}'))
+    unscoped = [s for s in s3["PolicyDocument"]["Statement"] if "Condition" not in s]
+    assert len(unscoped) == 1
+    assert unscoped[0]["Action"] == "s3:GetObject"
+    assert unscoped[0]["Resource"] == "arn:aws:s3:::prod-us-west-2-starport-layer-bucket/*"
+
+
+# --- BLOCK F: what the deploy role may do (M01 PR 3) -----------------------
+
+DEPLOY_YML = ROOT / ".github" / "workflows" / "deploy.yml"
+
+# deploy.yml's steps, and what each calls as the deploy role.
+DEPLOY_STEPS = {
+    "amazon-ecr-login": {"ecr:GetAuthorizationToken"},
+    "reuse an image already pushed under this tag": {"ecr:BatchGetImage"},
+    "docker push": {"ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
+                    "ecr:CompleteLayerUpload", "ecr:PutImage"},
+    "cloudformation deploy": {"cloudformation:CreateChangeSet", "cloudformation:ExecuteChangeSet",
+                              "cloudformation:DescribeStacks", "iam:PassRole"},
+    "load_rights_table.py": {"dynamodb:PutItem", "dynamodb:DescribeTable"},
+    "the load check": {"bedrock-agentcore:InvokeAgentRuntime", "cloudformation:DescribeStacks"},
+}  # fmt: skip
+
+
+def deploy_granted(template: dict[str, Any]) -> set[str]:
+    granted = allowed_actions(role_statements(template, "DeployRole"))
+    # cloudformation:Describe* is granted as a pattern.
+    return granted | ({"cloudformation:DescribeStacks"} if "cloudformation:Describe*" in granted else set())
+
+
+@pytest.mark.parametrize("step", sorted(DEPLOY_STEPS))
+def test_the_deploy_role_may_do_what_each_step_of_deploy_yml_calls(template, step):
+    missing = DEPLOY_STEPS[step] - deploy_granted(template)
+    assert not missing, f"{step}: {sorted(missing)}"
+
+
+def test_the_deploy_role_may_not_delete_or_batch_write(template):
+    granted = deploy_granted(template)
+    assert not any(a.startswith("ecr:Delete") or a == "ecr:BatchDeleteImage" for a in granted)
+    assert not {"dynamodb:DeleteItem", "dynamodb:BatchWriteItem", "dynamodb:DeleteTable"} & granted
+    assert not any(a == "*" or a.endswith(":*") for a in granted)
+
+
+def test_the_deploy_role_calls_refagents_runtime_and_no_other(template):
+    invoke = [s for s in role_statements(template, "DeployRole")
+              if "bedrock-agentcore:InvokeAgentRuntime" in actions(s)]  # fmt: skip
+    assert len(invoke) == 1
+    assert json.dumps(invoke[0]["Resource"]).endswith(':runtime/refagent*"]]}')
+
+
+def stack_names(workflow: str) -> list[str]:
+    """Every `--stack-name` a step runs. Comment lines are not commands."""
+    commands = "\n".join(line for line in workflow.splitlines() if not line.lstrip().startswith("#"))
+    return re.findall(r"--stack-name\s+(\S+)", commands)
+
+
+def test_every_stack_deploy_yml_names_is_one_the_deploy_role_may_touch(template):
+    """Item 7. `--stack-name AgentkeelBootstrap` against a grant on `stack/agentkeel-*/*`:
+    IAM ARN matching is case-sensitive, so that call would have been refused mid-deploy."""
+    grant = next(s for s in role_statements(template, "DeployRole") if "cloudformation:CreateStack" in actions(s))
+    pattern = json.dumps(grant["Resource"]).split(":stack/")[1].split("/")[0]
+    assert pattern == "agentkeel-*"
+    names = stack_names(DEPLOY_YML.read_text(encoding="utf-8"))
+    assert names, "deploy.yml names no stack"
+    for name in names:
+        assert fnmatch.fnmatchcase(name, pattern), f"deploy.yml names {name}, which stack/{pattern}/* does not match"

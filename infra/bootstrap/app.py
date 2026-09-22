@@ -25,10 +25,12 @@ What it makes:
   (SPEC/01 §1). It may read, and may not deploy;
 - the **eval role** `agentkeel-evals`, absorbed from `infra/eval-role/`
   (ruling f): the two pinned profiles, the five-action Deny,
-  `bedrock-agentcore:InvokeAgentRuntime` on refagent's runtime only;
+  `bedrock-agentcore:InvokeAgentRuntime` on refagent's runtime only, and
+  three reads of which bytes that runtime runs (ADR-0007, P1);
 - a **VPC with no internet gateway and no NAT**: interface endpoints for
-  bedrock-runtime, kms and logs, gateway endpoints for s3 and dynamodb
-  (ruling e, ADR-0006), each with a policy scoped to this account;
+  bedrock-runtime, kms, logs, ecr.api and ecr.dkr, gateway endpoints for s3
+  and dynamodb (ruling e, ADR-0006), each with a policy scoped to this
+  account. The one exception is s3's read of ECR's own layer bucket (B1);
 - one **KMS key per agent**, whose policy denies key-policy changes to
   everyone but Security, and denies `kms:GetKeyPolicy` to the agent role
   path `/agentkeel/agents/*` (ruling b, seed S6);
@@ -40,7 +42,7 @@ What it makes:
 - the **ECR repository** the runtime image is pulled from, tag-immutable, so
   a digest cannot be moved to other bytes (SPEC/01 §6, "at load");
 - the **Security-owned parameters** `GovernedAgent` reads: the boundary ARN,
-  the VPC, the subnets and the three interface endpoints' security groups.
+  the VPC, the subnets and the five interface endpoints' security groups.
   The two gateway-endpoint prefix lists have no CloudFormation attribute; the
   human who deploys this stack writes those two parameters, with one command
   each (`infra/bootstrap/README.md`).
@@ -95,17 +97,32 @@ EVAL_WORKFLOWS = [
     f"{REPO}/.github/workflows/evals.yml@refs/heads/main",
 ]
 DEPLOY_WORKFLOW = f"{REPO}/.github/workflows/deploy.yml@refs/heads/main"
-# The five service names a manifest may list (ruling d). Interface endpoints,
-# except s3 and dynamodb, which AWS offers as gateway endpoints (ruling e).
+# The seven service names a manifest may list (ruling d, amended at M01 PR 3).
+# Interface endpoints, except s3 and dynamodb, which AWS offers as gateway
+# endpoints (ruling e).
 INTERFACE_ENDPOINTS = {
     "bedrock-runtime": ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
     "kms": ec2.InterfaceVpcEndpointAwsService.KMS,
     "logs": ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+    # Ruling d, amended at M01 PR 3 (B1): a runtime in a VPC with no way out
+    # pulls its image through these two, and AWS lists both as required.
+    "ecr.api": ec2.InterfaceVpcEndpointAwsService.ECR,
+    "ecr.dkr": ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
 }
+# The regional bucket ECR keeps image layers in. AWS owns it, so the S3
+# endpoint's this-account policy refused it; it is named here and nowhere
+# else is outside the account (B1, from AgentCore's VPC documentation).
+ECR_LAYER_BUCKET = f"prod-{REGION}-starport-layer-bucket"
 GATEWAY_ENDPOINTS = {
     "s3": ec2.GatewayVpcEndpointAwsService.S3,
     "dynamodb": ec2.GatewayVpcEndpointAwsService.DYNAMODB,
 }
+
+
+def endpoint_id(name: str) -> str:
+    """`bedrock-runtime` -> `BedrockRuntime`, `ecr.api` -> `EcrApi`. The three older ids are unchanged,
+    so their endpoints and parameters are not replaced on redeploy."""
+    return name.title().replace("-", "").replace(".", "")
 
 
 class BootstrapStack(cdk.Stack):
@@ -129,7 +146,7 @@ class BootstrapStack(cdk.Stack):
         )  # fmt: skip
 
         vpc = self._vpc()
-        execution_role = self._execution_role(boundary)
+        execution_role = self._execution_role(boundary, vpc)
         self._deploy_role(provider)
         self._developer_role()
         eval_role = self._eval_role(provider)
@@ -166,6 +183,12 @@ class BootstrapStack(cdk.Stack):
                     actions=["bedrock:Invoke*", "bedrock-agentcore:*", "dynamodb:GetItem", "dynamodb:Query",
                              "kms:Decrypt", "kms:GenerateDataKey", "logs:CreateLogStream", "logs:PutLogEvents",
                              "s3:GetObject", "cloudformation:Describe*", "sts:AssumeRoleWithWebIdentity",
+                             # B1, ruling d amended (M01 PR 3): the runtime
+                             # pulls its own image and makes its own log
+                             # group, as its role. Read-only on ECR: no push,
+                             # no delete. AgentCore's documented execution role.
+                             "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:GetAuthorizationToken",
+                             "logs:CreateLogGroup", "logs:DescribeLogStreams", "logs:DescribeLogGroups",
                              # Seed S6, and the only reason it is here (ruling t).
                              # An allow-list caps by omission, so leaving this
                              # out would have made the BOUNDARY refuse S6 and
@@ -272,28 +295,214 @@ class BootstrapStack(cdk.Stack):
 
         for name, interface in INTERFACE_ENDPOINTS.items():
             endpoint = vpc.add_interface_endpoint(
-                f"Endpoint{name.title().replace('-', '')}", service=interface, private_dns_enabled=True)
+                f"Endpoint{endpoint_id(name)}", service=interface, private_dns_enabled=True)
             endpoint.add_to_policy(this_account())
             self.endpoint_groups[name] = endpoint.connections.security_groups[0]
         for name, gateway in GATEWAY_ENDPOINTS.items():
-            vpc.add_gateway_endpoint(f"Endpoint{name.title()}", service=gateway).add_to_policy(this_account())
+            endpoint = vpc.add_gateway_endpoint(f"Endpoint{name.title()}", service=gateway)
+            endpoint.add_to_policy(this_account())
+            if name == "s3":
+                # B1: the image's layers, read-only, from ECR's own bucket.
+                endpoint.add_to_policy(iam.PolicyStatement(
+                    sid="EcrImageLayersOnly",
+                    principals=[iam.AnyPrincipal()], actions=["s3:GetObject"],
+                    resources=[f"arn:aws:s3:::{ECR_LAYER_BUCKET}/*"],
+                ))  # fmt: skip
         return vpc
 
     # --- the roles ---------------------------------------------------------
 
-    def _execution_role(self, boundary: iam.ManagedPolicy) -> iam.Role:
-        """What CloudFormation runs as. Not admin, and it may create a role only with the boundary."""
+    def _execution_role(self, boundary: iam.ManagedPolicy, vpc: ec2.Vpc) -> iam.Role:
+        """What CloudFormation runs as. Not admin, and it may create a role only with the boundary.
+
+        BLOCK F (M01 PR 3). Until then its whole grant was the IAM statement
+        below, and the construct makes a security group, a table, an
+        inference profile and a runtime, so refagent's stack would have
+        failed on its first non-IAM resource. The grants below are what
+        `GovernedAgent` renders and nothing more, resource type by resource
+        type (`tests/test_bootstrap.py` holds the list against the construct's
+        template):
+
+        | Construct resource | Grant |
+        |---|---|
+        | 10 `AWS::SSM::Parameter::Value` | `ssm:GetParameters`, `/agentkeel/security/*` |
+        | `AWS::EC2::SecurityGroup`, 2 `SecurityGroupEgress` | create, egress, delete, in this VPC only |
+        | `AWS::DynamoDB::Table` | create, describe, PITR, tags; no delete (RETAIN) |
+        | `AWS::IAM::Role`, `AWS::IAM::Policy` | under `/agentkeel/agents/`, boundary-conditioned |
+        | `AWS::Bedrock::ApplicationInferenceProfile` | create, read, tag, delete, `agentkeel-*` |
+        | `AWS::BedrockAgentCore::Runtime` | runtime and its workload identity; pass the agent role to AgentCore only |
+
+        Nothing here grants `dynamodb:DeleteTable`: the table is RETAIN, so
+        CloudFormation never calls it, and a rollback leaves the table
+        rather than failing on it.
+        """
         role = iam.Role(
             self, "ExecutionRole",
             role_name="agentkeel-cfn-exec",
             assumed_by=iam.ServicePrincipal("cloudformation.amazonaws.com"),
             description="agentkeel: CloudFormation runs the deploy as this role, inside the boundary.",
         )  # fmt: skip
+        agent_roles = f"arn:aws:iam::{self.account}:role{AGENT_ROLE_PATH}*"
         role.add_to_policy(iam.PolicyStatement(
             sid="CreateRolesOnlyInsideTheBoundary",
-            actions=["iam:CreateRole", "iam:PutRolePolicy", "iam:AttachRolePolicy"],
-            resources=[f"arn:aws:iam::{self.account}:role{AGENT_ROLE_PATH}*"],
+            actions=["iam:CreateRole", "iam:PutRolePolicy", "iam:AttachRolePolicy",
+                     "iam:DeleteRolePolicy", "iam:DetachRolePolicy"],
+            resources=[agent_roles],
             conditions={"StringEquals": {"iam:PermissionsBoundary": boundary.managed_policy_arn}},
+        ))  # fmt: skip
+        # The IAM::Role read and delete handlers (describe-type, 2026-09-21).
+        # None takes a boundary key; all are on the agent path and nowhere
+        # else. Without the two List calls a rollback leaves the role
+        # DELETE_FAILED, which is the half-built stack `refuse` exists to stop.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadAndRollBackAgentRoles",
+            actions=["iam:GetRole", "iam:GetRolePolicy", "iam:DeleteRole", "iam:ListRolePolicies",
+                     "iam:ListAttachedRolePolicies", "iam:TagRole", "iam:UntagRole"],
+            resources=[agent_roles],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="PassAnAgentRoleToAgentCoreOnly",
+            actions=["iam:PassRole"],
+            resources=[agent_roles],
+            conditions={"StringEquals": {"iam:PassedToService": "bedrock-agentcore.amazonaws.com"}},
+        ))  # fmt: skip
+        # A runtime in VPC mode places its ENIs through AgentCore's
+        # service-linked role, created on first use by whoever creates the
+        # first runtime. That one role, by service name.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="AgentCoreNetworkServiceLinkedRole",
+            actions=["iam:CreateServiceLinkedRole"],
+            resources=[f"arn:aws:iam::{self.account}:role/aws-service-role/"
+                       "network.bedrock-agentcore.amazonaws.com/*"],
+            conditions={"StringEquals": {"iam:AWSServiceName": "network.bedrock-agentcore.amazonaws.com"}},
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadTheSecurityParameters",
+            actions=["ssm:GetParameters"],
+            resources=[f"arn:aws:ssm:{REGION}:{self.account}:parameter/agentkeel/security/*"],
+        ))  # fmt: skip
+
+        # The security group, in this stack's VPC and no other.
+        vpc_arn = f"arn:aws:ec2:{REGION}:{self.account}:vpc/{vpc.vpc_id}"
+        # CreateSecurityGroup authorises on the VPC and on the new group. The
+        # group does not exist yet, so IAM has no `ec2:Vpc` for it, and a
+        # condition on that key refuses every create; simulate-principal-policy
+        # read exactly that on the deployed role (M01 PR 3). The VPC resource
+        # is what holds creation to the platform VPC, as AWS's own examples do.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="CreateSecurityGroupsInThePlatformVpcOnly",
+            actions=["ec2:CreateSecurityGroup"],
+            resources=[vpc_arn, f"arn:aws:ec2:{REGION}:{self.account}:security-group/*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ManageSecurityGroupsInThePlatformVpcOnly",
+            actions=["ec2:DeleteSecurityGroup", "ec2:CreateTags",
+                     "ec2:AuthorizeSecurityGroupEgress", "ec2:RevokeSecurityGroupEgress"],
+            resources=[f"arn:aws:ec2:{REGION}:{self.account}:security-group/*"],
+            conditions={"ArnEquals": {"ec2:Vpc": vpc_arn}},
+        ))  # fmt: skip
+        # The runtime in VPC mode places its interface in the platform's
+        # subnets, behind the construct's group, and in no other VPC.
+        # All three resources must be allowed. The new interface has no
+        # `ec2:Vpc` until it exists (the same defect as CreateSecurityGroup,
+        # read on the deployed role), so the subnet and the group carry the
+        # condition and the interface does not.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="RuntimeInterfacesInThePlatformVpcOnly",
+            actions=["ec2:CreateNetworkInterface"],
+            resources=[f"arn:aws:ec2:{REGION}:{self.account}:{kind}/*" for kind in ("subnet", "security-group")],
+            conditions={"ArnEquals": {"ec2:Vpc": vpc_arn}},
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="TheNewInterfaceItself",
+            actions=["ec2:CreateNetworkInterface"],
+            resources=[f"arn:aws:ec2:{REGION}:{self.account}:network-interface/*"],
+        ))  # fmt: skip
+        # An egress rule is a resource of its own for authorisation. The
+        # prefix list it names is not: AWS's service reference lists
+        # security-group and security-group-rule for these two, and no more.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="EgressRulesAsResources",
+            actions=["ec2:AuthorizeSecurityGroupEgress", "ec2:RevokeSecurityGroupEgress"],
+            resources=[f"arn:aws:ec2:{REGION}:{self.account}:security-group-rule/*"],
+        ))  # fmt: skip
+        # Describe calls take no resource-level permission.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="DescribeTheNetwork",
+            actions=["ec2:DescribeSecurityGroups", "ec2:DescribeSecurityGroupRules",
+                     "ec2:DescribeVpcs", "ec2:DescribeSubnets", "ec2:DescribeInstances"],
+            resources=["*"],
+        ))  # fmt: skip
+
+        role.add_to_policy(iam.PolicyStatement(
+            sid="TheRightsTableAndNoDelete",
+            actions=["dynamodb:CreateTable", "dynamodb:DescribeTable", "dynamodb:UpdateTable",
+                     "dynamodb:DescribeContinuousBackups", "dynamodb:UpdateContinuousBackups",
+                     "dynamodb:DescribeTimeToLive", "dynamodb:ListTagsOfResource",
+                     "dynamodb:TagResource", "dynamodb:UntagResource",
+                     # The read handler, which CloudFormation runs after create.
+                     "dynamodb:DescribeContributorInsights", "dynamodb:DescribeKinesisStreamingDestination",
+                     "dynamodb:GetResourcePolicy"],
+            resources=[f"arn:aws:dynamodb:{REGION}:{self.account}:table/agentkeel-*-rights"],
+        ))  # fmt: skip
+
+        profiles = f"arn:aws:bedrock:{REGION}:{self.account}:application-inference-profile/*"
+        role.add_to_policy(iam.PolicyStatement(
+            sid="OneInferenceProfilePerAgent",
+            actions=["bedrock:CreateInferenceProfile", "bedrock:GetInferenceProfile",
+                     "bedrock:DeleteInferenceProfile", "bedrock:TagResource",
+                     "bedrock:UntagResource", "bedrock:ListTagsForResource"],
+            resources=[profiles],
+        ))  # fmt: skip
+        # The profile copies from a pinned system profile (ruling p), and no other.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="CopyFromThePinnedProfilesOnly",
+            actions=["bedrock:CreateInferenceProfile", "bedrock:GetInferenceProfile"],
+            resources=[f"arn:aws:bedrock:{REGION}:{self.account}:inference-profile/us.{model}" for model in MODELS]
+                      + [f"arn:aws:bedrock:{region}::foundation-model/{model}"
+                         for model in MODELS for region in PROFILE_REGIONS],
+        ))  # fmt: skip
+
+        agentcore = f"arn:aws:bedrock-agentcore:{REGION}:{self.account}"
+        role.add_to_policy(iam.PolicyStatement(
+            sid="TheRuntimeAndItsWorkloadIdentity",
+            actions=["bedrock-agentcore:GetAgentRuntime",
+                     "bedrock-agentcore:UpdateAgentRuntime", "bedrock-agentcore:DeleteAgentRuntime",
+                     "bedrock-agentcore:CreateAgentRuntimeEndpoint", "bedrock-agentcore:GetAgentRuntimeEndpoint",
+                     "bedrock-agentcore:UpdateAgentRuntimeEndpoint", "bedrock-agentcore:DeleteAgentRuntimeEndpoint",
+                     "bedrock-agentcore:CreateWorkloadIdentity", "bedrock-agentcore:DeleteWorkloadIdentity",
+                     "bedrock-agentcore:TagResource", "bedrock-agentcore:UntagResource",
+                     "bedrock-agentcore:ListTagsForResource"],
+            resources=[f"{agentcore}:runtime/*",
+                       f"{agentcore}:workload-identity-directory/default",
+                       f"{agentcore}:workload-identity-directory/default/workload-identity/*"],
+        ))  # fmt: skip
+        # CreateAgentRuntime takes no resource-level permission (AWS service
+        # reference: resource `*` only), so `runtime/*` never matched it, and
+        # simulate-principal-policy read implicitDeny on the deployed role.
+        # It does take `bedrock-agentcore:subnets`, so the create is held to
+        # the platform's own subnets instead, and must name subnets at all:
+        # no runtime outside the platform VPC, enforced by IAM as well as by
+        # the construct's synth check (S8).
+        role.add_to_policy(iam.PolicyStatement(
+            sid="CreateRuntimesInThePlatformSubnetsOnly",
+            actions=["bedrock-agentcore:CreateAgentRuntime"],
+            resources=["*"],
+            conditions={
+                "ForAllValues:StringEquals": {
+                    "bedrock-agentcore:subnets": [s.subnet_id for s in vpc.isolated_subnets]},
+                "Null": {"bedrock-agentcore:subnets": "false"},
+            },
+        ))  # fmt: skip
+        # The Runtime create handler's VPC-mode calls (describe-type,
+        # 2026-09-21). Not scoped further because the handler does not say
+        # which lattice resources it names; flagged in pr3.md, Unsure 3.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="RuntimeVpcModeLattice",
+            actions=["vpc-lattice:GetResourceConfiguration", "vpc-lattice:CreateServiceNetworkResourceAssociation",
+                     "vpc-lattice:GetServiceNetworkResourceAssociation",
+                     "vpc-lattice:ListServiceNetworkResourceAssociations", "vpc-lattice:AssociateViaAWSService"],
+            resources=["*"],
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="NeverTouchTheBoundaryOrAKeyPolicy",
@@ -346,6 +555,35 @@ class BootstrapStack(cdk.Stack):
             sid="PassTheExecutionRoleAndNothingElse",
             actions=["iam:PassRole"],
             resources=[f"arn:aws:iam::{self.account}:role/agentkeel-cfn-exec"],
+        ))  # fmt: skip
+        # BLOCK F, the deploy role's half (M01 PR 3): what deploy.yml's own
+        # steps call, step by step, and nothing a step does not call.
+        #
+        # `amazon-ecr-login`: GetAuthorizationToken, which takes no resource.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="LogInToEcr", actions=["ecr:GetAuthorizationToken"], resources=["*"]))
+        # `docker push`, and the layer check it makes first. The repository is
+        # tag-immutable, so PutImage writes a tag once. No ecr:Delete*.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="PushTheAgentImage",
+            actions=["ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
+                     "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:BatchGetImage",
+                     "ecr:GetDownloadUrlForLayer"],
+            resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel-*"],
+        ))  # fmt: skip
+        # `scripts/load_rights_table.py`: put_item per row, then describe_table.
+        # Not BatchWriteItem, which it does not call. Not DeleteItem.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="LoadTheRightsTable",
+            actions=["dynamodb:PutItem", "dynamodb:DescribeTable"],
+            resources=[f"arn:aws:dynamodb:{REGION}:{self.account}:table/agentkeel-*-rights"],
+        ))  # fmt: skip
+        # The load check: `src.agent.run` calls the runtime it just deployed,
+        # once per golden. refagent's runtime, as the eval role's grant is.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="CallTheRuntimeItJustDeployed",
+            actions=["bedrock-agentcore:InvokeAgentRuntime"],
+            resources=[f"arn:aws:bedrock-agentcore:{REGION}:{self.account}:runtime/refagent*"],
         ))  # fmt: skip
         return role
 
@@ -410,6 +648,26 @@ class BootstrapStack(cdk.Stack):
             sid="InvokeRefagentRuntimeOnly",
             actions=["bedrock-agentcore:InvokeAgentRuntime"],
             resources=[f"arn:aws:bedrock-agentcore:{REGION}:{self.account}:runtime/refagent*"],
+        ))  # fmt: skip
+        # ADR-0007, P1 (Option B): which bytes the deployed runtime runs, so a
+        # pull request's run measures in the runtime only when they are the
+        # tree's (`scripts/runtime_for_tree.py`). Three reads, each on refagent
+        # alone: the stack's RuntimeArn output, the image digest the runtime
+        # pins, and that image's tags. Nothing here can change what it reads.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadWhichBytesTheRuntimeRuns",
+            actions=["cloudformation:DescribeStacks"],
+            resources=[f"arn:aws:cloudformation:{REGION}:{self.account}:stack/agentkeel-refagent/*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadTheRuntimesImage",
+            actions=["bedrock-agentcore:GetAgentRuntime"],
+            resources=[f"arn:aws:bedrock-agentcore:{REGION}:{self.account}:runtime/refagent*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadTheImagesTags",
+            actions=["ecr:DescribeImages"],
+            resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel-refagent"],
         ))  # fmt: skip
         # Ruling i: the human makes S4's and S6's attempts, and this role asks
         # CloudTrail whether AWS refused each request id
@@ -658,7 +916,7 @@ class BootstrapStack(cdk.Stack):
         )  # fmt: skip
         for name, group in self.endpoint_groups.items():
             ssm.StringParameter(
-                self, f"ParamEndpoint{name.title().replace('-', '')}",
+                self, f"ParamEndpoint{endpoint_id(name)}",
                 parameter_name=ENDPOINT_PARAM.format(name=name),
                 string_value=group.security_group_id,
                 description=f"agentkeel: the {name} interface endpoint. An agent reaches it and nothing else.",
@@ -697,13 +955,25 @@ SUPPRESSIONS = {
         "boundary and may create a role only with the boundary attached'. iam:CreateRole is scoped to "
         f"{AGENT_ROLE_PATH} and conditioned on iam:PermissionsBoundary; the wildcard is in the Deny. It is "
         f"half of what seed S4 reads: the laptop cannot reach CloudFormation, and CloudFormation cannot "
-        f"exceed this. {CEILING}"
+        f"exceed this. BLOCK F's grants are what GovernedAgent renders, one statement per resource type: "
+        f"managing security-group/* is conditioned on ec2:Vpc being this stack's VPC, and creating one is held "
+        f"by the VPC resource, because a new group has no ec2:Vpc yet; a new network-interface/* likewise, "
+        f"held by its subnet and group; CreateAgentRuntime takes no resource-level permission and is held to "
+        f"this stack's subnets by bedrock-agentcore:subnets; runtime/*, application-inference-profile/* and "
+        f"the agent role path name resources whose ids AWS assigns at create; ec2:Describe* takes no "
+        f"resource-level permission; security-group-rule/* is the egress rule's own resource; the five "
+        f"vpc-lattice actions are the Runtime create handler's VPC-mode calls, which name no resource "
+        f"in advance. The action lists are CloudFormation's published handler permissions (describe-type). "
+        f"{CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "
         "refs/heads/main, and job_workflow_ref'. Seed S4 is an attempt to do from a laptop what only this "
         "role may do. cloudformation:* is scoped to stack/agentkeel-*, the set of stacks this platform "
-        "deploys; AWS appends the stack id suffix, which cannot be named in advance."
+        "deploys; AWS appends the stack id suffix, which cannot be named in advance. BLOCK F: "
+        "ecr:GetAuthorizationToken takes no resource; the push is on repository/agentkeel-*, the table load "
+        "on table/agentkeel-*-rights, and the load check's InvokeAgentRuntime on runtime/refagent*, the "
+        "versioned name AgentCore assigns at create."
     ),
     "DeveloperRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the developer role (§1), boundary on'. This is seed S4's principal. "
@@ -718,6 +988,8 @@ SUPPRESSIONS = {
         "cloudtrail:LookupEvents is on * because CloudTrail takes no resource-level condition for it, "
         "and ruling i has this role ask CloudTrail whether the human's attempts were refused. It is the "
         "only cloudtrail action granted, so the instrument may read the record and may not change it. "
+        "ADR-0007 (P1): stack/agentkeel-refagent/* is the stack id suffix AWS appends, and runtime/refagent* "
+        "the versioned name; DescribeStacks, GetAgentRuntime and ecr:DescribeImages are reads on refagent alone. "
         f"{CEILING}"
     ),
 }
@@ -727,7 +999,7 @@ for path, reason in SUPPRESSIONS.items():
 # Not an IAM wildcard: cdk-nag cannot resolve these rules at all. They are
 # CDK's own endpoint security groups, and their source is the VPC's CIDR,
 # an intrinsic function at synth.
-for name in ("EndpointBedrockRuntime", "EndpointKms", "EndpointLogs"):
+for name in (f"Endpoint{endpoint_id(n)}" for n in INTERFACE_ENDPOINTS):
     NagSuppressions.add_resource_suppressions_by_path(
         stack, f"AgentkeelBootstrap/Vpc/{name}/SecurityGroup/Resource",
         [{"id": "CdkNagValidationFailure",

@@ -1,0 +1,428 @@
+---
+# M01 PR 3 (#9), the repair PR. Ruling B: one seat per file. This file is
+# Security's; `pr3-engineering.md` carries Engineering's key for `tests/**`
+# and has the same `pr`. Opened early and grown as PR 3 lands its items,
+# rather than written at the end: `cold-review-ruling` is red without it,
+# and a check that is red for a whole PR is a check nobody reads.
+ruling: pr3
+seat: Security
+authorises:
+  - .github/workflows/evals.yml
+  - infra/workflows.sha256
+  - infra/ruleset/main.json
+  - infra/ruleset/README.md
+  - infra/bootstrap/app.py
+  - infra/construct/governed_agent.py
+  - infra/construct/__init__.py
+  - infra/construct/app.py
+  - infra/construct/AwsSolutions--AgentkeelRefagent-NagReport.csv
+  - infra/bootstrap/AwsSolutions--AgentkeelBootstrap-NagReport.csv
+  - .github/workflows/deploy.yml
+  - milestones/M01/rulings/pr3.md
+evidence:
+  - SPEC/00-overview.md#8-M01
+  - milestones/M01/rulings/pr2-cold-review.md
+  - https://github.com/andaro74/agentkeel/actions/runs/35555584127
+pr: 9
+---
+
+# M01 PR 3 — the repair
+
+PR 2's cold review left four BLOCKs. Three were cured inside PR 2 (M00's
+precedent). **B2 was carried here**, with BLOCK F's grants, ADR-0007,
+BLOCK D's wording and the first real deploy. This file grows as each lands.
+
+## BLOCK C / B2 — a fork PR could merge with nothing run
+
+**The defect.** `.github/workflows/evals.yml` skips the `evals` job on a
+fork, because a fork gets no OIDC token and cannot measure anything. That
+skip is right. What was wrong is that **GitHub counts a skipped required
+check as satisfied**, and `evals` was one of only two required contexts
+(`infra/ruleset/main.json`). So a fork pull request could merge into `main`
+with no `make validate` and no pytest having run at all.
+
+`security-reviewer` found it independently at PR 2 and named the half
+`pr2.md`'s ruling had missed: the ruleset is what turns the skip into a
+hole, not the `if:`.
+
+**The repair.** A `checks` job that carries the half needing no credentials
+— checkout, install, `make validate`, cosign, pytest. It has no `if:` on the
+job or on any step, so it cannot be skipped, and it asks for
+`contents: read` and nothing else, so it behaves the same on a fork as
+anywhere else.
+
+**pytest now runs twice, and that is a decision rather than an oversight.**
+The copy inside `evals` carries `continue-on-error: true` so that a failing
+test reaches the envelope as `checks.F0_2 = fail` (SPEC/01 §4). This copy
+must do the opposite and fail the pull request. The two answer different
+questions — *what did the tree measure* and *may this merge* — so neither
+can be dropped for the other. About 40 seconds.
+
+**Proved once before anything was required of it**: run 35555584127 on this
+PR, job `checks`, success.
+
+## The ruleset is not changed in this PR's first commit, and that is the point
+
+`infra/ruleset/main.json` is an **export** — a record of what GitHub holds.
+Editing it to name `checks` would make it assert a required context that
+GitHub does not require, which is the prose-against-reality defect this
+milestone has now caught five times.
+
+Applying it live before the job had reported would also have been
+dangerous. `bypass_actors` is `[]` and `current_user_can_bypass` is
+`never`: a required context that never reports blocks every merge into
+`main`, with no one able to override it.
+
+**The order, which is a human step (R1):**
+
+1. push, and let `checks` report green once on this pull request — done,
+   run 35555584127;
+2. `PUT` the context into the live ruleset — done;
+3. re-export, so the file in the tree is a true export again — done,
+   `5693447`.
+
+**Splitting the job without step 2 would have left the hole exactly where
+it was**, because the required context would still have been the one a
+fork skips. Steps 2 and 3 are done: the live ruleset (id 23685206) requires
+`checks`, `cold-review-ruling` and `evals`, and `infra/ruleset/main.json`
+says the same three. B2 is closed mechanically, not only made available.
+What it does not close is below.
+
+## What B2 does not close
+
+- **The check can still be switched off from inside.** A PR with write
+  access can edit `evals.yml` and `infra/workflows.sha256` in one commit and
+  `workflow-hash` still passes. Self-disclosed in both files; M02.
+- **`workflow-hash` hashes workflow text only** — not the `Makefile`, not
+  `src/`, not `scripts/`. M02.
+- **The envelope the required check reads is written by the PR's own code.**
+  M02, as the workflow's own header says.
+- **No fork PR has ever been opened against this repo.** R1 is one human.
+  The exposure is zero today, which is not the same as a control that has
+  fired. **M02 plants the case**; until it does, no prose here calls this
+  proven.
+
+## BLOCK F and item 7 — deployed, read back, `refuse` deleted
+
+**The defect.** `agentkeel-cfn-exec` could create a role under
+`/agentkeel/agents/` and nothing else, and the construct makes a security
+group, two egress rules, a table, an inference profile and a runtime. The
+deploy role could drive CloudFormation and pass cfn-exec, and could not log
+in to ECR, push the image, load the table or call the runtime, all of which
+`deploy.yml` does. Item 7 is the same shape: `deploy.yml` described
+`AgentkeelBootstrap` with a grant on `stack/agentkeel-*/*`, and IAM ARN
+matching is case-sensitive.
+
+**The repair, in `infra/bootstrap/app.py`.** cfn-exec gets one statement
+per resource type `GovernedAgent` renders, and nothing for a type it does
+not render: security groups only in the platform VPC (`ec2:Vpc`), the table
+with no `DeleteTable` (it is RETAIN), `iam:PassRole` on the agent path to
+`bedrock-agentcore.amazonaws.com` only, `ssm:GetParameters` on
+`/agentkeel/security/*` for the parameters CloudFormation resolves (ten since B1), and
+AgentCore's network service-linked role by service name. The deploy role gets
+what each step of `deploy.yml` calls: `ecr:GetAuthorizationToken`, the push
+actions on `repository/agentkeel-*`, `dynamodb:PutItem` and `DescribeTable`
+(the loader calls `put_item`, not `BatchWriteItem`), and
+`InvokeAgentRuntime` on `runtime/refagent*`. No `ecr:Delete*`, no
+`DeleteItem`, no service wildcard on either role.
+
+**Where the action lists come from.** The first draft of cfn-exec's grant was
+a reading of what CloudFormation calls, and `security-reviewer` found it
+short (F1): a rollback would have left the agent role `DELETE_FAILED`,
+because the IAM::Role delete handler calls `ListRolePolicies` and
+`ListAttachedRolePolicies`. The lists are now the handler permissions AWS
+publishes for each type (`aws cloudformation describe-type`, read
+2026-09-21). Calls made only by features the template does not use are
+left out: Kinesis streaming, table import, replicas, a customer key, S3
+code artifacts and capacity providers.
+
+**Item 7, in `deploy.yml`.** The step builds the execution role's ARN from
+its fixed name and `sts get-caller-identity`, which needs no grant, rather
+than widening the deploy role to a second stack pattern.
+`infra/workflows.sha256` is rewritten.
+
+**What holds it.** `tests/test_bootstrap.py` grew from 17 cases to 38 (Engineering's key,
+`pr3-engineering.md`). The grant is tested against the construct's own
+template in both directions: a resource type the construct renders with no
+grant fails, and so does a grant for a type it no longer renders. 16 of the
+new tests fail on the tree before this repair, and all pass after it.
+
+**Where it stands.** The human (R1) redeployed the bootstrap stack twice,
+after reading `cdk diff` each time. The grants were read back from the
+account after each redeploy. The first read found three creates the account
+refused (below). The second read gave **42 of 42 as expected**. The `refuse`
+job was deleted after that, and only after that. **No deploy of
+`deploy.yml` has run.** The merge of this PR is its first run, and nothing
+here is proven until that run is in the record.
+
+**Unsure, for the Security seat** (from `security-reviewer` on this diff:
+2 BLOCK, 6 FINDING, 7 NOTE; the full report is in the PR body). None of
+these is repaired here, because each changes the agent's ceiling or the
+construct, not cfn-exec:
+
+1. ~~**B1: the runtime probably cannot pull its image.**~~ Ruled and
+   repaired below, with F5 and F6.
+2. ~~**B2: the agent cannot call its model.**~~ Repaired below.
+3. **The five `vpc-lattice` actions are on `*`.** They are the Runtime
+   create handler's VPC-mode calls, and the handler does not say which
+   resources they name.
+4. **F3: whether CloudFormation resolves the SSM parameters as cfn-exec or
+   as the caller.** If it resolves them as the caller, the change set fails
+   cleanly at create, and the deploy role needs `ssm:GetParameters` on
+   `/agentkeel/security/*`. The first deploy settles it.
+5. **F4: nothing constrains an agent-path role's trust policy.** A template
+   merged to `main` could make one that something other than AgentCore can
+   assume. The fix is for S5's synth check to also read the principal.
+
+## B2 — the agent could not call its model (`security-reviewer`, this PR)
+
+**The defect.** `GovernedAgent` granted invoke on
+`application-inference-profile/agentkeel-refagent`. AWS gives an
+application profile a generated id, so that ARN named nothing. The runtime
+was also handed `us.anthropic.claude-sonnet-4-6`, the system profile, which
+the role was never granted. The stack would have deployed, and every call
+the load check made would have been refused.
+
+**The repair, in `infra/construct/governed_agent.py`.**
+- The role grants invoke on the ARN CloudFormation returns for the profile
+  (`attr_inference_profile_arn`). The runtime is given that same ARN.
+- The foundation model is granted in the three regions a `us.` profile
+  routes to, conditioned on `bedrock:InferenceProfileArn` being the agent's
+  own profile. So the model is reachable only through the profile.
+- `bedrock:Converse` is dropped: it is not an IAM action.
+
+`tests/test_construct.py` has four new tests. All four fail on the construct
+before the repair, and pass after it. None of this is observed until a
+runtime answers a call.
+
+**No redeploy of the bootstrap stack is needed for B2.** It lands with the
+agent stack when `deploy.yml` first runs.
+
+## B1 — the runtime could not pull its own image; ruling d amended
+
+**The defect.** AWS's documentation settles two facts
+([runtime permissions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html),
+[VPC mode](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-vpc.html),
+read 2026-09-21):
+- the runtime pulls its image **as its own execution role**;
+- in a VPC with no internet access, `ecr.api` and `ecr.dkr` interface
+  endpoints are **required**, and so is the S3 gateway endpoint for the image
+  layers.
+
+Against that, the platform as built fails in four places:
+- the agent boundary allows no `ecr:*` read and no `logs:CreateLogGroup`;
+- the agent role grants neither;
+- the VPC has no ECR endpoint;
+- the S3 endpoint's policy allows only this account's buckets, and the layers
+  live in an AWS-owned bucket.
+
+The fourth was not in `security-reviewer`'s report. It came from the
+documentation.
+
+**Ruling d, amended (Security, 2026-09-21).** `endpoint_allowlist` holds
+AWS service names only. The enum is now **seven**: `bedrock-runtime`,
+`dynamodb`, `ecr.api`, `ecr.dkr`, `kms`, `logs`, `s3`. The two new names are
+interface endpoints of the bootstrap VPC, reached by their security groups
+like the other three. Everything else in ruling d stands. The alternative —
+the platform adding ECR egress that the manifest does not list — is ruled
+out. It would give refagent's own stack "egress not in the manifest", the
+words of F1.1's falsifier, and that falsifier is not reworded after its
+plant. **A manifest without `ecr.api` and `ecr.dkr` is refused at synth**: a
+container agent cannot pull its image without them, and a refusal before the
+deploy says why, where a failed pull after it would not.
+
+**The repair:**
+
+| | Change | Where |
+|---|---|---|
+| a | `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`, `ecr:GetAuthorizationToken`, `logs:CreateLogGroup`, `logs:DescribeLogStreams`, `logs:DescribeLogGroups` added to the agent allow-list. No ECR write. `kms:GetKeyPolicy` stays allowed and the key policy still denies it (S6); a role without the boundary is still refused at synth (S5). | `agentkeel-boundary` |
+| b | The same grants on the agent role: pull on `repository/agentkeel-<name>` only, the log group under `/aws/bedrock-agentcore/runtimes/` | `governed_agent.py` |
+| c | Interface endpoints `ecr.api` and `ecr.dkr`, each publishing its security group as a parameter, as the other three do | bootstrap VPC |
+| d | The S3 gateway endpoint also allows `s3:GetObject` on `prod-us-west-2-starport-layer-bucket/*`, the regional ECR layer bucket, and nothing else outside the account | bootstrap VPC |
+| e | Schema enum 5 → 7; refagent lists both; the construct refuses a manifest without them | `src/manifest/schema.json`, `agents/refagent/manifest.yaml`, `governed_agent.py` |
+
+**What this costs.** Two interface endpoints in two AZs: about USD 29 a
+month at us-west-2 list price, before data.
+
+**What it leaves open.**
+- It is not known yet whether the pull runs through the runtime's network
+  interface, and so through its security group. If it does not, e's egress
+  rules are unused, and a to d still matter. The first deploy settles it.
+- `docs/adr/ADR-0006` says "the five names". It is now seven, and that ADR
+  is Product's to amend.
+- AWS's example execution role also grants X-Ray and
+  `cloudwatch:PutMetricData`. Both are left out: they carry telemetry, and
+  the runtime does not need them to answer. If a missing one ever stops the
+  runtime, the deploy's load check will say so.
+
+## Read back from the account — the first read found three defects
+
+The human redeployed `AgentkeelBootstrap` on 2026-09-21
+(`UPDATE_COMPLETE`, 14:06:18 UTC, no failed events). All ten
+`/agentkeel/security/*` parameters exist, including the two for ECR.
+
+`simulate-principal-policy` on the deployed roles, as ruling j did, gave 37
+rows. 35 read as the template said. **Two did not, and both would have
+failed the first deploy**, with nothing in the template, the tests or cdk-nag
+to show it:
+
+| Principal | Action | Resource | Template said | Account said |
+|---|---|---|---|---|
+| `agentkeel-cfn-exec` | `ec2:CreateSecurityGroup` | `security-group/*`, `ec2:Vpc` = platform VPC | allowed | implicitDeny |
+| `agentkeel-cfn-exec` | `bedrock-agentcore:CreateAgentRuntime` | `runtime/refagent-abc` | allowed | implicitDeny |
+
+A probe found a third of the same kind: `ec2:CreateNetworkInterface` on
+`network-interface/*`. Why each failed:
+
+- **A resource being created has no `ec2:Vpc` yet.** A condition on that key
+  refuses the create, even when the VPC is right. The VPC resource, the
+  subnet and the group are what hold these creates to the platform VPC, so
+  they carry the scope now. That is AWS's own pattern.
+- **`CreateAgentRuntime` takes no resource-level permission.** AWS's service
+  reference lists `*` only, so `runtime/*` never matched it. It is now on `*`
+  with `bedrock-agentcore:subnets` limited to the platform's own subnets, and
+  it must name subnets at all. IAM now refuses a runtime outside the platform
+  VPC, alongside the construct's synth check (S8).
+- The `prefix-list/*` resource was dropped: the service reference does not
+  list it for these two actions.
+
+`test_no_create_is_conditioned_on_a_key_the_new_resource_does_not_have_yet`
+holds all three. The earlier caution was right: a template is not a grant
+AWS has honoured.
+
+### The second read: 42 of 42 (2026-09-21)
+
+The human redeployed a second time (`UPDATE_COMPLETE`, 14:41:50 UTC). Then
+the same script read every row again, with a negative beside each grant: the
+wrong VPC, the wrong subnet, no boundary, the wrong service, a delete where
+only a write is granted. **0 mismatches.** The three rows the first read
+refused are now allowed, and their negatives are still refused.
+
+The boundary rows are read as a ceiling. No agent role exists until the first
+deploy, so these rows run `simulate-custom-policy` with an allow-all policy
+under `agentkeel-boundary`, and show what the ceiling lets through.
+
+| Principal | Action | Resource | Context | Decision | Expected |
+|---|---|---|---|---|---|
+| `agentkeel-cfn-exec` | `iam:CreateRole` | `iam::<acct>:role/agentkeel/agents/refagent-x` | iam:PermissionsBoundary=policy/agentkeel-boundary | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `iam:CreateRole` | `iam::<acct>:role/agentkeel/agents/refagent-x` | — | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `iam:CreateRole` | `iam::<acct>:role/not-an-agent` | iam:PermissionsBoundary=policy/agentkeel-boundary | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `iam:ListRolePolicies` | `iam::<acct>:role/agentkeel/agents/refagent-x` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `iam:PassRole` | `iam::<acct>:role/agentkeel/agents/refagent-x` | iam:PassedToService=bedrock-agentcore.amazonaws.com | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `iam:PassRole` | `iam::<acct>:role/agentkeel/agents/refagent-x` | iam:PassedToService=ec2.amazonaws.com | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `iam:CreateServiceLinkedRole` | `iam::<acct>:role/aws-service-role/network.bedrock-agentcore.amazonaws.com/AWSServiceRoleForBedrockAgentCoreNetwork` | iam:AWSServiceName=network.bedrock-agentcore.amazonaws.com | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `ssm:GetParameters` | `ssm:us-west-2:<acct>:parameter/agentkeel/security/vpc-id` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `ssm:GetParameters` | `ssm:us-west-2:<acct>:parameter/other/secret` | — | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `ec2:CreateSecurityGroup` | `security-group/* + vpc/vpc-0638596d59ee8f1b9` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `ec2:CreateSecurityGroup` | `security-group/* + vpc/vpc-other` | — | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `ec2:DeleteSecurityGroup` | `ec2:us-west-2:<acct>:security-group/sg-0` | ec2:Vpc=vpc/vpc-0638596d59ee8f1b9 | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `ec2:DeleteSecurityGroup` | `ec2:us-west-2:<acct>:security-group/sg-0` | ec2:Vpc=vpc/vpc-other | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `ec2:CreateNetworkInterface` | `network-interface/* + subnet/subnet-0 + security-group/sg-0` | ec2:Vpc=vpc/vpc-0638596d59ee8f1b9 | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `ec2:CreateNetworkInterface` | `network-interface/* + subnet/subnet-0 + security-group/sg-0` | ec2:Vpc=vpc/vpc-other | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `dynamodb:CreateTable` | `dynamodb:us-west-2:<acct>:table/agentkeel-refagent-rights` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `dynamodb:DeleteTable` | `dynamodb:us-west-2:<acct>:table/agentkeel-refagent-rights` | — | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `bedrock:CreateInferenceProfile` | `bedrock:us-west-2:<acct>:application-inference-profile/abc123` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `bedrock-agentcore:CreateAgentRuntime` | `*` | bedrock-agentcore:subnets=subnet-00008bbb7a11551a0/subnet-0f82c2f36bd203187 | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `bedrock-agentcore:CreateAgentRuntime` | `*` | bedrock-agentcore:subnets=subnet-00008bbb7a11551a0/subnet-elsewhere | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `bedrock-agentcore:CreateAgentRuntime` | `*` | — | implicitDeny | implicitDeny |
+| `agentkeel-cfn-exec` | `bedrock-agentcore:GetAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/refagent-abc` | — | **allowed** | allowed |
+| `agentkeel-cfn-exec` | `kms:PutKeyPolicy` | `*` | — | explicitDeny | explicitDeny |
+| `agentkeel-cfn-exec` | `ec2:CreateInternetGateway` | `*` | — | explicitDeny | explicitDeny |
+| `agentkeel-deploy` | `ecr:GetAuthorizationToken` | `*` | — | **allowed** | allowed |
+| `agentkeel-deploy` | `ecr:PutImage` | `ecr:us-west-2:<acct>:repository/agentkeel-refagent` | — | **allowed** | allowed |
+| `agentkeel-deploy` | `ecr:BatchDeleteImage` | `ecr:us-west-2:<acct>:repository/agentkeel-refagent` | — | implicitDeny | implicitDeny |
+| `agentkeel-deploy` | `dynamodb:PutItem` | `dynamodb:us-west-2:<acct>:table/agentkeel-refagent-rights` | — | **allowed** | allowed |
+| `agentkeel-deploy` | `dynamodb:DeleteItem` | `dynamodb:us-west-2:<acct>:table/agentkeel-refagent-rights` | — | implicitDeny | implicitDeny |
+| `agentkeel-deploy` | `bedrock-agentcore:InvokeAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/refagent-abc` | — | **allowed** | allowed |
+| `agentkeel-deploy` | `bedrock-agentcore:InvokeAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/other-abc` | — | implicitDeny | implicitDeny |
+| `agentkeel-deploy` | `cloudformation:CreateChangeSet` | `cloudformation:us-west-2:<acct>:stack/agentkeel-refagent/x` | — | **allowed** | allowed |
+| `agentkeel-deploy` | `cloudformation:DescribeStacks` | `cloudformation:us-west-2:<acct>:stack/AgentkeelBootstrap/x` | — | implicitDeny | implicitDeny |
+| `agentkeel-deploy` | `iam:PassRole` | `iam::<acct>:role/agentkeel-cfn-exec` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `ecr:BatchGetImage` | `*` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `ecr:GetDownloadUrlForLayer` | `*` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `ecr:GetAuthorizationToken` | `*` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `logs:CreateLogGroup` | `*` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `ecr:PutImage` | `*` | — | implicitDeny | implicitDeny |
+| `agentkeel-boundary (ceiling)` | `ecr:BatchDeleteImage` | `*` | — | implicitDeny | implicitDeny |
+| `agentkeel-boundary (ceiling)` | `kms:GetKeyPolicy` | `*` | — | **allowed** | allowed |
+| `agentkeel-boundary (ceiling)` | `kms:PutKeyPolicy` | `*` | — | explicitDeny | explicitDeny |
+
+What this table does not say: that CloudFormation and AgentCore make exactly
+these calls. The action lists come from `describe-type` and from the service
+reference, and a simulation reads IAM, not the service. The first run of
+`deploy.yml` is what reads the rest.
+
+## ADR-0007, P1: the workflow and the eval role (Security's half)
+
+Product ruled P1 as Option B, and this is the part on Security's paths.
+- **`evals.yml`** gains a step, before `make evals` and under the same
+  condition. It runs `scripts/runtime_for_tree.py` and hands `make evals`
+  the runtime's ARN only when the deployed image carries this tree's bundle
+  digest. "Which refagent answered" now reports on every measuring run, not
+  only on `main`. `infra/workflows.sha256` is rehashed.
+- **The eval role** gains three reads, each on refagent alone:
+  `cloudformation:DescribeStacks` on `stack/agentkeel-refagent/*`,
+  `bedrock-agentcore:GetAgentRuntime` on `runtime/refagent*`, and
+  `ecr:DescribeImages` on `repository/agentkeel-refagent`. None of them can
+  change what it reads.
+
+**In the account.** The human redeployed a third time, after `cdk diff`
+showed only these three reads (`UPDATE_COMPLETE`, 2026-09-22 00:45:44
+UTC). The same read-back script ran again, now 50 rows: **50 of 50 as
+expected**. BLOCK F's 42 rows are unchanged, and the eval role's are these:
+
+| Principal | Action | Resource | Context | Decision | Expected |
+|---|---|---|---|---|---|
+| `agentkeel-evals` | `cloudformation:DescribeStacks` | `cloudformation:us-west-2:<acct>:stack/agentkeel-refagent/x` | — | **allowed** | allowed |
+| `agentkeel-evals` | `cloudformation:DescribeStacks` | `cloudformation:us-west-2:<acct>:stack/AgentkeelBootstrap/x` | — | implicitDeny | implicitDeny |
+| `agentkeel-evals` | `bedrock-agentcore:GetAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/refagent-abc` | — | **allowed** | allowed |
+| `agentkeel-evals` | `bedrock-agentcore:GetAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/other-abc` | — | implicitDeny | implicitDeny |
+| `agentkeel-evals` | `bedrock-agentcore:UpdateAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/refagent-abc` | — | implicitDeny | implicitDeny |
+| `agentkeel-evals` | `ecr:DescribeImages` | `ecr:us-west-2:<acct>:repository/agentkeel-refagent` | — | **allowed** | allowed |
+| `agentkeel-evals` | `ecr:PutImage` | `ecr:us-west-2:<acct>:repository/agentkeel-refagent` | — | implicitDeny | implicitDeny |
+| `agentkeel-evals` | `bedrock-agentcore:InvokeAgentRuntime` | `bedrock-agentcore:us-west-2:<acct>:runtime/refagent-abc` | — | **allowed** | allowed |
+
+`scripts/runtime_for_tree.py`, run straight after the redeploy, still
+answers `runner: … Stack with id agentkeel-refagent does not exist`. That is
+correct: no refagent stack exists until this PR merges.
+
+## Still to land in PR 3
+
+| # | Item | Seat |
+|---|---|---|
+| 1 | ~~The live ruleset `PUT` and re-export~~ — done, `5693447` | Security |
+| 2 | ~~**BLOCK F**~~ — grants deployed, read back 42/42, `refuse` job deleted (above) | Security |
+| 3 | **The first real deploy is this PR's merge.** Construct tenancy is *read* at M01 PR 4's run, not in PR 3 (ADR-0007, P2; ledger row 1). What PR 3 lands is the machinery: the envelope's `mode`, the digest match, and the gate reading row 1 as UNMEASURED on any envelope that did not run in the runtime | Security |
+| 4 | **ADR-0007**: the envelope's mode field, plus region and model version (`schema.json` is `additionalProperties: false`) | Product, with Threshold Owner |
+| 5 | ~~**BLOCK D**: SPEC/01 §5 takes the narrowing~~ — done: SPEC/01 §2 and §5 and the explainer, keyed in `pr3-product.md`. Security reworded `governed_agent.py`'s refusal and `infra/construct/__init__.py`'s docstring (whose "no role's policy grants it today" went stale in this PR). The S8 fixture's docstring keeps the old sentence: it is a planted seed | Security rules, Product keys the text |
+| 6 | ~~The two routes `tests/test_evals_workflow.py` did not cover~~ — covered, 7 cases, each broken on purpose (`pr3-engineering.md`) | Engineering |
+| 7 | ~~`deploy.yml:198` reads `--stack-name AgentkeelBootstrap`~~ — written (above); holds once `deploy.yml` runs | Security |
+
+PR 4 must close the milestone. There is no fifth PR; if this list will not
+fit, the cut is item 3, and claim 1's second half becomes a stated RED half
+at the close rather than a missed one.
+
+## What a reader can run to falsify this PR's own claims
+
+```bash
+uv sync --frozen
+
+# The credential-free job exists, cannot be skipped, and asks for nothing.
+uv run pytest tests/test_evals_workflow.py -q
+
+# It really is unconditional: no `if:` on the job or any of its steps.
+uv run python -c "
+import yaml, pathlib
+job = yaml.safe_load(pathlib.Path('.github/workflows/evals.yml').read_text())['jobs']['checks']
+print('job if:', job.get('if'), '| permissions:', job['permissions'])
+print('step ifs:', [s.get('if') for s in job['steps']])"
+
+# The export still says what GitHub holds: checks, cold-review-ruling,
+# evals, in both.
+grep -o '"required_status_checks":\[[^]]*\]' infra/ruleset/main.json
+gh api repos/andaro74/agentkeel/rulesets/23685206 \
+  --jq '.rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context'
+```
+
+The last two commands must agree. If they ever disagree, the export is
+prose about a control rather than a record of one.

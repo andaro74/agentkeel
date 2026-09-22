@@ -79,6 +79,19 @@ GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
 THRESHOLDS = ROOT / "thresholds.yaml"
 CITING_KINDS = {"ordinary", "trap"}
+# The one agent under test at M01. The envelope does not name its bundle, and
+# ADR-0007 adds no field for it; the second agent (ratings-helper, M02) is
+# where that changes, and this constant is what it replaces.
+AGENT_BUNDLE = "agents/refagent"
+# The commit that accepted ADR-0007. An agent envelope for this commit or any
+# commit before it may be version 1; one for any later commit must be version
+# 2, or it would skip every check below (PR 3 cold review, F2). All 23
+# version 1 envelopes in history are for its ancestors.
+ADR_0007 = "7f8d0aedcbffc0dee9c4abe1d7363dbef60369cb"
+# Rows whose claim is read in the deployed runtime, not only in the runner.
+# M01's second half is "refagent runs inside the construct": an envelope that
+# did not run there has not read it (PR 3 cold review, B1).
+READ_IN_THE_RUNTIME = {"M01"}
 
 
 class Rejected(Exception):
@@ -115,6 +128,59 @@ def cap_at(commit: str, root: Path = ROOT) -> tuple[int, str]:
         raise Rejected(f"thresholds.yaml cost_cap.tokens_per_run at {where} "
                        f"must be a positive integer, got {cap!r}")  # fmt: skip
     return cap, where
+
+
+def manifest_at(commit: str, bundle: str, root: Path = ROOT) -> tuple[dict[str, Any], str]:
+    """The agent's manifest as it stood at `commit`, and where it was read. The same fallback as ruling m."""
+    done = subprocess.run(
+        ["git", "show", f"{commit}:{bundle}/manifest.yaml"], cwd=root, capture_output=True, text=True
+    )
+    if done.returncode != 0:
+        return yaml.safe_load((root / bundle / "manifest.yaml").read_text(encoding="utf-8")), "the working tree"
+    return yaml.safe_load(done.stdout), f"{commit[:12]}, the envelope's own commit"
+
+
+def before_adr_0007(commit: str, root: Path = ROOT) -> bool:
+    """True when `commit` is ADR-0007's commit or one before it. False when git cannot say."""
+    done = subprocess.run(["git", "merge-base", "--is-ancestor", commit, ADR_0007], cwd=root, capture_output=True)
+    return done.returncode == 0
+
+
+def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:
+    """ADR-0007, on a version 2 envelope. Version 1 (all history before it) is read as it was.
+
+    - `runtime` and `runtime_arn` come together, or not at all.
+    - An agent envelope says runner or runtime; a control envelope says control.
+    - T3: the model id, region and version are the manifest's pin at the
+      envelope's commit, or the run did not measure the pinned subject and is
+      REJECTED — not RED, which would record it as a result about that
+      subject (cold review finding 35).
+    """
+    if envelope.get("schema_version") != 2:
+        if agent and not before_adr_0007(envelope["commit"], root):
+            raise Rejected(f"{path}: an agent envelope without schema_version, for a commit that is not "
+                           f"before ADR-0007 ({ADR_0007[:7]}): it would skip the mode and pin checks")  # fmt: skip
+        return
+    mode, arn = envelope["mode"], envelope["runtime_arn"]
+    if (mode == "runtime") != (arn is not None):
+        raise Rejected(f"{path}: mode {mode} with runtime_arn {arn!r}: a runtime run names its runtime, "
+                       "and only a runtime run does (ADR-0007)")  # fmt: skip
+    if agent == (mode == "control"):
+        raise Rejected(f"{path}: {'an agent' if agent else 'a control'} envelope says mode {mode} (ADR-0007)")
+    if not agent:
+        return
+    pin, where = manifest_at(envelope["commit"], AGENT_BUNDLE, root)
+    # The pin names the model twice, as `id` and as the `us.` profile over it.
+    # The envelope carries the profile, so an `id` that disagreed with it would
+    # pass unread; M04's A-vs-A compares ids (PR 3 threshold-owner, F2).
+    if pin["model"]["profile"].partition(".")[2] != pin["model"]["id"]:
+        raise Rejected(f"{path}: the pin disagrees with itself in {AGENT_BUNDLE}/manifest.yaml at {where}: "
+                       f"id {pin['model']['id']!r}, profile {pin['model']['profile']!r} (ADR-0007, T3)")  # fmt: skip
+    for field, key in (("model_id", "profile"), ("region", "region"), ("model_version", "version")):
+        if envelope[field] != pin["model"][key]:
+            raise Rejected(f"{path}: {field} {envelope[field]!r} is not the pin {pin['model'][key]!r} in "
+                           f"{AGENT_BUNDLE}/manifest.yaml at {where}: the run did not measure the pinned "
+                           "subject (ADR-0007, T3)")  # fmt: skip
 
 
 def card_at(path: Path, ref: Any, root: Path, field: str) -> dict[str, Any]:
@@ -158,6 +224,7 @@ def read(path: Path, root: Path = ROOT) -> dict[str, Any]:
         unscoped = {name: value for name, value in result.items() if name != "scope"}
         if unscoped != card.get("goldens", {}).get(golden_id):
             raise Rejected(f"{path}: {golden_id} says scope control and differs from the baseline card")
+    read_subject(path, envelope, False, root)
     return envelope
 
 
@@ -175,6 +242,7 @@ def read_agent(path: Path, envelope: dict[str, Any], scopes: set[str], root: Pat
     control = card_at(path, envelope["control_card_ref"], root, "control_card_ref")
     if control.get("commit") != envelope["commit"]:
         raise Rejected(f"{path}: control card is for {control.get('commit')}, not {envelope['commit']}")
+    read_subject(path, envelope, True, root)
     return envelope
 
 
@@ -280,11 +348,20 @@ def tallies(label: str, results: dict[str, dict[str, Any]]) -> str:
     )
 
 
-def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any] | None = None) -> str:
+def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any] | None = None,
+             *, in_the_runtime: bool = False) -> str:
     """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's.
 
     An M00 envelope: its control tallies. From M01: the agent's tallies, then
     this run's control card's, then the base the numbers are a delta against.
+
+    `in_the_runtime` is for a row whose claim is read in the deployed runtime
+    (`READ_IN_THE_RUNTIME`). For such a row an agent envelope that did not run
+    there has not read the claim, whatever its own verdict, so the cell says
+    UNMEASURED and why. That is the gate's reading, not prose at the close
+    (PR 3 cold review, B1), and a State of GREEN cannot stand beside it
+    (`src/ledger.py`). A pull request's own verdict is untouched: a run in the
+    runner is still the right measurement of that pull request's code.
     """
     results = envelope["goldens"]
     agent = {g: r for g, r in results.items() if r["scope"] == "agent"}
@@ -294,6 +371,13 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         heads = [tallies("agent", agent), tallies("control", control_card["goldens"])]
     else:
         heads = [tallies("control", results)]
+    # ADR-0007: the mode, for a version 2 envelope only, so every Measured
+    # cell written from a version 1 envelope still matches byte for byte.
+    if envelope.get("schema_version") == 2:
+        heads.append(f"mode {envelope['mode']}")
+    if in_the_runtime and agent and envelope.get("mode") != "runtime":
+        heads.append(f"not read in the runtime (mode {envelope.get('mode', 'unrecorded')})")
+        verdict = "UNMEASURED"
     parts = [
         *heads,
         f"never_passed {len(envelope['never_passed'])}",
@@ -333,11 +417,16 @@ def control_card_of(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> 
     return card_at(path, ref, root, "control_card_ref") if ref else None
 
 
-def measured_at(path: Path, history_dir: Path = HISTORY) -> str:
-    """What `make ledger` holds a Measured cell to: the envelope's numbers under the gate's verdict."""
+def measured_at(path: Path, history_dir: Path = HISTORY, *, milestone: str | None = None) -> str:
+    """What `make ledger` holds a Measured cell to: the envelope's numbers under the gate's verdict.
+
+    `milestone` is the row's (`M01`). It decides whether the claim is read in
+    the runtime; with none, the cell is the envelope's alone.
+    """
     verdict, _ = rule(path, history_dir)
     envelope = read(path)
-    return measured(envelope, verdict, control_card_of(envelope, path))
+    return measured(envelope, verdict, control_card_of(envelope, path),
+                    in_the_runtime=milestone in READ_IN_THE_RUNTIME)  # fmt: skip
 
 
 def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> str | None:

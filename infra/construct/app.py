@@ -60,11 +60,17 @@ stack = RefagentStack(
 NagSuppressions.add_resource_suppressions_by_path(
     stack, "AgentkeelRefagent/Refagent/Role/DefaultPolicy/Resource",
     [{"id": "AwsSolutions-IAM5",
-      "reason": "SPEC/01 §6, 'its own log group' and 'the agent's key': logs:CreateLogStream, "
-                "logs:PutLogEvents, kms:Decrypt and kms:GenerateDataKey are on *, because the log stream "
-                "does not exist until the runtime writes it and the key is reached through the grant, not "
-                "by ARN. The boundary (S5) caps all four, and the key policy denies this role its own key "
-                "policy (S6). The profile and the rights table are named by ARN."}],
+      "reason": "SPEC/01 §6, 'its own log group' and 'the agent's key'. The log streams are "
+                "log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*, because AgentCore names the group "
+                "and the stream at runtime. kms:Decrypt and kms:GenerateDataKey are on key/* conditioned on "
+                "kms:ResourceAliases being this agent's alias, because the key's id is the bootstrap stack's "
+                "and the construct does not read it (PR 3 security-reviewer F6: the earlier reason, 'reached "
+                "through the grant', named a grant that does not exist). The boundary (S5) caps all of it, and "
+                "the key policy denies this role its own key policy (S6). The profile and the rights table are "
+                "named by ARN. B1 (M01 PR 3): "
+                "ecr:GetAuthorizationToken and logs:DescribeLogGroups take no resource-level permission; "
+                "the image pull is on this agent's repository and the log group under "
+                "/aws/bedrock-agentcore/runtimes/*, whose suffix AgentCore assigns."}],
 )
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

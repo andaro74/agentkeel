@@ -1,10 +1,12 @@
 """`GovernedAgent`, and the checks over the whole synthesised stack (Security seat).
 
-An agent exists on this platform only as an instance of this construct
-(SPEC/01 §2) — at synth, in a stack that installs these checks. Nothing in
-the account says so: there is no service control policy, and a role whose
-own policy were widened could call `CreateAgentRuntime` directly. That is
-landing-zone work (SPEC/00 §2, §12), and no role's policy grants it today.
+An agent on this platform is an instance of this construct (SPEC/01 §2),
+and that is checked at synth, in a stack that installs these checks, and no
+further (BLOCK D). The account holds less than that. There is no service
+control policy. Since M01 PR 3, `agentkeel-cfn-exec` may call
+`CreateAgentRuntime`, held by IAM to the platform VPC's subnets: that limits
+where a runtime is made, not who built it. Binding an author who never
+installs these checks is M05's (SPEC/00 §2, §12).
 
 Three of M01's seeded cases are read here, and each is read over the whole
 stack, not inside the construct:
