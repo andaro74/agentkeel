@@ -4,7 +4,11 @@ M00 PR 1 (ADR-0001 amendment 1 item 22): golden front matter, ruling front
 matter, and that every ordinary and trap golden cites a rights-table row and
 a clause that exist. M01 PR 1 (Security, M01 open item 29): the workflow
 file hash. M01 PR 2 (SPEC/01 §6): the manifest schema, and cdk-nag over
-both stacks.
+both stacks. M02 PR 2 (SPEC/02 §6): CODEOWNERS complete and single-owner
+with real logins; `relaxes:` on every bar; edges two-sided, no cycle,
+ceilings within bounds; golden ids against `origin/main`; computed semver;
+the live `main` ruleset equal to its export with `bypass_actors: []`. The
+ledger header (milestones/README.md) says which of these held at each tag.
 """
 
 from __future__ import annotations
@@ -21,6 +25,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from src.gates import two_key
+from src.validate import codeowners, edges, golden_ids, ruleset, semver
 
 GOLDEN_FIELDS = {"id", "kind", "question", "expected", "seat", "added", "retired"}
 GOLDEN_ID = re.compile(r"^g-\d{3}$")
@@ -306,6 +313,34 @@ def _names_its_case(reason: str) -> bool:
     return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason)
 
 
+THRESHOLDS = "thresholds.yaml"
+
+
+def check_relaxes(root: Path) -> list[str]:
+    """Every bar in thresholds.yaml has a `relaxes:` entry, up or down, and every entry names a bar (M02 PR 2).
+
+    `two-key` reads the entry to tell a relaxation from a tightening. A
+    bar with no entry cannot be moved with one key either, but the
+    Threshold Owner is asked to say the direction here, not leave it to
+    the gate to refuse both ways.
+    """
+    try:
+        thresholds = yaml.safe_load((root / THRESHOLDS).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        return [f"{THRESHOLDS}: unreadable: {exc}"]
+    if not isinstance(thresholds, dict):
+        return [f"{THRESHOLDS}: not a mapping"]
+    bars = two_key.bars(thresholds)
+    relaxes = thresholds.get("relaxes")
+    if not isinstance(relaxes, dict):
+        return [f"{THRESHOLDS}: no relaxes: mapping (Threshold Owner, M02 PR 2)"]
+    errors = [f"{THRESHOLDS}: bar {bar} has no relaxes: entry" for bar in sorted(set(bars) - set(relaxes))]
+    errors += [f"{THRESHOLDS}: relaxes: names {name}, which is not a bar" for name in sorted(set(relaxes) - set(bars))]
+    errors += [f"{THRESHOLDS}: relaxes.{name} is {value!r}, not up or down" for name, value in sorted(relaxes.items())
+               if value not in ("up", "down")]  # fmt: skip
+    return errors
+
+
 CHECKS = {
     "golden front matter": check_goldens,
     "golden citations exist in data/": check_golden_citations,
@@ -313,4 +348,11 @@ CHECKS = {
     "workflow-hash": check_workflow_hashes,
     "manifest schema": check_manifests,
     "cdk-nag, both stacks": check_cdk_nag,
+    # M02 PR 2 (SPEC/02 section 6)
+    "CODEOWNERS complete, single-owner, logins real": codeowners.check,
+    "relaxes: on every bar": check_relaxes,
+    "edges two-sided, no cycle, ceilings within bounds": edges.check,
+    "golden ids against origin/main": golden_ids.check,
+    "computed semver": semver.check,
+    "live main ruleset equals its export, bypass_actors []": ruleset.check,
 }

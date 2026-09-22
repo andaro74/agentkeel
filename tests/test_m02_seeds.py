@@ -95,7 +95,6 @@ def test_s2_a_golden_edited_to_green_a_build_is_refused(seeded):
 # --- S3: an edge declared on one side only ------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="validate's edge check lands at M02 PR 2")
 def test_s3_a_one_sided_edge_is_refused(seeded):
     """refagent says it may call ratings-helper@v1; no manifest says ratings-helper may be called."""
     from src.validate import edges
@@ -130,7 +129,6 @@ def test_s4_the_owner_was_refused():
 # --- S5: a golden id renamed --------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="validate's golden-id check against main lands at M02 PR 2")
 def test_s5_a_renamed_golden_id_is_refused(seeded):
     """g-005 disappears and g-099 appears with its content; retired is untouched. Today's validate
     passes it: the id matches the file name and nothing is duplicated. The reader compares to main."""
