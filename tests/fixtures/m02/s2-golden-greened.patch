@@ -1,0 +1,16 @@
+diff --git a/evals/goldens/v1/g-010.yaml b/evals/goldens/v1/g-010.yaml
+index 688cda4..d547679 100644
+--- a/evals/goldens/v1/g-010.yaml
++++ b/evals/goldens/v1/g-010.yaml
+@@ -7,9 +7,9 @@ expected:
+   table_row: r-009
+   clause_id: HS-4
+   answer_fields:
+-    available: false
++    available: true
+     exclusive: true
+-    constraints: [holdback]
++    constraints: []
+ seat: Data Owner
+ added: M00
+ retired: null

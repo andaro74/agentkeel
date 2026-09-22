@@ -76,3 +76,19 @@ def test_s1_two_files_from_one_seat_are_one_key(seeded):
     refusal = two_key.refusal(tree, base=ROOT, pr=0)
     assert refusal is not None and "thresholds.yaml" in refusal
     assert "Threshold Owner" in refusal and ("same seat" in refusal or "distinct" in refusal)
+
+
+# --- S2: a golden edited so the trap rewards what it was written to catch --
+
+
+@pytest.mark.xfail(strict=True, reason="src/gates/ruling_cited.py and two_key.py land at M02 PR 2")
+def test_s2_a_golden_edited_to_green_a_build_is_refused(seeded):
+    """No ruling at all, so ruling-cited refuses it; and `expected` moved on an id with a pass in
+    history, so two-key refuses it too. Both must name the golden."""
+    from src.gates import ruling_cited, two_key
+
+    tree = seeded("s2-golden-greened.patch")
+    cited = ruling_cited.refusal(tree, base=ROOT, pr=0)
+    assert cited is not None and "evals/goldens/v1/g-010.yaml" in cited and "Data Owner" in cited
+    keys = two_key.refusal(tree, base=ROOT, pr=0)
+    assert keys is not None and "g-010" in keys and "expected" in keys
