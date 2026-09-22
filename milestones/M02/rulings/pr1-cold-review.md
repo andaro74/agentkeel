@@ -5,7 +5,7 @@
 # Engineering's key for this PR's paths is pr1-engineering.md; this file
 # names the same paths and takes no second key over them. The security-
 # reviewer report is in the PR body verbatim, not here.
-ruling: DRAFT
+ruling: pr1-cold-review
 seat: Engineering
 authorises:
   - tests/test_bootstrap.py
