@@ -1,0 +1,75 @@
+# ratings-helper's manifest: a stub, manifest only (SPEC/02 §6; SPEC/00 §8
+# M01 listed it, SPEC/01 §10 cut it at M01 open, M02 PR 2 adds it). Its code,
+# the 12-row ratings table and the budget headers are M07's (SPEC/02 §10).
+# No bundle is packed from this folder and nothing deploys it: deploy.yml
+# packs agents/refagent only.
+#
+# Why a manifest with no agent: the edge check reads `may_call` and
+# `may_be_called_by` across every manifest under agents/, and the second
+# tenant is what gives an edge a second side. At M02 neither side is
+# declared: refagent's `may_call` is empty, and this file's
+# `may_be_called_by` is empty, so seed S3 (refagent declaring the edge
+# alone, tests/fixtures/m02/s3-one-sided-edge.patch) still applies and is
+# still one-sided. Declaring the edge on both sides is the M07 PR that
+# brings the code, with the Tool Owner's ruling and a major bump.
+#
+# Field owners as for refagent (ADR-0003 amendment 1): model and budgets,
+# Threshold Owner; guardrail, Rule Owner; seats and endpoint_allowlist,
+# Security; may_call, may_be_called_by, ceilings, version, Tool Owner; the
+# rest, Engineering.
+name: ratings-helper
+
+# Tool Owner (M02 PR 2): the contract's version, computed by `validate`
+# from the diff (an edge or schema change is a major bump), never chosen.
+# An edge `ratings-helper@v1` names this major.
+version: 1.0.0
+
+# Threshold Owner: the same pin as refagent's, so that a swap at M04 moves
+# both or neither. Nothing calls it before M07.
+model:
+  id: anthropic.claude-sonnet-4-6
+  version: null
+  profile: us.anthropic.claude-sonnet-4-6
+  region: us-west-2
+
+judge_model_id: null
+guardrail: null
+
+# Security: what its runtime could reach if one existed. The minimum the
+# construct accepts (ecr.api and ecr.dkr are required) plus the model.
+endpoint_allowlist:
+  - bedrock-runtime
+  - ecr.api
+  - ecr.dkr
+  - logs
+
+seats:
+  product: null
+  rule-owner: null
+  data-owner: null
+  tool-owner: null
+  threshold-owner: null
+  security: null
+  engineering: null
+
+# Tool Owner: no edge yet (see the header).
+may_call: []
+may_be_called_by: []
+
+# Tool Owner: at the platform's bounds (thresholds.yaml ceilings).
+ceilings:
+  concurrency: 2
+  rps_per_edge: 1
+  depth: 2
+  fan_out: 3
+
+# Threshold Owner: a helper answers one question per call; the budget is
+# a placeholder until M07 measures a call.
+max_tokens_per_session: 4000
+daily_usd: 1
+
+memory: null
+data_class: internal
+deprecated_after: null
+rollout: all-at-once
+platform_version: m01
