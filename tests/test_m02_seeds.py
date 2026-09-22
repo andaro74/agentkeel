@@ -125,3 +125,20 @@ def test_s4_the_owner_was_refused():
     assert ruleset["validate_result"] == "RED" and ruleset["bypass_actors_after"] == []
     export = json.loads((ROOT / "infra" / "ruleset" / "main.json").read_text(encoding="utf-8"))
     assert export["bypass_actors"] == [], "the export on main must say nobody bypasses"
+
+
+# --- S5: a golden id renamed --------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, reason="validate's golden-id check against main lands at M02 PR 2")
+def test_s5_a_renamed_golden_id_is_refused(seeded):
+    """g-005 disappears and g-099 appears with its content; retired is untouched. Today's validate
+    passes it: the id matches the file name and nothing is duplicated. The reader compares to main."""
+    from src.gates import ruling_cited
+    from src.validate import checks
+
+    tree = seeded("s5-golden-renamed.patch")
+    errors = checks.check_golden_ids_against(tree, base=ROOT)
+    assert any("g-005" in e and "retired" in e for e in errors), errors
+    cited = ruling_cited.refusal(tree, base=ROOT, pr=0)
+    assert cited is not None and "g-099.yaml" in cited
