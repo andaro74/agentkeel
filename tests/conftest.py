@@ -7,12 +7,18 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from src.verdict import ROOT, build
 
 GOLDENS_DIR = ROOT / "evals" / "goldens" / "v1"
 COMMIT = "a" * 40
 URL = "https://github.com/andaro74/agentkeel/actions/runs/1"
+REFAGENT_PIN = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))["model"]
+# What an agent's raw file says about where it ran (ADR-0007): refagent's pin,
+# in the runner. The gate refuses a run whose model or region is not the pin.
+AGENT_TOP = {"model_id": REFAGENT_PIN["profile"], "region": REFAGENT_PIN["region"],
+             "mode": "runner", "runtime_arn": None, "bundle": "agents/refagent"}  # fmt: skip
 
 
 @pytest.fixture(scope="session")
@@ -68,7 +74,7 @@ def chain(tmp_path: Path, goldens):
         flags: list[str] = []
         if agent:
             raw_path = tmp_path / f"{COMMIT}.agent-raw.json"
-            raw_path.write_text(json.dumps(make_raw(goldens, right, model_id="agent-under-test", **top)), encoding="utf-8")
+            raw_path.write_text(json.dumps(make_raw(goldens, right, **{**AGENT_TOP, **top})), encoding="utf-8")
             flags = claim_1_checks(tmp_path)
         assert build.main(["envelope", "--raw", str(raw_path), "--control-card", str(card_path),
                            "--out", str(envelope_path), "--history-dir", str(history), "--run-url", URL,

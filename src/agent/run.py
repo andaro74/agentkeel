@@ -135,6 +135,11 @@ def main(argv: list[str] | None = None) -> int:
         "guardrail": None,  # M03
         "retrieval": None,  # the knowledge base is cut to M03 (SPEC/01 §10, cut 3)
         "where": "the deployed runtime" if runtime_arn else "refagent's code, in the runner",
+        # ADR-0007: what verdict.build copies into the envelope, which the gate
+        # then checks for pairing and against the bundle's manifest pin.
+        "mode": "runtime" if runtime_arn else "runner",
+        "runtime_arn": runtime_arn or None,
+        "bundle": BUNDLE,
         "rights_table": source,
         "observations": observations,
     }

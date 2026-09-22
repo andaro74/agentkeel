@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "verdict.schema.json",
-  "title": "Envelope (SPEC/00 section 6 as amended by ADR-0004: checks, and scope on each result; amendment 2: control_card_ref, tokens_in)",
+  "title": "Envelope (SPEC/00 section 6 as amended by ADR-0004: checks, and scope on each result; amendment 2: control_card_ref, tokens_in; ADR-0007: schema_version 2, mode, runtime_arn, region, model_version)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -228,8 +228,37 @@
         "RED",
         "UNMEASURED"
       ]
+    },
+    "schema_version": {
+      "description": "ADR-0007. Absent: version 1, every envelope before it. 2: the four fields below are required.",
+      "const": 2
+    },
+    "mode": {
+      "description": "ADR-0007. Where the subject ran: control (no agent ran), runner (refagent's code in the CI runner), runtime (the deployed AgentCore runtime).",
+      "enum": ["control", "runner", "runtime"]
+    },
+    "runtime_arn": {
+      "description": "ADR-0007. The runtime called, or null. The gate refuses runtime without an ARN, and an ARN without runtime.",
+      "type": ["string", "null"]
+    },
+    "region": {
+      "description": "ADR-0007, T2. The request region, as the run reports it.",
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "description": "ADR-0007, T1. The manifest's pinned version; null where Bedrock gives none (ruling p).",
+      "type": ["string", "null"]
     }
   },
+  "dependentRequired": {
+    "mode": ["schema_version"],
+    "runtime_arn": ["schema_version"],
+    "region": ["schema_version"],
+    "model_version": ["schema_version"]
+  },
+  "if": {"required": ["schema_version"]},
+  "then": {"required": ["mode", "runtime_arn", "region", "model_version"]},
   "$defs": {
     "card_ref": {
       "type": "object",

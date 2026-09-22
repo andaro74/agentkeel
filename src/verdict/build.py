@@ -323,6 +323,25 @@ def scope_of(raw: dict[str, Any], card: dict[str, Any]) -> str:
     return "control" if canonical_sha256(raw) == card.get("raw_sha256") else "agent"
 
 
+def subject(raw: dict[str, Any], scope: str, root: Path = ROOT) -> dict[str, Any]:
+    """ADR-0007: where the subject ran, in which region, on which model version.
+
+    Written as the run reports it, and not judged here. The gate is what
+    refuses `runtime` without an ARN, and a model or region that is not the
+    manifest's pin (T3); build writing what happened is what lets the gate
+    disagree with it (P5). `model_version` is the pin's (T1): Bedrock
+    returns none for the profile, so there is no second source to prefer.
+    """
+    if scope == "control":
+        return {"schema_version": 2, "mode": "control", "runtime_arn": None,
+                "region": raw["region"], "model_version": None}  # fmt: skip
+    if raw.get("mode") not in ("runner", "runtime") or "bundle" not in raw:
+        raise Refused("the agent's raw file does not say where it ran (mode, bundle): ADR-0007")
+    manifest = yaml.safe_load((root / raw["bundle"] / "manifest.yaml").read_text(encoding="utf-8"))
+    return {"schema_version": 2, "mode": raw["mode"], "runtime_arn": raw.get("runtime_arn"),
+            "region": raw["region"], "model_version": manifest["model"]["version"]}  # fmt: skip
+
+
 def f1_4(results: dict[str, dict[str, Any]]) -> str:
     """fail when any ordinary answer does not cite a row and a clause that exist (SPEC/01 §4)."""
     return "fail" if any(r["kind"] == "ordinary" and not r["cites"] for r in results.values()) else "pass"
@@ -414,6 +433,7 @@ def compose_envelope(
         "alarm_latency_s": None,
         "checks": checks,
         "verdict": verdict,
+        **subject(raw, scope),
     }
 
 

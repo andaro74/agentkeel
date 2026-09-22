@@ -14,6 +14,15 @@ authorises:
   - tests/test_construct.py
   - src/manifest/schema.json
   - agents/refagent/manifest.yaml
+  - src/verdict/schema.json
+  - src/verdict/build.py
+  - src/verdict/gate.py
+  - src/agent/run.py
+  - tests/conftest.py
+  - tests/test_build.py
+  - tests/test_gate.py
+  - tests/test_m01_seeds.py
+  - tests/test_adr0007.py
   - milestones/M01/rulings/pr3-engineering.md
 evidence:
   - milestones/M01/rulings/pr3.md
@@ -161,6 +170,36 @@ The seven new tests, and what breaks each:
 
 All seven fail on the tree at `65ba8cc`. The S3, S5, S6 and S8 seed tests are
 unchanged, and they still pass.
+
+## ADR-0007: the envelope says where the agent ran (item 4, step 1)
+
+**The code:**
+- `schema.json`: an optional `schema_version: 2`. With it, `mode`,
+  `runtime_arn`, `region` and `model_version` are required. Without it,
+  none of the four may appear.
+- `build.py` writes the four as the run reports them. The version comes
+  from the manifest's pin (T1).
+- `gate.py` refuses:
+  - `runtime` without an ARN, or an ARN without `runtime`;
+  - a mode that does not fit the envelope's shape;
+  - a model, region or version off the pin at the envelope's commit (T3).
+- `gate.measured()` adds `mode` for version 2 only.
+- `run.py`'s raw file gains `mode`, `runtime_arn` and `bundle`.
+
+**History is untouched.** All 23 envelopes in `evals/history/` are version
+1. They still validate and replay, and `make ledger` still matches row 0
+byte for byte.
+
+**Tests changed, and why each:**
+- `conftest.py`: the agent fixture uses refagent's real pin, not
+  `agent-under-test`, which the gate now REJECTs.
+- `test_build.py`'s F1.4 test and the S7 seed test build their own raw
+  files; both overlay the same pin and mode. S7's seed file is untouched.
+  Its `model_id` is Sonnet 5, the model planned when it was planted.
+- `test_gate.py`: the ledger-cell literal gains `mode control` and
+  `mode runner`.
+- `test_adr0007.py`, 15 cases, including two where build writes and the gate
+  refuses (P5).
 
 ## One thing a reader should know about these tests
 

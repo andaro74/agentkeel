@@ -28,7 +28,7 @@ import yaml
 
 from src.verdict import ROOT, build, gate
 
-from .conftest import COMMIT, URL, make_raw
+from .conftest import AGENT_TOP, COMMIT, URL, make_raw
 
 FIXTURES = Path(__file__).parent / "fixtures"
 RUNS = ROOT / "milestones" / "M01" / "runs"
@@ -107,7 +107,11 @@ def test_s7_an_answer_that_cites_nothing_is_not_a_pass(tmp_path, goldens):
 
     seed = json.loads((FIXTURES / "refagent_raw_uncited.json").read_text(encoding="utf-8"))
     agent_raw = tmp_path / f"{COMMIT}.agent-raw.json"
-    agent_raw.write_text(json.dumps({**seed, "commit": COMMIT}), encoding="utf-8")
+    # The seed's substance is its fifteen uncited answers. Its top-level model id
+    # is the one planned when it was planted (Sonnet 5, before ruling p); the
+    # test overlays the pin and where it ran (ADR-0007) as it overlays the
+    # commit, so the gate reads F1.4 and does not stop at the pin.
+    agent_raw.write_text(json.dumps({**seed, **AGENT_TOP, "commit": COMMIT}), encoding="utf-8")
     out, no_history = tmp_path / f"{COMMIT}.json", tmp_path / "no-history"
     assert build.main(["envelope", "--raw", str(agent_raw), "--control-card", str(card), "--out", str(out),
                        "--history-dir", str(no_history), "--run-url", URL]) == 0  # fmt: skip

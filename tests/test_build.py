@@ -8,7 +8,7 @@ import pytest
 
 from src.verdict import build
 
-from .conftest import COMMIT, URL, make_raw
+from .conftest import AGENT_TOP, COMMIT, URL, make_raw
 
 ROWS, CLAUSES = {"r-019"}, {"ML-2.1"}
 GOLDEN = {
@@ -158,7 +158,7 @@ def test_an_over_cap_run_is_a_recorded_red(tmp_path, chain):
 
 def test_f1_4_an_agent_answer_passes_only_if_it_cites(goldens):
     """SPEC/01 §4. The control is scored as at m00: pass is score, citations or not."""
-    raw = make_raw(goldens, right={"g-001", "g-002"})
+    raw = make_raw(goldens, right={"g-001", "g-002"}, **AGENT_TOP)
     raw["observations"][1]["parsed"].pop("clause_id")  # g-002: right, and cites no clause
     results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
     assert results["g-002"] == {"kind": "ordinary", "score": True, "cites": False, "pass": True}  # the control's reading
