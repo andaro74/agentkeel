@@ -10,9 +10,9 @@ Written at M02 PR 1 open. The row in `milestones/README.md` is the one
 | Claim | Seat-owned files change only with a ruling; relaxations need two keys |
 | Falsifiers | F2.1 any of the five seeded changes merges: a threshold relaxed with one key or with two files from one seat, a golden edited to green a build, an edge declared on one side, the owner merging past a red required check, a golden id renamed. F2.2 the three doors (Door 1 blocked by the gate, Door 2 merged with two keys, Door 3 blocked by two gates) are not reproducible from the PR record. |
 | Seeded commit | `6ff333a` (S1, both forms); `74a38be` (S2); `d8fbdb1` (S3); `9eb539c` (S4, the attempt to make, `observed: null`); `479abb9` (S5), each its own commit (SPEC/02 §5) |
-| Expected gate output | PR 1: refagent's envelope in runner mode, gated and recorded as at M01; it says nothing about claim 2. `make plants` lists S1–S5 with no reader in the tree; `tests/test_m02_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 (both forms), S2, S3 and S5 refused by `src/gates/` and `validate` in a copy of the tree, each with its planted reason; `checks.F2_1` fails on PR 2's own run, because S4's `observed` is null; `two-key` green on PR 2's own two files for `g-012`, which is Door 2. After PR 2 merges and before PR 3's first CI run: the human makes `ruling-cited` and `two-key` required, opens the seed PRs from `main`, and makes S4's two attempts; PR 3's run looks each up (`scripts/observe_pr.py`) and writes `checks.F2_1` (both halves) and `checks.F2_2` pass. **A named P3 exception (SPEC/02 §5.1): a PR refused by a gate on `main` cannot exist before the gate is on `main`; the machinery is PR 2's, the reading is PR 3's, whether PR 3 is the repair or the close.** RED if any seed PR's check is green, if `--admin` merges, if `validate` stays green with `bypass_actors` non-empty, or if PR 3's run reads anything else. No count of refagent's passes is expected to change; the checks decide the row. |
+| Expected gate output | PR 1: refagent's envelope in runner mode, gated and recorded as at M01; it says nothing about claim 2. `make plants` lists S1–S5 with no reader in the tree; `tests/test_m02_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 (both forms), S2, S3 and S5 refused by `src/gates/` and `validate` in a copy of the tree, each with its planted reason; **Amended at PR 2 (Product, `rulings/pr2.md`; SPEC/02 §4): `checks.F2_1` on PR 2's own envelope is its first source alone, the five seed tests passing on refusing; the second source and `checks.F2_2` are wired at PR 3, because a failing check on PR 2's run would have made `evals`, a required check, red, and PR 2 could not have merged through the ruleset it measures. S4's test keeps its marker until the attempts.** `two-key` green on PR 2's own two files for `g-012`, which is Door 2 (its check run is `gates.yml`'s `two-key` job on PR 2's head). After PR 2 merges and before PR 3's first CI run: the human makes `ruling-cited` and `two-key` required, opens the seed PRs from `main`, and makes S4's two attempts; PR 3's run looks each up (`scripts/observe_pr.py`) and writes `checks.F2_1` (both halves) and `checks.F2_2` pass. **A named P3 exception (SPEC/02 §5.1): a PR refused by a gate on `main` cannot exist before the gate is on `main`; the machinery is PR 2's, the reading is PR 3's, whether PR 3 is the repair or the close.** RED if any seed PR's check is green, if `--admin` merges, if `validate` stays green with `bypass_actors` non-empty, or if PR 3's run reads anything else. The count of refagent's passes changes by one golden at PR 2, `g-012` retired and `g-021` added never passed; the checks decide the row. |
 | Measured | — |
-| PRs used / cap | 1 / 4 |
+| PRs used / cap | 2 / 4 |
 | State | OPEN |
 
 ### Open detail (PR 1, #11, 2026-09-22)
@@ -58,6 +58,45 @@ Written at M02 PR 1 open. The row in `milestones/README.md` is the one
   recorded as at M01. It does not measure claim 2. Its merge triggers
   `deploy.yml` on `main`: the first agent deploy since the failed one,
   read at PR 2 (row 10).
+
+### PR 2 detail (#12, 2026-09-22): the measurement
+
+- **Read in this PR**, in the order the commits land them: `relaxes:` and
+  `ceilings:` bars (Threshold Owner); `.github/CODEOWNERS` (Security);
+  `src/gates/ruling_cited.py`; `src/gates/two_key.py`, and S1 (both
+  forms) and S2 lose their markers in that commit; `validate`'s six new
+  checks, and S3 and S5 lose theirs in that commit; the `ratings-helper`
+  stub; `gates.yml`, committed unlisted first so that `workflow-hash`
+  refusing it could be recorded (row 16); `scripts/observe_pr.py` and
+  `build`'s three readers, rehearsed against PRs #10 and #11 (row 17);
+  a retired golden out of the run and the gate reading the goldens at the
+  envelope's commit; then Door 2, `g-012` retired and `g-021` added with
+  the Data Owner's and the Threshold Owner's keys.
+- **What went RED on the plant, where.** `uv run pytest
+  tests/test_m02_seeds.py` at the head: 5 passed, 1 xfailed (S4). The
+  strict markers came off in the reader's commits, and each test asserts
+  the planted reason is in the refusal. `make plants`: every reader "in
+  the tree". Both gates run on this branch against `main` before the
+  ruling files existed and refused it: `two-key` on `g-012`'s
+  retirement with no key, `ruling-cited` on 50 paths; the ruling files
+  are what turn them green on PR 2's head, which is Door 2's record.
+- **What PR 2 does not do.** It makes nothing required on the ruleset
+  and does not export it: `ruling-cited` and `two-key` become required
+  after the merge (SPEC/02 §5.1). It does not open a seed PR or make an
+  attempt; S4's `observed` stays null. It does not wire `checks.F2_2` or
+  `F2_1`'s second source (SPEC/02 §4, amended here). It does not remove
+  `infra/eval-role/`: `AgentkeelM00EvalRole` was still `UPDATE_COMPLETE`
+  in the account on 2026-09-22 (Unsure E stands). It does not fill
+  `observed_at_pr2_merge` in `runs/row10_first_deploy.yaml`: the merge
+  is the first arm64 deploy, and the run file records why the refusal by
+  name of `822fe2b5` will not fire at it.
+- **Read by the call, not assumed.** `runs/api_probes.yaml`: the ruleset
+  endpoint answers unauthenticated but omits `bypass_actors`; the
+  rule-suites endpoint is 401 without a token and 200 with the human's.
+  `validate` therefore reads the ruleset with a token, and an absent
+  bypass list is an error naming the token. Whether a workflow's
+  `GITHUB_TOKEN` is shown the list is read on this PR's first `checks`
+  run.
 
 ### For the seats, at M02 PR 2 open
 

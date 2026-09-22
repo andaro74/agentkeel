@@ -84,8 +84,18 @@ what_was_read:
     - whether the arm64 runner image carries the docker and aws CLI the job expects
 
 state_left_by_the_human:
-  agent_stack: UPDATE_ROLLBACK_FAILED; recovered with `continue-update-rollback --resources-to-skip RefagentRuntime148EBA78` (fill in the time when done)
+  agent_stack: UPDATE_ROLLBACK_COMPLETE at 2026-09-22T15:19:15Z, by the human, with `continue-update-rollback --resources-to-skip RefagentRuntime148EBA78` (describe-stack-events: UPDATE_ROLLBACK_IN_PROGRESS 15:19:12Z, the runtime resource UPDATE_COMPLETE 15:19:14Z)
   runtime_image_reference: sha256:6fcd185b…, deleted from ECR; replaced by the next successful update
   ecr: sha256:822fe2b5… (amd64) left under the immutable tag on purpose, so the first arm64 run refuses to reuse it by name; the human then deletes it and reruns that job
+  # Read at PR 2, before the merge (the session, 2026-09-22): that refusal by name will NOT fire at
+  # PR 2's merge. The tag is the bundle digest, and the bundle is every file under agents/refagent/
+  # (src/bundle/pack.py), the Dockerfile included; d426573's platform pin moved it. Digests:
+  #   main (c77e872)   bf0afd04cd1be49c9eb7e43961e927cf9cae8ac9afeb5d97b3eb0f0f5610220e
+  #   this branch      9ea5fac4053d1fe6a82a46e9a200cbd5d4512332355ce08e907da5f61ef6351a
+  #   the ECR tag      26ed38d150044927d8aa0c684966366001928041bf87d3dbc4e086e1276e99de (the failed M01 image's)
+  # So the merge finds no image under its tag, builds fresh on the arm64 runner, and pushes; 822fe2b5
+  # stays under 26ed38d1 until deleted by hand. The reuse branch's refusal is exercised by
+  # tests/test_deploy_image_architecture.py and fires in the account only on a rerun whose tag already
+  # holds an amd64 image. Security decides whether to delete 822fe2b5 before or after the merge.
 
 observed_at_pr2_merge: null  # the arm64 run: its id, the refusal of 822fe2b5, the rebuild, the runtime's first log lines, the load check's answer
