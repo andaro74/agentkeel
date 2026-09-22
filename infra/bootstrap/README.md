@@ -100,10 +100,16 @@ done
 ```
 
 ```bash
-# 3. Point CI at the new eval role, and check the parameters are all there.
+# 3. Point CI at the new eval role and at the deploy role, and check the
+#    parameters are all there. Both variables, or a workflow fails at its
+#    assume step: `evals.yml` reads AWS_EVAL_ROLE_ARN, `deploy.yml` reads
+#    AWS_DEPLOY_ROLE_ARN. The second was missing until 2026-09-22, and the
+#    first deploy on `main` (run 35683865472) failed on it before it failed
+#    on anything else (M02 open.md row 9).
 aws cloudformation describe-stacks --stack-name AgentkeelBootstrap \
   --query 'Stacks[0].Outputs' --output table
 gh variable set AWS_EVAL_ROLE_ARN --body "arn:aws:iam::<account>:role/agentkeel-evals"
+gh variable set AWS_DEPLOY_ROLE_ARN --body "arn:aws:iam::<account>:role/agentkeel-deploy"
 aws ssm get-parameters-by-path --region us-west-2 --path /agentkeel/security --recursive \
   --query 'Parameters[].Name' --output table
 ```
@@ -117,10 +123,21 @@ wrote feeds no check by itself (SPEC/01 §4).
 
 After PR 2 merges: `cd infra/eval-role && npx aws-cdk@2 destroy` (ruling f).
 
-## What has not been observed
+## What has been observed, and what has not
 
-Nothing in this stack has been deployed yet at the time this file was
-written. Until the deploy and the two attempts are in the record, no
-sentence here or anywhere else may call any of it proven (SPEC/00 §10.5):
-what exists is a template, a cdk-nag report and two seeded cases waiting
-for their attempt.
+This stack was deployed by the human during M01 PR 2, and the two
+attempts S4 and S6 were made against it on 2026-09-20; their request ids
+are in the M01 run files and CloudTrail's record of each is what wrote
+`checks.F1_1` and `checks.F1_3` in envelope `e97125e` (run 35680056132).
+
+The first deploy of an **agent** stack through this stack's roles failed
+twice on 2026-09-22 (run 35683865472, M02 open.md row 9): first because
+`AWS_DEPLOY_ROLE_ARN` was not set, then at CREATE on the rights table,
+because `TableEncryption.AWS_MANAGED` needs `kms:CreateGrant` and the
+deploy boundary denies it. Nothing was half-built; the stack rolled back
+and was deleted. The construct now uses `TableEncryption.DEFAULT`, and
+`tests/test_bootstrap.py` reads a handler call the boundary denies before
+a deploy does. No agent stack has yet deployed through these roles at the
+time this paragraph was written; the first that does is read at M02 PR 2
+(row 10). Until then no sentence here or anywhere else may call the
+deploy plane proven (SPEC/00 §10.5).
