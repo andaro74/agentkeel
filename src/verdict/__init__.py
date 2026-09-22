@@ -49,11 +49,49 @@ def canonical_sha256(document: Any) -> str:
 
 
 def load_golden_kinds(goldens_dir: Path) -> dict[str, str]:
-    """Golden id -> kind. Reads nothing else from a golden."""
+    """Golden id -> kind, for the goldens that are not retired. Reads nothing else from a golden.
+
+    From M02 PR 2 (Door 2, `g-012` retired): a retired golden is out of
+    the run, the card, the envelope and the plant count. Its id is never
+    reused (R11) and its file stays, so `replay_history` still keys on it.
+    """
     import yaml
 
     kinds = {}
     for path in sorted(goldens_dir.glob("g-*.yaml")):
         golden = yaml.safe_load(path.read_text(encoding="utf-8"))
-        kinds[golden["id"]] = golden["kind"]
+        if golden.get("retired") is None:
+            kinds[golden["id"]] = golden["kind"]
     return kinds
+
+
+def golden_kinds_at(commit: str, goldens_dir: Path, root: Path = ROOT) -> tuple[dict[str, str], str]:
+    """Golden id -> kind as the goldens stood at `commit`, retired ones left out; and where it was read.
+
+    The gate holds an envelope to the goldens of its own commit, as it
+    holds it to the cap of its own commit (ruling m): a golden added or
+    retired later must not re-rule an old envelope. When git cannot
+    resolve the commit (a test, a shallow clone) the tree is used and the
+    caller says so.
+    """
+    import subprocess
+
+    import yaml
+
+    try:
+        rel = goldens_dir.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return load_golden_kinds(goldens_dir), "the working tree"
+    listing = subprocess.run(["git", "ls-tree", "-r", "--name-only", commit, "--", rel], cwd=root,
+                             capture_output=True, text=True, check=False)  # fmt: skip
+    if listing.returncode != 0 or not listing.stdout.strip():
+        return load_golden_kinds(goldens_dir), "the working tree"
+    kinds = {}
+    for path in sorted(listing.stdout.split()):
+        if not path.rsplit("/", 1)[-1].startswith("g-") or not path.endswith(".yaml"):
+            continue
+        shown = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=root, capture_output=True, text=True, check=True)
+        golden = yaml.safe_load(shown.stdout)
+        if golden.get("retired") is None:
+            kinds[golden["id"]] = golden["kind"]
+    return kinds, f"{commit[:12]}, the envelope's own commit"

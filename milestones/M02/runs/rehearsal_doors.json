@@ -1,0 +1,53 @@
+{
+  "what": "GitHub's record of M02's seeded cases; not an envelope; rules nothing",
+  "looked_up_at": "2026-09-22T16:08:13+00:00",
+  "run": "milestones/M02/runs/rehearsal_doors.yaml",
+  "repo": "andaro74/agentkeel",
+  "kind": "doors",
+  "doors": [
+    {
+      "door": 2,
+      "what": "rehearsal against a known merged PR (M01 PR 4,",
+      "expected": "found and merged; two_key null (no gates.yml at that date); rulings_in_merge lists pr4.md and pr4-engineering.md; distinct_seats [Engineering, Product]",
+      "pr": 10,
+      "found": true,
+      "pr_url": "https://github.com/andaro74/agentkeel/pull/10",
+      "state": "closed",
+      "merged": true,
+      "merge_commit_sha": "ec0358d8ff5b2c6332ef9c5042f2b80dd41ee2c0",
+      "base": "main",
+      "head_sha": "89ef483775b427b3cd0ae5cc16f24e75b6e38330",
+      "two_key": null,
+      "rulings_in_merge": [
+        {
+          "path": "milestones/M01/rulings/pr4-engineering.md",
+          "seat": "Engineering",
+          "authorises": [
+            "src/ledger.py",
+            "tests/test_cost_cap_and_ledger.py",
+            "tests/test_adr0007.py",
+            "milestones/M01/rulings/pr4-engineering.md"
+          ]
+        },
+        {
+          "path": "milestones/M01/rulings/pr4.md",
+          "seat": "Product",
+          "authorises": [
+            "milestones/README.md",
+            "milestones/M01/README.md",
+            "milestones/M01/attestations.md",
+            "milestones/M01/rulings/pr4.md",
+            "milestones/M02/open.md",
+            "docs/milestones/M01.md",
+            "docs/milestones/README.md",
+            "docs/video/README.md"
+          ]
+        }
+      ],
+      "distinct_seats": [
+        "Engineering",
+        "Product"
+      ]
+    }
+  ]
+}

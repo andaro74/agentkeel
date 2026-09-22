@@ -60,6 +60,7 @@ import yaml
 from src.verdict import (
     ROOT,
     canonical_sha256,
+    golden_kinds_at,
     load_golden_kinds,
     plants,
     replay_history,
@@ -407,7 +408,9 @@ def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
         history = replay_history.load(history_dir, exclude_commit=envelope["commit"])
     except ValueError as exc:  # a bad file in history: the gate cannot rule, which is not RED
         raise Rejected(f"history cannot be replayed: {exc}") from exc
-    kinds = load_golden_kinds(GOLDENS)
+    # The goldens as they stood at the envelope's commit, retired ones left
+    # out (M02 PR 2): a golden added or retired since must not re-rule it.
+    kinds, _ = golden_kinds_at(envelope["commit"], GOLDENS, ROOT)
     cap, _ = cap_at(envelope["commit"])
     return judge(envelope, kinds, history, plants.plant_ids(kinds, ROOT), cap)
 

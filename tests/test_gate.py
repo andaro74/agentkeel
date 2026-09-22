@@ -44,15 +44,15 @@ def test_a_golden_that_has_only_ever_failed_does_not_gate(chain):
 
 
 def test_at_m00_every_result_is_the_controls(chain):
-    envelope_path, _, _ = chain(right={"g-012"})
+    envelope_path, _, _ = chain(right={"g-010"})
     envelope = gate.read(envelope_path)
     assert {r["scope"] for r in envelope["goldens"].values()} == {"control"}
     assert len(envelope["goldens"]) == 15
 
 
 def test_the_control_is_never_gated(chain, past, capsys):
-    """The control passed g-001 and g-012 once and fails both now. Reported, noted, not RED."""
-    history_dir = past(right={"g-001", "g-012"}, agent=False)
+    """The control passed g-001 and g-010 once and fails both now. Reported, noted, not RED."""
+    history_dir = past(right={"g-001", "g-010"}, agent=False)
     envelope_path, _, _ = chain(history_dir=history_dir)
     envelope = gate.read(envelope_path)
     assert envelope["regressed"] == [] and envelope["verdict"] == "GREEN"
@@ -61,7 +61,7 @@ def test_the_control_is_never_gated(chain, past, capsys):
     assert gate.main([str(envelope_path), "--history-dir", str(history_dir)]) == 0
     out = capsys.readouterr().out
     assert "note: control g-001 has passed before and fails now; not gated (Finding F0.4)" in out
-    assert "note: control g-012" in out
+    assert "note: control g-010" in out
 
 
 def test_the_controls_luck_is_not_the_agents_bar(chain):
@@ -245,9 +245,9 @@ def test_a_dropped_golden_is_red(chain):
 
 
 def test_measured_is_what_the_ledger_cell_must_say(chain):
-    envelope_path, _, _ = chain(right={"g-001", "g-012"})
+    envelope_path, _, _ = chain(right={"g-001", "g-010"})
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
-        "control: traps 1/3 (g-012); ordinary 1/9; guardrail 0/3; mode control; never_passed 13; regressed 0; "
+        "control: traps 1/3 (g-010); ordinary 1/9; guardrail 0/3; mode control; never_passed 13; regressed 0; "
         f"plants 0/0; GREEN; envelope `{'a' * 40}`"
     )
     envelope_path, _, _ = chain(right={"g-001"}, agent=True)

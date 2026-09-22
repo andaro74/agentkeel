@@ -1,0 +1,35 @@
+{
+  "what": "GitHub's record of M02's seeded cases; not an envelope; rules nothing",
+  "looked_up_at": "2026-09-22T16:08:15+00:00",
+  "run": "milestones/M02/runs/rehearsal_seed_prs.yaml",
+  "repo": "andaro74/agentkeel",
+  "kind": "seed_prs",
+  "seeds": [
+    {
+      "seed": "rehearsal (M02 PR 1,",
+      "expected_check": "checks",
+      "expected_path": "infra/construct/governed_agent.py",
+      "human_said": {
+        "pr": 11
+      },
+      "pr": 11,
+      "found": true,
+      "pr_url": "https://github.com/andaro74/agentkeel/pull/11",
+      "state": "closed",
+      "merged": true,
+      "merge_commit_sha": "c77e87270e6152ab0a8536b86642406449ebd78e",
+      "base": "main",
+      "head_sha": "f6d1e736eba1db1b2715ee12ae218746dae702bf",
+      "required_on_base": true,
+      "check_run": {
+        "id": 106767716370,
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/andaro74/agentkeel/actions/runs/35734375676/job/106767716370"
+      },
+      "path_named_in_log": false,
+      "log_lines": [],
+      "log_status": 200
+    }
+  ]
+}
