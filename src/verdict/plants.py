@@ -30,6 +30,25 @@ SEEDS: dict[str, tuple[str, str, str]] = {
 }
 
 
+# Claim 2's seeded cases (SPEC/02 section 5), the same shape. Each is a diff
+# to a seat-owned path under tests/fixtures/m02/, or an attempt against the
+# main ruleset recorded under milestones/M02/runs/. The readers land at M02
+# PR 2; listing them here reads nothing and gates nothing.
+SEEDS_M02: dict[str, tuple[str, str, str]] = {
+    "S1": ("F2.1", "tests/fixtures/m02/s1-one-key.patch, s1-two-files-one-seat.patch", "src/gates/two_key.py"),
+    "S2": ("F2.1", "tests/fixtures/m02/s2-golden-greened.patch", "src/gates/ruling_cited.py"),
+    "S3": ("F2.1", "tests/fixtures/m02/s3-one-sided-edge.patch", "src/validate/edges.py"),
+    "S4": ("F2.1, F2.2", "milestones/M02/runs/f2_1_bypass.yaml", "scripts/observe_pr.py"),
+    "S5": ("F2.1", "tests/fixtures/m02/s5-golden-renamed.patch", "src/validate/golden_ids.py"),
+}
+
+# Every milestone's seeded cases, in order, with the SPEC section that lists them.
+SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
+    ("SPEC/01 section 5", SEEDS),
+    ("SPEC/02 section 5", SEEDS_M02),
+]
+
+
 def plant_ids(kinds: dict[str, str], root: Path) -> list[str]:
     # The rule, one line.
     return sorted(g for g, kind in kinds.items() if kind in CONTROLS and (root / CONTROLS[kind]).exists())
