@@ -10,7 +10,7 @@
 # A budget, not a quality bar. Relaxes upward: a higher number needs two keys.
 # At M00 it was 20000 for one subject: the PR 1 plant run spent 5,662, the
 # worst case about 11,500. From M01 a run has two subjects. The control is
-# about 6,000. refagent on Sonnet 5, with retrieval and one tool, is not
+# about 6,000. refagent on Sonnet 4.6 (us.anthropic.claude-sonnet-4-6, ruling p), with retrieval and one tool, is not
 # measured yet; PR 2's run writes the number, and the Threshold Owner rules
 # the cap again against it. The envelope's tokens_in and tokens_out are the
 # run's: both subjects when an agent ran, the control's when none did. An

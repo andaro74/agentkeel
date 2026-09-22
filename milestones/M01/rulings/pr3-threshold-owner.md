@@ -6,6 +6,7 @@
 ruling: pr3-threshold-owner
 seat: Threshold Owner
 authorises:
+  - thresholds.yaml
   - milestones/M01/rulings/pr3-threshold-owner.md
 evidence:
   - docs/adr/ADR-0007-the-envelope-says-where-the-agent-ran.md
@@ -27,9 +28,16 @@ response would be a second source that can disagree with the first, and
 there would be nothing to settle which one is right.
 
 **T2 — `region` is recorded per run,** from the raw file's request region,
-and compared with the pin. The pin says what should have happened; the run
-says what did. Recording only the pin would hide a run made from the wrong
-region.
+and compared with the pin.
+
+*Reworded after the PR 3 cold review* (threshold-owner F1 = cold F1). The
+first wording said "the run says what did", and that overstated it. The
+region recorded is **the request region the client was built with**. The
+runner takes it from the pin (`src/agent/run.py`), and Converse reports no
+region that served the call, so a run routed elsewhere by Bedrock is not
+seen. So the check guards against a changed runner or a hand-edited raw file
+or envelope. It does not guard against routing. That limit is the Threshold
+Owner's to carry into M04, where A-vs-A compares the pair.
 
 **T3 — a run off the pin is REJECTED, not RED.** A run on another model or
 another region did not measure the pinned subject, so it is not a result
@@ -48,3 +56,11 @@ envelope's commit, the same way the cap is read (ruling m).
 **What holds it:** `tests/test_adr0007.py`. A run off the pin in each of the
 three fields is REJECTED. build writes a region off the pin, and the gate
 refuses it: the two disagree, which is P5.
+
+**Finding 30 (PR 2 cold review), closed here.** `thresholds.yaml`'s comment
+named "refagent on Sonnet 5", but the pin is Sonnet 4.6 (ruling p). The
+comment is corrected. It is prose only: no bar moves, so it takes one key,
+this one.
+
+**The pin's `id`** (threshold-owner F2). The envelope carries the profile, so
+the gate now also refuses a pin whose `id` and `profile` disagree.
