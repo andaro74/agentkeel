@@ -58,7 +58,7 @@ Two facts about the current tree limit what can be decided.
 
 | Field | Values | Written from |
 |---|---|---|
-| `mode` | `control`, `runner`, `runtime` | the raw file's `where`, mapped. A control-only envelope, M00's form, is `control` |
+| `mode` | `control`, `runner`, `runtime` | the raw file's `mode`, which `run.py` writes beside `where`. A control-only envelope, M00's form, is `control` |
 | `runtime_arn` | the runtime's ARN, or `null` | the raw file. Non-null exactly when `mode` is `runtime` |
 | `region` | a region name | the raw file's request region (see T2) |
 | `model_version` | a string, or `null` | see T1 |
@@ -152,9 +152,27 @@ Where the code differs from the text above, the code is the ruling's:
   `measured()` starts printing the mode, row 0's cell (M00) must still match
   its version 1 envelope, so `measured()` prints the mode only for version 2.
 - If B: when an envelope is in `runner` mode although a runtime exists, it
-  is because the bytes differ, and the envelope says so. It does not fail:
+  is because the bytes differ or the lookup failed. The envelope says
+  `runner`; the job summary says which, since the envelope has no field for
+  why. It does not fail the pull request:
   a pull request that changes refagent cannot be measured on the runtime
   until it is deployed.
+
+## Amended by the PR 3 cold review (before merge; not an amendment)
+
+- **B1.** Recording the mode was not a reading of claim 1. From this repair,
+  `gate.measured_at()` shows a row in `READ_IN_THE_RUNTIME` (M01) as
+  **UNMEASURED** when its agent envelope is not `mode: runtime`, and
+  `src/ledger.py` refuses a GREEN state beside that cell. A pull request's
+  own verdict is unchanged.
+- **F2.** A version 1 agent envelope is REJECTED unless its commit is at or
+  before this ADR's (`7f8d0ae`). All 23 in history are.
+- **The pin's id.** The gate also refuses a pin whose `id` and `profile`
+  disagree.
+- **T2.** The region recorded "per run" is the request region the client was
+  built with. Converse does not report the region that served the call, so
+  the check guards against a changed runner or a hand-edited file. It does
+  not guard against routing.
 
 ## Not decided here
 
