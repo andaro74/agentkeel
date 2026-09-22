@@ -20,6 +20,7 @@ what the seed adds or removes.
 
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 from pathlib import Path
@@ -105,3 +106,22 @@ def test_s3_a_one_sided_edge_is_refused(seeded):
     tree = seeded("s3-one-sided-edge.patch")
     errors = checks.check_edges(tree)
     assert any("ratings-helper@v1" in e and "may_be_called_by" in e for e in errors), errors
+
+
+# --- S4: the owner tries to bypass a red check ----------------------------
+
+
+@pytest.mark.xfail(strict=True, reason="the attempts are made by the human after M02 PR 2 merges")
+def test_s4_the_owner_was_refused():
+    """Two attempts against GitHub, recorded by the human and looked up by CI at PR 3.
+    Door 3 is two gates: the ruleset refuses the merge, and validate refuses the ruleset
+    that would have allowed it."""
+    run = yaml.safe_load((RUNS / "f2_1_bypass.yaml").read_text(encoding="utf-8"))
+    observed = run["observed"]
+    assert observed is not None, "the attempts have not been made"
+    assert len(observed) == len(run["attempts"]), "every attempt is made, not some"
+    merge, ruleset = observed
+    assert merge["result"] == "refused" and merge["message_must_contain"] in merge["message"]
+    assert ruleset["validate_result"] == "RED" and ruleset["bypass_actors_after"] == []
+    export = json.loads((ROOT / "infra" / "ruleset" / "main.json").read_text(encoding="utf-8"))
+    assert export["bypass_actors"] == [], "the export on main must say nobody bypasses"
