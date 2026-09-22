@@ -6,7 +6,7 @@ date: 2026-09-19
 seat: Security
 authorises:
   - Security  # SPEC/00 §8 M01, the bootstrap stack's "VPC with interface endpoints only"
-amendments: 0
+amendments: 1
 ---
 
 # ADR-0006 — Gateway endpoints for S3 and DynamoDB
@@ -68,3 +68,19 @@ the schema, and an egress rule to anything else is refused at synth
 - Arbitrary hostnames remain M05 (ruling d). The enum is five AWS
   service names, and the reason it is an enum is that a hostname is not
   something the VPC can refuse at synth.
+
+## Amendment 1 (M02 PR 1, 2026-09-22): seven names, not five
+
+Security.
+
+"The five names" above was true at M01 PR 1. Ruling d was amended at M01
+PR 3 (`milestones/M01/rulings/pr3.md`): the runtime pulls its image
+through `ecr.api` and `ecr.dkr`, both interface endpoints, and the
+construct refuses a manifest that omits them. The enum is therefore
+**seven** names: `bedrock-runtime`, `dynamodb`, `ecr.api`, `ecr.dkr`,
+`kms`, `logs`, `s3`. Five are interface endpoints and two are gateway
+endpoints; the shapes of egress rule in "Consequences" are unchanged.
+The sentence above is left as written, dated by this amendment
+(`milestones/M02/open.md` row 22).
+
+This is ADR-0006's first amendment. One is left.

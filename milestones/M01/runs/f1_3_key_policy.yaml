@@ -32,6 +32,12 @@ attempts:
   - what: read the key policy of refagent's KMS key
     event_name: GetKeyPolicy
     command: aws kms get-key-policy --key-id alias/agentkeel-refagent --policy-name default
+    # The command above is wrong as written (M02 open.md row 22, Product,
+    # M02 PR 1): KMS refuses an alias for GetKeyPolicy with
+    # InvalidArnException, "Key Aliases are not supported for this
+    # operation". The attempt was made with the key id, as the observed
+    # message's key ARN shows. The line is left as it was planted; this
+    # field is documentation and feeds no check (rulings/pr2.md).
     refused_when: AccessDenied with an explicit deny in a resource-based policy
     # The check reads this against CloudTrail's own errorMessage, not against
     # the human's note. A denial that named the role's own policy would be the

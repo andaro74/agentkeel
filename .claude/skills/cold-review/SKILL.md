@@ -49,6 +49,38 @@ diff is the problem.
    The `product-spec-reviewer` report goes into
    `milestones/MNN/feasibility.md` instead.
 
+## Diff or tree: every report says which (M02 PR 1, open.md row 8)
+
+At M01 PR 2 three of the four seat reports, and at PR 3 two of three,
+read the tree at HEAD instead of the diff: the seat subagents have
+`Read, Grep, Glob` and no Bash, so `git diff` was not theirs to run.
+Their findings could not say which the PR caused and which predated it,
+and every one was re-checked by hand. The only reason it was noticed is
+that the reports said so.
+
+So, from M02:
+
+- **The caller supplies the diff as a file.** Before calling a seat
+  subagent, write `git diff <base>...HEAD` to a file the subagent can
+  `Read` (the scratchpad directory, or `.git/cold-review.patch`, never a
+  tracked path) and name that path and the base commit in the prompt.
+  `git log <base>..HEAD --format=%h` goes in the prompt too.
+- **Each report's first line says what it read.** One of exactly:
+  `Read: the diff <base>...<head> (<n> files)` or
+  `Read: the tree at <head>, not the diff`. A report without that line is
+  sent back, not pasted. A report that read the tree is pasted with its
+  line, and the ruling file records it as a **weaker witness**: its
+  findings are attributed to no commit until the caller re-checks each
+  against the diff and says so beside it.
+- **`engineering-cold-reviewer` keeps Bash** and runs `git diff` itself;
+  its first line still says so. No other seat subagent is given Bash for
+  this: a reviewer that can run commands can run more than `git diff`,
+  and the seat prompts are read-only by design (SPEC/00 §5.1).
+
+Nothing mechanical reads that first line at M02. `validate` reads no
+subagent definition and no PR body, and R1 puts no gate on a report. It
+is a line a human can see is missing, which is more than M01 had.
+
 A report is a draft. It is never a ruling. A subagent does not decide
 anything; it tells you what it saw.
 
