@@ -8,6 +8,9 @@ ruling: pr3
 seat: Product
 authorises:
   - milestones/M02/runs/row10_first_deploy.yaml
+  - milestones/M02/runs/f2_1_seed_prs.yaml
+  - milestones/M02/runs/f2_1_bypass.yaml
+  - milestones/M02/runs/f2_2_three_doors.yaml
   - milestones/M02/rulings/pr3.md
   - milestones/M02/rulings/pr3-engineering.md
 evidence:
@@ -33,3 +36,15 @@ been since `d8783f6`.
 
 M01 row 1 stays RED as ruled at its close: a later deploy does not
 reopen it. This reading is M02 PR 3's.
+
+## The three run files, filled by the human on 2026-09-23
+
+`f2_1_seed_prs.yaml`: PRs 14 to 18, opened from `main` between 13:10Z
+and 13:11Z. `f2_1_bypass.yaml`: attempt 1 refused at 13:34:13Z (rule
+suite 4192991324, the API's record; Unsure B answered yes); attempt 2
+at 13:40Z, validate RED in run 35862459367's `evals` job while the
+repository-admin role was listed, restored at 13:45:29Z.
+`f2_2_three_doors.yaml`: doors 1 and 3 are PR 14, door 2 is PR 12.
+Run once against the API before this PR's run depends on them: every
+seed refused with its path named, both attempts witnessed, three doors
+in the record. The reading itself is PR 3's run.
