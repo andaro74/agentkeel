@@ -6,6 +6,7 @@ ruling: pr3-engineering
 seat: Engineering
 authorises:
   - tests/test_bootstrap.py
+  - src/validate/codeowners.py
 evidence:
   - SPEC/00-overview.md#8-M02
   - milestones/M02/runs/row10_first_deploy.yaml
@@ -30,3 +31,11 @@ two lists.
 git checkout 0faf973 && uv run pytest tests/test_bootstrap.py -k under_the_agent_boundary   # fails on dynamodb:Scan
 git checkout c34da39 && uv run pytest tests/test_bootstrap.py -k under_the_agent_boundary   # passes
 ```
+
+## `src/validate/codeowners.py`
+
+The login check reads with the same token order as the ruleset read
+(`GITHUB_TOKEN`, then the gh CLI's). Unauthenticated, the users endpoint
+allows 60 calls an hour per address; a day of local `make validate`
+runs spent them and the check failed 403 on the developer's machine
+while CI, which has `GITHUB_TOKEN`, passed (`951d98e`).
