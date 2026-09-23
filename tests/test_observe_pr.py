@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from scripts import observe_pr
 from src.verdict import build
@@ -135,9 +136,84 @@ def test_the_login_is_read_from_the_seeds_own_principal_line():
     assert observe_pr.login_in("") == ""
 
 
-def test_observe_bypass_on_the_committed_seed_writes_a_note_and_calls_nothing(tmp_path, monkeypatch):
+def test_observe_bypass_on_the_seed_before_the_attempts_writes_a_note_and_calls_nothing(tmp_path, monkeypatch):
+    """The seed as planted (`observed: null`), on a copy: the committed file was filled by the human on
+    2026-09-23, and a test that read it asserted the state it had at PR 2 (the branch's run 35874322479)."""
     monkeypatch.setenv("GITHUB_REPOSITORY", "andaro74/agentkeel")
+    monkeypatch.setenv("GITHUB_API_URL", "http://127.0.0.1:9")  # a call would fail loudly, not silently pass
+    seed = yaml.safe_load((observe_pr.ROOT / "milestones" / "M02" / "runs" / "f2_1_bypass.yaml").read_text(encoding="utf-8"))
+    planted = tmp_path / "f2_1_bypass.yaml"
+    planted.write_text(yaml.safe_dump({**seed, "observed": None}), encoding="utf-8")
     out = tmp_path / "bypass.json"
-    assert observe_pr.main([str(observe_pr.ROOT / "milestones" / "M02" / "runs" / "f2_1_bypass.yaml"), "--out", str(out)]) == 0
+    assert observe_pr.main([str(planted), "--out", str(out)]) == 0
     seen = json.loads(out.read_text(encoding="utf-8"))
     assert seen["kind"] == "bypass" and seen["attempt_1"] is None and "not been made" in seen["note"]
+
+
+# --- the files evals.yml fetches with RULESET_TOKEN (M02 PR 3) ---------------------------
+
+
+SUITE = {"id": 4192991324, "actor_name": "andaro74", "before_sha": "97d3c76", "after_sha": "1995389", "ref": "refs/heads/main",
+         "pushed_at": "2026-09-23T06:34:13-07:00", "result": "fail",
+         "rule_evaluations": [{"rule_type": "required_status_checks", "result": "fail"}, {"rule_type": "pull_request", "result": "pass"}]}  # fmt: skip
+
+
+def suites_dir(tmp_path: Path, listed: list, by_id: dict | None) -> Path:
+    folder = tmp_path / "rule-suites"
+    folder.mkdir(parents=True)
+    (folder / "list.json").write_text(json.dumps(listed), encoding="utf-8")
+    if by_id is not None:
+        (folder / f"{by_id['id']}.json").write_text(json.dumps(by_id), encoding="utf-8")
+    return folder
+
+
+def test_rule_suites_are_read_from_the_directory_the_workflow_filled_and_not_the_api(tmp_path, monkeypatch):
+    monkeypatch.setenv("GITHUB_API_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("AGENTKEEL_RULE_SUITES", str(suites_dir(tmp_path, [SUITE], SUITE)))
+    at = observe_pr.parse_time("2026-09-23T13:34:13Z")
+    seen = observe_pr.rule_suites("andaro74/agentkeel", "andaro74", at, None, recorded_id=4192991324)
+    assert seen["source"] == "file" and seen["readable"] is True
+    assert [s["id"] for s in seen["failed_evaluations"]] == [4192991324]
+    assert seen["recorded"]["is_the_actors_refusal"] is True
+    assert seen["recorded"]["refusing_rules"] == ["required_status_checks"]
+    # another actor's suite, or the recorded one for another actor, is not this actor's refusal
+    seen = observe_pr.rule_suites("andaro74/agentkeel", "someone-else", at, None, recorded_id=4192991324)
+    assert seen["failed_evaluations"] == [] and seen["recorded"]["is_the_actors_refusal"] is False
+    # the list aged out but the recorded id is still there: the by-id read carries it
+    monkeypatch.setenv("AGENTKEEL_RULE_SUITES", str(suites_dir(tmp_path / "later", [], SUITE)))
+    seen = observe_pr.rule_suites("andaro74/agentkeel", "andaro74", at, None, recorded_id=4192991324)
+    assert seen["failed_evaluations"] == [] and seen["recorded"]["is_the_actors_refusal"] is True
+    # a directory that is set and empty is unreadable, never the API
+    monkeypatch.setenv("AGENTKEEL_RULE_SUITES", str(tmp_path / "missing"))
+    seen = observe_pr.rule_suites("andaro74/agentkeel", "andaro74", at, None, recorded_id=4192991324)
+    assert seen["readable"] is False and seen["failed_evaluations"] == [] and seen["recorded"]["readable"] is False
+
+
+def test_the_live_ruleset_is_read_from_the_file_validate_reads(tmp_path, monkeypatch):
+    monkeypatch.setenv("GITHUB_API_URL", "http://127.0.0.1:9")
+    live = tmp_path / "live-ruleset.json"
+    live.write_text(json.dumps({"id": 23685206, "bypass_actors": [], "updated_at": "2026-09-23T06:45:29.044-07:00"}), encoding="utf-8")
+    monkeypatch.setenv("AGENTKEEL_LIVE_RULESET", str(live))
+    seen = observe_pr.live_ruleset("andaro74/agentkeel", 23685206, None)
+    assert seen == {"source": "file", "status": 200, "readable": True, "bypass_actors": [],
+                    "updated_at": "2026-09-23T06:45:29.044-07:00", "shown_bypass_actors": True}  # fmt: skip
+    # the file must be the export's ruleset, and an absent list is not an empty one
+    live.write_text(json.dumps({"id": 1, "bypass_actors": []}), encoding="utf-8")
+    assert observe_pr.live_ruleset("andaro74/agentkeel", 23685206, None)["readable"] is False
+    live.write_text(json.dumps({"id": 23685206}), encoding="utf-8")
+    seen = observe_pr.live_ruleset("andaro74/agentkeel", 23685206, None)
+    assert seen["readable"] is True and seen["bypass_actors"] is None and seen["shown_bypass_actors"] is False
+    monkeypatch.setenv("AGENTKEEL_LIVE_RULESET", str(tmp_path / "missing.json"))
+    assert observe_pr.live_ruleset("andaro74/agentkeel", 23685206, None)["readable"] is False
+
+
+def test_attempt_1_is_witnessed_by_the_recorded_suite_when_the_list_is_empty(tmp_path, monkeypatch):
+    """`rule_suite_fail_found` reads the by-id record too; build then names the API as the witness."""
+    monkeypatch.setenv("GITHUB_API_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("AGENTKEEL_RULE_SUITES", str(suites_dir(tmp_path, [], SUITE)))
+    monkeypatch.setattr(observe_pr, "pull", lambda repo, number, token: {"pr": number, "found": True, "merged": False})
+    run = {"principal": "the repository owner, andaro74, with admin on andaro74/agentkeel",
+           "attempts": [{"message_must_contain": "required status check"}],
+           "observed": [{"pr": 14, "at": "2026-09-23T13:34:13Z", "rule_suite": 4192991324, "message": "3 of 5 required status checks are failing."}]}  # fmt: skip
+    seen = observe_pr.observe_bypass("andaro74/agentkeel", run, None, None)
+    assert seen["attempt_1"]["rule_suite_fail_found"] is True and seen["attempt_1"]["witness"] == "the rule-suites API"

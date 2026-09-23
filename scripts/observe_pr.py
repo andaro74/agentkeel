@@ -46,8 +46,18 @@ that says so, and the check fails; it does not error (ruling i, M01).
 Exit 0 when the observation is written, whatever it says; 1 only when it
 could not be written at all.
 
-Environment: GITHUB_REPOSITORY; GITHUB_TOKEN (check runs and job logs);
-RULESET_TOKEN (the rule-suites lookup and the live ruleset's bypass list).
+Environment: GITHUB_REPOSITORY; GITHUB_TOKEN (pulls, check runs and job
+logs: `actions: read` on the job that runs this); RULESET_TOKEN (the
+rule-suites lookup and the live ruleset's bypass list), **or** the two
+files `evals.yml` fetches with that token in a step that runs no code from
+the PR (M02 PR 3, pr2-security.md item 2): `AGENTKEEL_LIVE_RULESET`, the
+live ruleset as JSON, the same file `validate` reads; and
+`AGENTKEEL_RULE_SUITES`, a directory holding `list.json` (the failed
+rule-suite evaluations on `main`, `time_period=month`) and `<id>.json` for
+each `rule_suite:` id the human recorded, fetched by id so the record does
+not age out of the list. When a file is set it is read instead of the API,
+and the observation says `source: file`; a file that is set and missing is
+read as unreadable, never as the API.
 """
 
 from __future__ import annotations
@@ -207,30 +217,77 @@ def login_in(principal: str) -> str:
     return ""
 
 
-def rule_suites(repo: str, actor: str, at: datetime | None, token: str | None) -> dict[str, Any]:
-    """Failed rule-suite evaluations for the actor on main around `at`, and what the API said to the call."""
-    path = f"/rulesets/rule-suites?ref=main&actor_name={actor}&rule_suite_result=fail&per_page=100"
-    if at is not None:
-        path += "&time_period=week"
-    status, body = get(repo, path, token)
-    out: dict[str, Any] = {"status": status, "readable": status == 200 and isinstance(body, list)}
+def read_file(path: Path) -> tuple[int, Any]:
+    """A file the workflow fetched with RULESET_TOKEN, in the shape `get` returns: (200, body) or (0, None)."""
+    try:
+        return 200, json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0, None
+
+
+SUITE_KEYS = ("id", "actor_name", "before_sha", "after_sha", "ref", "pushed_at", "result")
+
+
+def rule_suite_by_id(repo: str, suite_id: int, actor: str, token: str | None, files: Path | None) -> dict[str, Any]:
+    """The rule suite the human recorded, read by id: durable where the list ages out (`time_period`)."""
+    status, body = read_file(files / f"{suite_id}.json") if files is not None else get(repo, f"/rulesets/rule-suites/{suite_id}", token)
+    out: dict[str, Any] = {"id": suite_id, "source": "file" if files is not None else "api", "status": status,
+                           "readable": status == 200 and isinstance(body, dict)}  # fmt: skip
     if not out["readable"]:
-        out["note"] = "the rule-suites API could not be read with this token (needs administration:read)"
         return out
-    suites = body
-    if at is not None:
-        suites = [s for s in suites if (t := parse_time(s.get("pushed_at"))) is not None and abs(t - at) <= WINDOW]
-    out["failed_evaluations"] = [{k: s.get(k) for k in ("id", "actor_name", "before_sha", "after_sha", "ref", "pushed_at", "result")}
-                                 for s in suites]  # fmt: skip
+    out |= {k: body.get(k) for k in SUITE_KEYS if k != "id"}
+    out["refusing_rules"] = [e.get("rule_type") for e in body.get("rule_evaluations") or [] if e.get("result") == "fail"]
+    out["is_the_actors_refusal"] = body.get("result") == "fail" and body.get("actor_name") == actor and body.get("ref") == "refs/heads/main"
+    return out
+
+
+def rule_suites(repo: str, actor: str, at: datetime | None, token: str | None, recorded_id: int | None = None) -> dict[str, Any]:
+    """Failed rule-suite evaluations for the actor on main around `at`, and what the API said to the call.
+
+    With `AGENTKEEL_RULE_SUITES` set, the list is `list.json` in that directory
+    and a recorded id is `<id>.json` there, both fetched by `evals.yml` with
+    RULESET_TOKEN; the token never reaches this script (M02 PR 3).
+    """
+    files = Path(os.environ["AGENTKEEL_RULE_SUITES"]) if os.environ.get("AGENTKEEL_RULE_SUITES") else None
+    if files is not None:
+        status, body = read_file(files / "list.json")
+        if isinstance(body, list):
+            body = [s for s in body if s.get("actor_name") == actor]
+    else:
+        path = f"/rulesets/rule-suites?ref=main&actor_name={actor}&rule_suite_result=fail&per_page=100"
+        if at is not None:
+            path += "&time_period=month"
+        status, body = get(repo, path, token)
+    out: dict[str, Any] = {"source": "file" if files is not None else "api", "status": status,
+                           "readable": status == 200 and isinstance(body, list)}  # fmt: skip
+    if not out["readable"]:
+        out["note"] = ("the rule-suites list could not be read from the file the workflow fetched" if files is not None
+                       else "the rule-suites API could not be read with this token (needs administration:read)")  # fmt: skip
+        out["failed_evaluations"] = []
+    else:
+        suites = body
+        if at is not None:
+            suites = [s for s in suites if (t := parse_time(s.get("pushed_at"))) is not None and abs(t - at) <= WINDOW]
+        out["failed_evaluations"] = [{k: s.get(k) for k in SUITE_KEYS} for s in suites]
+    if recorded_id is not None:
+        out["recorded"] = rule_suite_by_id(repo, recorded_id, actor, token, files)
     return out
 
 
 def live_ruleset(repo: str, ruleset_id: int, token: str | None) -> dict[str, Any]:
-    status, body = get(repo, f"/rulesets/{ruleset_id}", token)
+    """The live ruleset's bypass list now. With `AGENTKEEL_LIVE_RULESET` set, the file `validate` reads (M02 PR 3)."""
+    if os.environ.get("AGENTKEEL_LIVE_RULESET"):
+        status, body = read_file(Path(os.environ["AGENTKEEL_LIVE_RULESET"]))
+        source = "file"
+    else:
+        status, body = get(repo, f"/rulesets/{ruleset_id}", token)
+        source = "api"
     if status != 200 or not isinstance(body, dict):
-        return {"status": status, "readable": False}
-    return {"status": status, "readable": True, "bypass_actors": body.get("bypass_actors"), "updated_at": body.get("updated_at"),
-            "shown_bypass_actors": body.get("bypass_actors") is not None}  # fmt: skip
+        return {"source": source, "status": status, "readable": False}
+    if body.get("id") != ruleset_id:
+        return {"source": source, "status": status, "readable": False, "note": f"ruleset {body.get('id')} is not the export's {ruleset_id}"}
+    return {"source": source, "status": status, "readable": True, "bypass_actors": body.get("bypass_actors"),
+            "updated_at": body.get("updated_at"), "shown_bypass_actors": body.get("bypass_actors") is not None}  # fmt: skip
 
 
 def observe_bypass(repo: str, run: dict[str, Any], token: str | None, suites_token: str | None) -> dict[str, Any]:
@@ -244,8 +301,10 @@ def observe_bypass(repo: str, run: dict[str, Any], token: str | None, suites_tok
         number = pr_number(first.get("pr"))
         if number is not None:
             entry |= pull(repo, number, token)
-        entry["rule_suites"] = rule_suites(repo, actor, parse_time(first.get("at")), suites_token or token)
-        entry["rule_suite_fail_found"] = bool(entry["rule_suites"].get("failed_evaluations"))
+        entry["rule_suites"] = rule_suites(repo, actor, parse_time(first.get("at")), suites_token or token,
+                                           recorded_id=pr_number(first.get("rule_suite")))  # fmt: skip
+        recorded = entry["rule_suites"].get("recorded") or {}
+        entry["rule_suite_fail_found"] = bool(entry["rule_suites"].get("failed_evaluations")) or bool(recorded.get("is_the_actors_refusal"))
         phrase = str(attempts[0].get("message_must_contain", "")) if attempts else ""
         entry["human_message_contains"] = bool(phrase) and phrase.lower() in str(first.get("message", "")).lower()
         entry["witness"] = ("the rule-suites API" if entry["rule_suite_fail_found"]
