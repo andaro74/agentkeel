@@ -84,7 +84,10 @@ what_was_read:
     - whether the arm64 runner image carries the docker and aws CLI the job expects
 
 state_left_by_the_human:
-  agent_stack: UPDATE_ROLLBACK_COMPLETE at 2026-09-22T15:19:15Z, by the human, with `continue-update-rollback --resources-to-skip RefagentRuntime148EBA78` (describe-stack-events: UPDATE_ROLLBACK_IN_PROGRESS 15:19:12Z, the runtime resource UPDATE_COMPLETE 15:19:14Z)
+  agent_stack: >-
+    UPDATE_ROLLBACK_COMPLETE at 2026-09-22T15:19:15Z, by the human, with
+    `continue-update-rollback --resources-to-skip RefagentRuntime148EBA78` (describe-stack-events:
+    UPDATE_ROLLBACK_IN_PROGRESS 15:19:12Z, the runtime resource UPDATE_COMPLETE 15:19:14Z)
   runtime_image_reference: sha256:6fcd185b…, deleted from ECR; replaced by the next successful update
   ecr: sha256:822fe2b5… (amd64) left under the immutable tag on purpose, so the first arm64 run refuses to reuse it by name; the human then deletes it and reruns that job
   # Read at PR 2, before the merge (the session, 2026-09-22): that refusal by name will NOT fire at
