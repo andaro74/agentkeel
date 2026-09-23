@@ -27,8 +27,9 @@ What is read, per run file:
   (`GET /repos/{owner}/{repo}/rulesets/rule-suites`) holds a failed
   evaluation for the actor at the time. That endpoint needs a token with
   `administration:read`, which a workflow's `GITHUB_TOKEN` cannot carry;
-  `RULE_SUITES_TOKEN` is used when set, else `GITHUB_TOKEN`, and the
-  observation records the status code it got. Whether GitHub records a
+  `RULESET_TOKEN` (the fine-grained token `validate` reads the ruleset
+  with) is used when set, else `GITHUB_TOKEN`, and the observation records
+  the status code it got. Whether GitHub records a
   refused merge there at all is read at the attempt (SPEC/02 §5.1); when it
   does not, Door 3 rests on the PR's unmerged state and the human's own
   output, and the observation says which. Attempt 2, the owner in
@@ -46,7 +47,7 @@ Exit 0 when the observation is written, whatever it says; 1 only when it
 could not be written at all.
 
 Environment: GITHUB_REPOSITORY; GITHUB_TOKEN (check runs and job logs);
-RULE_SUITES_TOKEN (optional, the rule-suites lookup).
+RULESET_TOKEN (the rule-suites lookup and the live ruleset's bypass list).
 """
 
 from __future__ import annotations
@@ -339,7 +340,7 @@ def main(argv: list[str] | None = None) -> int:
     run = yaml.safe_load(args.run.read_text(encoding="utf-8"))
     repo = os.environ.get("GITHUB_REPOSITORY", "andaro74/agentkeel")
     token = os.environ.get("GITHUB_TOKEN") or None
-    suites_token = os.environ.get("RULE_SUITES_TOKEN") or None
+    suites_token = os.environ.get("RULESET_TOKEN") or None
     result: dict[str, Any] = {
         "what": "GitHub's record of M02's seeded cases; not an envelope; rules nothing",
         "looked_up_at": datetime.now(UTC).isoformat(timespec="seconds"),

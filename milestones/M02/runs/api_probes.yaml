@@ -13,7 +13,7 @@
 # caller" and the compare needs a token that is (Unsure H, Security).
 probes:
   - what: the main ruleset, unauthenticated
-    command: curl -s -H 'Accept: application/vnd.github+json' https://api.github.com/repos/andaro74/agentkeel/rulesets/23685206
+    command: "curl -s -H 'Accept: application/vnd.github+json' https://api.github.com/repos/andaro74/agentkeel/rulesets/23685206"
     status: 200
     read: enforcement active, 4 rules; `bypass_actors` and `current_user_can_bypass` ABSENT from the answer
     consequence: an unauthenticated read cannot compare bypass_actors; validate treats an absent list as unreadable, never as "nobody bypasses"
@@ -35,6 +35,17 @@ probes:
       the endpoint needs a token GitHub can name with administration:read; a workflow's
       `permissions:` block cannot grant that key, so scripts/observe_pr.py takes RULE_SUITES_TOKEN
       when the environment has one, and records the status it got when it does not.
+  - what: the main ruleset, from a workflow with GITHUB_TOKEN (permissions contents read), PR 12's first run
+    command: make validate in evals.yml's checks and evals jobs, run 35809406890, 2026-09-23T02:12Z
+    status: 200 with GITHUB_TOKEN
+    read: "FAIL live main ruleset equals its export, bypass_actors []: the live ruleset's bypass_actors is not shown to this caller"
+    consequence: >-
+      the answer to Unsure A and H: an Actions token is not shown the bypass list. The compare reads
+      with RULESET_TOKEN, a fine-grained token with Administration: read on this repository, kept as
+      a repository secret by the human, in the evals job only; the checks job carries no secret (a
+      fork's PR runs it) and validate prints there that the compare is skipped (Security,
+      pr2-security.md item 2). Both jobs were red on this line alone; no token was spent (validate
+      runs before AWS).
   - what: a job's log by job id, with the human's gh token
     command: gh api repos/andaro74/agentkeel/actions/jobs/106624547408/logs
     status: see rehearsal_seed_prs.json (log_status)

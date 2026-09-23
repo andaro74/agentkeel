@@ -53,7 +53,18 @@ def repository(root: Path) -> str | None:
 
 
 def token() -> tuple[str | None, str]:
-    """`GITHUB_TOKEN` from the environment, else the gh CLI's token on a developer's machine; and which."""
+    """The token that reads the ruleset, and which it was.
+
+    `RULESET_TOKEN` first: a fine-grained token with Administration: read on
+    this repository, kept as a repository secret. Read by the call on M02
+    PR 2's first run (35809406890): an Actions `GITHUB_TOKEN` answers 200
+    and is **not** shown `bypass_actors`, so the compare cannot rest on it.
+    Then `GITHUB_TOKEN`, which still spares the rate limit and reads the
+    rest; then the gh CLI's token on a developer's machine, which is shown
+    the list.
+    """
+    if value := os.environ.get("RULESET_TOKEN"):
+        return value, "RULESET_TOKEN"
     if value := os.environ.get("GITHUB_TOKEN"):
         return value, "GITHUB_TOKEN"
     done = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, check=False)
@@ -98,7 +109,20 @@ def compare(export: dict[str, Any], live: dict[str, Any], status: str = "") -> l
     return errors
 
 
+NO_TOKEN_FLAG = "AGENTKEEL_NO_RULESET_TOKEN"
+
+
 def check(root: Path, *, fetcher=fetch) -> list[str]:
+    # evals.yml's `checks` job carries no secret, so that a fork's pull
+    # request can run it (BLOCK C); it sets this flag, and the compare is
+    # not pretended to there: the line printed says it is skipped. The
+    # compare runs in the `evals` job, which has the secret, on every
+    # non-fork PR and on every push to main; what it watches is the live
+    # ruleset, which no outsider can edit (Security, M02 PR 2 ruling, item 2).
+    if os.environ.get(NO_TOKEN_FLAG, "").lower() == "true":
+        print(f"     note: {EXPORT}: the live compare is skipped in this job, which carries no token that is shown the "
+              "bypass list; it runs in the evals job on every non-fork PR and on main")  # fmt: skip
+        return []
     path = root / EXPORT
     if not path.is_file():
         return [f"{EXPORT}: missing"]

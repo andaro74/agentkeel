@@ -52,19 +52,30 @@ fork's PR runs them (a skipped required check counts as satisfied,
 evals.yml BLOCK C). The checkout is the merge ref with full history; the
 base sha comes from the event. Neither job reads the live ruleset.
 
-**The live compare runs in `evals.yml`'s `checks` job**, inside `make
-validate`, with `GITHUB_TOKEN` (`contents: read`) passed to that step and
-to the `evals` job's copy. Read by the call: unauthenticated, the ruleset
+**The live compare runs in `evals.yml`'s `evals` job**, inside `make
+validate`, as ruled below after this PR's first run; the first draft of
+this item had it in the `checks` job with `GITHUB_TOKEN` alone. Read by the call: unauthenticated, the ruleset
 endpoint answers 200 **without** `bypass_actors`; with a token GitHub
 can name, it answers `[]`. So `validate` sends the token and treats an
 absent list as "not shown to this caller", an error naming the token,
-never a pass. **Still unread**: whether an Actions token is shown the
-list. It is read on this PR's first `checks` run. If it is not, the
-compare needs a token that is; a fine-grained PAT (`administration:read`
-on this repository) as a secret is the only shape, a fork cannot read a
-secret, and Security rules then whether the compare moves to the `evals`
-job (which a fork already skips) with the fork's `checks` left with the
-eleven other checks. That is a PR 3 repair, not a re-plant.
+never a pass. **Read on this PR's first run (35809406890,
+2026-09-23T02:12Z): an Actions token is not shown the list.** Both jobs
+were red on that line alone, before any spend (`runs/api_probes.yaml`).
+Ruled, and repaired in this PR since it cannot merge otherwise: **the
+compare runs in the `evals` job and only there**, with `RULESET_TOKEN`,
+a fine-grained token with Administration: read on this repository only,
+which the human creates and stores as a repository secret before
+re-running; `GITHUB_TOKEN` still reads the logins in both jobs. The
+`checks` job keeps no secret (`tests/test_evals_workflow.py` holds that,
+so a fork's PR can run it) and sets `AGENTKEEL_NO_RULESET_TOKEN`, on
+which `validate` prints that the compare is skipped there rather than
+failing for a list that job cannot see. That is not the BLOCK C hole:
+the compare watches the live ruleset, which no outsider can edit, and
+the `evals` job compares it on every non-fork PR and on every push to
+`main`; a fork's PR cannot merge without `evals` running on a non-fork
+head anyway. `observe_pr.py` uses the same token for the rule-suites
+lookup (item 5). The secret is the one thing this PR needs from the
+human before its checks can be green.
 
 ## 3. Which ruleset fields the compare reads (Unsure H, a)
 

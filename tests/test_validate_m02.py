@@ -260,6 +260,27 @@ def test_a_bypass_list_the_caller_is_not_shown_is_an_error_not_a_pass():
     assert len(errors) == 1 and "not shown to this caller (200 with no token)" in errors[0]
 
 
+def test_the_fine_grained_token_is_read_first_and_the_tokenless_job_skips_with_a_note(monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_TOKEN", "actions")
+    monkeypatch.setenv("RULESET_TOKEN", "fine-grained")
+    assert ruleset.token() == ("fine-grained", "RULESET_TOKEN")
+    monkeypatch.delenv("RULESET_TOKEN")
+    assert ruleset.token() == ("actions", "GITHUB_TOKEN")
+    monkeypatch.setenv(ruleset.NO_TOKEN_FLAG, "true")
+    assert ruleset.check(ROOT, fetcher=lambda repo, i: (None, "must not be called")) == []
+    assert "skipped in this job" in capsys.readouterr().out
+    monkeypatch.setenv(ruleset.NO_TOKEN_FLAG, "false")
+    assert ruleset.check(ROOT, fetcher=lambda repo, i: (None, "403")) != []
+
+
+def test_the_compare_runs_in_the_evals_job_with_the_secret_and_the_checks_job_says_it_skips():
+    workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "evals.yml").read_text(encoding="utf-8"))
+    checks = next(s for s in workflow["jobs"]["checks"]["steps"] if s.get("run") == "make validate")
+    evals = next(s for s in workflow["jobs"]["evals"]["steps"] if s.get("run") == "make validate")
+    assert checks["env"][ruleset.NO_TOKEN_FLAG] == "true" and "RULESET_TOKEN" not in checks["env"]
+    assert evals["env"]["RULESET_TOKEN"] == "${{ secrets.RULESET_TOKEN }}" and ruleset.NO_TOKEN_FLAG not in evals["env"]
+
+
 def test_an_unreadable_ruleset_is_an_error_not_a_pass():
     errors = ruleset.check(ROOT, fetcher=lambda repo, i: (None, "403"))
     assert errors == ["infra/ruleset/main.json: the live ruleset 23685206 on andaro74/agentkeel could not be read (403); unread is not unchanged"]

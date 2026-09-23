@@ -98,13 +98,20 @@ jobs:
       - name: Install
         run: uv sync --frozen
 
-      # GITHUB_TOKEN is for `validate`'s two API reads from M02 PR 2, the
-      # live ruleset and the CODEOWNERS logins: both answer without a token
-      # on a public repository, and the token spares the unauthenticated rate
-      # limit shared by every runner. Read-only; a fork's token is read-only too.
+      # `validate` makes two API reads from M02 PR 2: the CODEOWNERS logins
+      # and the live main ruleset. GITHUB_TOKEN spares the rate limit and
+      # reads the logins. It is NOT shown the ruleset's bypass_actors (read by
+      # the call on M02 PR 2's first run, 35809406890), and this job carries
+      # no secret so that a fork's PR can run it, so the flag below makes
+      # validate print that the live compare is skipped here rather than
+      # fail every fork for a list it cannot see. The compare runs in the
+      # `evals` job below, with RULESET_TOKEN, on every non-fork PR and on
+      # every push to main; what it watches is the live ruleset, which no
+      # outsider can edit (milestones/M02/rulings/pr2-security.md, item 2).
       - name: make validate
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          AGENTKEEL_NO_RULESET_TOKEN: "true"
         run: make validate
 
       # Same reason as in `evals`: without cosign the signature check never
@@ -172,10 +179,17 @@ jobs:
           MEASURED_AT: ${{ steps.current.outputs.measured_at }}
         run: uv run python -m src.verdict.gate "evals/history/$MEASURED_AT.json"
 
+      # The live ruleset compare runs here and only here (M02 PR 2). This
+      # job never runs on a fork (the `if:` above), so it can carry the
+      # secret: RULESET_TOKEN, a fine-grained token with Administration: read
+      # on this repository and nothing else, which is what GitHub needs to
+      # show bypass_actors. Without the secret validate fails closed on that
+      # line ("not shown to this caller"); it does not pretend.
       - name: make validate
         if: steps.current.outputs.measured_at == ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          RULESET_TOKEN: ${{ secrets.RULESET_TOKEN }}
         run: make validate
 
       # `src/bundle/verify.py` skips the cosign check when cosign is not on
