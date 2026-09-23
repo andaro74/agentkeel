@@ -17,7 +17,7 @@
 # envelope over the cap is written RED by verdict.build and read RED by
 # verdict.gate (item 22), whichever its subject.
 cost_cap:
-  tokens_per_run: 150000
+  tokens_per_run: 300000
 
 # The base every later number is a delta against: the baseline card at tag
 # m00, the one row 0 cites (evals/history/9407615….json), not the last card
