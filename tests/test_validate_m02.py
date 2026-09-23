@@ -277,7 +277,7 @@ def test_the_compare_runs_in_the_evals_job_from_a_file_the_workflow_fetched_and_
     workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "evals.yml").read_text(encoding="utf-8"))
     checks = next(s for s in workflow["jobs"]["checks"]["steps"] if s.get("run") == "make validate")
     evals = next(s for s in workflow["jobs"]["evals"]["steps"] if s.get("run") == "make validate")
-    fetch_step = next(s for s in workflow["jobs"]["evals"]["steps"] if s.get("name") == "Read the live main ruleset")
+    fetch_step = next(s for s in workflow["jobs"]["evals"]["steps"] if str(s.get("name", "")).startswith("Read the live main ruleset"))
     assert checks["env"][ruleset.NO_TOKEN_FLAG] == "true" and "secrets." not in str(checks)  # no secret in the fork-safe job
     # the secret is in the fetch step only, which runs no code from the PR; validate reads the file
     assert fetch_step["env"]["RULESET_TOKEN"] == "${{ secrets.RULESET_TOKEN }}" and "curl" in fetch_step["run"]

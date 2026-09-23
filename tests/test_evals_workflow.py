@@ -249,3 +249,42 @@ def test_the_makefile_exits_with_the_gates_code(variant, gate_exit):
     line = lines[0].replace(gate_call, f"(exit {gate_exit})", 1).replace('"x"', "/dev/null")
     ran = subprocess.run(["sh", "-c", line], cwd=ROOT, check=False)
     assert ran.returncode == gate_exit, f"the recipe turned the gate's {gate_exit} into {ran.returncode}: {lines[0]}"
+
+
+# --- claim 2's reading (M02 PR 3): the observer runs, the secret stays out of PR code ------
+
+
+def test_the_eval_job_can_read_the_seed_prs_job_logs(workflow):
+    """`scripts/observe_pr.py` reads the job log in which the gate named each seed's path."""
+    assert workflow["jobs"]["evals"]["permissions"].get("actions") == "read"
+
+
+def test_the_three_observations_are_made_and_handed_to_make_evals(workflow):
+    """One step runs the observer on the three run files; the measuring step passes all three files on."""
+    steps = workflow["jobs"]["evals"]["steps"]
+    observe = [s for s in steps if "scripts/observe_pr.py" in str(s.get("run", ""))]
+    assert len(observe) == 1
+    run = str(observe[0]["run"])
+    for name in ("f2_1_seed_prs.yaml", "f2_1_bypass.yaml", "f2_2_three_doors.yaml"):
+        assert f"milestones/M02/runs/{name}" in run
+    assert observe[0].get("if") == "steps.current.outputs.measured_at == ''", "on the measuring path, as F0.3's observer is"
+    assert "GITHUB_TOKEN" in observe[0].get("env", {})
+    measure = measuring_steps(workflow)[0]["run"]
+    for flag in ("SEED_PRS_OBS=", "BYPASS_OBS=", "DOORS_OBS="):
+        assert flag in measure
+    assert steps.index(observe[0]) < steps.index(measuring_steps(workflow)[0])
+
+
+def test_ruleset_token_reaches_no_step_that_runs_code_from_the_pr(workflow):
+    """pr2-security.md item 2: the fine-grained token is used by curl in one step and by nothing under src/ or scripts/."""
+    for job in workflow["jobs"].values():
+        for step in job.get("steps", []):
+            env = step.get("env") or {}
+            if any("RULESET_TOKEN" in str(v) for v in env.values()):
+                run = str(step.get("run", ""))
+                assert "uv run" not in run and "make " not in run and "python " not in run.replace("python3 -c", ""), step.get("name")
+    observe = next(s for s in workflow["jobs"]["evals"]["steps"] if "scripts/observe_pr.py" in str(s.get("run", "")))
+    assert "RULESET_TOKEN" not in str(observe.get("env", {}))
+    # the observer gets the files that step fetched, both of them
+    assert observe["env"]["AGENTKEEL_LIVE_RULESET"].endswith("live-ruleset.json")
+    assert observe["env"]["AGENTKEEL_RULE_SUITES"].endswith("rule-suites")

@@ -19,8 +19,11 @@
 # evals.yml again at M02 PR 2, after its first run read that an Actions token is not shown bypass_actors:
 # the live-ruleset compare moves to the evals job, whose own step fetches the ruleset with RULESET_TOKEN
 # and hands validate a file (no PR code sees the secret; no if:); the checks job says it skips it.
+# evals.yml at M02 PR 3: the evals job gains actions: read and one step that runs scripts/observe_pr.py on the
+# three M02 run files, and hands make evals SEED_PRS_OBS, BYPASS_OBS and DOORS_OBS (SPEC/02 §4, §5.1); the
+# RULESET_TOKEN step also fetches the rule-suites record into files, so the observer never sees the secret.
 0d938815e7d3756e05659beb95a82f490b521a183bf34f9584cd98874cf36567  .github/workflows/cold-review-ruling.yml
 c1957b9cf7d8e68a3da10631fac98cc2bc1b5d6045fa09167f76aa87a3a2b8c4  .github/workflows/deploy.yml
-d7e6aa6bc6267b198b5e0a0ffb1f5ca6009a81fb31972a2f87db26971f2ef497  .github/workflows/evals.yml
+59e56458d8840d2a58a1f2d8bcdbdb9d9d39b46e1505f25320f6f55ba31bade9  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml

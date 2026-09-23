@@ -4,7 +4,8 @@
 # milestones/M01/rulings/pr1.md (items 9 and 16). Its hash is listed in
 # infra/workflows.sha256, which `make validate` reads (item 29).
 #
-# Runs `make evals` with the role in infra/eval-role/ and writes the
+# Runs `make evals` as the eval role (`agentkeel-evals`, infra/bootstrap/;
+# infra/eval-role/ was M00's stack and is gone at M02 PR 3) and writes the
 # envelope to evals/history/<commit>.json with a commit from this workflow.
 # That commit is what "CI-written" means (ADR-0003); a human commit to
 # evals/history/ needs two keys.
@@ -39,6 +40,18 @@
 # from two sources passes only if both do. The attempts are the human's,
 # made before this run; what this run reads is AWS's record of them
 # (`scripts/observe_attempt.py`, ruling i).
+#
+# From M02 PR 3 the run also carries claim 2's checks (SPEC/02 §4, amended
+# at PR 2): F2_1 from the five seed tests (PR 2) and from GitHub's record
+# of the seed PRs and the owner's two attempts; F2_2 from the three doors.
+# The seed PRs and the attempts are the human's, made after PR 2 merged;
+# what this run reads is GitHub's record of them (`scripts/observe_pr.py`),
+# with `actions: read` for the job logs in which the gate named each
+# seed's path. The rule-suites list and the live ruleset need
+# RULESET_TOKEN; the step that holds the token fetches both into files
+# with curl and runs no code from the PR, and the observer reads the files.
+# From PR 2's merge commit the gate requires F2_1 and F2_2 on every agent
+# envelope (`CLAIM_2_CHECKS`), so a run that dropped these steps is RED.
 #
 # What this does not do:
 # - stop someone with write access from editing this file, or from adding
@@ -136,6 +149,7 @@ jobs:
       contents: read
       id-token: write # OIDC to AWS
       checks: read # the F0.3 observer reads one check run
+      actions: read # the seed PRs' job logs, in which the gate named each seed's path (M02 PR 3)
       pull-requests: read
     env:
       COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -196,7 +210,15 @@ jobs:
       # on that line ("not shown to this caller"); it does not pretend.
       # No `if:`: a ruleset change with no tree change is exactly what the
       # compare exists to read, and the skip path above must not skip it.
-      - name: Read the live main ruleset
+      #
+      # M02 PR 3: the same step, the same token, two more reads for
+      # `scripts/observe_pr.py`, which is code from the PR and must not see
+      # the secret: the failed rule-suite evaluations on main (a month; the
+      # list ages out) and each rule suite the human recorded by id in
+      # milestones/M02/runs/f2_1_bypass.yaml (which does not). Files under
+      # $RUNNER_TEMP/rule-suites/; a read that fails leaves no file, and the
+      # observer says the record was unreadable rather than absent.
+      - name: Read the live main ruleset, and GitHub's record of the owner's attempts
         env:
           RULESET_TOKEN: ${{ secrets.RULESET_TOKEN }}
           REPO: ${{ github.repository }}
@@ -207,9 +229,16 @@ jobs:
             echo "::warning::RULESET_TOKEN is not set; the live ruleset is not read and validate fails closed on it"
             exit 0
           fi
-          curl -sSf -H "Authorization: Bearer $RULESET_TOKEN" -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/$REPO/rulesets/$id" \
-            -o "$RUNNER_TEMP/live-ruleset.json"
+          api() { curl -sSf -H "Authorization: Bearer $RULESET_TOKEN" -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/$REPO$1" -o "$2"; }
+          api "/rulesets/$id" "$RUNNER_TEMP/live-ruleset.json"
+          mkdir -p "$RUNNER_TEMP/rule-suites"
+          api "/rulesets/rule-suites?ref=main&rule_suite_result=fail&time_period=month&per_page=100" "$RUNNER_TEMP/rule-suites/list.json" \
+            || echo "::warning::the rule-suites list could not be read; observe_pr.py records it as unreadable"
+          for suite in $(grep -oE '^ *rule_suite: *[0-9]+' milestones/M02/runs/f2_1_bypass.yaml | grep -oE '[0-9]+$'); do
+            api "/rulesets/rule-suites/$suite" "$RUNNER_TEMP/rule-suites/$suite.json" \
+              || echo "::warning::rule suite $suite could not be read; observe_pr.py records it as unreadable"
+          done
 
       # validate spends nothing on AWS, so it runs on the skip path too.
       - name: make validate
@@ -239,6 +268,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: uv run python scripts/observe_pr_check.py milestones/M00/runs/f0_3.yaml --out "$RUNNER_TEMP/f0_3.json"
+
+      # Claim 2's second source and F2_2 (SPEC/02 §5.1, M02 PR 3). The seed
+      # PRs, the owner's attempts and the three doors are read from GitHub's
+      # record by the run files' PR numbers; an entry the human has not
+      # filled writes an observation that says so, and the check fails. The
+      # two files come from the step above; the observer sees no secret.
+      - name: Look up the seed PRs, the owner's attempts and the three doors
+        if: steps.current.outputs.measured_at == ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AGENTKEEL_LIVE_RULESET: ${{ runner.temp }}/live-ruleset.json
+          AGENTKEEL_RULE_SUITES: ${{ runner.temp }}/rule-suites
+        run: |
+          set -euo pipefail
+          uv run python scripts/observe_pr.py milestones/M02/runs/f2_1_seed_prs.yaml --out "$RUNNER_TEMP/seed_prs.json"
+          uv run python scripts/observe_pr.py milestones/M02/runs/f2_1_bypass.yaml --out "$RUNNER_TEMP/bypass.json"
+          uv run python scripts/observe_pr.py milestones/M02/runs/f2_2_three_doors.yaml --out "$RUNNER_TEMP/doors.json"
 
       # The three claims the role's trust policy matches on: `aud` and `sub`
       # exactly, `job_workflow_ref` by pattern. When an assume is refused, look
@@ -332,7 +378,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           # Empty unless the step above matched the bytes: empty is runner mode.
           AGENTKEEL_RUNTIME_ARN: ${{ steps.runtime.outputs.arn }}
-        run: make evals F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
+        run: make evals F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" SEED_PRS_OBS="$RUNNER_TEMP/seed_prs.json" BYPASS_OBS="$RUNNER_TEMP/bypass.json" DOORS_OBS="$RUNNER_TEMP/doors.json" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
 
       # Which refagent answered, as the runner printed it. From ADR-0007 the
       # envelope records the mode itself (`mode`, `runtime_arn`); this line is
