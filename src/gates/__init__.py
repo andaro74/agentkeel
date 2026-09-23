@@ -307,6 +307,14 @@ def seats_of(path: str, base: Tree, tree: Tree, owners: Owners) -> list[tuple[st
     (a comment) is the file owner's.
     """
     owner = owners.owner(path)
+    if RULING_GLOB.match(path):
+        # A ruling file is owned by the seat in its own front matter, as a
+        # subagent prompt is (SPEC/00 §5, last row): Product's `milestones/**`
+        # key must not cover an edit to another seat's past ruling
+        # (security-reviewer on PR 2, F5). A new file with this PR's number
+        # covers itself before this is reached.
+        fm = front_matter(base.text(path) or tree.text(path) or "") or {}
+        return [(canonical_seat(fm.get("seat")) or owner, " (a ruling file, owned by its seat:)")]
     if not MANIFEST.match(path):
         return [(owner, "")]
     before = _yaml_mapping(base.text(path))

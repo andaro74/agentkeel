@@ -362,3 +362,22 @@ def test_the_command_exits_1_on_a_refusal_and_0_otherwise_two_key(repo, capsys):
     repo.write("milestones/M02/rulings/b.md", ruling("Engineering", ["src/**"], body="thresholds.yaml"))
     assert two_key.main(["--base", str(repo.base), "--tree", str(repo.root), "--pr", "12"]) == 0
     assert "two keys with pr: 12 found" in capsys.readouterr().out
+
+
+def test_a_ruling_file_is_owned_by_the_seat_in_its_own_front_matter(repo):
+    """Product's milestones/** key does not cover an edit to another seat's past ruling (security-reviewer on PR 2, F5)."""
+    repo.write("milestones/M01/rulings/old-security.md", ruling("Security", ["infra/**"], pr=7))
+    repo.commit_as("t", "a past ruling")
+    git(repo.root, "worktree", "remove", "--force", str(repo.base))
+    git(repo.root, "worktree", "add", "-q", "--detach", str(repo.base), "HEAD")
+    repo.write("milestones/M01/rulings/old-security.md", ruling("Security", ["infra/**"], pr=7, body="edited later"))
+    repo.write("milestones/M02/rulings/pr2.md", ruling("Product", ["milestones/**"]))
+    refused = repo.cited() or ""
+    assert "milestones/M01/rulings/old-security.md (a ruling file, owned by its seat:): owned by Security" in refused
+    repo.write("milestones/M02/rulings/pr2-security.md", ruling("Security", ["milestones/M01/rulings/old-security.md"]))
+    assert repo.cited() is None
+
+
+def test_deleting_the_memory_key_outright_is_a_relaxation(repo):
+    repo.write("agents/refagent/manifest.yaml", MANIFEST.replace("memory: {retention_days: 30, ttl_days: 7, per_user: true}\n", ""))
+    assert "memory removed" in (repo.keys() or "")

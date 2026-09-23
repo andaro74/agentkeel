@@ -60,6 +60,8 @@ def two_sided(tree: Path) -> list[str]:
                 errors.append(f"{rel}: may_call {edge}, and no agents/{callee}/manifest.yaml exists to say may_be_called_by {name}: one-sided")
             elif name not in {a for a, _ in _edges(other, "may_be_called_by")}:
                 errors.append(f"{rel}: may_call {edge}, and agents/{callee}/manifest.yaml may_be_called_by does not name {name}: one-sided")
+            elif _major_of(other) != major:
+                errors.append(f"{rel}: may_call {edge} names major {major}, and agents/{callee}/manifest.yaml is at major {_major_of(other)}: not the same major")
         for caller, major in _edges(manifest, "may_be_called_by"):
             edge = f"{caller}@v{major}"
             other = all_manifests.get(caller)
@@ -67,7 +69,15 @@ def two_sided(tree: Path) -> list[str]:
                 errors.append(f"{rel}: may_be_called_by {edge}, and no agents/{caller}/manifest.yaml exists to say may_call {name}: one-sided")
             elif name not in {a for a, _ in _edges(other, "may_call")}:
                 errors.append(f"{rel}: may_be_called_by {edge}, and agents/{caller}/manifest.yaml may_call does not name {name}: one-sided")
+            elif _major_of(other) != major:
+                errors.append(f"{rel}: may_be_called_by {edge} names major {major}, and agents/{caller}/manifest.yaml is at major {_major_of(other)}: not the same major")
     return errors
+
+
+def _major_of(manifest: dict[str, Any]) -> str:
+    """The major of a manifest's `version`; `1` when it has none (tool-owner on PR 2: an edge is at the same major)."""
+    match = re.match(r"^\s*v?(\d+)\.", str(manifest.get("version") or "1.0.0"))
+    return match[1] if match else "?"
 
 
 def cycles(tree: Path) -> list[str]:

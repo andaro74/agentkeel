@@ -81,9 +81,9 @@ def fetch(repo: str, ruleset_id: int) -> tuple[dict[str, Any] | None, str]:
 def compare(export: dict[str, Any], live: dict[str, Any], status: str = "") -> list[str]:
     if live.get("bypass_actors") is None:
         return [
-            f"{EXPORT}: the live ruleset's bypass_actors is not shown to this caller ({status}); GitHub shows the "
-            "bypass list only to a token it can name, so the compare needs one (Security, M02 PR 2 Unsure H)"
-        ]
+            (f"{EXPORT}: the live ruleset's bypass_actors is not shown to this caller ({status}); GitHub shows the "
+             "bypass list only to a token it can name, so the compare needs one (Security, M02 PR 2 Unsure H)")
+        ]  # fmt: skip
     errors = []
     for key in COMPARED:
         if export.get(key) != live.get(key):

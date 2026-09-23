@@ -89,6 +89,12 @@ def compare(tree: Tree, base: Tree) -> list[str]:
         elif new < old:
             errors.append(f"{path}: version moved down, {'.'.join(map(str, old))} -> {'.'.join(map(str, new))}")
 
+    # A tool schema on the base and gone from the tree is a contract change
+    # too (tool-owner on PR 2, F1): the first draft walked the tree only.
+    for path in sorted(base.files() - tree.files()):
+        if match := TOOL.match(path):
+            tools_bumped.setdefault(match[1], []).append(f"{path} (removed)")
+
     majors: dict[str, int] = {}
     for path in sorted(tree.files()):
         if not (match := MANIFEST.match(path)):

@@ -372,6 +372,7 @@ def check_from_doors(path: Path, run_url: str | None) -> dict[str, str]:
     door_2 = (
         two.get("found") is True and two.get("merged") is True
         and (two.get("two_key") or {}).get("conclusion") == "success" and len(two.get("distinct_seats") or []) >= 2
+        and two.get("relaxation_keyed") is True  # the gate named a keyed relaxation, not merely two files
     )  # fmt: skip
     bypass = three.get("bypass") or {}
     first, second = bypass.get("attempt_1") or {}, bypass.get("attempt_2") or {}

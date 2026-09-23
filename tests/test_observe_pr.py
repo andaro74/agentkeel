@@ -95,7 +95,7 @@ def test_bypass_passes_on_the_api_record_or_the_humans_output_and_fails_without_
 def doors() -> dict:
     return {"doors": [
         {"door": 1, "found": True, "merged": False, "two_key": {"conclusion": "failure"}, "path_named_in_log": True},
-        {"door": 2, "found": True, "merged": True, "two_key": {"conclusion": "success"}, "distinct_seats": ["Data Owner", "Threshold Owner"]},
+        {"door": 2, "found": True, "merged": True, "two_key": {"conclusion": "success"}, "distinct_seats": ["Data Owner", "Threshold Owner"], "relaxation_keyed": True},
         {"door": 3, "found": True, "merged": False, "bypass": bypass()},
     ]}  # fmt: skip
 
@@ -104,6 +104,9 @@ def test_doors_pass_only_when_all_three_are_in_the_record(tmp_path):
     assert build.check_from_doors(write(tmp_path, doors()), URL)["status"] == "pass"
     broken = doors()
     broken["doors"][1]["distinct_seats"] = ["Data Owner"]
+    assert build.check_from_doors(write(tmp_path, broken), URL)["status"] == "fail"
+    broken = doors()
+    broken["doors"][1]["relaxation_keyed"] = False  # two files, nothing relaxed: not Door 2 (cold review, F2)
     assert build.check_from_doors(write(tmp_path, broken), URL)["status"] == "fail"
     broken = doors()
     broken["doors"][0]["two_key"] = {"conclusion": "success"}
@@ -124,3 +127,17 @@ def test_the_second_source_joins_the_first_through_both(tmp_path):
     first = {"F2_1": {"status": "pass", "url": URL}}
     joined = build.both(first, "F2_1", build.check_from_seed_prs(write(tmp_path, {"seeds": []}), URL))
     assert joined["F2_1"]["status"] == "fail"
+
+
+def test_the_login_is_read_from_the_seeds_own_principal_line():
+    """The committed f2_1_bypass.yaml line; the first draft raised IndexError on it (cold review of PR 2, F1)."""
+    assert observe_pr.login_in("the repository owner, andaro74, with admin on andaro74/agentkeel") == "andaro74"
+    assert observe_pr.login_in("") == ""
+
+
+def test_observe_bypass_on_the_committed_seed_writes_a_note_and_calls_nothing(tmp_path, monkeypatch):
+    monkeypatch.setenv("GITHUB_REPOSITORY", "andaro74/agentkeel")
+    out = tmp_path / "bypass.json"
+    assert observe_pr.main([str(observe_pr.ROOT / "milestones" / "M02" / "runs" / "f2_1_bypass.yaml"), "--out", str(out)]) == 0
+    seen = json.loads(out.read_text(encoding="utf-8"))
+    assert seen["kind"] == "bypass" and seen["attempt_1"] is None and "not been made" in seen["note"]

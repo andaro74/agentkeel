@@ -135,7 +135,7 @@ def relaxations(tree: Tree, base: Tree) -> list[Relaxation]:
                 found.append(Relaxation(path, f"guardrail version {versions[0]} -> {versions[1]} moved down", "Rule Owner"))
             old_mem, new_mem = before.get("memory"), after.get("memory")
             if isinstance(old_mem, dict):
-                if new_mem is None and "memory" in after:
+                if after.get("memory") is None:  # set to null, or the key deleted outright (cold review of PR 2, F5)
                     found.append(Relaxation(path, "memory removed (retention shortened to nothing)", owner))
                 elif isinstance(new_mem, dict) and (new_mem.get("retention_days") or 0) < (old_mem.get("retention_days") or 0):
                     found.append(Relaxation(

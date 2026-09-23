@@ -163,7 +163,7 @@ def test_this_repository_passes_against_origin_main():
     assert golden_ids.check(ROOT) == []
 
 
-def test_a_deleted_unretired_id_fails_and_a_retired_one_may_go(tree):
+def test_a_deleted_id_fails_retired_or_not(tree):
     (tree / "evals" / "goldens" / "v1" / "g-005.yaml").unlink()
     errors = golden_ids.check(tree, "origin/main")
     assert any("g-005 is on" in e and "retired is null" in e for e in errors), errors
@@ -173,7 +173,7 @@ def test_a_deleted_unretired_id_fails_and_a_retired_one_may_go(tree):
     git(tree, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "retire")
     git(tree, "fetch", "-q", "origin")
     path.unlink()
-    assert not any("g-006" in e for e in golden_ids.check(tree, "origin/main"))
+    assert any("g-006" in e and "its file stays" in e for e in golden_ids.check(tree, "origin/main"))
 
 
 def test_the_burned_id_is_refused_anywhere(tree):
@@ -270,3 +270,17 @@ def test_the_export_itself_must_say_nobody_bypasses(tmp_path, monkeypatch):
     write(tmp_path, "infra/ruleset/main.json", json.dumps({**EXPORT, "bypass_actors": [{"actor_id": 1}]}))
     errors = ruleset.check(tmp_path, fetcher=lambda repo, i: (EXPORT, "200"))
     assert any("infra/ruleset/main.json: bypass_actors is [{\"actor_id\": 1}], not []" in e for e in errors)
+
+
+def test_an_edge_at_another_major_is_refused_by_the_edge_check_alone(tree):
+    manifest(tree, "refagent", may_call=["ratings-helper@v2"])
+    manifest(tree, "ratings-helper", may_be_called_by=["refagent@v1"])
+    assert any("names major 2, and agents/ratings-helper/manifest.yaml is at major 1: not the same major" in e for e in edges.check(tree))
+
+
+def test_a_removed_tool_schema_is_a_major_bump(tree):
+    tool(tree).unlink()
+    assert any("a tool schema took a major bump (agents/refagent/tools/check_availability.json (removed))" in e
+               for e in semver.check(tree, "origin/main"))  # fmt: skip
+    manifest(tree, "refagent", version="2.0.0")
+    assert semver.check(tree, "origin/main") == []

@@ -193,6 +193,19 @@ def parse_time(value: Any) -> datetime | None:
         return None
 
 
+def login_in(principal: str) -> str:
+    """The bare login in a `principal:` line such as `the repository owner, andaro74, with admin on ...`.
+
+    The comma-separated part that is a login and nothing else; "" when
+    none is. The first draft indexed into a split of the wrong part and
+    raised on the seed's own line (cold review of PR 2, F1).
+    """
+    for part in principal.split(","):
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]*", part.strip()):
+            return part.strip()
+    return ""
+
+
 def rule_suites(repo: str, actor: str, at: datetime | None, token: str | None) -> dict[str, Any]:
     """Failed rule-suite evaluations for the actor on main around `at`, and what the API said to the call."""
     path = f"/rulesets/rule-suites?ref=main&actor_name={actor}&rule_suite_result=fail&per_page=100"
@@ -223,7 +236,7 @@ def observe_bypass(repo: str, run: dict[str, Any], token: str | None, suites_tok
     observed = run.get("observed") or []
     attempts = run.get("attempts") or []
     out: dict[str, Any] = {"principal": run.get("principal"), "attempt_1": None, "attempt_2": None}
-    actor = str(run.get("principal", "")).split(",")[0].replace("the repository owner", "").strip().split()[-1] if run.get("principal") else ""
+    actor = login_in(str(run.get("principal") or ""))
     if len(observed) >= 1 and isinstance(observed[0], dict):
         first = observed[0]
         entry: dict[str, Any] = {"human_said": first}
@@ -241,6 +254,17 @@ def observe_bypass(repo: str, run: dict[str, Any], token: str | None, suites_tok
         second = observed[1]
         export = json.loads((ROOT / "infra" / "ruleset" / "main.json").read_text(encoding="utf-8"))
         entry = {"human_said": second, "live_now": live_ruleset(repo, int(export["id"]), token)}
+        # A CI witness of the RED, when the human recorded the `checks` job
+        # that ran while the actor was listed (`checks_job_id` in the
+        # observed entry): validate's own line in that job's log. Without
+        # it the observation says the RED is the human's word (cold review
+        # of PR 2, F3), as attempt 1's `witness` does.
+        entry["ci_red_lines"] = []
+        if job := second.get("checks_job_id"):
+            _status, log = job_log(repo, int(job), token)
+            entry["ci_red_lines"] = [line for line in (log or "").splitlines() if "somebody can bypass main" in line]
+        entry["witness"] = ("validate's line in the checks job's log" if entry["ci_red_lines"]
+                            else "the human's own output (no checks_job_id recorded, or the line was not in its log)")  # fmt: skip
         out["attempt_2"] = entry
     if not observed:
         out["note"] = "the attempts have not been made: `observed` is empty in the run file"
@@ -286,6 +310,15 @@ def observe_doors(repo: str, run: dict[str, Any], token: str | None, suites_toke
         if door["door"] == 2 and entry.get("merge_commit_sha"):
             entry["rulings_in_merge"] = rulings_in(entry["merge_commit_sha"], number)
             entry["distinct_seats"] = sorted({r["seat"] for r in entry["rulings_in_merge"] if r["seat"]})
+            # A merged PR with two seat files and nothing relaxed is not Door
+            # 2 (cold review of PR 2, F2): the gate's own line on a keyed
+            # relaxation, from the two-key job's log, is what says a
+            # relaxation was there to key.
+            entry["keyed_lines"] = []
+            if entry["two_key"] is not None:
+                _status, log = job_log(repo, entry["two_key"]["id"], token)
+                entry["keyed_lines"] = [line for line in (log or "").splitlines() if "two keys with pr:" in line]
+            entry["relaxation_keyed"] = bool(entry["keyed_lines"])
         if door["door"] == 3:
             bypass_file = ROOT / "milestones" / "M02" / "runs" / "f2_1_bypass.yaml"
             bypass = yaml.safe_load(bypass_file.read_text(encoding="utf-8"))

@@ -48,11 +48,14 @@ def compare(tree: Tree, base: Tree) -> list[str]:
     for golden_id, (path, doc) in sorted(before.items()):
         if golden_id in after:
             continue
-        if doc.get("retired") is None:
-            errors.append(
-                f"{path}: {golden_id} is on {base.name} and not in this tree, and its retired is null: "
-                "an id is retired (retired: MNN), never renamed or deleted (R11)"
-            )
+        # Retired or not: the file stays, so that history keyed on the id
+        # still reads and the id can never be reused (data-owner on PR 2,
+        # F3; the first draft let a retired golden's file go).
+        state = "its retired is null" if doc.get("retired") is None else f"it is retired ({doc.get('retired')}) and its file stays"
+        errors.append(
+            f"{path}: {golden_id} is on {base.name} and not in this tree, and {state}: "
+            "an id is retired (retired: MNN), never renamed or deleted (R11)"
+        )
     for golden_id, (path, doc) in sorted(after.items()):
         if golden_id in BURNED or doc.get("id") in BURNED:
             errors.append(f"{path}: {golden_id} is a burned id (tests/fixtures/README.md); no golden ever gets it")
