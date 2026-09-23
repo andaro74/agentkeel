@@ -42,4 +42,13 @@ attempts:
     command: gh api -X PUT repos/andaro74/agentkeel/rulesets/23685206 --input <ruleset with bypass_actors set>; make validate; then the same PUT with bypass_actors []
     refused_when: validate is RED on the live-vs-export diff while the actor is listed, and green again after
     record: the ruleset's updated_at before, during and after; validate's output both times
-observed: null
+observed:
+  - what: merge seed S1's PR while its two-key check is red
+    at: 2026-09-23T13:34:13Z
+    pr: 14
+    command: gh pr merge 14 --merge --admin
+    result: refused
+    message: "GraphQL: Repository rule violations found. 3 of 5 required status checks are failing."
+    rule_suite: 4192991324  # GET rulesets/rule-suites?ref=main&actor_name=andaro74&rule_suite_result=fail: result fail, 97d3c76 -> 1995389
+    witness: the rule-suites API and my own output
+

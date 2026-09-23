@@ -15,4 +15,27 @@ doors:
     what: the owner attempting bypass, blocked by two gates
     pr: null  # seed S1's PR again; the attempt is f2_1_bypass.yaml attempt 1, the second gate attempt 2
     expected: the merge refused to the owner with bypass_actors [] at that time; validate RED on the ruleset that would have allowed it
-observed: null
+doors:
+  - door: 1
+    what: a relaxation without two keys, blocked by the gate
+    pr: 14
+    expected: closed unmerged; check two-key failed on its head sha, naming thresholds.yaml
+  - door: 2
+    what: the same kind of change with two keys, merged
+    pr: 12
+    expected: merged; check two-key succeeded on its head sha; the merge commit carries two ruling files with distinct seats and pr equal to this number, both covering evals/goldens/v1/g-012.yaml
+  - door: 3
+    what: the owner attempting bypass, blocked by two gates
+    pr: 14
+    expected: the merge refused to the owner with bypass_actors [] at that time; validate RED on the ruleset that would have allowed it
+observed:
+  - door: 1
+    pr: 14
+    seen: two-key red on 97968bc naming thresholds.yaml; unmerged
+  - door: 2
+    pr: 12
+    seen: merged as 97d3c76; two-key green on 183496d; pr2-data-owner.md and pr2-threshold-owner.md, both pr 12
+  - door: 3
+    pr: 14
+    seen: gh pr merge 14 --merge --admin refused, rule suite 4192991324; attempt 2 in f2_1_bypass.yaml
+
