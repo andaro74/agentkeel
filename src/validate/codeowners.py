@@ -34,16 +34,25 @@ def tracked(root: Path) -> list[str]:
 
 
 def login_exists(login: str) -> tuple[bool, str]:
+    """`GET /users/{login}` with the same token order as the ruleset read: GITHUB_TOKEN, then gh's.
+
+    Unauthenticated, GitHub allows 60 calls an hour per address, and a day
+    of local `make validate` runs spent them (403 on 2026-09-23); the
+    status is reported with the token that was used.
+    """
+    from src.validate.ruleset import token
+
     request = urllib.request.Request(f"{API}/users/{login}")
     request.add_header("Accept", "application/vnd.github+json")
     request.add_header("X-GitHub-Api-Version", "2022-11-28")
-    if token := os.environ.get("GITHUB_TOKEN"):
-        request.add_header("Authorization", f"Bearer {token}")
+    value, which = token()
+    if value:
+        request.add_header("Authorization", f"Bearer {value}")
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
-            return json.load(response).get("login", "").lower() == login.lower(), "200"
+            return json.load(response).get("login", "").lower() == login.lower(), f"200 with {which}"
     except urllib.error.HTTPError as exc:
-        return False, str(exc.code)
+        return False, f"{exc.code} with {which}"
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
