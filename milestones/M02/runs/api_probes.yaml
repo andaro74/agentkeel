@@ -42,10 +42,12 @@ probes:
     consequence: >-
       the answer to Unsure A and H: an Actions token is not shown the bypass list. The compare reads
       with RULESET_TOKEN, a fine-grained token with Administration: read on this repository, kept as
-      a repository secret by the human, in the evals job only; the checks job carries no secret (a
-      fork's PR runs it) and validate prints there that the compare is skipped (Security,
-      pr2-security.md item 2). Both jobs were red on this line alone; no token was spent (validate
-      runs before AWS).
+      a repository secret by the human, fetched by a step of the evals job that runs no PR code and
+      handed to validate as a file; the checks job carries no secret (a fork's PR runs it) and
+      validate prints there that the compare is skipped (Security, pr2-security.md item 2). Both jobs
+      were red on this line alone; no token was spent (validate runs before AWS). Unread: whether a
+      fine-grained token with Metadata: read alone is shown the list; Administration: read is what
+      the endpoints document, not what was measured as the minimum.
   - what: a job's log by job id, with the human's gh token
     command: gh api repos/andaro74/agentkeel/actions/jobs/106624547408/logs
     status: see rehearsal_seed_prs.json (log_status)

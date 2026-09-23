@@ -273,12 +273,24 @@ def test_the_fine_grained_token_is_read_first_and_the_tokenless_job_skips_with_a
     assert ruleset.check(ROOT, fetcher=lambda repo, i: (None, "403")) != []
 
 
-def test_the_compare_runs_in_the_evals_job_with_the_secret_and_the_checks_job_says_it_skips():
+def test_the_compare_runs_in_the_evals_job_from_a_file_the_workflow_fetched_and_the_checks_job_says_it_skips():
     workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "evals.yml").read_text(encoding="utf-8"))
     checks = next(s for s in workflow["jobs"]["checks"]["steps"] if s.get("run") == "make validate")
     evals = next(s for s in workflow["jobs"]["evals"]["steps"] if s.get("run") == "make validate")
-    assert checks["env"][ruleset.NO_TOKEN_FLAG] == "true" and "RULESET_TOKEN" not in checks["env"]
-    assert evals["env"]["RULESET_TOKEN"] == "${{ secrets.RULESET_TOKEN }}" and ruleset.NO_TOKEN_FLAG not in evals["env"]
+    fetch_step = next(s for s in workflow["jobs"]["evals"]["steps"] if s.get("name") == "Read the live main ruleset")
+    assert checks["env"][ruleset.NO_TOKEN_FLAG] == "true" and "RULESET_TOKEN" not in str(checks)
+    # the secret is in the fetch step only, which runs no code from the PR; validate reads the file
+    assert fetch_step["env"]["RULESET_TOKEN"] == "${{ secrets.RULESET_TOKEN }}" and "curl" in fetch_step["run"]
+    assert "if" not in fetch_step and "if" not in evals, "a ruleset change with no tree change must still be compared"
+    assert "RULESET_TOKEN" not in str(evals) and evals["env"][ruleset.LIVE_FILE].endswith("live-ruleset.json")
+
+
+def test_a_named_live_file_that_is_missing_is_an_error_not_a_fetch(monkeypatch, tmp_path):
+    monkeypatch.setenv(ruleset.LIVE_FILE, str(tmp_path / "nothing.json"))
+    errors = ruleset.check(ROOT)
+    assert len(errors) == 1 and "not readable" in errors[0] and "wrote nothing" in errors[0]
+    (tmp_path / "nothing.json").write_text(json.dumps(EXPORT), encoding="utf-8")
+    assert ruleset.check(ROOT) == []
 
 
 def test_an_unreadable_ruleset_is_an_error_not_a_pass():

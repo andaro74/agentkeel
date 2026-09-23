@@ -62,20 +62,28 @@ never a pass. **Read on this PR's first run (35809406890,
 2026-09-23T02:12Z): an Actions token is not shown the list.** Both jobs
 were red on that line alone, before any spend (`runs/api_probes.yaml`).
 Ruled, and repaired in this PR since it cannot merge otherwise: **the
-compare runs in the `evals` job and only there**, with `RULESET_TOKEN`,
-a fine-grained token with Administration: read on this repository only,
-which the human creates and stores as a repository secret before
-re-running; `GITHUB_TOKEN` still reads the logins in both jobs. The
-`checks` job keeps no secret (`tests/test_evals_workflow.py` holds that,
-so a fork's PR can run it) and sets `AGENTKEEL_NO_RULESET_TOKEN`, on
-which `validate` prints that the compare is skipped there rather than
-failing for a list that job cannot see. That is not the BLOCK C hole:
-the compare watches the live ruleset, which no outsider can edit, and
-the `evals` job compares it on every non-fork PR and on every push to
-`main`; a fork's PR cannot merge without `evals` running on a non-fork
-head anyway. `observe_pr.py` uses the same token for the rule-suites
-lookup (item 5). The secret is the one thing this PR needs from the
-human before its checks can be green.
+compare runs in the `evals` job and only there.** A step of the workflow
+itself, running no code from the PR, fetches the ruleset with
+`RULESET_TOKEN`, a fine-grained token on this repository alone with
+Administration: read (the permission the rulesets endpoints document;
+whether a narrower one is shown the list is unread, and a probe with a
+Metadata-only token would settle it), into a file that `validate` reads.
+The secret is never in the environment of `src/`. The step has no `if:`,
+so a ruleset change with no tree change, the case the compare exists
+for, is compared on the skip path and on every push to `main` too.
+`GITHUB_TOKEN` still reads the logins in both jobs. The `checks` job
+keeps no secret (`tests/test_evals_workflow.py` holds that, so a fork's
+PR can run it) and sets `AGENTKEEL_NO_RULESET_TOKEN`, on which `validate`
+prints that the compare is skipped there rather than failing for a list
+that job cannot see. What stands on its own is that a fork cannot edit
+the live ruleset. What does not: the flag is an environment variable the
+PR's own Makefile or `src/validate/` could set, the same gap as the
+header's first ("the reader is the PR's", M05). `observe_pr.py` uses the
+same token for the rule-suites lookup (item 5). The human creates the
+token and stores it as the repository secret `RULESET_TOKEN` before
+re-running, and records here its holder and expiry, never its value:
+holder ______, expires ______. On expiry the fetch step writes no file
+and `validate` fails closed with the same line as run 35809406890.
 
 ## 3. Which ruleset fields the compare reads (Unsure H, a)
 

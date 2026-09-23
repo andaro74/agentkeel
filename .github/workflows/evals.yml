@@ -48,6 +48,11 @@
 # - tell a hand-written evals/history/<commit>.json from a recorded one,
 #   beyond what verdict.gate checks. `two-key` on a human commit there is M02.
 # - record on `push` to main. It measures and gates only.
+# - stop the PR's own code from turning the live-ruleset compare off
+#   (M02 PR 2). The `checks` job sets AGENTKEEL_NO_RULESET_TOKEN so
+#   validate prints a skip there; the Makefile and src/validate/ sit between
+#   this file and that read, and both are the PR's. The reader taken from
+#   main is M05, with the rest of the header's first gap.
 name: evals
 
 on:
@@ -181,15 +186,36 @@ jobs:
 
       # The live ruleset compare runs here and only here (M02 PR 2). This
       # job never runs on a fork (the `if:` above), so it can carry the
-      # secret: RULESET_TOKEN, a fine-grained token with Administration: read
-      # on this repository and nothing else, which is what GitHub needs to
-      # show bypass_actors. Without the secret validate fails closed on that
-      # line ("not shown to this caller"); it does not pretend.
+      # secret: RULESET_TOKEN, a fine-grained token on this repository alone
+      # with Administration: read, the permission the rulesets endpoints
+      # document. Whether a narrower one is shown bypass_actors is unread.
+      # The token is used in this step only, which runs no code from the
+      # PR: the ruleset is fetched with curl into a file that `validate`
+      # reads, so the secret is never in the environment of `src/`. A
+      # missing or expired secret writes no file, and validate fails closed
+      # on that line ("not shown to this caller"); it does not pretend.
+      # No `if:`: a ruleset change with no tree change is exactly what the
+      # compare exists to read, and the skip path above must not skip it.
+      - name: Read the live main ruleset
+        env:
+          RULESET_TOKEN: ${{ secrets.RULESET_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          id=$(python3 -c 'import json; print(json.load(open("infra/ruleset/main.json"))["id"])')
+          if [ -z "$RULESET_TOKEN" ]; then
+            echo "::warning::RULESET_TOKEN is not set; the live ruleset is not read and validate fails closed on it"
+            exit 0
+          fi
+          curl -sSf -H "Authorization: Bearer $RULESET_TOKEN" -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/$REPO/rulesets/$id" \
+            -o "$RUNNER_TEMP/live-ruleset.json"
+
+      # validate spends nothing on AWS, so it runs on the skip path too.
       - name: make validate
-        if: steps.current.outputs.measured_at == ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          RULESET_TOKEN: ${{ secrets.RULESET_TOKEN }}
+          AGENTKEEL_LIVE_RULESET: ${{ runner.temp }}/live-ruleset.json
         run: make validate
 
       # `src/bundle/verify.py` skips the cosign check when cosign is not on

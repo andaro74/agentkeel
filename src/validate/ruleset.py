@@ -56,12 +56,14 @@ def token() -> tuple[str | None, str]:
     """The token that reads the ruleset, and which it was.
 
     `RULESET_TOKEN` first: a fine-grained token with Administration: read on
-    this repository, kept as a repository secret. Read by the call on M02
-    PR 2's first run (35809406890): an Actions `GITHUB_TOKEN` answers 200
-    and is **not** shown `bypass_actors`, so the compare cannot rest on it.
-    Then `GITHUB_TOKEN`, which still spares the rate limit and reads the
-    rest; then the gh CLI's token on a developer's machine, which is shown
-    the list.
+    this repository (the permission the rulesets endpoints document;
+    whether a narrower one is shown the list is unread). In CI that token
+    is used by the workflow's own fetch step, not here (`fetch_or_file`).
+    Read by the call on M02 PR 2's first run (35809406890): an Actions
+    `GITHUB_TOKEN` answers 200 and is **not** shown `bypass_actors`, so the
+    compare cannot rest on it. Then `GITHUB_TOKEN`, which still spares the
+    rate limit and reads the rest; then the gh CLI's token on a developer's
+    machine, which is shown the list.
     """
     if value := os.environ.get("RULESET_TOKEN"):
         return value, "RULESET_TOKEN"
@@ -110,15 +112,37 @@ def compare(export: dict[str, Any], live: dict[str, Any], status: str = "") -> l
 
 
 NO_TOKEN_FLAG = "AGENTKEEL_NO_RULESET_TOKEN"
+LIVE_FILE = "AGENTKEEL_LIVE_RULESET"
 
 
-def check(root: Path, *, fetcher=fetch) -> list[str]:
+def fetch_or_file(repo: str, ruleset_id: int) -> tuple[dict[str, Any] | None, str]:
+    """The live ruleset from the file the workflow fetched (`AGENTKEEL_LIVE_RULESET`), else from the API.
+
+    In CI the `evals` job fetches the ruleset with the secret in a step of
+    its own and hands `validate` the file, so the secret is never in the
+    environment of the PR's code (security-reviewer on M02 PR 2's repair).
+    A named file that is missing is what a missing secret looks like: an
+    error, not a fetch with a weaker token.
+    """
+    if path := os.environ.get(LIVE_FILE):
+        try:
+            doc = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return None, f"{LIVE_FILE} {path} not readable ({type(exc).__name__}); the workflow step that fetches it wrote nothing"
+        return (doc if isinstance(doc, dict) else None), f"the file the workflow fetched ({path})"
+    return fetch(repo, ruleset_id)
+
+
+def check(root: Path, *, fetcher=fetch_or_file) -> list[str]:
     # evals.yml's `checks` job carries no secret, so that a fork's pull
     # request can run it (BLOCK C); it sets this flag, and the compare is
     # not pretended to there: the line printed says it is skipped. The
-    # compare runs in the `evals` job, which has the secret, on every
-    # non-fork PR and on every push to main; what it watches is the live
-    # ruleset, which no outsider can edit (Security, M02 PR 2 ruling, item 2).
+    # compare runs in the `evals` job, which fetches the ruleset with the
+    # secret, on every non-fork PR and on every push to main, the skip path
+    # included; what it watches is the live ruleset, which no outsider can
+    # edit (Security, M02 PR 2 ruling, item 2). The flag is an environment
+    # variable the PR's own Makefile or src/ could set: named in evals.yml's
+    # header as a gap, with the rest of "the reader is the PR's".
     if os.environ.get(NO_TOKEN_FLAG, "").lower() == "true":
         print(f"     note: {EXPORT}: the live compare is skipped in this job, which carries no token that is shown the "
               "bypass list; it runs in the evals job on every non-fork PR and on main")  # fmt: skip
