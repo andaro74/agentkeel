@@ -1,3 +1,4 @@
+A
 ---
 # M02 PR 2 (#12), Security's key. Product's file is rulings/pr2.md.
 ruling: pr2-security
@@ -82,7 +83,7 @@ header's first ("the reader is the PR's", M05). `observe_pr.py` uses the
 same token for the rule-suites lookup (item 5). The human creates the
 token and stores it as the repository secret `RULESET_TOKEN` before
 re-running, and records here its holder and expiry, never its value:
-holder ______, expires ______. On expiry the fetch step writes no file
+holder andaro74, expires 2026-12-31. On expiry the fetch step writes no file
 and `validate` fails closed with the same line as run 35809406890.
 
 ## 3. Which ruleset fields the compare reads (Unsure H, a)
