@@ -53,8 +53,8 @@ attempts:
     failed_at: RefagentRuntime148EBA78 UPDATE_FAILED at 14:34:46Z
     message: the same, Request ID 04c9c5dc-4aea-47df-8b7e-c65fcc23e983
     rollback: UPDATE_ROLLBACK_FAILED at 14:34:50Z, the same reason (Request ID 68840b7b-61ba-4f8d-8956-3dae7ff9355b)
-  read_with: |
-    gh api repos/andaro74/agentkeel/actions/runs/35734541276/jobs?filter=all
+attempts_read_with: |  # (was indented under the list; a YAML error since d8783f6)
+  gh api repos/andaro74/agentkeel/actions/runs/35734541276/jobs?filter=all
     MSYS_NO_PATHCONV=1 aws cloudformation describe-stack-events --region us-west-2 --stack-name agentkeel-refagent --query 'StackEvents[?ResourceStatus==`UPDATE_FAILED`].[Timestamp,ResourceStatusReason]'
 
 what_was_read:
@@ -98,4 +98,36 @@ state_left_by_the_human:
   # tests/test_deploy_image_architecture.py and fires in the account only on a rerun whose tag already
   # holds an amd64 image. Security decides whether to delete 822fe2b5 before or after the merge.
 
-observed_at_pr2_merge: null  # the arm64 run: its id, the refusal of 822fe2b5, the rebuild, the runtime's first log lines, the load check's answer
+observed_at_pr2_merge:  # filled by the session from `gh` and `aws` output on 2026-09-23; the human reads it before PR 3 opens
+  run: 35817173042  # deploy.yml on main, merge commit 97d3c76 of PR #12
+  at: 2026-09-23T04:09:29Z to 04:12:06Z
+  runner: ubuntu-24.04-arm carried docker and aws; sign, build, push, deploy and the table load all succeeded
+  image: sha256:17e087c7d098f34a209f010d4c56a8041bd23c8cff974bf5fc4bed5f04be72cc  # arm64, built fresh under tag 187c6bec (the new bundle digest); 822fe2b5 untouched under 26ed38d1, as predicted above
+  refusal_of_822fe2b5: "did not fire, as predicted: no image existed under the new tag, so the reuse branch was not taken"
+  stack: UPDATE_COMPLETE at 04:11:23Z; RefagentRuntime148EBA78 UPDATE_IN_PROGRESS 04:11:01Z, UPDATE_COMPLETE 04:11:21Z
+  runtime_log: >-
+    the runtime STARTED, for the first time: "refagent on :8080, model
+    arn:aws:bedrock:us-west-2:581208540944:application-inference-profile/j1pmc2efi7ih, table
+    agentkeel-refagent-rights" at 04:11:19Z, then GET /ping 200 and POST /invocations 200 for every
+    golden. No "parent snapshot" line: the arm64 image is what the service could run.
+  load_check: >-
+    FAILED, 15 of 15 goldens ERROR: "AccessDeniedException when calling the Scan operation: User:
+    arn:aws:sts::581208540944:assumed-role/agentkeel-refagent-RefagentRole5888DB41-i9IqTXU6NVSL/...".
+    Cause, read from the account: the role's own policy allows dynamodb:GetItem, Query and Scan on
+    the table (the construct's grant, M01 PR 3), but its permission boundary agentkeel-boundary
+    (the bootstrap stack's ceiling on every platform role, R4) lists GetItem and Query only; the
+    DynamoDB gateway endpoint policy allows all in the account. The ceiling fired on a real case.
+    Repaired in PR 3: tests/test_bootstrap.py compares the construct's grants to the boundary and
+    failed on Scan first (0faf973); the boundary gains Scan (the next commit); the human deploys the
+    bootstrap stack by hand after reading cdk diff.
+  cfn_exec_from_cloudtrail: >-
+    bedrock-agentcore: UpdateAgentRuntime x1, GetAgentRuntime x10, ListTagsForResource x9, as
+    AWSCloudFormation. vpc-lattice: NO events by any principal since 2026-09-22T13:30Z, so the
+    RuntimeVpcModeLattice wildcard (bootstrap app.py) cannot be scoped from CloudTrail; either the
+    service makes the association without a CloudTrail event under this source, or the association
+    is not remade on update. Still open (Security, M05 open row 15).
+  claim_1: >-
+    "refagent runs inside the construct" was read for the first time here: the runtime ran and
+    answered. Its answers were wrong for a reason the ceiling caused. M01 row 1 stays RED as ruled
+    (a later deploy does not reopen it); this reading belongs to M02 PR 3 and to M05's containment
+    work.
