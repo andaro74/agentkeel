@@ -1,4 +1,3 @@
-A
 ---
 # M02 PR 2 (#12), Security's key. Product's file is rulings/pr2.md.
 ruling: pr2-security
