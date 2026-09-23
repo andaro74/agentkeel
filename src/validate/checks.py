@@ -26,7 +26,7 @@ from typing import Any
 
 import yaml
 
-from src.gates import two_key
+from src.gates import pattern_regex, two_key
 from src.validate import codeowners, edges, golden_ids, ruleset, semver
 
 GOLDEN_FIELDS = {"id", "kind", "question", "expected", "seat", "added", "retired"}
@@ -153,11 +153,26 @@ def front_matter(text: str) -> dict[str, Any] | None:
     return doc if isinstance(doc, dict) else None
 
 
+def deleted_paths(root: Path) -> set[str]:
+    """Every path deleted from the tree somewhere in HEAD's history. Empty when git cannot say.
+
+    A ruling is a record of the PR it merged with, and the paths it named can
+    be deleted later (`infra/eval-role/` at M02 PR 3, authorised by four M00
+    and M01 rulings). The front-matter check exists to catch a glob that
+    names nothing; a glob that names something the tree once had is not
+    that, and a past ruling is not edited to keep a check green.
+    """
+    done = subprocess.run(["git", "log", "--diff-filter=D", "--name-only", "--format="], cwd=root,
+                          capture_output=True, text=True)  # fmt: skip
+    return set(done.stdout.split()) if done.returncode == 0 else set()
+
+
 def check_rulings(root: Path) -> list[str]:
     paths = sorted((root / "milestones").glob("*/rulings/*.md"))
     if not paths:
         return ["milestones/*/rulings/: no ruling files found"]
     errors = []
+    gone: set[str] | None = None  # read once, only if a glob matches nothing in the tree
     for path in paths:
         rel = path.relative_to(root).as_posix()
         fm = front_matter(path.read_text(encoding="utf-8"))
@@ -172,10 +187,16 @@ def check_rulings(root: Path) -> list[str]:
                 errors.append(f"{rel}: {field} must be a list")
         if isinstance(fm.get("authorises"), list):
             for pattern in fm["authorises"]:
-                if not glob.glob(str(pattern), root_dir=root, recursive=True):
-                    errors.append(
-                        f"{rel}: authorises path {pattern!r} matches nothing in the tree"
-                    )
+                if glob.glob(str(pattern), root_dir=root, recursive=True):
+                    continue
+                if gone is None:
+                    gone = deleted_paths(root)
+                regex = pattern_regex(str(pattern), anchored=True)
+                if any(regex.match(path) for path in gone):
+                    continue  # named something the tree once had (M02 PR 3)
+                errors.append(
+                    f"{rel}: authorises path {pattern!r} matches nothing in the tree, nor anything deleted from it"
+                )
     return errors
 
 
