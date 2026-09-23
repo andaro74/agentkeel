@@ -104,6 +104,11 @@ def main(argv: list[str] | None = None) -> int:
     observations, errors = [], 0
     for path in sorted(args.goldens.glob("g-*.yaml")):
         golden = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if golden.get("retired") is not None:
+            # M02 PR 2 (Door 2): a retired golden is not asked. The frozen
+            # control still asks it (ADR-0002); build drops that answer.
+            print(f"{golden['id']} {golden['kind']:<9} retired at {golden['retired']}; not asked")
+            continue
         entry = {"id": golden["id"], "kind": golden["kind"], "question": golden["question"]}
         try:
             if runtime_arn:

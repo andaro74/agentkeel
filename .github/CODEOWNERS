@@ -1,0 +1,87 @@
+# .github/CODEOWNERS (Security; SPEC/00 §5's Security row, ADR-0003
+# amendment 2). The SPEC/00 §5 seat table as owner lines, from M02 PR 2.
+#
+# How it is read. GitHub reads the login and uses this file for review
+# routing only: `require_code_owner_review` is false on the main ruleset
+# and stays false (R1: no gate waits for a human). The gates read the
+# seat, this way: `src/gates/` takes the `# seat:` line above each block as the
+# owner of every pattern below it, reads this file FROM THE BASE REF (SPEC/02 §6),
+# and refuses a PR that changes a path with no ruling from that seat.
+# `make validate` checks that every tracked file matches a line, that no
+# file matches lines from two seats, that every `.claude/agents/<name>.md`
+# is under the seat its own front matter names, and that each login is a
+# real GitHub user.
+#
+# At M02 every seat is one person (R1), so every line names the same
+# login. A path not listed here has no seat, and a file no seat owns is
+# deleted, not adopted (SPEC/00 §5).
+#
+# A manifest is one file with several owners (ADR-0003 amendment 1): the
+# file is Engineering's here, and `src/gates/` attributes each changed
+# field to its owner (model and budgets: Threshold Owner; guardrail: Rule
+# Owner; seats and endpoint_allowlist: Security; may_call, may_be_called_by,
+# ceilings, version: Tool Owner). GitHub cannot express that; the gate does.
+
+# seat: Product
+/SPEC/ @andaro74
+/milestones/ @andaro74
+/CLAUDE.md @andaro74
+/.claude/skills/ @andaro74
+/docs/ @andaro74
+/README.md @andaro74
+/LICENSE @andaro74
+
+# seat: Rule Owner
+/rules/ @andaro74
+/agents/*/rules/ @andaro74
+
+# seat: Data Owner
+/evals/goldens/ @andaro74
+/data/ @andaro74
+
+# seat: Tool Owner
+/tools/ @andaro74
+/agents/*/tools/ @andaro74
+
+# seat: Threshold Owner
+/thresholds.yaml @andaro74
+
+# seat: Security
+/.github/workflows/ @andaro74
+/.github/CODEOWNERS @andaro74
+/infra/ @andaro74
+
+# seat: Engineering
+/src/ @andaro74
+/scripts/ @andaro74
+/tests/ @andaro74
+/Makefile @andaro74
+/pyproject.toml @andaro74
+/uv.lock @andaro74
+/.python-version @andaro74
+/.gitignore @andaro74
+/.gitattributes @andaro74
+/agents/__init__.py @andaro74
+/agents/*/manifest.yaml @andaro74
+/agents/*/prompt.txt @andaro74
+/agents/*/Dockerfile @andaro74
+/agents/*/*.py @andaro74
+/evals/history/ @andaro74
+
+# Each subagent prompt is owned by the seat in its own `seat:` front
+# matter (SPEC/00 §5, last row); `make validate` holds the two equal.
+# seat: Product
+/.claude/agents/product-spec-reviewer.md @andaro74
+# seat: Rule Owner
+/.claude/agents/rule-owner.md @andaro74
+# seat: Data Owner
+/.claude/agents/data-owner.md @andaro74
+# seat: Tool Owner
+/.claude/agents/tool-owner.md @andaro74
+# seat: Threshold Owner
+/.claude/agents/threshold-owner.md @andaro74
+# seat: Security
+/.claude/agents/security-reviewer.md @andaro74
+/.claude/agents/platform-architect.md @andaro74
+# seat: Engineering
+/.claude/agents/engineering-cold-reviewer.md @andaro74

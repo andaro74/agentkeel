@@ -58,7 +58,9 @@ the diff; you do not merge.
 - Never edit `src/baseline/` after tag `m00`. It is the control.
 - Never write an envelope by hand or from a runner. Only
   `src/verdict/build.py` writes envelopes; only `src/verdict/gate.py`
-  reads them; a test proves they can disagree. The one exception is a
+  rules on them (`src/verdict/replay_history.py` is the shared reader of
+  past ones, which `build`, `gate` and `two-key` all use); a test proves
+  build and gate can disagree. The one exception is a
   seed under tests/fixtures/: a false state, never copied to
   evals/history/, named in tests/fixtures/README.md.
 - Never touch `evals/goldens/`, `thresholds.yaml`, `rules/`,
@@ -127,6 +129,9 @@ milestones/MNN/       README.md (row + open/close detail), feasibility.md,
                       into MNN at the last close), runs/
 src/baseline/         frozen control
 src/verdict/          schema.json, build.py, gate.py, replay_history
+src/gates/            ruling_cited.py, two_key.py (M02 PR 2; gates.yml runs them)
+src/validate/         checks.py and the M02 modules (codeowners, edges, golden_ids, semver, ruleset)
+.github/CODEOWNERS    the seat table as owner lines (Security); the gates read it from the base ref
 agents/refagent/      the reference agent (title availability): manifest.yaml,
                       prompt.txt, tools/, rules/ (ADR-0003 amendment 1)
 agents/ratings-helper/  manifest-only stub from M02 PR 2 (cut from M01 at open); code at M07
@@ -150,7 +155,8 @@ make evals            baseline, plus refagent from M01, against goldens, CI-equi
 make evals-local      same, your credentials, writes evals/local/ only
 make validate         grows by milestone; the ledger header says what it
                       checked at each tag. M00: golden and ruling front
-                      matter. M01+: schema, seats, edges, semver, cdk-nag
+                      matter. M01: schema, workflow hash, cdk-nag. M02: CODEOWNERS,
+                      relaxes, edges, golden ids, semver, the live ruleset
 make plants           list plants and whether each fired on last run
 make ledger           print the ledger with measured values; exits 1 if a
                       Measured cell differs from its envelope

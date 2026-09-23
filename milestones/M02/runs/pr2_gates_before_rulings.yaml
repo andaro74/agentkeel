@@ -1,0 +1,67 @@
+# Cold review of PR 2, N2: the two gates run on this branch before its ruling files existed
+# (commit 0fc95a6, the Door 2 commit, against main c77e872), recorded so the sentence in
+# milestones/M02/README.md rests on an output and not on prose. Re-read with the commands below.
+# Not an envelope; rules nothing; the seeds are the measurement, not this.
+run_at: 2026-09-22
+tree: 0fc95a6
+base: c77e872
+commands:
+  - uv run python -m src.gates.two_key --base c77e872 --tree 0fc95a6 --pr 12
+  - uv run python -m src.gates.ruling_cited --base c77e872 --tree 0fc95a6 --pr 12
+two_key_exit: 1
+two_key_output: |
+  two-key: 1 relaxation(s) without two keys:
+    unkeyed evals/goldens/v1/g-012.yaml: g-012 retired (retired: M02); two keys from two distinct seats are needed and no seat holds a key: none; the owner seat Data Owner holds none. Two files from the same seat are one key.
+ruling_cited_exit: 1
+ruling_cited_output: |
+  ruling-cited: 50 uncovered path(s) in the diff (CODEOWNERS read from the PR itself, because the base c77e87270e61 has no .github/CODEOWNERS):
+    uncovered .github/CODEOWNERS: owned by Security; no ruling file with pr: 12 and seat: Security authorises it
+    uncovered .github/workflows/deploy.yml: owned by Security; no ruling file with pr: 12 and seat: Security authorises it
+    uncovered .github/workflows/evals.yml: owned by Security; no ruling file with pr: 12 and seat: Security authorises it
+    uncovered .github/workflows/gates.yml: owned by Security; no ruling file with pr: 12 and seat: Security authorises it
+    uncovered Makefile: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered agents/ratings-helper/manifest.yaml (ceilings, may_be_called_by, may_call, version): owned by Tool Owner; no ruling file with pr: 12 and seat: Tool Owner authorises it
+    uncovered agents/ratings-helper/manifest.yaml (daily_usd, max_tokens_per_session, model): owned by Threshold Owner; no ruling file with pr: 12 and seat: Threshold Owner authorises it
+    uncovered agents/ratings-helper/manifest.yaml (data_class, name, platform_version, rollout): owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered agents/ratings-helper/manifest.yaml (endpoint_allowlist, seats): owned by Security; no ruling file with pr: 12 and seat: Security authorises it
+    uncovered agents/refagent/Dockerfile: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered evals/goldens/v1/g-012.yaml: owned by Data Owner; no ruling file with pr: 12 and seat: Data Owner authorises it
+    uncovered evals/goldens/v1/g-021.yaml: owned by Data Owner; no ruling file with pr: 12 and seat: Data Owner authorises it
+    uncovered infra/bootstrap/app.py: owned by Security; no ruling file with pr: 12 and seat: Security authorises it
+    uncovered infra/workflows.sha256: owned by Security; no ruling file with pr: 12 and seat: Security authorises it
+    uncovered milestones/M02/runs/api_probes.yaml: owned by Product; no ruling file with pr: 12 and seat: Product authorises it
+    uncovered milestones/M02/runs/rehearsal_doors.json: owned by Product; no ruling file with pr: 12 and seat: Product authorises it
+    uncovered milestones/M02/runs/rehearsal_doors.yaml: owned by Product; no ruling file with pr: 12 and seat: Product authorises it
+    uncovered milestones/M02/runs/rehearsal_seed_prs.json: owned by Product; no ruling file with pr: 12 and seat: Product authorises it
+    uncovered milestones/M02/runs/rehearsal_seed_prs.yaml: owned by Product; no ruling file with pr: 12 and seat: Product authorises it
+    uncovered milestones/M02/runs/row10_first_deploy.yaml: owned by Product; no ruling file with pr: 12 and seat: Product authorises it
+    uncovered milestones/M02/runs/row16_second_workflow.yaml: owned by Product; no ruling file with pr: 12 and seat: Product authorises it
+    uncovered scripts/observe_pr.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/agent/run.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/gates/__init__.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/gates/ruling_cited.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/gates/two_key.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/manifest/schema.json: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/validate/checks.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/validate/codeowners.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/validate/edges.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/validate/golden_ids.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/validate/ruleset.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/validate/semver.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/verdict/__init__.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/verdict/build.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered src/verdict/gate.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/fixtures/README.md: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_bootstrap.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_build.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_cost_cap_and_ledger.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_deploy_image_architecture.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_gate.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_gates.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_m01_seeds.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_m02_seeds.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_observe_pr.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_replay_history.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_retired.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered tests/test_validate_m02.py: owned by Engineering; no ruling file with pr: 12 and seat: Engineering authorises it
+    uncovered thresholds.yaml: owned by Threshold Owner; no ruling file with pr: 12 and seat: Threshold Owner authorises it

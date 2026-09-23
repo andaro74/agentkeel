@@ -125,13 +125,29 @@ ruleset; `evals` reads goldens as they are, not as they were.
 passes only if both do. First, at PR 2, the junit result of the tests in
 `tests/test_m02_seeds.py`: S1 (both forms), S2, S3 and S5 each apply
 their seed to a copy of the tree and ask `src/gates/` and `validate` to
-refuse it; S4's test reads `f2_1_bypass.yaml` and the ruleset export.
+refuse it (the Makefile's `F2_1_CASES`). S4's test reads
+`f2_1_bypass.yaml` and the ruleset export, and is not in that list: it
+is the weaker witness (§5.1), and its marker stays until the attempts.
 Second, at PR 3, the GitHub API's record of the seed PRs and of S4's
 attempts, looked up by `scripts/observe_pr.py` from the run files the
 human wrote, as `scripts/observe_attempt.py` reads CloudTrail at M01.
 `F2_2` is read the same way from `f2_2_three_doors.yaml`, at PR 3. A
 human-written file feeds no check by itself; the check is the CI lookup
 of the PR number.
+
+**Amended at PR 2 (Product, `milestones/M02/rulings/pr2.md`).** As first
+written, §7 had `checks.F2_1` failing on PR 2's own run because S4's
+`observed` is null. That cannot be executed: `evals` is a required check
+on the `main` ruleset, its job exits with the gate's code, and a RED
+envelope would have left PR 2 unable to merge through the very ruleset
+it measures, with `bypass_actors` `[]`. So PR 2's envelope carries
+`checks.F2_1` from the first source alone, and the second source and
+`checks.F2_2` are wired into `evals.yml` and the Makefile at PR 3 with
+the observations (`--check-seed-prs`, `--check-bypass`, `--check-doors`,
+all in `build` from PR 2). The gate is to require both checks on every
+agent envelope from PR 2's merge commit on, a constant set at PR 3 as
+`ADR_0007`'s was at M01 PR 3, so that a later run that forgot them is
+RED. That is one more line of the P3 exception §5.1 already names.
 
 **P5.** The gate that refuses a PR is a workflow (`gates.yml`, Security)
 running `src/gates/` (Engineering); it never writes an envelope.
@@ -251,8 +267,10 @@ None of it is in PR 1.
   `agents/*/manifest.yaml`; no cycle in the call graph; ceilings within
   `thresholds.yaml` bounds; live `main` ruleset equal to
   `infra/ruleset/main.json` with `bypass_actors: []` (open.md row 5); a
-  golden id present on `main` is present in the PR or has `retired:` set
-  (S5). The ledger header gains a row for M02 PR 2 listing exactly what
+  golden id present on `main` is present in the PR, retired or not:
+  `retired:` is how a golden leaves the run, and its file stays so that
+  the id is never reused (S5; data-owner on PR 2, F3, which found the
+  first draft of this line let a retired file go). The ledger header gains a row for M02 PR 2 listing exactly what
   landed, under the rows for M01 PR 2 and `m01` that PR 1 adds (note 12).
 - **Computed semver** (Tool Owner, row 20): `validate` computes the
   version each tool schema and each edge would need from the diff
@@ -260,11 +278,15 @@ None of it is in PR 1.
   manifest asserts a smaller one.
 - **`agents/ratings-helper/manifest.yaml`** (Tool Owner for the edge,
   Threshold Owner for the model fields, Engineering for the rest): a
-  manifest-only stub with `may_be_called_by: [refagent]`, so that the
-  two-sided edge exists and S3 has a side to be missing. SPEC/00 §8 M01
-  and CLAUDE.md list it under M01; M01 cut it at open (SPEC/01 §10) and
-  did not build it. Its code, the 12-row table and budget headers are M07
-  (§10).
+  manifest-only stub, so that the edge has a second side to be declared
+  on and S3 has a side to be missing. **As built at PR 2 neither side is
+  declared** (`may_be_called_by: []`, refagent's `may_call: []`): a stub
+  that named refagent would itself be one-sided on `main`, and a
+  two-sided edge on `main` would have made S3's patch stop applying; the
+  seed is never edited. The edge is declared on both sides by the M07 PR
+  that brings the code, with a major bump. SPEC/00 §8 M01 and CLAUDE.md
+  list it under M01; M01 cut it at open (SPEC/01 §10) and did not build
+  it. Its code, the 12-row table and budget headers are M07 (§10).
 - **`scripts/observe_pr.py`** (Engineering): given a run file naming PR
   numbers and attempts, asks the GitHub API what happened to each
   (check-run conclusions on the head sha, the job log's uncovered-path
@@ -282,11 +304,13 @@ None of it is in PR 1.
   the seeds as committed: a patch file is not a golden, a threshold or a
   manifest, and `f2_1_bypass.yaml` is not a ruling.
 - **PR 2's run on the PR.** S1 (both forms), S2, S3 and S5 each refused
-  with the planted reason among the reasons; S4's test fails on
-  `observed: null`, which is the row RED until the attempts are made;
-  `checks.F2_1` therefore fails on PR 2's own run and passes only at PR
-  3. `two-key` green on PR 2 with the two files for `g-012`. No count of
-  refagent's passes changes; the checks decide the row.
+  with the planted reason among the reasons, and `checks.F2_1` on PR 2's
+  envelope is that first source alone (§4, amended at PR 2: S4's test
+  keeps its marker, and the second source is PR 3's, or `evals` would be
+  red and PR 2 could not merge). `two-key` green on PR 2 with the two
+  files for `g-012`. The count of refagent's passes changes by one
+  golden: `g-012` is out of the run and `g-021` is in it, never passed;
+  the checks decide the row.
 - **PR 3's run.** `checks.F2_1` pass on both halves; `checks.F2_2` pass:
   three PR numbers, three records.
 - **The row goes RED** if any seed PR's required check is green, if

@@ -548,7 +548,15 @@ class BootstrapStack(cdk.Stack):
             sid="DeployThroughCloudFormationOnly",
             actions=["cloudformation:CreateStack", "cloudformation:UpdateStack", "cloudformation:Describe*",
                      "cloudformation:GetTemplate", "cloudformation:CreateChangeSet",
-                     "cloudformation:ExecuteChangeSet"],
+                     "cloudformation:ExecuteChangeSet",
+                     # The update path (M02, the second deploy, run 35734541276 rerun):
+                     # `aws cloudformation deploy` (deploy.yml; the synth is CDK's,
+                     # the deploy is the AWS CLI's) reads the deployed template's
+                     # summary before it makes a change set on an existing stack,
+                     # and deletes a change set that turns out empty. The first
+                     # deploy created the stack and called neither; the second was
+                     # refused on the first.
+                     "cloudformation:GetTemplateSummary", "cloudformation:DeleteChangeSet"],
             resources=[f"arn:aws:cloudformation:{REGION}:{self.account}:stack/agentkeel-*/*"],
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(

@@ -1,0 +1,18 @@
+# open.md row 17: the seed-PR reader of scripts/observe_pr.py, run once at
+# M02 PR 2 against a known record before PR 3's run depends on it. The
+# known record is M02 PR 1 (#11): merged as c77e872, `checks` green on its
+# head 59c7e3d. A seed PR is the opposite shape (unmerged, its check red,
+# the path named in the log), so the instrument must report: found, merged
+# true, check_run conclusion success, required_on_base true, log fetched
+# (log_status 200), path_named_in_log false. build's reader would read that
+# as fail, which is right: PR 1 was not a refusal of anything. Its output
+# is rehearsal_seed_prs.json beside this file. Not an envelope; rules
+# nothing; feeds no check.
+seeds:
+  - seed: rehearsal (M02 PR 1, #11)
+    patch: none
+    expected_check: checks
+    expected_path: infra/construct/governed_agent.py
+observed:
+  - seed: rehearsal (M02 PR 1, #11)
+    pr: 11

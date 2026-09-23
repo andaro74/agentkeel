@@ -31,3 +31,27 @@ cost_cap:
 baseline_card:
   path: evals/history/9407615dcde09308490f6699c21a18100bfedcd2.baseline-card.json
   sha256: b0219756cad63be67fb51aa4632dd015084840833341f15235fab4569adc3295
+
+# Threshold Owner (M02 PR 2, milestones/M02/rulings/pr2-threshold-owner.md).
+# The platform's ceilings: the most any manifest may ask for (SPEC/00 §6:
+# depth 2, fan-out 3; concurrency and per-edge rps at refagent's M01
+# values, the only tenant that has run). `make validate` fails a manifest
+# whose `ceilings` exceed these. Each relaxes upward.
+ceilings:
+  concurrency: 2
+  rps_per_edge: 1
+  depth: 2
+  fan_out: 3
+
+# Threshold Owner (M02 PR 2): which direction relaxes each bar, read by
+# `two-key` (src/gates/two_key.py) instead of the comments above. A bar is a
+# numeric leaf under the mappings in this file; `baseline_card` is a pin,
+# not a bar (M01 PR 1, ruling 3: a new base is ruled, not built). A bar with
+# no entry here, or an entry that names no bar, fails `make validate`, and
+# `two-key` refuses a move on a bar whose direction it cannot read.
+relaxes:
+  cost_cap.tokens_per_run: up
+  ceilings.concurrency: up
+  ceilings.rps_per_edge: up
+  ceilings.depth: up
+  ceilings.fan_out: up

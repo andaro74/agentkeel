@@ -98,6 +98,27 @@ def test_s8_an_agent_outside_the_construct_is_refused_at_synth():
     assert refusal is not None and "not a GovernedAgent's own runtime" in refusal
 
 
+def covering(seed: dict, goldens: dict) -> list[dict]:
+    """The seed's answers, plus one uncited answer for every live golden the seed predates.
+
+    M02 PR 2 retired g-012 and added g-021 (Door 2). The seed was planted over
+    M00's fifteen goldens; build drops the retired answer and refuses a raw
+    file that does not cover g-021. The test overlays an uncited answer for
+    it, as it overlays the pin and the commit: what the seed shows, fifteen
+    right answers that cite nothing, is unchanged, and so is the file.
+    """
+    have = {o["id"] for o in seed["observations"]}
+    template = seed["observations"][0]
+    extra = []
+    for g in sorted(set(goldens) - have):
+        golden = goldens[g]
+        # the right answer fields and no citation, as every answer in the seed
+        parsed = dict(golden["expected"]["answer_fields"]) if golden["kind"] in build.CITING_KINDS else None
+        extra.append({**template, "id": g, "kind": golden["kind"], "question": golden["question"],
+                      "parsed": parsed, "text": json.dumps(parsed)})  # fmt: skip
+    return seed["observations"] + extra
+
+
 def test_s7_an_answer_that_cites_nothing_is_not_a_pass(tmp_path, goldens):
     """Every answer field right, no table_row, no clause_id: pass false, checks.F1_4 fail, RED (F1.4)."""
     control_raw = tmp_path / f"{COMMIT}.baseline-raw.json"
@@ -111,7 +132,7 @@ def test_s7_an_answer_that_cites_nothing_is_not_a_pass(tmp_path, goldens):
     # is the one planned when it was planted (Sonnet 5, before ruling p); the
     # test overlays the pin and where it ran (ADR-0007) as it overlays the
     # commit, so the gate reads F1.4 and does not stop at the pin.
-    agent_raw.write_text(json.dumps({**seed, **AGENT_TOP, "commit": COMMIT}), encoding="utf-8")
+    agent_raw.write_text(json.dumps({**seed, "observations": covering(seed, goldens), **AGENT_TOP, "commit": COMMIT}), encoding="utf-8")
     out, no_history = tmp_path / f"{COMMIT}.json", tmp_path / "no-history"
     assert build.main(["envelope", "--raw", str(agent_raw), "--control-card", str(card), "--out", str(out),
                        "--history-dir", str(no_history), "--run-url", URL]) == 0  # fmt: skip
@@ -139,7 +160,7 @@ def test_s7_as_committed_is_refused_at_build_since_adr_0007(tmp_path, goldens):
     seed = json.loads((FIXTURES / "refagent_raw_uncited.json").read_text(encoding="utf-8"))
     assert "mode" not in seed and "bundle" not in seed  # untouched since it was planted
     agent_raw = tmp_path / f"{COMMIT}.agent-raw.json"
-    agent_raw.write_text(json.dumps({**seed, "commit": COMMIT}), encoding="utf-8")
+    agent_raw.write_text(json.dumps({**seed, "observations": covering(seed, goldens), "commit": COMMIT}), encoding="utf-8")
     assert build.main(["envelope", "--raw", str(agent_raw), "--control-card", str(card),
                        "--out", str(tmp_path / "out.json"), "--history-dir", str(tmp_path / "none"),
                        "--run-url", URL]) == 3  # fmt: skip

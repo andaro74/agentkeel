@@ -76,9 +76,9 @@ def test_refuses_a_dirty_tree(tmp_path, goldens, capsys):
 
 def test_refuses_observations_that_do_not_cover_the_goldens(tmp_path, goldens, capsys):
     raw = make_raw(goldens)
-    raw["observations"].pop()
+    dropped = raw["observations"].pop()["id"]  # the last live golden; g-021 from M02 PR 2
     assert run(tmp_path, raw) == 3
-    assert "missing ['g-015']" in capsys.readouterr().err
+    assert f"missing ['{dropped}']" in capsys.readouterr().err
 
 
 def envelope_args(raw_path, card_path, out, *extra):
@@ -97,7 +97,7 @@ def test_refuses_a_card_for_another_commit(tmp_path, chain):
 
 def test_when_no_agent_ran_the_envelope_is_the_controls_in_m00s_form(chain):
     """ADR-0004 amendment 2, ruling A: one subject, the control; its own card is the base."""
-    envelope_path, card_path, _ = chain(right={"g-012"})
+    envelope_path, card_path, _ = chain(right={"g-010"})
     envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
     assert {r["scope"] for r in envelope["goldens"].values()} == {"control"}
     assert envelope["control_card_ref"] is None

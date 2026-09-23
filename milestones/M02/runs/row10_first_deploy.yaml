@@ -1,0 +1,101 @@
+# open.md row 10 (Security, M02 PR 2): read from the first deploy after
+# M02 PR 1 merged, not assumed. Written 2026-09-22 from the account and the
+# run record; every value below can be re-read with the command beside it.
+# Not an envelope; rules nothing. What it answers: whether the image pull
+# goes through the runtime's network interface (yes), and why the runtime
+# never answered (an amd64 image on an arm64-only service). The load
+# check's answer and cfn-exec's vpc-lattice scope stay open until the
+# arm64 run at PR 2's merge (`observed_at_pr2_merge`).
+row: 10
+seat: Security
+trigger: merge of PR #11 (c77e872) to main, deploy.yml run 35734541276
+recorded_by: the human, with the session, from `aws` and `gh` output
+
+attempts:
+  - attempt: 1
+    at: 2026-09-22T13:36:29Z to 13:58:30Z
+    image: sha256:6fcd185b6bf586b5016c112aaaa02c85f0f86f496c1c22e269785172291c7487  # reused from the failed M01 deploy, amd64
+    stack: CREATE_COMPLETE at 13:42:04Z; the rights table created with TableEncryption.DEFAULT (row 9 held)
+    runtime: refagent-Du2VJx6xWc READY at 13:41:57Z
+    load_table: succeeded, 4 s
+    check_at_load: hung from 13:42:10Z; cancelled by the human at 13:58
+    runtime_log: >-
+      one line, repeated every few seconds, and nothing from refagent's code:
+      status: NotFound, message: "parent snapshot sha256:db80abbd0828f7d6f950e173e137eb9229b5d86b12446902c49affbfd3d2c2dc does not exist: not found"
+    read_with: MSYS_NO_PATHCONV=1 aws logs tail /aws/bedrock-agentcore/runtimes/refagent-Du2VJx6xWc-DEFAULT --region us-west-2 --since 2026-09-22T13:42:00Z --format short
+  - attempt: 2
+    at: 2026-09-22T13:59:49Z to 14:01:12Z
+    before: the human deleted image 6fcd185b from ECR so the build step would rebuild
+    image: sha256:9b4dea8e5dbc83916babad065d6a4f5a226fb9eaf79d4dcb563924ea38fe765c  # rebuilt on x86, amd64, pushed 14:00:54Z
+    failed_at: Deploy refagent's stack, before the change set
+    message: >-
+      An error occurred (AccessDenied) when calling the GetTemplateSummary operation:
+      User: arn:aws:sts::581208540944:assumed-role/agentkeel-deploy/agentkeel-deploy-35734541276
+      is not authorized to perform: cloudformation:GetTemplateSummary
+    cause: the deploy role's CloudFormation statement was written for the create path; the update path calls GetTemplateSummary and DeleteChangeSet
+    fix: m02-pr2 4db2211 (the grant), 2c0cbd3 (the test that fails without it); the human deployed the bootstrap stack by hand, UPDATE_COMPLETE
+  - attempt: 3
+    at: 2026-09-22T14:22:47Z to 14:23:59Z
+    image: sha256:9b4dea8e…  # reused; the tag is immutable
+    failed_at: RefagentRuntime148EBA78 UPDATE_FAILED at 14:23:31Z
+    message: >-
+      Invalid request provided: Architecture incompatible for uri
+      '581208540944.dkr.ecr.us-west-2.amazonaws.com/agentkeel-refagent@sha256:9b4dea8e…'.
+      Supported platforms: [arm64] (Service: BedrockAgentCoreControl, Status Code: 400,
+      Request ID: fd9befc7-f300-442f-83fb-6acf4df4e9a8)
+    rollback: >-
+      UPDATE_ROLLBACK_FAILED at 14:23:35Z: the rollback set the runtime back to 6fcd185b, which
+      no longer exists in the repository (Request ID: 645cdb7d-99d0-4903-ae9c-6a0d46f50b40)
+  - attempt: 4
+    at: 2026-09-22T14:33:42Z to 14:35:13Z
+    before: the human deleted 9b4dea8e; main's deploy.yml rebuilt on x86 again
+    image: sha256:822fe2b593fecbb1e209b9612aec75f2ce1b07045ec9dce3403b0c221422e493  # amd64, pushed 14:34:23Z
+    failed_at: RefagentRuntime148EBA78 UPDATE_FAILED at 14:34:46Z
+    message: the same, Request ID 04c9c5dc-4aea-47df-8b7e-c65fcc23e983
+    rollback: UPDATE_ROLLBACK_FAILED at 14:34:50Z, the same reason (Request ID 68840b7b-61ba-4f8d-8956-3dae7ff9355b)
+  read_with: |
+    gh api repos/andaro74/agentkeel/actions/runs/35734541276/jobs?filter=all
+    MSYS_NO_PATHCONV=1 aws cloudformation describe-stack-events --region us-west-2 --stack-name agentkeel-refagent --query 'StackEvents[?ResourceStatus==`UPDATE_FAILED`].[Timestamp,ResourceStatusReason]'
+
+what_was_read:
+  image_pull_through_the_runtimes_interface: yes
+  evidence: >-
+    CloudTrail, EventSource ecr.amazonaws.com, from 13:42Z: every ~20 s a new session pulled the
+    image as refagent's own role (arn:aws:iam::581208540944:role/agentkeel/agents/agentkeel-refagent-RefagentRole5888DB41-i9IqTXU6NVSL):
+    GetAuthorizationToken from sourceIPAddress 10.20.0.190, inside subnet 10.20.0.0/24 of the
+    platform VPC, then BatchGetImage and eleven GetDownloadUrlForLayer, no errorCode.
+  read_with: MSYS_NO_PATHCONV=1 aws cloudtrail lookup-events --region us-west-2 --lookup-attributes AttributeKey=EventSource,AttributeValue=ecr.amazonaws.com --start-time 2026-09-22T13:36:00Z
+  network_path_for_the_layers: correct throughout
+  evidence_network: >-
+    the runtime's security group sg-003ad866687089f27 allows 443 to pl-68a54001 (s3) and
+    pl-00a54069 (dynamodb) and to the five interface-endpoint groups; the SSM prefix-list
+    parameters match the real ids; the S3 gateway endpoint vpce-0935bc42f2c1e5172 is on both
+    subnets' route tables and its policy allows s3:GetObject on prod-us-west-2-starport-layer-bucket/*;
+    all seven endpoints available.
+  why_the_runtime_never_answered: >-
+    the image was amd64. AgentCore Runtime runs arm64 only. CreateAgentRuntime accepted the
+    amd64 image and the host could not start it ("parent snapshot ... does not exist");
+    UpdateAgentRuntime refuses one outright ("Architecture incompatible"). Nothing in the tree
+    named the architecture; no test could have read it. Ours, not the platform's.
+  fix: m02-pr2 d426573 (arm64 runner, the build step refuses any other architecture, the Dockerfile pins linux/arm64), eb104e3 (the three readers, failing first)
+  not_read_yet:
+    - the load check's answer (the runtime has never started)
+    - cfn-exec's vpc-lattice actions scoped from CloudTrail (no session ever reached the lattice association)
+    - whether the arm64 runner image carries the docker and aws CLI the job expects
+
+state_left_by_the_human:
+  agent_stack: UPDATE_ROLLBACK_COMPLETE at 2026-09-22T15:19:15Z, by the human, with `continue-update-rollback --resources-to-skip RefagentRuntime148EBA78` (describe-stack-events: UPDATE_ROLLBACK_IN_PROGRESS 15:19:12Z, the runtime resource UPDATE_COMPLETE 15:19:14Z)
+  runtime_image_reference: sha256:6fcd185b…, deleted from ECR; replaced by the next successful update
+  ecr: sha256:822fe2b5… (amd64) left under the immutable tag on purpose, so the first arm64 run refuses to reuse it by name; the human then deletes it and reruns that job
+  # Read at PR 2, before the merge (the session, 2026-09-22): that refusal by name will NOT fire at
+  # PR 2's merge. The tag is the bundle digest, and the bundle is every file under agents/refagent/
+  # (src/bundle/pack.py), the Dockerfile included; d426573's platform pin moved it. Digests:
+  #   main (c77e872)   bf0afd04cd1be49c9eb7e43961e927cf9cae8ac9afeb5d97b3eb0f0f5610220e
+  #   this branch      9ea5fac4053d1fe6a82a46e9a200cbd5d4512332355ce08e907da5f61ef6351a
+  #   the ECR tag      26ed38d150044927d8aa0c684966366001928041bf87d3dbc4e086e1276e99de (the failed M01 image's)
+  # So the merge finds no image under its tag, builds fresh on the arm64 runner, and pushes; 822fe2b5
+  # stays under 26ed38d1 until deleted by hand. The reuse branch's refusal is exercised by
+  # tests/test_deploy_image_architecture.py and fires in the account only on a rerun whose tag already
+  # holds an amd64 image. Security decides whether to delete 822fe2b5 before or after the merge.
+
+observed_at_pr2_merge: null  # the arm64 run: its id, the refusal of 822fe2b5, the rebuild, the runtime's first log lines, the load check's answer

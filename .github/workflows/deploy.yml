@@ -2,6 +2,13 @@
 # Authorised by SPEC/00-overview.md#8-M01 and milestones/M01/rulings/pr2.md.
 # Its hash is listed in infra/workflows.sha256, which `make validate` reads.
 #
+# M02 PR 2: the deploy job runs on an arm64 runner and the build step reads
+# the image's architecture. AgentCore Runtime runs arm64 images only; the
+# two images this file built on x86 were amd64, and the runtime never
+# started from the first (run 35734541276, "parent snapshot ... does not
+# exist") and refused the second ("Architecture incompatible"). The
+# repository is public, so the arm64 runner is free.
+#
 # On `main` only. Packs refagent's bundle, signs the archive with cosign
 # keyless, verifies it, builds and pushes the image, verifies again inside
 # the job that deploys, and deploys `AgentkeelRefagent` through the deploy
@@ -109,7 +116,7 @@ jobs:
 
   deploy:
     needs: sign
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm # arm64: the only architecture AgentCore Runtime runs (M02 PR 2)
     timeout-minutes: 30
     permissions:
       contents: read
@@ -168,11 +175,26 @@ jobs:
           # takes ecr:BatchGetImage, which the deploy role already has.
           existing=$(aws ecr batch-get-image --repository-name "$IMAGE" --image-ids imageTag="$tag" \
             --query 'images[0].imageId.imageDigest' --output text)
+          # AgentCore Runtime runs arm64 only (M02 PR 2). An image of any other
+          # architecture is refused here, before a push or a reuse, with its
+          # digest named: the runtime accepted an amd64 image once and never
+          # started from it, and the tag is immutable, so a wrong image under
+          # it has to be deleted by hand before this step can rebuild.
+          refuse_unless_arm64() {
+            arch=$(docker inspect --format='{{.Architecture}}' "$1")
+            if [ "$arch" != "arm64" ]; then
+              echo "::error::$1 is $arch; AgentCore Runtime runs arm64 only. Delete it from ECR by digest and rerun."
+              exit 1
+            fi
+          }
           if [ -n "$existing" ] && [ "$existing" != "None" ]; then
             digest="$existing"
-            echo "image $REGISTRY/$IMAGE:$tag exists; reusing $digest" >> "$GITHUB_STEP_SUMMARY"
+            docker pull "$REGISTRY/$IMAGE@$digest"
+            refuse_unless_arm64 "$REGISTRY/$IMAGE@$digest"
+            echo "image $REGISTRY/$IMAGE:$tag exists; reusing $digest (arm64)" >> "$GITHUB_STEP_SUMMARY"
           else
             docker build -f "$BUNDLE/Dockerfile" -t "$REGISTRY/$IMAGE:$tag" .
+            refuse_unless_arm64 "$REGISTRY/$IMAGE:$tag"
             docker push "$REGISTRY/$IMAGE:$tag"
             digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$REGISTRY/$IMAGE:$tag" | cut -d@ -f2)
           fi

@@ -73,11 +73,23 @@ def load_json(path: Path) -> Any:
 
 
 def load_goldens(goldens_dir: Path) -> dict[str, dict[str, Any]]:
+    """The goldens that are not retired. A retired one is scored by nothing (M02 PR 2, Door 2)."""
     goldens = {}
     for path in sorted(goldens_dir.glob("g-*.yaml")):
         golden = yaml.safe_load(path.read_text(encoding="utf-8"))
-        goldens[golden["id"]] = golden
+        if golden.get("retired") is None:
+            goldens[golden["id"]] = golden
     return goldens
+
+
+def retired_ids(goldens_dir: Path) -> set[str]:
+    """The ids whose file says `retired:`. The frozen control still answers them (ADR-0002); build drops the answers."""
+    retired = set()
+    for path in sorted(goldens_dir.glob("g-*.yaml")):
+        golden = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if golden.get("retired") is not None:
+            retired.add(golden["id"])
+    return retired
 
 
 def load_thresholds(path: Path) -> dict[str, Any]:
@@ -142,11 +154,17 @@ def score_one(
 
 
 def score_all(
-    raw: dict[str, Any], goldens: dict[str, dict[str, Any]], rows: set[str], clauses: set[str]
-) -> dict[str, dict[str, Any]]:
+    raw: dict[str, Any], goldens: dict[str, dict[str, Any]], rows: set[str], clauses: set[str],
+    retired: set[str] = frozenset(),
+) -> dict[str, dict[str, Any]]:  # fmt: skip
     observations = {o["id"]: o for o in raw["observations"]}
     if len(observations) != len(raw["observations"]):
         raise Refused("raw observations repeat a golden id")
+    # A runner that still answers a retired golden (the frozen control,
+    # ADR-0002) is not wrong; its answer to it is simply not scored.
+    for golden_id in sorted(set(observations) & retired):
+        del observations[golden_id]
+        print(f"note: {golden_id} is retired; its answer is not scored", file=sys.stderr)
     if set(observations) != set(goldens):
         missing = sorted(set(goldens) - set(observations))
         extra = sorted(set(observations) - set(goldens))
@@ -295,6 +313,76 @@ def both(checks: dict[str, dict[str, str]], falsifier: str, result: dict[str, st
     first = checks[falsifier]
     status = "pass" if first["status"] == "pass" and result["status"] == "pass" else "fail"
     return checks | {falsifier: {"status": status, "url": first["url"]}}
+
+
+def check_from_seed_prs(path: Path, run_url: str | None) -> dict[str, str]:
+    """pass when every seed PR was refused by the check it expected, naming its path (SPEC/02 §4, F2.1's second source).
+
+    Read from `scripts/observe_pr.py`'s observation of `f2_1_seed_prs.yaml`:
+    each seed has a PR, the PR is not merged, the expected check concluded
+    failure on its head, that check is required on the base, and the job
+    log names the seed's path. A red check that names no path is not a
+    refusal of the seed.
+    """
+    if not run_url:
+        raise Refused("a check needs the CI run URL (--run-url)")
+    seeds = load_json(path).get("seeds") or []
+    held = bool(seeds) and all(
+        s.get("found") is True and s.get("merged") is False and (s.get("check_run") or {}).get("conclusion") == "failure"
+        and s.get("required_on_base") is True and s.get("path_named_in_log") is True
+        for s in seeds
+    )  # fmt: skip
+    return {"status": "pass" if held else "fail", "url": run_url}
+
+
+def check_from_bypass(path: Path, run_url: str | None) -> dict[str, str]:
+    """pass when the owner's two attempts were refused (SPEC/02 §5.1, S4; Door 3's two gates).
+
+    Attempt 1: S1's PR is not merged, and either the rule-suites API holds
+    a failed evaluation for the actor or the human's own output carries
+    the refusal's words (the weaker witness, named as such in the
+    observation). Attempt 2: the human recorded `validate` RED while the
+    actor was listed, and the live ruleset's `bypass_actors` is `[]` now.
+    """
+    if not run_url:
+        raise Refused("a check needs the CI run URL (--run-url)")
+    seen = load_json(path)
+    first, second = seen.get("attempt_1") or {}, seen.get("attempt_2") or {}
+    refused_merge = (
+        first.get("found") is True and first.get("merged") is False
+        and (first.get("rule_suite_fail_found") is True or first.get("human_message_contains") is True)
+    )  # fmt: skip
+    refused_ruleset = (
+        (second.get("human_said") or {}).get("validate_result") == "RED"
+        and (second.get("live_now") or {}).get("bypass_actors") == []
+    )  # fmt: skip
+    return {"status": "pass" if refused_merge and refused_ruleset else "fail", "url": run_url}
+
+
+def check_from_doors(path: Path, run_url: str | None) -> dict[str, str]:
+    """pass when the three doors are in the PR record as SPEC/00 §8 M02 describes them (F2.2)."""
+    if not run_url:
+        raise Refused("a check needs the CI run URL (--run-url)")
+    doors = {d.get("door"): d for d in load_json(path).get("doors") or []}
+    one, two, three = doors.get(1) or {}, doors.get(2) or {}, doors.get(3) or {}
+    door_1 = (
+        one.get("found") is True and one.get("merged") is False
+        and (one.get("two_key") or {}).get("conclusion") == "failure" and one.get("path_named_in_log") is True
+    )  # fmt: skip
+    door_2 = (
+        two.get("found") is True and two.get("merged") is True
+        and (two.get("two_key") or {}).get("conclusion") == "success" and len(two.get("distinct_seats") or []) >= 2
+        and two.get("relaxation_keyed") is True  # the gate named a keyed relaxation, not merely two files
+    )  # fmt: skip
+    bypass = three.get("bypass") or {}
+    first, second = bypass.get("attempt_1") or {}, bypass.get("attempt_2") or {}
+    door_3 = (
+        three.get("found") is True and three.get("merged") is False
+        and (first.get("rule_suite_fail_found") is True or first.get("human_message_contains") is True)
+        and (second.get("human_said") or {}).get("validate_result") == "RED"
+        and (second.get("live_now") or {}).get("bypass_actors") == []
+    )  # fmt: skip
+    return {"status": "pass" if door_1 and door_2 and door_3 else "fail", "url": run_url}
 
 
 def check_from_pr(path: Path) -> dict[str, str]:
@@ -485,6 +573,14 @@ def main(argv: list[str] | None = None) -> int:
                         metavar=("ID", "OBSERVATION"))  # fmt: skip
     parser.add_argument("--check-pr", nargs=2, action="append", default=[],
                         metavar=("ID", "OBSERVATION"))  # fmt: skip
+    # M02 (SPEC/02 §4): the second source of F2_1 and the source of F2_2,
+    # from scripts/observe_pr.py. Each joins its falsifier through both().
+    parser.add_argument("--check-seed-prs", nargs=2, action="append", default=[],
+                        metavar=("ID", "OBSERVATION"))  # fmt: skip
+    parser.add_argument("--check-bypass", nargs=2, action="append", default=[],
+                        metavar=("ID", "OBSERVATION"))  # fmt: skip
+    parser.add_argument("--check-doors", nargs=2, action="append", default=[],
+                        metavar=("ID", "OBSERVATION"))  # fmt: skip
     parser.add_argument("--run-url")
     parser.add_argument("--allow-dirty", action="store_true")
     args = parser.parse_args(argv)
@@ -494,7 +590,7 @@ def main(argv: list[str] | None = None) -> int:
         if raw.get("dirty") and not args.allow_dirty:
             raise Refused("the tree was dirty when the runner ran; the commit does not name what ran")
         goldens = load_goldens(args.goldens)
-        results = score_all(raw, goldens, *load_citables(ROOT))
+        results = score_all(raw, goldens, *load_citables(ROOT), retired=retired_ids(args.goldens))
 
         if args.what == "card":
             emit(compose_card(raw, results), args.out, envelope=False)
@@ -509,6 +605,12 @@ def main(argv: list[str] | None = None) -> int:
                 checks = both(checks, i, check_from_cases(Path(p), names, args.run_url))
             for i, p in args.check_attempt:
                 checks = both(checks, i, check_from_attempt(Path(p), args.run_url))
+            for i, p in args.check_seed_prs:
+                checks = both(checks, i, check_from_seed_prs(Path(p), args.run_url))
+            for i, p in args.check_bypass:
+                checks = both(checks, i, check_from_bypass(Path(p), args.run_url))
+            for i, p in args.check_doors:
+                checks = both(checks, i, check_from_doors(Path(p), args.run_url))
             kinds = {g: golden["kind"] for g, golden in goldens.items()}
             history = replay_history.load(args.history_dir, exclude_commit=raw["commit"])
             if scope_of(raw, control) == "control":

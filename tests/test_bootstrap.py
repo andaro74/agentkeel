@@ -553,6 +553,12 @@ DEPLOY_STEPS = {
                     "ecr:CompleteLayerUpload", "ecr:PutImage"},
     "cloudformation deploy": {"cloudformation:CreateChangeSet", "cloudformation:ExecuteChangeSet",
                               "cloudformation:DescribeStacks", "iam:PassRole"},
+    # The update path (M02, the second deploy, run 35734541276 rerun): the CDK
+    # CLI reads the deployed template's summary before it makes the change
+    # set, and deletes a change set that turns out empty. The first deploy
+    # created the stack and never called either; the second updated it and
+    # was refused on GetTemplateSummary.
+    "cloudformation deploy, update path": {"cloudformation:GetTemplateSummary", "cloudformation:DeleteChangeSet"},
     "load_rights_table.py": {"dynamodb:PutItem", "dynamodb:DescribeTable"},
     "the load check": {"bedrock-agentcore:InvokeAgentRuntime", "cloudformation:DescribeStacks"},
 }  # fmt: skip

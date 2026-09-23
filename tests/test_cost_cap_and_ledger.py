@@ -79,7 +79,7 @@ def row(measured, state="OPEN"):
 
 
 def test_ledger_fails_when_the_cell_differs_from_the_envelope(chain):
-    envelope_path, _, _ = chain(right={"g-012"})
+    envelope_path, _, _ = chain(right={"g-010"})
     history_dir = envelope_path.parent
     cell = gate.measured_at(envelope_path, history_dir)
     assert ledger.check_measured(row(cell), history_dir) is None

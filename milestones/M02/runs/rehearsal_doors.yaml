@@ -1,0 +1,17 @@
+# open.md row 17 (Security, with Product): no instrument runs first when a
+# run depends on it. scripts/observe_pr.py is run once here, at M02 PR 2,
+# against a record that is already known, before PR 3's run depends on it.
+# The known record is M01 PR 4 (#10): merged as ec0358d on 2026-09-22 with
+# two ruling files carrying pr: 10 (Product, Engineering), and no `two-key`
+# check run on its head, because gates.yml did not exist. The instrument
+# must therefore report: found, merged, two_key null, two ruling files, two
+# distinct seats. Its output is rehearsal_doors.json beside this file.
+# Not an envelope; rules nothing; feeds no check.
+doors:
+  - door: 2
+    what: rehearsal against a known merged PR (M01 PR 4, #10)
+    pr: 10
+    expected: found and merged; two_key null (no gates.yml at that date); rulings_in_merge lists pr4.md and pr4-engineering.md; distinct_seats [Engineering, Product]
+observed:
+  - door: 2
+    pr: 10

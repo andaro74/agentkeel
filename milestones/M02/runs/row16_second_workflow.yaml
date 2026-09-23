@@ -1,0 +1,30 @@
+# open.md row 16 (Security, M02 PR 2): "a second workflow file refused,
+# never observed". Observed here. gates.yml was committed unlisted, with
+# evals.yml's GITHUB_TOKEN line, as 0e78ef8; `make validate` on that
+# commit refuses both, and the next commit lists them. Re-read with:
+#   git checkout 0e78ef8 && make validate
+# Not an envelope; rules nothing. What it does not show: a PR that edits a
+# workflow and infra/workflows.sha256 together, which this check accepts
+# and ruling-cited on infra/** now refuses without a Security ruling
+# (open.md row 7, first half).
+row: 16
+seat: Security
+commit: 0e78ef8
+observed_at: 2026-09-22
+command: make validate
+exit: 2  # GNU make's exit for a recipe that exited 1
+output: |
+  ok   golden front matter
+  ok   golden citations exist in data/
+  ok   ruling front matter
+  FAIL workflow-hash
+       .github/workflows/gates.yml: a workflow file not listed in infra/workflows.sha256
+       .github/workflows/evals.yml: sha256 9c47851b74b0 is not the 0f98f3be7488 listed in infra/workflows.sha256
+  ok   manifest schema
+  ok   cdk-nag, both stacks
+  ok   CODEOWNERS complete, single-owner, logins real
+  ok   relaxes: on every bar
+  ok   edges two-sided, no cycle, ceilings within bounds
+  ok   golden ids against origin/main
+  ok   computed semver
+  ok   live main ruleset equals its export, bypass_actors []

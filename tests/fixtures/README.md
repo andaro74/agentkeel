@@ -61,9 +61,18 @@ or handed in.
 ## M02 (SPEC/02 §5)
 
 Committed at M02 PR 1, one commit per seed, each with its test in
-`tests/test_m02_seeds.py`, before any code that reads them. Each test is
-`xfail(strict=True)` until its reader lands at PR 2, and `strict` is what
-makes a marker come off in the commit that lands the reader.
+`tests/test_m02_seeds.py`, before any code that reads them. Each test was
+`xfail(strict=True)` until its reader landed at PR 2, and `strict` is what
+made a marker come off in the commit that landed the reader.
+
+**Five markers are off as of M02 PR 2**: S1 (both forms) and S2 in the
+commit that landed `src/gates/two_key.py`, S3 and S5 in the commit that
+landed `validate`'s edge and golden-id checks. **S4's marker stays on**:
+its reader, `scripts/observe_pr.py`, landed at PR 2, but the test reads
+`f2_1_bypass.yaml`, whose `observed:` is null until the human makes the
+attempts after PR 2 merges (SPEC/02 §5.1), and a strict marker taken off
+early would fail every run until then. It comes off at PR 3 with the
+attempts.
 
 A seed here is a **diff**, not a file: a unified patch against the tree
 at PR 1's base, under `m02/`, applied to a throwaway worktree by the test
