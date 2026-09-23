@@ -74,7 +74,7 @@ seats:
 
 # Tool Owner: edges. Empty at M01. `ratings-helper` is cut to M02 with the
 # two-sided edge check (SPEC/01 §10, ruling SCOPE).
-may_call: []
+may_call: [ratings-helper@v1]
 may_be_called_by: []
 
 # Tool Owner: ceilings (SPEC/00 §6). Read by validate from M02, when an edge
