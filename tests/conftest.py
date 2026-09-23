@@ -75,7 +75,7 @@ def chain(tmp_path: Path, goldens):
         if agent:
             raw_path = tmp_path / f"{COMMIT}.agent-raw.json"
             raw_path.write_text(json.dumps(make_raw(goldens, right, **{**AGENT_TOP, **top})), encoding="utf-8")
-            flags = claim_1_checks(tmp_path)
+            flags = claim_1_checks(tmp_path) + claim_2_checks(tmp_path)
         assert build.main(["envelope", "--raw", str(raw_path), "--control-card", str(card_path),
                            "--out", str(envelope_path), "--history-dir", str(history), "--run-url", URL,
                            *flags]) == 0  # fmt: skip
@@ -108,6 +108,40 @@ def claim_1_checks(tmp_path: Path) -> list[str]:
              "error_message": "explicit deny in a resource-based policy"}]}), encoding="utf-8")  # fmt: skip
         flags += ["--check-attempt", falsifier, str(observation)]
     return flags
+
+
+def claim_2_checks(tmp_path: Path) -> list[str]:
+    """The flags CI passes for F2_1 and F2_2 from M02 PR 3 (SPEC/02 §4), over files this writes.
+
+    The fixture's commit is not one git can place after M02 PR 2's merge, and
+    the gate holds such an envelope to claim 2 (`required_checks`), so the
+    fixture passes what CI passes: the five seed tests in the junit file, and
+    the three observations `scripts/observe_pr.py` writes, each in the shape
+    `build` reads as a pass.
+    """
+    junit = tmp_path / "junit-m02.xml"
+    names = ("test_s1_one_key_on_a_relaxation_is_refused", "test_s1_two_files_from_one_seat_are_one_key",
+             "test_s2_a_golden_edited_to_green_a_build_is_refused", "test_s3_a_one_sided_edge_is_refused",
+             "test_s5_a_renamed_golden_id_is_refused")  # fmt: skip
+    cases = "".join(f'<testcase classname="tests.test_m02_seeds" name="{name}"/>' for name in names)
+    junit.write_text(f"<testsuites><testsuite>{cases}</testsuite></testsuites>", encoding="utf-8")
+    seed = {"found": True, "merged": False, "check_run": {"conclusion": "failure"}, "required_on_base": True, "path_named_in_log": True}
+    bypass = {"attempt_1": {"found": True, "merged": False, "rule_suite_fail_found": True, "human_message_contains": True},
+              "attempt_2": {"human_said": {"validate_result": "RED"}, "live_now": {"bypass_actors": []}}}  # fmt: skip
+    doors = {"doors": [
+        {"door": 1, **seed, "two_key": {"conclusion": "failure"}},
+        {"door": 2, "found": True, "merged": True, "two_key": {"conclusion": "success"},
+         "distinct_seats": ["Data Owner", "Threshold Owner"], "relaxation_keyed": True},
+        {"door": 3, "found": True, "merged": False, "bypass": bypass},
+    ]}  # fmt: skip
+    files = {"seed_prs": {"seeds": [{"seed": s, **seed} for s in ("S1 one key", "S1 two files, one seat", "S2", "S3", "S5")]},
+             "bypass": bypass, "doors": doors}  # fmt: skip
+    for name, doc in files.items():
+        (tmp_path / f"{name}.json").write_text(json.dumps(doc), encoding="utf-8")
+    return ["--check-cases", "F2_1", ",".join(names), str(junit),
+            "--check-seed-prs", "F2_1", str(tmp_path / "seed_prs.json"),
+            "--check-bypass", "F2_1", str(tmp_path / "bypass.json"),
+            "--check-doors", "F2_2", str(tmp_path / "doors.json")]  # fmt: skip
 
 
 @pytest.fixture
