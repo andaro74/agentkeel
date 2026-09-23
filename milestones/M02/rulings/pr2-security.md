@@ -83,8 +83,8 @@ Ruled as follows, for the human to carry out after this PR merges:
    (`strict_required_status_checks_policy` stays true). Not before the
    merge: a required context nothing reports pins every open PR at
    "Expected".
-2. Export the ruleset at once to a fresh branch, `m02-pr3`, as its first
-   commit (`gh api repos/andaro74/agentkeel/rulesets/23685206 >
+2. Export the ruleset at once, the same day, to a fresh branch, `m02-pr3`, as its first
+   commit, and open PR 3 from it before any seed PR (security-reviewer on PR 2, F3: the window is bounded by that opening) (`gh api repos/andaro74/agentkeel/rulesets/23685206 >
    infra/ruleset/main.json`). Until PR 3 merges that export, `checks` is
    red on every branch off `main` for "live differs from export" as well
    as for any seed. That window is accepted: `scripts/observe_pr.py`
@@ -151,6 +151,17 @@ half, hashing what a workflow runs, stays M05.
 exist), `endpoint_allowlist` the four names a runtime would need to pull
 its image and call the model, and nothing reaches the rights table. No
 runtime is built from it before M07.
+
+## 10. The bot's exemption reads a name anyone can set (security-reviewer F1, cold review F4)
+
+`bot_only` reads `git log --format=%an` for `github-actions[bot]`, which
+`git config user.name` sets. A hand-written envelope committed under
+that name is exempt from `ruling-cited` and is not a relaxation for
+`two-key`. Ruled: the exemption stands until M05, when the reader
+becomes something a committer cannot set (the push actor from the API,
+or the envelope's signature); `docs/platform/overview.md` names it now
+under "What is not enforced", beside the unsigned envelope it is one
+face of. No seeded case at M02 (SPEC/02 §8).
 
 ## What a reader can falsify
 

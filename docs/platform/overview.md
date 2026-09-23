@@ -13,8 +13,11 @@ and which of it has fired on a planted case. SPEC/00 is the authority.
 - **The control** is `src/baseline/`, frozen at tag `m00`. Every number
   the platform reports is a delta against it.
 - **The goldens** are `evals/goldens/v1/g-NNN.yaml`: a question, the
-  expected answer, the row and clause it must cite. An id is never renamed
-  or reused; a golden is retired by setting `retired:`.
+  expected answer, and the row and clause a right answer reads. A trap's
+  or an ordinary golden's answer passes only if it also cites a row and a
+  clause that exist; the citation is not yet compared to the golden's own
+  (M03). An id is never renamed or reused; a golden is retired by setting
+  `retired:`, and its file stays.
 - **A run** is `make evals` in CI: the control and the agent answer every
   live golden, `src/verdict/build.py` scores them into an envelope under
   `evals/history/<commit>.json`, and `src/verdict/gate.py` rules on the
@@ -52,9 +55,16 @@ two checks are made required (SPEC/02 §5.1).
 
 ## What is not enforced at M02
 
-- A person holding every seat can write both keys. The gate proves the
-  change was named and under which seat; it does not prove a second
-  person looked.
+- A person holding every seat can write both keys. The gate records that
+  the change was named and under which seat; it does not record that a
+  second person looked. A ruling file is read for its seat, its globs
+  and its number, never for what it says.
+- The bot's exemption under `evals/history/` reads a commit's author
+  name, which anyone can set with `git config`. Until M05 reads something
+  a committer cannot set (the push actor from the API, or a signature), a
+  hand-written envelope committed under the bot's name passes both gates.
+- The gates run the pull request's own copy of `src/gates/`; a PR can
+  edit the gate it is gated by (M05).
 - A PR that edits a workflow can edit `src/`, `scripts/` and the
   `Makefile` it runs; only the workflow's text is hashed (M05).
 - The envelope is written by the PR's own code; nothing signs it (M05).

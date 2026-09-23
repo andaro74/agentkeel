@@ -25,7 +25,10 @@ name: ratings-helper
 version: 1.0.0
 
 # Threshold Owner: the same pin as refagent's, so that a swap at M04 moves
-# both or neither. Nothing calls it before M07.
+# both or neither. Nothing calls it before M07. Lifecycle read from
+# list-foundation-models on 2026-09-20 (milestones/M01/runs/model_lifecycle.txt):
+# one id, no version suffix, ACTIVE; `version: null` records that Bedrock
+# returns no version for it (ruling G).
 model:
   id: anthropic.claude-sonnet-4-6
   version: null

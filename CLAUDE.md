@@ -58,7 +58,9 @@ the diff; you do not merge.
 - Never edit `src/baseline/` after tag `m00`. It is the control.
 - Never write an envelope by hand or from a runner. Only
   `src/verdict/build.py` writes envelopes; only `src/verdict/gate.py`
-  reads them; a test proves they can disagree. The one exception is a
+  rules on them (`src/verdict/replay_history.py` is the shared reader of
+  past ones, which `build`, `gate` and `two-key` all use); a test proves
+  build and gate can disagree. The one exception is a
   seed under tests/fixtures/: a false state, never copied to
   evals/history/, named in tests/fixtures/README.md.
 - Never touch `evals/goldens/`, `thresholds.yaml`, `rules/`,

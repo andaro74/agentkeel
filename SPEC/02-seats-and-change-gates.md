@@ -267,8 +267,10 @@ None of it is in PR 1.
   `agents/*/manifest.yaml`; no cycle in the call graph; ceilings within
   `thresholds.yaml` bounds; live `main` ruleset equal to
   `infra/ruleset/main.json` with `bypass_actors: []` (open.md row 5); a
-  golden id present on `main` is present in the PR or has `retired:` set
-  (S5). The ledger header gains a row for M02 PR 2 listing exactly what
+  golden id present on `main` is present in the PR, retired or not:
+  `retired:` is how a golden leaves the run, and its file stays so that
+  the id is never reused (S5; data-owner on PR 2, F3, which found the
+  first draft of this line let a retired file go). The ledger header gains a row for M02 PR 2 listing exactly what
   landed, under the rows for M01 PR 2 and `m01` that PR 1 adds (note 12).
 - **Computed semver** (Tool Owner, row 20): `validate` computes the
   version each tool schema and each edge would need from the diff

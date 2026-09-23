@@ -77,7 +77,26 @@ upward.
 `agents/ratings-helper/manifest.yaml`: the same pin as refagent's, so
 that M04's swap moves both or neither. Nothing calls it before M07.
 
-## 8. `check_model_access` (row 18)
+## 8. Row 18's other two questions (threshold-owner on PR 2, F1)
+
+**Is Nova Micro still a fair control?** Yes, as ruled at M01 (ADR-0002
+froze it): fairness is a property of the delta, not of the control, and
+every number the platform reports is a delta against the same frozen
+card. Re-asked at M04, where the swaps are measured against the same
+base. **One cap for two run shapes** (a run with an agent and a run
+without): stands as ruled m at M01; the control alone spends about 6,000
+of the 150,000, and a cap per shape would be two bars for one budget.
+Re-ruled at M03 with the cap.
+
+**The rate.** Section 5 counts tokens, not dollars: the envelope's
+`cost_usd` is null (M05 open item 3, the price table), so no USD is
+computed here. The token count is the number; USD 300 is the Budgets
+alarm's figure and is Security's (ruling a). **The 4,000** in section 4
+is one call, g-001 at M01 PR 2 (3,533 tokens, refagent's manifest
+comment), not the envelope's per-golden maximum, which the envelope does
+not record.
+
+## 9. `check_model_access` (row 18)
 
 Not run in this PR: it spends against the human's credentials, and the
 session runs no Bedrock call. The human runs it and commits its stdout
