@@ -8,7 +8,7 @@ authorises:
   - thresholds.yaml
 evidence:
   - SPEC/02-seats-and-change-gates.md#5-the-seeded-cases
-pr: 0
+pr: 15
 ---
 
 # Seed S1: one key on a relaxation
