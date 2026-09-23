@@ -140,9 +140,10 @@ evals/history/        CI-written envelopes (evidence)
 evals/local/          your runs (not evidence)
 data/                 slate.json, rights_table.json, clause_index.json (M00);
                       corpus/ (M01)
-infra/                CDK: bootstrap stack, GovernedAgent construct; eval-role/
-                      (M00, absorbed at M01 PR 2); ruleset/main.json (the
-                      exported main ruleset); workflows.sha256 (validate)
+infra/                CDK: bootstrap stack, GovernedAgent construct (eval-role/
+                      was M00's, absorbed at M01 PR 2, removed at M02 PR 3);
+                      ruleset/main.json (the exported main ruleset);
+                      workflows.sha256 (validate)
 scripts/seed_slate.py writes data/slate.json and data/rights_table.json
 tests/
 Makefile              Engineering; all five targets exist from M00 PR 1

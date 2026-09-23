@@ -121,7 +121,11 @@ run looks each one up in CloudTrail (`scripts/observe_attempt.py`) and
 that lookup is what writes `checks.F1_1` and `checks.F1_3`. A file a human
 wrote feeds no check by itself (SPEC/01 §4).
 
-After PR 2 merges: `cd infra/eval-role && npx aws-cdk@2 destroy` (ruling f).
+Done at M02 PR 3: `AgentkeelM00EvalRole` was destroyed by the human on
+2026-09-23 (`DELETE_COMPLETE` at 13:48Z, read with `list-stacks`) and
+`infra/eval-role/` removed in the same PR (ruling f; M02 open.md row 16).
+The eval role this stack owns, `agentkeel-evals`, is what
+`AWS_EVAL_ROLE_ARN` names.
 
 ## What has been observed, and what has not
 
