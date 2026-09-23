@@ -10,7 +10,7 @@ Written at M02 PR 1 open. The row in `milestones/README.md` is the one
 | Claim | Seat-owned files change only with a ruling; relaxations need two keys |
 | Falsifiers | F2.1 any of the five seeded changes merges: a threshold relaxed with one key or with two files from one seat, a golden edited to green a build, an edge declared on one side, the owner merging past a red required check, a golden id renamed. F2.2 the three doors (Door 1 blocked by the gate, Door 2 merged with two keys, Door 3 blocked by two gates) are not reproducible from the PR record. |
 | Seeded commit | `6ff333a` (S1, both forms); `74a38be` (S2); `d8fbdb1` (S3); `9eb539c` (S4, the attempt to make, `observed: null`); `479abb9` (S5), each its own commit (SPEC/02 §5) |
-| Expected gate output | PR 1: refagent's envelope in runner mode, gated and recorded as at M01; it says nothing about claim 2. `make plants` lists S1–S5 with no reader in the tree; `tests/test_m02_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 (both forms), S2, S3 and S5 refused by `src/gates/` and `validate` in a copy of the tree, each with its planted reason; **Amended at PR 2 (Product, `rulings/pr2.md`; SPEC/02 §4): `checks.F2_1` on PR 2's own envelope is its first source alone, the five seed tests passing on refusing; the second source and `checks.F2_2` are wired at PR 3, because a failing check on PR 2's run would have made `evals`, a required check, red, and PR 2 could not have merged through the ruleset it measures. S4's test keeps its marker until the attempts. Two consequences, read here (cold review of PR 2, F7): PR 2's `checks.F2_1: pass` is a test-only witness of four seeds refused in a copy of the tree, not a pull request refused; and nothing in `gate.py` requires `F2_1` or `F2_2` on an agent envelope until PR 3 sets that constant, so until then a run that omitted them would still rule GREEN.** `two-key` green on PR 2's own two files for `g-012`, which is Door 2 (its check run is `gates.yml`'s `two-key` job on PR 2's head). After PR 2 merges and before PR 3's first CI run: the human makes `ruling-cited` and `two-key` required, opens the seed PRs from `main`, and makes S4's two attempts; PR 3's run looks each up (`scripts/observe_pr.py`) and writes `checks.F2_1` (both halves) and `checks.F2_2` pass. **A named P3 exception (SPEC/02 §5.1): a PR refused by a gate on `main` cannot exist before the gate is on `main`; the machinery is PR 2's, the reading is PR 3's, whether PR 3 is the repair or the close.** RED if any seed PR's check is green, if `--admin` merges, if `validate` stays green with `bypass_actors` non-empty, or if PR 3's run reads anything else. The count of refagent's passes changes by one golden at PR 2, `g-012` retired and `g-021` added never passed; the checks decide the row. |
+| Expected gate output | PR 1: refagent's envelope in runner mode, gated and recorded as at M01; it says nothing about claim 2. `make plants` lists S1–S5 with no reader in the tree; `tests/test_m02_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 (both forms), S2, S3 and S5 refused by `src/gates/` and `validate` in a copy of the tree, each with its planted reason; **Amended at PR 2 (Product, `rulings/pr2.md`; SPEC/02 §4): `checks.F2_1` on PR 2's own envelope is its first source alone, the five seed tests passing on refusing; the second source and `checks.F2_2` are wired at PR 3, because a failing check on PR 2's run would have made `evals`, a required check, red, and PR 2 could not have merged through the ruleset it measures. S4's test keeps its marker until the attempts. Two consequences, read here (cold review of PR 2, F7): PR 2's `checks.F2_1: pass` is a test-only witness of four seeds refused in a copy of the tree, not a pull request refused; and nothing in `gate.py` requires `F2_1` or `F2_2` on an agent envelope until PR 3 sets that constant, so until then a run that omitted them would still rule GREEN.** `two-key` green on PR 2's own two files for `g-012`, which is Door 2 (its check run is `gates.yml`'s `two-key` job on PR 2's head). After PR 2 merges and before PR 3's first CI run: the human makes `ruling-cited` and `two-key` required, opens the seed PRs from `main`, and makes S4's two attempts; PR 3's run looks each up (`scripts/observe_pr.py`) and writes `checks.F2_1` (both halves) and `checks.F2_2` pass. **A named P3 exception (SPEC/02 §5.1): a PR refused by a gate on `main` cannot exist before the gate is on `main`; the machinery is PR 2's, the reading is PR 3's, whether PR 3 is the repair or the close.** **At PR 3 (Product, `rulings/pr3.md`): the constant is `CLAIM_2_CHECKS` in `src/verdict/gate.py` (`74624cb`), required on every agent envelope after `97d3c76`; the three agent envelopes PR 3's branch recorded before it (`12b4646`, `47258f2`, `6daf6c4`) carry `F2_1` alone and rule RED under it, and no Measured cell cites them. The reading is the `evals` run on PR 3's head after `939709d`, which looks the seed PRs (14 to 18), the owner's attempts (rule suite 4192991324; `evals` job 107206831180) and the three doors (PRs 14, 12, 14) up from GitHub's record, with the rule-suites record fetched by the workflow and read from files so the token never reaches the observer. Read beside claim 2, not as part of it: `12b4646`'s run (35861180676) is the first envelope in `mode: runtime`, GREEN at 54,218 tokens, after the agent boundary took `dynamodb:Scan` (`c34da39`); row 1 stays RED as closed, since a later deploy does not reopen a closed row.** RED if any seed PR's check is green, if `--admin` merges, if `validate` stays green with `bypass_actors` non-empty, or if PR 3's run reads anything else. The count of refagent's passes changes by one golden at PR 2, `g-012` retired and `g-021` added never passed; the checks decide the row. |
 | Measured | — |
 | PRs used / cap | 2 / 4 |
 | State | OPEN |
@@ -98,6 +98,64 @@ Written at M02 PR 1 open. The row in `milestones/README.md` is the one
   bypass list is an error naming the token. Whether a workflow's
   `GITHUB_TOKEN` is shown the list is read on this PR's first `checks`
   run.
+
+### PR 3 detail (#13, 2026-09-23): the repair, and the reading
+
+- **Carried onto the branch from PR 2's merge**, before this session:
+  the `main` ruleset exported with `ruling-cited` and `two-key` required
+  (`12b4646`, Security; `bypass_actors` `[]`); the agent boundary takes
+  `dynamodb:Scan` after the first deploy on which the runtime answered
+  (run 35817173042) refused all fifteen goldens on it (`0faf973` the
+  test, failing first; `c34da39` the action; the bootstrap stack deployed
+  by hand after the human read `cdk diff`); row 10 read (`f54422f`); the
+  CODEOWNERS login check's token order (`951d98e`); the three run files
+  filled by the human (`76be099`, `979b9db`).
+- **The human's window, as the run files record it** (SPEC/02 §5.1).
+  Seed PRs 14 to 18 opened from `main` between 13:10Z and 13:11Z, each
+  showing its expected check red. Attempt 1, `gh pr merge 14 --merge
+  --admin`, refused at 13:34:13Z: "3 of 5 required status checks are
+  failing", rule suite 4192991324 (`required_status_checks` fail, actor
+  `andaro74`, `refs/heads/main`). So the rule-suites API does record a
+  refused `--admin` merge; Unsure B of PR 1 and PR 2 is answered yes, by
+  the call. Attempt 2, the repository-admin role in `bypass_actors` from
+  13:39:33Z to 13:45:29Z (the ruleset's own `updated_at`, in the
+  account's timezone in the file): `validate` RED in `evals` job
+  107206831180 while listed, `[]` after. Door 1 and Door 3 are PR 14,
+  Door 2 is PR 12.
+- **Built in this session, in the order the commits land.** `ab6219d`:
+  `scripts/observe_pr.py` reads the rule-suites record and the live
+  ruleset from files the workflow fetches, and the recorded suite by id,
+  which does not age out of the list as `time_period` does. `74624cb`:
+  `CLAIM_2_CHECKS` and `M02_PR2_MERGE` in `src/verdict/gate.py`, the
+  first item PR 2's cold review left for PR 3. `939709d`: `evals.yml`
+  runs the observer on the three run files on the measuring path with
+  `actions: read`, hands `make evals` the three observations, and the
+  `RULESET_TOKEN` step fetches the rule-suites record beside the live
+  ruleset so the observer, code from the PR, never sees the secret;
+  S4's `xfail(strict=True)` marker comes off in that commit. `b7311b3`:
+  `infra/eval-role/` removed, the stack `DELETE_COMPLETE` at 13:48:15Z
+  (row 16; Unsure E). `c7a8242`: `validate` accepts a ruling glob that
+  names a deleted path, because four M00 and M01 rulings name files
+  under `infra/eval-role/` and a past ruling is not edited.
+- **What the branch's last run said before the wiring** (35874322479,
+  `6daf6c4`): the envelope GREEN in `mode: runtime` with `F2_1` from
+  the first source alone, and the job failed on pytest: S4's strict
+  marker refused the filled run file (`XPASS(strict)`), and a test on
+  the observer asserted the seed's planted state. Both repaired here.
+  The marker did what strict is for.
+- **Read under the constant, now.** `12b4646`, `47258f2` and `6daf6c4`
+  are agent envelopes after `97d3c76` that carry `F2_1` alone; the gate
+  rules each RED from `74624cb` on ("checks.F2_2 is missing"), and
+  `tests/test_gate.py` holds it. None is cited by a Measured cell. They
+  stay in history as what they were: GREEN under the gate of their day.
+- **Before the run, not evidence:** the three observers run locally
+  against GitHub with the human's token. Five seeds `found`, unmerged,
+  expected check `failure`, required on `main`, path named in the job
+  log (status 200); attempt 1 witnessed by the rule-suites API; attempt
+  2 by `validate`'s line in the job's log; three doors in the record;
+  `build`'s three readers pass on all three. That is what PR 3's CI run
+  is expected to read. The reading is that run's.
+- **What PR 3's run read:** written at the close, from the envelope.
 
 ### For the seats, at M02 PR 2 open
 

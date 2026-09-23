@@ -1,9 +1,9 @@
 ---
-# M02 PR 3 (#13), Product's key, for the run file carried onto the branch
-# from PR 2's merge. Security's file is rulings/pr3-security.md,
-# Engineering's rulings/pr3-engineering.md. The rest of PR 3 (the reading
-# of the seed PRs and the doors, the ledger, the explainer if this is the
-# close) is written in the PR 3 session, and this file grows then.
+# M02 PR 3 (#13), Product's key. Security's file is rulings/pr3-security.md,
+# Engineering's rulings/pr3-engineering.md; the cold review of this PR is
+# rulings/pr3-cold-review.md, Engineering's second file, which names only
+# itself. This file was opened with the row 10 reading and the three run
+# files at the start of the branch and grew in the PR 3 session.
 ruling: pr3
 seat: Product
 authorises:
@@ -13,13 +13,21 @@ authorises:
   - milestones/M02/runs/f2_2_three_doors.yaml
   - milestones/M02/rulings/pr3.md
   - milestones/M02/rulings/pr3-engineering.md
+  - milestones/README.md
+  - milestones/M02/README.md
+  - CLAUDE.md
 evidence:
   - SPEC/00-overview.md#8-M02
+  - SPEC/02-seats-and-change-gates.md#4-falsifiers
+  - SPEC/02-seats-and-change-gates.md#51-when-each-is-measured
+  - milestones/M02/rulings/pr2-cold-review.md
   - https://github.com/andaro74/agentkeel/actions/runs/35817173042
+  - https://github.com/andaro74/agentkeel/actions/runs/35861180676
+  - https://github.com/andaro74/agentkeel/actions/runs/35874322479
 pr: 13
 ---
 
-# Ruling: M02 PR 3, Product (row 10 read)
+# Ruling: M02 PR 3, Product (row 10 read; the reading)
 
 Drafted by the session; the human rules as Product before the merge.
 
@@ -48,3 +56,53 @@ repository-admin role was listed, restored at 13:45:29Z.
 Run once against the API before this PR's run depends on them: every
 seed refused with its path named, both attempts witnessed, three doors
 in the record. The reading itself is PR 3's run.
+
+## The ledger at PR 3
+
+`milestones/README.md` row 2's Expected cell gains one amendment, in
+bold, after the P3 exception it already names, and
+`milestones/M02/README.md` carries the same cell and a PR 3 detail
+section. The amendment says four things a reader of the row needs and
+the row did not: which commit sets the constant PR 2's cold review
+asked for first (`74624cb`); that the three agent envelopes this branch
+recorded before it (`12b4646`, `47258f2`, `6daf6c4`) carry `F2_1` alone
+and rule RED under it, with no Measured cell citing them; which run is
+the reading (the `evals` run on PR 3's head after `939709d`) and what it
+looks up; and, beside claim 2 and not as part of it, that `12b4646`'s
+run was the first envelope in `mode: runtime`, GREEN at 54,218 tokens,
+after the boundary took `dynamodb:Scan`. Row 1 is not reopened by it.
+
+The header table gains a row for M02 PR 3: `validate` is unchanged but
+for the ruling front-matter check, which now also matches a glob against
+paths deleted from the tree (Engineering, `c7a8242`). The reason is
+recorded there: `infra/eval-role/` is removed in this PR and four M00
+and M01 rulings authorise files under it. This ruling records the gap
+that change closes as a finding for Product: **a ruling cannot name a
+deletion precisely.** `ruling-cited` requires a deleted path to be
+covered by a glob, and the front-matter check refused any glob that
+matched nothing in the tree, so before `c7a8242` the only way to delete
+an authorised file was a glob broad enough to match its neighbours.
+The check now reads history; SPEC/02 §2 does not say how a ruling names
+a deletion, and that sentence is M03 PR 1's, with the closed-list
+amendment already assigned there.
+
+`CLAUDE.md`'s "Where things are" says `infra/eval-role/` is gone.
+
+## Findings recorded here, with their homes
+
+| # | Finding | Home |
+|---|---|---|
+| 1 | The three branch envelopes before the constant rule RED under it | Recorded in row 2's cell and `tests/test_gate.py`; nothing cites them; no action |
+| 2 | `time_period=month` on the rule-suites list: after a month the list no longer holds attempt 1 | Engineering, `ab6219d`: the recorded suite is read by id, which does not age; the list is kept beside it and the observation says which source it read |
+| 3 | A ruling cannot name a deletion precisely (above) | Product, SPEC/02 §2 at M03 PR 1 |
+| 4 | The bot exemption still reads `%an` (PR 2 cold F4) | Security, M05, unchanged |
+| 5 | The reading is made by the PR's own code (`evals.yml` header, first gap) | Unchanged; M05 |
+
+## What a reader can run
+
+```
+uv run python -m src.ledger                       # row 2's cell is still —; the latest envelope's line
+git show 74624cb --stat                           # the constant, its fixture flags, its tests
+git show 939709d --stat                           # the wiring and S4's marker, one commit
+git show 6daf6c4:tests/test_m02_seeds.py | grep -c xfail   # 1 before; 0 after 939709d
+```
