@@ -26,8 +26,13 @@ pr: 13
 Drafted by the session; the human rules as Security before the merge.
 
 `ruling-cited` and `two-key` were made required on the live `main`
-ruleset after PR 2 merged, and the ruleset was exported at once as this
-PR's first commit (pr2-security.md item 4). `bypass_actors` is `[]`.
+ruleset after PR 2 merged (the ruleset's `updated_at`
+`2026-09-23T05:30:52-07:00`), and the export is `12b4646`, the fifth
+commit on the branch after the boundary repair and row 10, committed the
+same morning and before any seed PR was opened (13:10Z), which is the
+window pr2-security.md item 4 bounded; "first commit" in an earlier
+draft of this file was wrong (security-reviewer on PR 3, F5).
+`bypass_actors` is `[]`.
 
 ## `infra/bootstrap/app.py`: the agent boundary allows `dynamodb:Scan`
 
@@ -43,7 +48,21 @@ bootstrap stack by hand after reading the diff.
 This PR's own `ruling-cited` run refused the three paths of that repair
 until this file and `pr3.md`, `pr3-engineering.md` named them: the first
 refusal of a real pull request by the gate, and on PR 3 itself, not a
-seed.
+seed. The record: `ruling-cited` failure on `12b4646`,
+https://github.com/andaro74/agentkeel/actions/runs/35861180683/job/107181506184,
+and success on `89819e2`, the commit that added the three files (run
+35861631881).
+
+**The redeploy, recorded** (security-reviewer F3, platform-architect F1):
+`AgentkeelBootstrap` `UPDATE_COMPLETE`, `LastUpdatedTime`
+2026-09-23T04:45:35Z; the stack events of that update name one resource,
+`BoundaryEA298153` (`UPDATE_IN_PROGRESS` 04:45:39Z, `UPDATE_COMPLETE`
+04:45:57Z). `infra/bootstrap/README.md` carries the same paragraph and
+no longer says no agent stack has deployed. The ceiling refusing a call
+on run 35817173042 is an unplanned observation of a control SPEC/01 §9
+lists as having no seeded case (platform-architect F2): Product records
+it against that bullet at M03 PR 1; a seeded case for the ceiling is
+M05's, Security.
 
 ## `.github/workflows/evals.yml`: the reading (`939709d`)
 
@@ -72,7 +91,14 @@ Three changes to the `evals` job, and none to `checks` or `record`:
    holds that no step with the token runs `uv`, `make` or a Python
    script, and that the observer's step carries neither the token nor
    `secrets.`. A read that fails leaves no file, and the observer
-   records the source as unreadable, never as absent.
+   records the source as unreadable, never as absent; `--remove-on-error`
+   makes a transfer that drops mid-body leave no file either (N8). The
+   live-ruleset read still fails the step; the two new reads warn. When
+   both are unreadable, `rule_suite_fail_found` is false and
+   `build.check_from_bypass` passes attempt 1 on the human's own output
+   alone, the weaker witness SPEC/02 §5.1 names, with the observation
+   saying so (`witness`); a run that reads the record and a run that
+   could not are told apart in the observation, not in the check (F4).
 
 `infra/workflows.sha256` lists the new hash; the line above it says why.
 

@@ -24,6 +24,6 @@
 # RULESET_TOKEN step also fetches the rule-suites record into files, so the observer never sees the secret.
 0d938815e7d3756e05659beb95a82f490b521a183bf34f9584cd98874cf36567  .github/workflows/cold-review-ruling.yml
 c1957b9cf7d8e68a3da10631fac98cc2bc1b5d6045fa09167f76aa87a3a2b8c4  .github/workflows/deploy.yml
-59e56458d8840d2a58a1f2d8bcdbdb9d9d39b46e1505f25320f6f55ba31bade9  .github/workflows/evals.yml
+766f7b1d515c6e57f582eca5409f7a3ce1fe50c0303c8744b3bb1aee5dba4b5b  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml

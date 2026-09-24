@@ -229,7 +229,8 @@ jobs:
             echo "::warning::RULESET_TOKEN is not set; the live ruleset is not read and validate fails closed on it"
             exit 0
           fi
-          api() { curl -sSf -H "Authorization: Bearer $RULESET_TOKEN" -H "Accept: application/vnd.github+json" \
+          # --remove-on-error: a transfer that drops mid-body leaves no file either (security-reviewer on PR 3, N8)
+          api() { curl -sSf --remove-on-error -H "Authorization: Bearer $RULESET_TOKEN" -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/$REPO$1" -o "$2"; }
           api "/rulesets/$id" "$RUNNER_TEMP/live-ruleset.json"
           mkdir -p "$RUNNER_TEMP/rule-suites"

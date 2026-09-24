@@ -67,7 +67,7 @@ from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from constructs import Construct
 
 REPO = "andaro74/agentkeel"
-SUBJECT = "repo:andaro74@3157440/agentkeel@1376369685"  # the immutable subject, as at M00
+SUBJECT = "repo:andaro74@3157440/agentkeel@1376369685"  # the immutable subject, as at M00 (milestones/M00/feasibility.md, milestones/M01/rulings/pr1.md)
 REGION = "us-west-2"
 AGENT_ROLE_PATH = "/agentkeel/agents/"  # ruling b: the key policy matches agent roles by path
 BOUNDARY_NAME = "agentkeel-boundary"  # the agent plane's allow-list (S5, S6)
