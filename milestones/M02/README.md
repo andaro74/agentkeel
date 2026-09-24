@@ -216,8 +216,8 @@ video recorded at the tag for M03 PR 1.
 |---|---|---|
 | `product-spec-reviewer` on SPEC/02 | 1 BLOCK, 8 FINDING, 6 NOTE | `feasibility.md` §2, each ruled before the first seed; the BLOCK became S1's one-key form |
 | PR 1 seat reports and cold review | security 0/5/13; cold 0/5/5 | `rulings/pr1-cold-review.md` table, every row repaired or recorded; `pr1-security.md` |
-| PR 2 seat reports and cold review | cold 0/7/7; security 0/5/5; threshold 0/4/7; tool 0/3/7; data 0/3/6 | `rulings/pr2-cold-review.md` table: repaired in PR 2, ruled by a seat, or recorded with a milestone (M03 PR 1, M05, M06); the M03 and later items are rows 1 to 8 and 12 to 15 of `milestones/M03/open.md` |
-| PR 3 seat reports and cold review | cold 0/3/9; security 0/5/10; platform 0/2/5 | `rulings/pr3-cold-review.md` table: repaired in `7c9e6b1`, `871d90a`, `6b4cf2e`, ruled here, or in `milestones/M03/open.md` (rows 1, 2, 3, 8, 10, 15) |
+| PR 2 seat reports and cold review | cold 0/7/7; security 0/5/5; threshold 0/4/7; tool 0/3/7; data 0/3/6 | `rulings/pr2-cold-review.md` table: repaired in PR 2, ruled by a seat, or recorded with a milestone (M03 PR 1, M05, M06); the M03 and later items are rows 1, 3 to 7 and 12 to 15 of `milestones/M03/open.md` |
+| PR 3 seat reports and cold review | cold 0/3/9; security 0/5/10; platform 0/2/5 | `rulings/pr3-cold-review.md` table: repaired in `7c9e6b1`, `871d90a`, `6b4cf2e`, ruled here, or in `milestones/M03/open.md` (rows 1, 2, 3, 8, 10, 14, 15) |
 | PR 3's own findings | 9 | `rulings/pr3.md` table, each with a seat and a milestone |
 | Unsure, PR 11 (A to H) | 8 | A the video landed (`f6d1e73`; its length is over the ceiling, M03 row 9); B answered yes at the attempt; C, H answered at PR 2 (`pr2-security.md`); D ruled (`pr2-threshold-owner.md` §5); E done at PR 3 (`b7311b3`); F Door 2 was PR 2's merge; G ruled (ADR-0008) |
 | Unsure, PR 12 (A to I) | 9 | A, B, C, D, E closed at PR 2 or PR 3 as their text says; F (`822fe2b5` in ECR) M03 row 10; G (`g-021`) M03 row 5; H (SPEC/02 §2's closed list) M03 row 1; I done (`74624cb`) |

@@ -1,6 +1,7 @@
 ---
 # Cold review of M02 PR 3 (#13), base main (97d3c76), head c789320, by
-# engineering-cold-reviewer from the diff and the ledger row. DRAFT until
+# engineering-cold-reviewer from the diff and the ledger row; a second read
+# of the close commits (8033c2a...a10acf8) is at the end. DRAFT until
 # the Engineering seat reads it and rules; Engineering's key for this PR's
 # paths is pr3-engineering.md, and this file names only itself and takes
 # no second key over anything. The three reports (engineering-cold-reviewer,
@@ -280,6 +281,187 @@ git log --format='%h %an' 97d3c76..c789320 -- evals/history/                    
 ```
 
 BLOCK: 0 · FINDING: 3 · NOTE: 9
+
+## Second read: the close commits (`8033c2a...a10acf8`)
+
+The close commit is prose and the generated index, so the same reviewer
+read it cold after the run, from the diff and row 2 only. Counts: 0
+BLOCK, 2 FINDING, 4 NOTE. The Measured cell is byte-equal to `make
+ledger`'s line, the State is the cell's verdict, every number in the
+explainer and the attestations is the envelope's, and no reader is built.
+
+| # | Finding | Status |
+|---|---|---|
+| close F1 | the explainer said the check "went red the same minute"; no file holds a time for job 107206831180 | **Repaired** (Product, the commit after the close): "went red while the right was listed, and stayed red until it was removed" |
+| close F2 | the close detail's index of M03 rows missed row 14 for PR 3's M05 items, and rows 2 and 8 hold PR 3's alone | **Repaired** (Product): both lines |
+| close N1 | the close is dated 2026-09-24, the UTC date; the commit's local date is the 23rd | **Stands**: dates in the ledger are UTC |
+| close N2 | SPEC/00 §7's table still reads row 2 OPEN, as it reads rows 0 and 1 | **Stands**: the ledger is the row's source; Product's, not this PR's |
+| close N3 | the explainer's "proves the change was named", inside the rule now that `ruling-cited` has fired on real PRs, beside an attestation that says nothing is described as proven | **Repaired** (Product): "records", as PR 2's cold N5 did on the platform page |
+| close N4 | which run wrote `905f438` and that 35951237584 gated on the skip path are claims about runs, not the tree | **Stands**: the row rests on the envelope in the bot's commit, which the tree shows |
+
+### The second read's draft, verbatim
+
+Read: the diff 8033c2a...a10acf8 (13 files)
+
+Full text of `C:\Users\andar\code\agentkeel\milestones\M02\rulings\pr3-close-cold-review.md` (draft; Engineering rules and commits it):
+
+---
+# Cold review of M02 PR 3's close commits (#13), Engineering's second
+# file for the close. Read cold: `git diff 8033c2a...a10acf8` (13 files)
+# and `git log 8033c2a..a10acf8` (905f438 github-actions[bot]; a10acf8
+# andaro74), row 2 of milestones/README.md, milestones/M02/README.md.
+# The earlier head 8033c2a is ruled in pr3-cold-review.md and is not
+# redone here. No PR body, no commit body. Read-only git; nothing run
+# that spends.
+ruling: DRAFT
+seat: Engineering
+authorises:
+  - milestones/M02/rulings/pr3-close-cold-review.md
+evidence:
+  - evals/history/8033c2a7a0588e557df577464c190e64a435e88a.json
+  - evals/history/8033c2a7a0588e557df577464c190e64a435e88a.baseline-card.json
+  - milestones/README.md
+  - milestones/M02/README.md
+  - milestones/M02/attestations.md
+  - milestones/M02/runs/f2_1_bypass.yaml
+  - milestones/M02/runs/f2_1_seed_prs.yaml
+  - milestones/M03/open.md
+  - milestones/M02/rulings/pr3-cold-review.md
+  - docs/milestones/M02.md
+  - docs/milestones/README.md
+  - docs/video/README.md
+  - src/ledger.py
+  - src/gates/ruling_cited.py
+pr: 13
+---
+
+# Cold review: M02 PR 3, the close commits
+
+Two commits after `8033c2a`: `905f438` (`github-actions[bot]`, three files
+under `evals/history/`, 623 insertions) and `a10acf8` (andaro74, ten
+prose files, 311 insertions, 28 deletions). Nothing under `src/`,
+`scripts/`, `tests/`, `.github/`, `infra/` or `src/baseline/`
+(`git diff 8033c2a...a10acf8 --stat`; `git diff m00 HEAD --stat --
+src/baseline/` is empty). No reader is built. Every commit under
+`evals/history/` since tag `m01` is the bot's (six, `git log m01..HEAD --
+evals/history/`).
+
+## What was checked and held
+
+- **The Measured cell.** `uv run python -m src.ledger` exits 0. Its
+  "latest CI-written envelope reads" line is byte-equal to row 2's cell
+  (`milestones/README.md:36`) and to `milestones/M02/README.md:14`.
+  `src/ledger.py:71-72` would fail on any difference; `:79-80` fails a
+  State that is not the cell's verdict; the cell carries `; GREEN; ` and
+  State is GREEN (`milestones/README.md:36`, `milestones/M02/README.md:16`).
+- **The envelope's numbers in the close prose.** Envelope
+  `evals/history/8033c2a…json`: agent goldens g-001..g-009 pass (9/9),
+  g-010 and g-011 pass, g-021 fails (traps 2/3), g-013..g-015 fail
+  (guardrail 0/3), `never_passed` = [g-013, g-014, g-015, g-021],
+  `regressed` [], `tokens_in` 48815, `tokens_out` 5194 (sum 54,009),
+  `mode` runtime, `region` us-west-2, `model_version` null, all eight
+  checks pass with run 35951008874 (F0_3 with job 105781176255). The
+  control card's `traps_passed` is [] and `model_id`
+  `us.amazon.nova-micro-v1:0`. `docs/milestones/M02.md:76` (9 of 9, 2 of
+  3, 0 of 3), `:78-83` (why 2/3), `milestones/M02/README.md:181-195`
+  (every number, including 54,009 = 48,815 + 5,194 against
+  `thresholds.yaml:20`'s 150000) and `attestations.md:57-61` all match.
+- **"What GREEN does not mean"** is present at `docs/milestones/M02.md:85-93`
+  and `milestones/M02/README.md:210-217`; both name the one-person seats,
+  the PR's own code as the reader until M05, and the ceiling's unplanned
+  refusal.
+- **Forbidden words.** In the diff, "governed", "secure", "proven" appear
+  only in `attestations.md:87` as the negation.
+- **The generated index.** `ledger.plain(ledger.rows())` computed in
+  memory equals `docs/milestones/README.md` byte for byte; row 2 reads
+  GREEN and "not recorded", which is what `src/ledger.py:87-89` writes
+  while `docs/video/milestones/M02.mp4` does not exist.
+- **Video rows.** `docs/video/README.md:22`: M01.mp4 is an LFS pointer
+  (`git cat-file -p HEAD:docs/video/milestones/M01.mp4`, size 9465123)
+  landed in `f6d1e73` (M02 PR 1); the working file probes at 369.13 s =
+  6:09, 69 s over the 5-minute line at `:12`. The row says so and carries
+  the ruling to `milestones/M03/open.md:21` (row 9). `:23` M02 row
+  "not recorded", consistent with the tree.
+- **Homes.** `milestones/M03/open.md:13-27`: all 15 rows carry a Seat and
+  a When. `pr3.md:133-141`: nine findings, each with a seat and a
+  milestone or a commit. The counts in `milestones/M02/README.md:218-221`
+  trace to `feasibility.md:104-105`, `pr1-cold-review.md:213`,
+  `pr2-cold-review.md:34-35` and `pr3-cold-review.md:34-35`. Every commit
+  the close prose cites (`b7311b3`, `74624cb`, `7c9e6b1`, `871d90a`,
+  `6b4cf2e`, `939709d`, `97d3c76`, `c34da39`, `ab6219d`, `c7a8242`,
+  `12b4646`, `47258f2`, `6daf6c4`, `f6d1e73`) exists.
+- **Ruling coverage.** `pr3.md:9-24` authorises every prose path
+  `a10acf8` touches; `pr3-security.md` has `pr: 13` and covers itself
+  (`src/gates/ruling_cited.py:52-53`).
+- **Attestation claims against the record.** `attestations.md:44-46`
+  (13:34:13Z, suite 4192991324; emptied 13:45:29Z) match
+  `runs/f2_1_bypass.yaml:56-58` and `:69` (`updated_at_after`
+  06:45:29.044-07:00). `:63` "cap 150,000, unchanged": the value is
+  unchanged since `m01`; the file gained `ceilings:` and `relaxes:` at
+  PR 2. `:81-83` (g-010 on PR 16, g-005→g-099 on PR 18) match
+  `tests/fixtures/m02/s2-golden-greened.patch:1` and
+  `s5-golden-renamed.patch:3-4` and `runs/f2_1_seed_prs.yaml:54-91`.
+
+## BLOCK
+
+None.
+
+## FINDING
+
+**F1 — `docs/milestones/M02.md:81`: "the platform's check went red the
+same minute" has no witness in the repository.** The record of attempt 2,
+`milestones/M02/runs/f2_1_bypass.yaml:63-73`, carries `at:
+2026-09-23T13:40:26Z`, `updated_at_during: 06:39:33-07:00`,
+`validate_result: RED` and `checks_job_id: 107206831180` ("re-run while
+listed"), and no time for that job. The envelope records no time either.
+The close detail says only what the file holds
+(`milestones/M02/README.md:205-206`: "RED in job 107206831180 while the
+admin role was listed"). Falsify: `grep -n 107206831180 -r milestones
+evals` returns no timestamp. Repair (Product, one phrase): "went red
+while the right was listed, and stayed red until it was removed".
+
+**F2 — `milestones/M02/README.md:221` lists PR 3's carried items as
+`milestones/M03/open.md` rows "1, 2, 3, 8, 10, 15"; three PR 3 items are
+in row 14.** `milestones/M03/open.md:26` (row 14) names PR 3 security N13,
+platform N3 and platform N4, the same items `pr3-cold-review.md:65`, `:68`
+and `:69` send to M05. Every item has a home; the index that says so is
+short by one row. The line above it (`:220`) says PR 2's carried items are
+"rows 1 to 8 and 12 to 15", and rows 2 and 8 hold only PR 3 items
+(platform F2, platform N1). Falsify: `grep -n 'N13\|platform N3\|platform
+N4' milestones/M03/open.md` prints line 26. Repair (Product): "rows 1, 2,
+3, 8, 10, 14, 15" and "rows 1, 3 to 7 and 12 to 15".
+
+## NOTE
+
+**N1 — the close is dated 2026-09-24 at `milestones/M02/README.md:173`
+and `milestones/M03/open.md:3`.** `a10acf8` is authored 2026-09-23
+20:46:23 -0700 (04:46Z on the 24th); `905f438` is 2026-09-24 03:23:09Z.
+The date is the UTC one; the open detail at `:163` and the run files
+mix local and UTC (`f2_1_bypass.yaml:66-69`). Consistent as UTC; a
+reader matching against the commit's local date will see the 23rd.
+
+**N2 — `SPEC/00-overview.md:272` still reads row 2 OPEN.** Rows 0 and 1
+(`:270-271`) also read OPEN after their closes, so this is the standing
+practice: the ledger is the row's source and §7's table is the claim
+list. Product's to keep or amend; not this PR's.
+
+**N3 — `docs/milestones/M02.md:113-114`, unchanged context, not in the
+diff: "The platform proves the change was named and by whom".** The
+control it speaks of, `ruling-cited`, has now fired on PRs 16 and 18
+(`runs/f2_1_seed_prs.yaml:61`, `:88`), so the sentence is inside the
+rule; noted because `attestations.md:87` says nothing in the milestone is
+described as proven, and this is the nearest sentence.
+
+**N4 — claims about runs, not verifiable from the tree and not fetched
+here:** that `905f438` was written by the `record` job of run 35951008874
+(`attestations.md:24-25`; the commit's author is the bot, which is what
+the tree shows), that run 35951237584 gated the recorded envelope on the
+skip path (`milestones/M02/README.md:207-208`, `pr3-security.md:131`), and
+job 107181506184 (`docs/platform/overview.md:44`). The row does not rest
+on them: `make ledger` reads the envelope, and the envelope is in the
+bot's commit.
+
+BLOCK: 0 · FINDING: 2 · NOTE: 4
 
 ## To falsify this file's own claims, at the head that carries it
 
