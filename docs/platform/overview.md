@@ -40,13 +40,13 @@ Nobody approves anything by hand. The gates read files.
 
 | Gate | Where | Reads | Refused its planted case |
 |---|---|---|---|
-| `validate` | `src/validate/`, run by `evals.yml`'s `checks` job | the tree; `origin/main` for golden ids and semver; the API for the live ruleset and the logins | S3 (one-sided edge) and S5 (renamed golden id), in a copy of the tree, M02 PR 2 |
-| `ruling-cited` | `src/gates/ruling_cited.py`, run by `gates.yml` | the diff against the base; CODEOWNERS from the base | S2 (golden edited with no ruling) and S5, in a copy of the tree, M02 PR 2 |
-| `two-key` | `src/gates/two_key.py`, run by `gates.yml` | the diff, the history, `thresholds.yaml`'s `relaxes:` | S1 (one key; two files from one seat) and S2, in a copy of the tree, M02 PR 2 |
+| `validate` | `src/validate/`, run by `evals.yml`'s `checks` job | the tree; `origin/main` for golden ids and semver; the API for the live ruleset and the logins | S3 (one-sided edge) and S5 (renamed golden id), in a copy of the tree, M02 PR 2; on real PRs 17 and 18, read by M02 PR 3's run |
+| `ruling-cited` | `src/gates/ruling_cited.py`, run by `gates.yml` | the diff against the base; CODEOWNERS from the base | S2 (golden edited with no ruling) and S5, in a copy of the tree, M02 PR 2; on real PRs 16 and 18, and on M02 PR 3 itself before its rulings were written (job 107181506184), read by M02 PR 3's run |
+| `two-key` | `src/gates/two_key.py`, run by `gates.yml` | the diff, the history, `thresholds.yaml`'s `relaxes:` | S1 (one key; two files from one seat) and S2, in a copy of the tree, M02 PR 2; on real PRs 14, 15 and 16, read by M02 PR 3's run; green on PR 12's keyed retirement (Door 2) |
 | `evals` | `evals.yml`, the gate's exit code | the envelope | F0.2 (an envelope with no baseline ref), M00; F1.4 (an uncited answer), M01 |
 | `signature` | `src/bundle/verify.py`, `deploy.yml` | the bundle and its cosign bundle | S1 and S2 of M01 (unsigned; altered after signing) |
 | the construct | `infra/construct/` | the manifest | S3, S5, S8 of M01 at synth (egress not in the manifest; a role without the boundary; an agent outside the construct) |
-| the `main` ruleset | GitHub, exported to `infra/ruleset/main.json` | the required checks; `bypass_actors: []` | not yet on a real PR: the seed PRs and the owner's attempts are M02 PR 3's reading |
+| the `main` ruleset | GitHub, exported to `infra/ruleset/main.json` | the required checks; `bypass_actors: []` | the owner's `gh pr merge 14 --admin`, refused by GitHub (rule suite 4192991324); the owner listed in `bypass_actors`, refused by `validate` (job 107206831180); both read by M02 PR 3's run, envelope `8033c2a` |
 
 "Refused its planted case in a copy of the tree" means a test applied the
 seed and the gate refused it. It does not mean a real pull request was

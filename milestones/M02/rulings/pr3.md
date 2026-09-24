@@ -15,9 +15,18 @@ authorises:
   - milestones/M02/rulings/pr3-engineering.md
   - milestones/README.md
   - milestones/M02/README.md
+  - milestones/M02/attestations.md
+  - milestones/M03/open.md
   - CLAUDE.md
+  - docs/milestones/M02.md
+  - docs/milestones/README.md
+  - docs/video/README.md
+  - docs/platform/overview.md
 evidence:
   - SPEC/00-overview.md#8-M02
+  - evals/history/8033c2a7a0588e557df577464c190e64a435e88a.json
+  - https://github.com/andaro74/agentkeel/actions/runs/35951008874
+  - milestones/M02/rulings/pr3-cold-review.md
   - SPEC/02-seats-and-change-gates.md#4-falsifiers
   - SPEC/02-seats-and-change-gates.md#51-when-each-is-measured
   - milestones/M02/rulings/pr2-cold-review.md
@@ -27,9 +36,38 @@ evidence:
 pr: 13
 ---
 
-# Ruling: M02 PR 3, Product (row 10 read; the reading)
+# Ruling: M02 PR 3, Product (row 10 read; the reading; the close)
 
 Drafted by the session; the human rules as Product before the merge.
+
+## The close
+
+This PR closes M02 through `/close-milestone`: the cold review of PR 2
+found repairs and this PR carried them, its own cold review found no
+BLOCK, and its run read what row 2 expected. The Measured cell in
+`milestones/README.md` is the line `make ledger` prints for the envelope
+`8033c2a7a0588e557df577464c190e64a435e88a` (run 35951008874, recorded by
+`github-actions[bot]` in `905f438`), copied by a script and never
+retyped; `make ledger` exits 0; State GREEN; PRs used 3 / 4. The close
+detail in `milestones/M02/README.md` checks the envelope against row 2's
+four RED conditions and lists every finding and Unsure item with its
+home; `milestones/M03/open.md` carries what is not closed.
+`docs/milestones/M02.md` "What happened" uses the envelope's numbers and
+says what GREEN does not mean. `docs/video/README.md` gains M02's row and
+corrects M01's, which said "not recorded" after the file had landed and
+whose recording is 6:09, over the five-minute ceiling. `docs/milestones/
+README.md` is `make ledger-plain`'s. `git tag m02` is the human's, on
+`main`, after the merge.
+
+Two numbers changed from what a reader of PR 2 would expect, and why:
+the agent's traps are 2/3, not 3/3, because `g-012` was retired at PR 2
+and `g-021` took its place never passed; `never_passed` is 4, not 3, for
+the same reason. Both are the envelope's, and the checks decide the row.
+
+Two Unsure items of this PR are ruled here rather than carried: B, the
+constant stays PR 2's merge commit as SPEC/02 §4 says, with the three
+earlier branch envelopes recorded as RED under it; E, the two new reads
+in the token step warn rather than fail, and the check names its witness.
 
 `milestones/M02/runs/row10_first_deploy.yaml` gains
 `observed_at_pr2_merge`, read from run 35817173042 and the account on

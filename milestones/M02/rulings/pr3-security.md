@@ -18,6 +18,7 @@ evidence:
   - milestones/M02/runs/row10_first_deploy.yaml
   - milestones/M02/runs/f2_1_bypass.yaml
   - https://github.com/andaro74/agentkeel/actions/runs/35817173042
+  - https://github.com/andaro74/agentkeel/actions/runs/35951008874
 pr: 13
 ---
 
@@ -118,6 +119,16 @@ it; `.claude/agents/platform-architect.md` no longer lists the path.
 Four past rulings authorise files under the directory and are not
 edited; `validate`'s front-matter check reads deleted paths from history
 instead (Engineering, `c7a8242`; Product's finding 3 in `pr3.md`).
+
+## The run that read it (security-reviewer F1, PR 13 Unsure F)
+
+Run 35951008874 on `8033c2a`: the token step fetched the live ruleset,
+the rule-suites list and suite 4192991324 with no warning; the observer
+step wrote the three observations from those files; `build` wrote
+`checks.F2_1` pass (both sources) and `checks.F2_2` pass; the gate ruled
+GREEN and the `record` job committed the envelope as `905f438`. The run
+on that commit (35951237584) gated the recorded envelope GREEN on the
+skip path. The wiring has fired in CI.
 
 ## Security's items, standing
 
