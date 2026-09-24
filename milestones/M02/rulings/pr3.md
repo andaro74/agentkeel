@@ -38,7 +38,7 @@ pr: 13
 
 # Ruling: M02 PR 3, Product (row 10 read; the reading; the close)
 
-Drafted by the session; the human rules as Product before the merge.
+Ruled by andaro74 as Product, 2026-09-24.
 
 ## The close
 

@@ -32,7 +32,7 @@ pr: 13
 
 # Ruling: M02 PR 3, Engineering (the boundary test; the constant; the observer; validate)
 
-Drafted by the session; the human rules as Engineering before the merge.
+Ruled by andaro74 as Engineering, 2026-09-24.
 
 ## `tests/test_bootstrap.py`
 

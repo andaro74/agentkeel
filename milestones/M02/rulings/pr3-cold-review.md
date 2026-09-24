@@ -2,7 +2,7 @@
 # Cold review of M02 PR 3 (#13), base main (97d3c76), head c789320, by
 # engineering-cold-reviewer from the diff and the ledger row; a second read
 # of the close commits (8033c2a...a10acf8) is at the end. DRAFT until
-# the Engineering seat reads it and rules; Engineering's key for this PR's
+# ruled by andaro74 as Engineering, 2026-09-24; Engineering's key for this PR's
 # paths is pr3-engineering.md, and this file names only itself and takes
 # no second key over anything. The three reports (engineering-cold-reviewer,
 # security-reviewer, platform-architect) are in the PR body verbatim; their

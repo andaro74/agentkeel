@@ -24,7 +24,7 @@ pr: 13
 
 # Ruling: M02 PR 3, Security (the export, the boundary, the reading's wiring)
 
-Drafted by the session; the human rules as Security before the merge.
+Ruled by andaro74 as Security, 2026-09-24.
 
 `ruling-cited` and `two-key` were made required on the live `main`
 ruleset after PR 2 merged (the ruleset's `updated_at`

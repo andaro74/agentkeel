@@ -30,7 +30,7 @@ The three earlier envelopes on this branch (`12b4646`, `47258f2`,
 `6daf6c4`) were not edited either; they rule RED under the gate from
 `74624cb` and nothing cites them.
 
-Signed: ____________________  Date: __________
+Signed: andaro74  Date: 2026-09-24
 
 ---
 
@@ -50,7 +50,7 @@ one resource, the agent boundary, `dynamodb:Scan` added). The M00 stack
 `infra/eval-role/` was removed. The `RULESET_TOKEN` reaches no step that
 runs code from a pull request.
 
-Signed: ____________________  Date: __________
+Signed: andaro74  Date: 2026-09-24
 
 ---
 
@@ -67,7 +67,7 @@ planted, the cap raised to 300,000 with one key, was refused on PR 14 and,
 with two files from this seat, on PR 15. `g-012` was retired with this
 seat's key beside the Data Owner's (PR 12).
 
-Signed: ____________________  Date: __________
+Signed: andaro74  Date: 2026-09-24
 
 ---
 
@@ -80,7 +80,7 @@ refused on PR 18; `g-099` is burned. `g-012` was retired, never renamed,
 with two keys (PR 12), and `g-021` was added and has never passed. Every
 golden id on `main` at `97d3c76` is present or retired at the close.
 
-Signed: ____________________  Date: __________
+Signed: andaro74  Date: 2026-09-24
 
 ---
 
@@ -95,4 +95,4 @@ Every Finding and Unsure item of M02 is closed, ruled, or in
 milestone is described as governed, secure or proven; the ceiling's one
 refusal is recorded as unplanned.
 
-Signed: ____________________  Date: __________
+Signed: andaro74  Date: 2026-09-24
