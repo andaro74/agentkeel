@@ -133,6 +133,6 @@ a throwaway repository and in this tree.
 ```
 uv run pytest -q tests/test_gate.py tests/test_observe_pr.py tests/test_evals_workflow.py tests/test_m02_seeds.py tests/test_validate_rulings_name_deleted_paths.py
 uv run python -m src.verdict.gate evals/history/6daf6c4f369bea52f80e210b6bf80d3029dc5af1.json   # RED: checks.F2_2 is missing
-git show 6daf6c4:tests/test_m02_seeds.py | grep -c xfail                                         # 1; 0 at HEAD
+git show 6daf6c4:tests/test_m02_seeds.py | grep -c xfail                                         # 2 (marker and docstring); 1 at HEAD, the docstring
 uv run python -m src.validate                                                                     # 12 ok, eval-role gone
 ```

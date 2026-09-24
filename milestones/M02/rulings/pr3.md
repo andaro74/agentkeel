@@ -97,6 +97,10 @@ amendment already assigned there.
 | 3 | A ruling cannot name a deletion precisely (above) | Product, SPEC/02 §2 at M03 PR 1 |
 | 4 | The bot exemption still reads `%an` (PR 2 cold F4) | Security, M05, unchanged |
 | 5 | The reading is made by the PR's own code (`evals.yml` header, first gap) | Unchanged; M05 |
+| 6 | `f2_2_three_doors.yaml` carries two top-level `doors:` keys: the human's fill appended a block instead of editing the first, which still says door 3 `pr: null` (cold F1, security F2). PyYAML keeps the last mapping, so the observer reads the filled block and the reading is unchanged; a strict loader would refuse the file | Product, the human: the session does not edit run files. Collapse the two blocks before the merge, or leave the duplicate as the record of the fill; either way the reading stands. Named under **Unsure** in the PR body |
+| 7 | `feasibility.md` §6 row 16 dated the `infra/eval-role/` removal to PR 2 and `open.md` row 16 to PR 1; it landed in PR 3 (`b7311b3`) after the destroy (platform N5) | Recorded here; neither file is rewritten |
+| 8 | The ceiling refused a call once, unplanned (run 35817173042), and SPEC/01 §9 lists it as a control with no seeded case (platform F2) | Product, SPEC/01 §9 at M03 PR 1: "observed once, unplanned"; a seeded case at M05, Security |
+| 9 | `validate`'s front-matter check accepts any glob that ever matched a deleted path, and a rename is not a deletion (cold N4, security N15) | Inside finding 3, SPEC/02 §2 at M03 PR 1 |
 
 ## What a reader can run
 
@@ -104,5 +108,5 @@ amendment already assigned there.
 uv run python -m src.ledger                       # row 2's cell is still —; the latest envelope's line
 git show 74624cb --stat                           # the constant, its fixture flags, its tests
 git show 939709d --stat                           # the wiring and S4's marker, one commit
-git show 6daf6c4:tests/test_m02_seeds.py | grep -c xfail   # 1 before; 0 after 939709d
+git show 6daf6c4:tests/test_m02_seeds.py | grep -c xfail   # 2 before (the marker and the docstring); 1 at HEAD, the docstring
 ```
