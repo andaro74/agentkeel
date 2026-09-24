@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 
 import pytest
 
@@ -86,9 +87,9 @@ def test_an_agent_cannot_call_itself_the_control(chain):
     for field in ("control_card_ref", "tokens_in"):
         del envelope[field]
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
-    with pytest.raises(gate.Rejected, match="claim 1 is read on an agent envelope only"):
+    with pytest.raises(gate.Rejected, match="claims 1 and 2 are read on an agent envelope only"):
         gate.read(envelope_path)
-    for name in gate.CLAIM_1_CHECKS:  # and without them, its base is another commit's card
+    for name in gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS:  # and without them, its base is another commit's card
         envelope["checks"].pop(name, None)
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
     with pytest.raises(gate.Rejected, match="baseline card is for 9407615"):
@@ -101,7 +102,7 @@ def test_a_control_envelope_carries_no_claim_1_check(chain):
     envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
     envelope["checks"]["F1_1"] = {"status": "pass", "url": URL}
     envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
-    with pytest.raises(gate.Rejected, match="claim 1 is read on an agent envelope only"):
+    with pytest.raises(gate.Rejected, match="claims 1 and 2 are read on an agent envelope only"):
         gate.read(envelope_path)
 
 
@@ -158,6 +159,61 @@ def test_the_gate_reads_f1_4_for_itself(chain):
 
     del envelope["checks"]["F1_4"]
     assert "checks.F1_4 is missing from an agent envelope" in gate.judge(envelope, KINDS, {}, [])[1]
+
+
+# --- claim 2's checks, from M02 PR 2's merge (SPEC/02 §4; M02 PR 3) ------------------
+
+
+def test_the_claim_2_constant_is_pr_2s_merge_commit_on_main():
+    """The commit the checks are required from is #12's merge commit, and it is on main."""
+    shown = subprocess.run(["git", "show", "-s", "--format=%P %s", gate.M02_PR2_MERGE], cwd=ROOT,
+                           capture_output=True, text=True, check=True).stdout.split()  # fmt: skip
+    assert len(shown) >= 2 and len(shown[0]) == 40 and len(shown[1]) == 40, "a merge commit has two parents"
+    assert "#12" in " ".join(shown)
+    assert subprocess.run(["git", "merge-base", "--is-ancestor", gate.M02_PR2_MERGE, "origin/main"], cwd=ROOT).returncode == 0
+
+
+def test_an_agent_envelope_after_pr_2s_merge_must_carry_claim_2s_checks(chain):
+    """Before the merge: claim 1's four. From it: those and F2_1, F2_2. A commit git cannot place: held to both."""
+    before = "e97125e970ccfc6d044612eb006cdbdbcdb99337"  # M01's Measured envelope, an ancestor of the merge
+    assert gate.required_checks(before) == gate.CLAIM_1_CHECKS
+    assert gate.required_checks(gate.M02_PR2_MERGE) == gate.CLAIM_1_CHECKS
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    assert gate.required_checks(head) == gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS
+    assert gate.required_checks("a" * 40) == gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS
+
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    assert envelope["checks"]["F2_1"]["status"] == "pass" and envelope["checks"]["F2_2"]["status"] == "pass"
+    assert gate.rule(envelope_path, envelope_path.parent / "none") == ("GREEN", [])
+    for name in gate.CLAIM_2_CHECKS:
+        forgot = json.loads(json.dumps(envelope))
+        del forgot["checks"][name]
+        assert f"checks.{name} is missing from an agent envelope" not in gate.judge(forgot, KINDS, {}, [])[1]  # claim 1 alone
+        verdict, reasons = gate.judge(forgot, KINDS, {}, [], required=gate.required_checks("a" * 40))
+        assert verdict == "RED" and f"checks.{name} is missing from an agent envelope" in reasons
+
+
+def test_the_three_branch_envelopes_before_the_constant_are_red_under_it():
+    """12b4646, 47258f2 and 6daf6c4 are agent envelopes after the merge that carry F2_1 alone (PR 3's
+    branch before this constant). The gate rules them RED now, as SPEC/02 §4 says a run that forgot
+    the checks must be; no Measured cell cites them."""
+    for commit in ("12b4646d666dbbcc208a54bac20499146469b43e", "47258f2f690d80d52a245ee8d294167045bcc047",
+                   "6daf6c4f369bea52f80e210b6bf80d3029dc5af1"):  # fmt: skip
+        path = gate.HISTORY / f"{commit}.json"
+        if not path.exists():
+            pytest.skip(f"{commit[:7]} is not in history here")
+        verdict, reasons = gate.rule(path)
+        assert verdict == "RED" and "checks.F2_2 is missing from an agent envelope" in reasons
+
+
+def test_a_control_envelope_carries_no_claim_2_check(chain):
+    envelope_path, _, _ = chain()
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    envelope["checks"]["F2_2"] = {"status": "pass", "url": URL}
+    envelope_path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(gate.Rejected, match="read on an agent envelope only"):
+        gate.read(envelope_path)
 
 
 def test_over_the_cap_is_red_in_the_gate_too(chain):
@@ -254,7 +310,7 @@ def test_measured_is_what_the_ledger_cell_must_say(chain):
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
         "agent: traps 0/3; ordinary 1/9; guardrail 0/3; control: traps 0/3; ordinary 0/9; guardrail 0/3; mode runner; "
         f"never_passed 14; regressed 0; plants 0/0; F1_1 pass {URL}; F1_2 pass {URL}; F1_3 pass {URL}; "
-        f"F1_4 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
+        f"F1_4 pass {URL}; F2_1 pass {URL}; F2_2 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
     )
 
 

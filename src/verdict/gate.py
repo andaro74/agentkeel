@@ -67,14 +67,21 @@ from src.verdict import (
     schema_errors,
 )
 
-__all__ = ["Rejected", "cap_at", "control_drift", "judge", "measured", "measured_at", "read", "rule",
-           "schema_errors", "thresholds_at"]
+__all__ = ["Rejected", "cap_at", "control_drift", "judge", "measured", "measured_at", "read", "required_checks",
+           "rule", "schema_errors", "thresholds_at"]
 
 # What an agent envelope must carry from M01 (SPEC/01 §4). A check that is
 # absent is not a check that passed: the Makefile builds the list from
 # variables CI passes, and a run that forgot one would otherwise be read as
 # a run that measured the claim.
 CLAIM_1_CHECKS = ("F1_1", "F1_2", "F1_3", "F1_4")
+# What an agent envelope must carry from M02 PR 2's merge (SPEC/02 §4, amended
+# at PR 2): F2_1 from both sources and F2_2 from the three doors. Set at PR 3
+# as ADR_0007 was at M01 PR 3, so a later run that forgot the observation
+# flags is RED, not GREEN by omission. Every envelope for a descendant of the
+# merge commit is held to it; a commit git cannot place is held to it too.
+CLAIM_2_CHECKS = ("F2_1", "F2_2")
+M02_PR2_MERGE = "97d3c761bc561b9a33949a6d3d5a193aeb88debf"
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -147,6 +154,17 @@ def before_adr_0007(commit: str, root: Path = ROOT) -> bool:
     return done.returncode == 0
 
 
+def before_m02_pr2(commit: str, root: Path = ROOT) -> bool:
+    """True when `commit` is M02 PR 2's merge commit or one before it. False when git cannot say."""
+    done = subprocess.run(["git", "merge-base", "--is-ancestor", commit, M02_PR2_MERGE], cwd=root, capture_output=True)
+    return done.returncode == 0
+
+
+def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
+    """What an agent envelope for `commit` must carry: claim 1's checks, and claim 2's from PR 2's merge on."""
+    return CLAIM_1_CHECKS if before_m02_pr2(commit, root) else CLAIM_1_CHECKS + CLAIM_2_CHECKS
+
+
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:
     """ADR-0007, on a version 2 envelope. Version 1 (all history before it) is read as it was.
 
@@ -213,8 +231,8 @@ def read(path: Path, root: Path = ROOT) -> dict[str, Any]:
         return read_agent(path, envelope, scopes, root)
     if envelope.get("control_card_ref") is not None:
         raise Rejected(f"{path}: control results beside a control_card_ref: a control envelope's base is its own card")
-    if claim_1 := sorted(name for name in envelope["checks"] if name.startswith("F1_")):
-        raise Rejected(f"{path}: a control envelope carries {claim_1}: claim 1 is read on an agent envelope only")
+    if claimed := sorted(name for name in envelope["checks"] if name.startswith(("F1_", "F2_"))):
+        raise Rejected(f"{path}: a control envelope carries {claimed}: claims 1 and 2 are read on an agent envelope only")
 
     card = card_at(path, envelope["baseline_card_ref"], root, "baseline_card_ref")
     if card.get("commit") != envelope["commit"]:
@@ -259,8 +277,13 @@ def judge(
     history: replay_history.History,
     plant_ids: list[str],
     cap: int | None = None,
+    required: tuple[str, ...] = CLAIM_1_CHECKS,  # a direct caller gets claim 1 only; `rule` passes `required_checks`
 ) -> tuple[str, list[str]]:
-    """The gate's own verdict and its reasons. `envelope` has passed `read`."""
+    """The gate's own verdict and its reasons. `envelope` has passed `read`.
+
+    `required` is what an agent envelope must carry (`required_checks`):
+    claim 1's four, and from M02 PR 2's merge claim 2's two as well.
+    """
     results = envelope["goldens"]
     reasons: list[str] = []
 
@@ -306,7 +329,7 @@ def judge(
         # would otherwise be read as a run that measured the claim and found
         # it whole.
         reasons += [f"checks.{name} is missing from an agent envelope"
-                    for name in CLAIM_1_CHECKS if name not in envelope["checks"]]  # fmt: skip
+                    for name in required if name not in envelope["checks"]]  # fmt: skip
     reasons += [
         f"check {name} failed: {check['url']}"
         for name, check in sorted(envelope["checks"].items())
@@ -412,7 +435,7 @@ def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
     # out (M02 PR 2): a golden added or retired since must not re-rule it.
     kinds, _ = golden_kinds_at(envelope["commit"], GOLDENS, ROOT)
     cap, _ = cap_at(envelope["commit"])
-    return judge(envelope, kinds, history, plants.plant_ids(kinds, ROOT), cap)
+    return judge(envelope, kinds, history, plants.plant_ids(kinds, ROOT), cap, required_checks(envelope["commit"]))
 
 
 def control_card_of(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> dict[str, Any] | None:

@@ -67,7 +67,7 @@ from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from constructs import Construct
 
 REPO = "andaro74/agentkeel"
-SUBJECT = "repo:andaro74@3157440/agentkeel@1376369685"  # the immutable subject, as at M00
+SUBJECT = "repo:andaro74@3157440/agentkeel@1376369685"  # the immutable subject, as at M00 (milestones/M00/feasibility.md, milestones/M01/rulings/pr1.md)
 REGION = "us-west-2"
 AGENT_ROLE_PATH = "/agentkeel/agents/"  # ruling b: the key policy matches agent roles by path
 BOUNDARY_NAME = "agentkeel-boundary"  # the agent plane's allow-list (S5, S6)
@@ -181,6 +181,14 @@ class BootstrapStack(cdk.Stack):
                 iam.PolicyStatement(
                     sid="WhatAnyPlatformRoleMayDo",
                     actions=["bedrock:Invoke*", "bedrock-agentcore:*", "dynamodb:GetItem", "dynamodb:Query",
+                             # M02 PR 3: refagent reads the whole rights table with Scan
+                             # (agents/refagent/agent.py, rights_rows), and the construct
+                             # grants it on the table (M01 PR 3). The ceiling never listed
+                             # it, and the first deploy on which the runtime answered
+                             # (run 35817173042) refused all fifteen goldens on it.
+                             # tests/test_bootstrap.py now holds the construct's grants
+                             # under this list.
+                             "dynamodb:Scan",
                              "kms:Decrypt", "kms:GenerateDataKey", "logs:CreateLogStream", "logs:PutLogEvents",
                              "s3:GetObject", "cloudformation:Describe*", "sts:AssumeRoleWithWebIdentity",
                              # B1, ruling d amended (M01 PR 3): the runtime

@@ -26,4 +26,65 @@ seeds:
     patch: tests/fixtures/m02/s5-golden-renamed.patch
     expected_check: checks
     expected_path: evals/goldens/v1/g-005.yaml
-observed: null
+observed:
+  - seed: S1 one key
+    pr: 14
+    opened_at: 2026-09-23T13:10:19Z
+    expected_seen: two-key red naming thresholds.yaml; ruling-cited green
+    my_output: |
+      NAME                                                  DESCRIPTION  ELAPSED  URL
+      X  evals/checks (pull_request)                                        1m18s    https://github.com/andaro74/agentkeel/actions/runs/35865281462/job/107195528369
+      X  evals/evals (pull_request)                                         31s      https://github.com/andaro74/agentkeel/actions/runs/35865281462/job/107195527986
+      X  gates/two-key (pull_request)                                       13s      https://github.com/andaro74/agentkeel/actions/runs/35865281458/job/107195196920
+      -  evals/record (pull_request)                                                 https://github.com/andaro74/agentkeel/actions/runs/35865281462/job/107195747658
+      ✓  cold-review-ruling/cold-review-ruling (pull_request)               6s       https://github.com/andaro74/agentkeel/actions/runs/35865281469/job/107195196902
+      ✓  gates/ruling-cited (pull_request)                                  14s      https://github.com/andaro74/agentkeel/actions/runs/35865281458/job/107195197437
+  - seed: S1 two files, one seat
+    pr: 15
+    opened_at: 2026-09-23T13:10:55Z
+    expected_seen: two-key red naming thresholds.yaml, "same seat"
+    my_output: |
+      NAME                                                  DESCRIPTION  ELAPSED  URL
+      X  evals/checks (pull_request)                                        1m14s    https://github.com/andaro74/agentkeel/actions/runs/35865345093/job/107195728495
+      X  evals/evals (pull_request)                                         29s      https://github.com/andaro74/agentkeel/actions/runs/35865345093/job/107195728001
+      X  gates/two-key (pull_request)                                       15s      https://github.com/andaro74/agentkeel/actions/runs/35865345013/job/107195407182
+      -  evals/record (pull_request)                                                 https://github.com/andaro74/agentkeel/actions/runs/35865345093/job/107195928442
+      ✓  cold-review-ruling/cold-review-ruling (pull_request)               9s       https://github.com/andaro74/agentkeel/actions/runs/35865345199/job/107195408154
+      ✓  gates/ruling-cited (pull_request)                                  16s      https://github.com/andaro74/agentkeel/actions/runs/35865345013/job/107195407510
+  - seed: S2
+    pr: 16
+    opened_at: 2026-09-23T13:11:29Z
+    expected_seen: ruling-cited red naming evals/goldens/v1/g-010.yaml; two-key red too
+    my_output: |
+      NAME                                                  DESCRIPTION  ELAPSED  URL
+      X  evals/checks (pull_request)                                        1m15s    https://github.com/andaro74/agentkeel/actions/runs/35865367597/job/107195484936
+      X  cold-review-ruling/cold-review-ruling (pull_request)               9s       https://github.com/andaro74/agentkeel/actions/runs/35865367592/job/107195483912
+      X  evals/evals (pull_request)                                         33s      https://github.com/andaro74/agentkeel/actions/runs/35865367597/job/107195484818
+      X  gates/ruling-cited (pull_request)                                  12s      https://github.com/andaro74/agentkeel/actions/runs/35865367591/job/107195483701
+      X  gates/two-key (pull_request)                                       12s      https://github.com/andaro74/agentkeel/actions/runs/35865367591/job/107195484106
+      -  evals/record (pull_request)                                                 https://github.com/andaro74/agentkeel/actions/runs/35865367597/job/107195715063
+  - seed: S3
+    pr: 17
+    opened_at: 2026-09-23T13:11:40Z
+    expected_seen: checks red, the edge line naming agents/refagent/manifest.yaml (and the export line, the accepted window)
+    my_output: |
+      NAME                                                  DESCRIPTION  ELAPSED  URL
+      X  evals/checks (pull_request)                                        26s      https://github.com/andaro74/agentkeel/actions/runs/35865388250/job/107195552419
+      X  cold-review-ruling/cold-review-ruling (pull_request)               7s       https://github.com/andaro74/agentkeel/actions/runs/35865388273/job/107195552049
+      X  evals/evals (pull_request)                                         24s      https://github.com/andaro74/agentkeel/actions/runs/35865388250/job/107195552723
+      X  gates/ruling-cited (pull_request)                                  16s      https://github.com/andaro74/agentkeel/actions/runs/35865388120/job/107195562355
+      ✓  gates/two-key (pull_request)                                       10s      https://github.com/andaro74/agentkeel/actions/runs/35865388120/job/107195562015
+      -  evals/record (pull_request)                                                 https://github.com/andaro74/agentkeel/actions/runs/35865388250/job/107195724639
+  - seed: S5
+    pr: 18
+    opened_at: 2026-09-23T13:11:51Z
+    expected_seen: checks red naming evals/goldens/v1/g-005.yaml, and ruling-cited red naming g-099.yaml
+    my_output: |
+      NAME                                                  DESCRIPTION  ELAPSED  URL
+      X  evals/checks (pull_request)                                        28s      https://github.com/andaro74/agentkeel/actions/runs/35865409705/job/107195622881
+      X  cold-review-ruling/cold-review-ruling (pull_request)               7s       https://github.com/andaro74/agentkeel/actions/runs/35865409638/job/107195621210
+      X  evals/evals (pull_request)                                         26s      https://github.com/andaro74/agentkeel/actions/runs/35865409705/job/107195623315
+      X  gates/ruling-cited (pull_request)                                  11s      https://github.com/andaro74/agentkeel/actions/runs/35865409673/job/107195622976
+      -  evals/record (pull_request)                                                 https://github.com/andaro74/agentkeel/actions/runs/35865409705/job/107195812589
+      ✓  gates/two-key (pull_request)                                       12s      https://github.com/andaro74/agentkeel/actions/runs/35865409673/job/107195623240
+

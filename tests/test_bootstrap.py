@@ -606,3 +606,21 @@ def test_every_stack_deploy_yml_names_is_one_the_deploy_role_may_touch(template)
     assert names, "deploy.yml names no stack"
     for name in names:
         assert fnmatch.fnmatchcase(name, pattern), f"deploy.yml names {name}, which stack/{pattern}/* does not match"
+
+
+def test_every_action_the_construct_grants_the_agent_role_is_under_the_agent_boundary(template, construct_template):
+    """The boundary is a ceiling: a grant it does not list is a grant that fails at the call, not at synth.
+
+    The first deploy on which refagent's runtime answered (M02 PR 2's merge,
+    run 35817173042) returned AccessDeniedException on dynamodb:Scan for all
+    fifteen goldens: the construct grants Scan on the rights table and the
+    boundary listed only GetItem and Query. Nothing compared the two.
+    """
+    ceiling = allowed(named(template, "agentkeel-boundary")) - denied(named(template, "agentkeel-boundary"))
+    granted = allowed_actions(role_statements(construct_template, "RefagentRole"))
+    over = sorted(a for a in granted if a not in ceiling and not any(
+        c.endswith("*") and a.startswith(c[:-1]) for c in ceiling))
+    assert not over, f"the construct grants the agent role actions the boundary does not allow: {over}"
+    # the ceiling allows bedrock-agentcore:* and the wildcard test above would pass any action under it
+    # (platform-architect on M02 PR 3, N2); the construct grants the agent role none, and this holds it
+    assert not [a for a in granted if a.startswith("bedrock-agentcore:")], granted

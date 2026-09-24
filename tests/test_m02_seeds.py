@@ -7,7 +7,9 @@ path and the planted reason. Until the reader is in the tree the test
 fails, and it is marked `xfail(strict=True)`: an expected failure now, and
 a failure the first time it passes, so the marker has to come off in the
 commit that lands the reader. A seed cannot start passing without
-somebody saying so.
+somebody saying so. All six markers are off as of M02 PR 3; S4's came off
+last, in the commit that wired its reading, after it had refused the
+filled run file once (run 35874322479).
 
 The readers, none of which exist at M02 PR 1: `src/gates/two_key.py` (S1),
 `src/gates/ruling_cited.py` (S2, S3, S5), `src/validate/edges.py` and
@@ -107,7 +109,6 @@ def test_s3_a_one_sided_edge_is_refused(seeded):
 # --- S4: the owner tries to bypass a red check ----------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="the attempts are made by the human after M02 PR 2 merges")
 def test_s4_the_owner_was_refused():
     """Two attempts against GitHub, recorded by the human and looked up by CI at PR 3.
     Door 3 is two gates: the ruleset refuses the merge, and validate refuses the ruleset

@@ -1,4 +1,0 @@
-Rule ID,Resource ID,Compliance,Exception Reason,Rule Level,Rule Info
-"AwsSolutions-IAM4","AgentkeelM00EvalRole/EvalRole/Resource","Compliant","N/A","Error","The IAM user, role, or group uses AWS managed policies."
-"AwsSolutions-IAM5","AgentkeelM00EvalRole/EvalRole/Resource","Compliant","N/A","Error","The IAM entity contains wildcard permissions and does not have a cdk-nag rule suppression with evidence for those permission."
-"AwsSolutions-IAM5","AgentkeelM00EvalRole/EvalRole/DefaultPolicy/Resource","Compliant","N/A","Error","The IAM entity contains wildcard permissions and does not have a cdk-nag rule suppression with evidence for those permission."

@@ -121,7 +121,11 @@ run looks each one up in CloudTrail (`scripts/observe_attempt.py`) and
 that lookup is what writes `checks.F1_1` and `checks.F1_3`. A file a human
 wrote feeds no check by itself (SPEC/01 §4).
 
-After PR 2 merges: `cd infra/eval-role && npx aws-cdk@2 destroy` (ruling f).
+Done at M02 PR 3: `AgentkeelM00EvalRole` was destroyed by the human on
+2026-09-23 (`DELETE_COMPLETE` at 13:48Z, read with `list-stacks`) and
+`infra/eval-role/` removed in the same PR (ruling f; M02 open.md row 16).
+The eval role this stack owns, `agentkeel-evals`, is what
+`AWS_EVAL_ROLE_ARN` names.
 
 ## What has been observed, and what has not
 
@@ -137,7 +141,24 @@ because `TableEncryption.AWS_MANAGED` needs `kms:CreateGrant` and the
 deploy boundary denies it. Nothing was half-built; the stack rolled back
 and was deleted. The construct now uses `TableEncryption.DEFAULT`, and
 `tests/test_bootstrap.py` reads a handler call the boundary denies before
-a deploy does. No agent stack has yet deployed through these roles at the
-time this paragraph was written; the first that does is read at M02 PR 2
-(row 10). Until then no sentence here or anywhere else may call the
-deploy plane proven (SPEC/00 §10.5).
+a deploy does. The first agent stack deployed through these roles at M02
+PR 2's merge (run 35817173042, `agentkeel-refagent` `UPDATE_COMPLETE` at
+2026-09-23T04:11:23Z; row 10). Its runtime answered every golden with
+`AccessDeniedException` on `dynamodb:Scan`: the boundary, not the role,
+refused it, the first time the ceiling has refused a call. That was not a
+seeded case (SPEC/01 §9 names the ceiling as a control without one); it
+is recorded as an observation and nothing here calls the ceiling proven.
+
+The boundary redeploy that followed (`c34da39`, `dynamodb:Scan` added):
+`describe-stacks` on `AgentkeelBootstrap` reads `UPDATE_COMPLETE` with
+`LastUpdatedTime` 2026-09-23T04:45:35Z, and the stack events between
+04:45:35Z and 04:46:00Z name one resource, `BoundaryEA298153`
+(`UPDATE_IN_PROGRESS` 04:45:39Z, `UPDATE_COMPLETE` 04:45:57Z), which is
+the one line `cdk diff` showed. The first run after it in `mode: runtime`
+is envelope `12b4646` (run 35861180676), GREEN.
+
+The GitHub OIDC provider this stack imports by ARN predates the
+repository; who created it and when is not recorded anywhere, and its
+thumbprint and audience are landing-zone work (SPEC/00 §2). Until then
+no sentence here or anywhere else may call the deploy plane proven
+(SPEC/00 §10.5).

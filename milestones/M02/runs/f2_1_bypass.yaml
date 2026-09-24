@@ -42,4 +42,24 @@ attempts:
     command: gh api -X PUT repos/andaro74/agentkeel/rulesets/23685206 --input <ruleset with bypass_actors set>; make validate; then the same PUT with bypass_actors []
     refused_when: validate is RED on the live-vs-export diff while the actor is listed, and green again after
     record: the ruleset's updated_at before, during and after; validate's output both times
-observed: null
+observed:
+  - what: merge seed S1's PR while its two-key check is red
+    at: 2026-09-23T13:34:13Z
+    pr: 14
+    command: gh pr merge 14 --merge --admin
+    result: refused
+    message: "GraphQL: Repository rule violations found. 3 of 5 required status checks are failing."
+    rule_suite: 4192991324  # GET rulesets/rule-suites?ref=main&actor_name=andaro74&rule_suite_result=fail: result fail, 97d3c76 -> 1995389
+    witness: the rule-suites API and my own output
+  - what: add the owner to bypass_actors on the live main ruleset, run validate, remove them
+    at: 2026-09-23T13:40:26Z
+    actor_added: {actor_id: 5, actor_type: RepositoryRole, bypass_mode: always}  # the repository admin role, which is me
+    updated_at_before: "2026-09-23T05:30:52.936-07:00"
+    updated_at_during: "2026-09-23T06:39:33.877-07:00"
+    updated_at_after: "2026-09-23T06:45:29.044-07:00"
+    validate_result: RED
+    checks_job_id: 107206831180  # run 35862459367 attempt 3, the evals job, re-run while listed
+    message: "FAIL live main ruleset equals its export, bypass_actors []: the live ruleset's bypass_actors is [{\"actor_id\": 5, \"actor_type\": \"RepositoryRole\", \"bypass_mode\": \"always\"}], not []: somebody can bypass main"
+    bypass_actors_after: []
+    witness: validate's own line in the evals job's log, and my own output
+
