@@ -228,8 +228,13 @@ def read_file(path: Path) -> tuple[int, Any]:
 SUITE_KEYS = ("id", "actor_name", "before_sha", "after_sha", "ref", "pushed_at", "result")
 
 
-def rule_suite_by_id(repo: str, suite_id: int, actor: str, token: str | None, files: Path | None) -> dict[str, Any]:
-    """The rule suite the human recorded, read by id: durable where the list ages out (`time_period`)."""
+def rule_suite_by_id(repo: str, suite_id: int, actor: str, at: datetime | None, token: str | None, files: Path | None) -> dict[str, Any]:
+    """The rule suite the human recorded, read by id: durable where the list ages out (`time_period`).
+
+    It is the attempt's only if it is the actor's, on `main`, failed, and pushed
+    within `WINDOW` of the time the human wrote (cold review of PR 3, F3): any
+    other failed push by the owner is not this refusal.
+    """
     status, body = read_file(files / f"{suite_id}.json") if files is not None else get(repo, f"/rulesets/rule-suites/{suite_id}", token)
     out: dict[str, Any] = {"id": suite_id, "source": "file" if files is not None else "api", "status": status,
                            "readable": status == 200 and isinstance(body, dict)}  # fmt: skip
@@ -237,7 +242,10 @@ def rule_suite_by_id(repo: str, suite_id: int, actor: str, token: str | None, fi
         return out
     out |= {k: body.get(k) for k in SUITE_KEYS if k != "id"}
     out["refusing_rules"] = [e.get("rule_type") for e in body.get("rule_evaluations") or [] if e.get("result") == "fail"]
-    out["is_the_actors_refusal"] = body.get("result") == "fail" and body.get("actor_name") == actor and body.get("ref") == "refs/heads/main"
+    pushed = parse_time(body.get("pushed_at"))
+    out["within_window_of_attempt"] = at is None or (pushed is not None and abs(pushed - at) <= WINDOW)
+    out["is_the_actors_refusal"] = (body.get("result") == "fail" and body.get("actor_name") == actor
+                                    and body.get("ref") == "refs/heads/main" and out["within_window_of_attempt"])  # fmt: skip
     return out
 
 
@@ -270,7 +278,7 @@ def rule_suites(repo: str, actor: str, at: datetime | None, token: str | None, r
             suites = [s for s in suites if (t := parse_time(s.get("pushed_at"))) is not None and abs(t - at) <= WINDOW]
         out["failed_evaluations"] = [{k: s.get(k) for k in SUITE_KEYS} for s in suites]
     if recorded_id is not None:
-        out["recorded"] = rule_suite_by_id(repo, recorded_id, actor, token, files)
+        out["recorded"] = rule_suite_by_id(repo, recorded_id, actor, at, token, files)
     return out
 
 
@@ -323,7 +331,7 @@ def observe_bypass(repo: str, run: dict[str, Any], token: str | None, suites_tok
         if job := second.get("checks_job_id"):
             _status, log = job_log(repo, int(job), token)
             entry["ci_red_lines"] = [line for line in (log or "").splitlines() if "somebody can bypass main" in line]
-        entry["witness"] = ("validate's line in the checks job's log" if entry["ci_red_lines"]
+        entry["witness"] = ("validate's line in the recorded job's log" if entry["ci_red_lines"]
                             else "the human's own output (no checks_job_id recorded, or the line was not in its log)")  # fmt: skip
         out["attempt_2"] = entry
     if not observed:

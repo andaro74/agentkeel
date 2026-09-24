@@ -176,6 +176,12 @@ def test_rule_suites_are_read_from_the_directory_the_workflow_filled_and_not_the
     assert [s["id"] for s in seen["failed_evaluations"]] == [4192991324]
     assert seen["recorded"]["is_the_actors_refusal"] is True
     assert seen["recorded"]["refusing_rules"] == ["required_status_checks"]
+    # the recorded suite must be within WINDOW of the attempt: another failed push by the owner is not this refusal (F3)
+    early = {**SUITE, "pushed_at": "2025-09-23T06:34:13-07:00"}
+    monkeypatch.setenv("AGENTKEEL_RULE_SUITES", str(suites_dir(tmp_path / "early", [], early)))
+    seen = observe_pr.rule_suites("andaro74/agentkeel", "andaro74", at, None, recorded_id=4192991324)
+    assert seen["recorded"]["within_window_of_attempt"] is False and seen["recorded"]["is_the_actors_refusal"] is False
+    monkeypatch.setenv("AGENTKEEL_RULE_SUITES", str(suites_dir(tmp_path / "again", [SUITE], SUITE)))
     # another actor's suite, or the recorded one for another actor, is not this actor's refusal
     seen = observe_pr.rule_suites("andaro74/agentkeel", "someone-else", at, None, recorded_id=4192991324)
     assert seen["failed_evaluations"] == [] and seen["recorded"]["is_the_actors_refusal"] is False
@@ -217,3 +223,6 @@ def test_attempt_1_is_witnessed_by_the_recorded_suite_when_the_list_is_empty(tmp
            "observed": [{"pr": 14, "at": "2026-09-23T13:34:13Z", "rule_suite": 4192991324, "message": "3 of 5 required status checks are failing."}]}  # fmt: skip
     seen = observe_pr.observe_bypass("andaro74/agentkeel", run, None, None)
     assert seen["attempt_1"]["rule_suite_fail_found"] is True and seen["attempt_1"]["witness"] == "the rule-suites API"
+    run["observed"][0]["at"] = "2026-10-30T13:34:13Z"  # the same suite, a month after the attempt: not its witness
+    seen = observe_pr.observe_bypass("andaro74/agentkeel", run, None, None)
+    assert seen["attempt_1"]["rule_suite_fail_found"] is False

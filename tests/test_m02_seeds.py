@@ -7,7 +7,9 @@ path and the planted reason. Until the reader is in the tree the test
 fails, and it is marked `xfail(strict=True)`: an expected failure now, and
 a failure the first time it passes, so the marker has to come off in the
 commit that lands the reader. A seed cannot start passing without
-somebody saying so.
+somebody saying so. All six markers are off as of M02 PR 3; S4's came off
+last, in the commit that wired its reading, after it had refused the
+filled run file once (run 35874322479).
 
 The readers, none of which exist at M02 PR 1: `src/gates/two_key.py` (S1),
 `src/gates/ruling_cited.py` (S2, S3, S5), `src/validate/edges.py` and

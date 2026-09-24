@@ -621,3 +621,6 @@ def test_every_action_the_construct_grants_the_agent_role_is_under_the_agent_bou
     over = sorted(a for a in granted if a not in ceiling and not any(
         c.endswith("*") and a.startswith(c[:-1]) for c in ceiling))
     assert not over, f"the construct grants the agent role actions the boundary does not allow: {over}"
+    # the ceiling allows bedrock-agentcore:* and the wildcard test above would pass any action under it
+    # (platform-architect on M02 PR 3, N2); the construct grants the agent role none, and this holds it
+    assert not [a for a in granted if a.startswith("bedrock-agentcore:")], granted

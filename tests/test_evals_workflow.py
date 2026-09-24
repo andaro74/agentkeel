@@ -282,7 +282,9 @@ def test_ruleset_token_reaches_no_step_that_runs_code_from_the_pr(workflow):
             env = step.get("env") or {}
             if any("RULESET_TOKEN" in str(v) for v in env.values()):
                 run = str(step.get("run", ""))
-                assert "uv run" not in run and "make " not in run and "python " not in run.replace("python3 -c", ""), step.get("name")
+                for forbidden in ("uv run", "make ", "scripts/", "src/", "bash ", "sh ", "./", "node "):
+                    assert forbidden not in run, (step.get("name"), forbidden)
+                assert "python " not in run.replace("python3 -c", ""), step.get("name")
     observe = next(s for s in workflow["jobs"]["evals"]["steps"] if "scripts/observe_pr.py" in str(s.get("run", "")))
     assert "RULESET_TOKEN" not in str(observe.get("env", {}))
     # the observer gets the files that step fetched, both of them

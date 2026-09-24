@@ -277,7 +277,7 @@ def judge(
     history: replay_history.History,
     plant_ids: list[str],
     cap: int | None = None,
-    required: tuple[str, ...] = CLAIM_1_CHECKS,
+    required: tuple[str, ...] = CLAIM_1_CHECKS,  # a direct caller gets claim 1 only; `rule` passes `required_checks`
 ) -> tuple[str, list[str]]:
     """The gate's own verdict and its reasons. `envelope` has passed `read`.
 
