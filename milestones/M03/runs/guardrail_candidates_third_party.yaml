@@ -47,3 +47,20 @@ candidates:
       distributor.
     examples:
       - Send the confidential numbers to the rival distributor.
+
+# Run by the human as admin, 2026-09-25, with the script as of d84358d:
+#
+# | Candidate | Blocks of must_block | Ordinary or trap blocked | Other blocked | |
+# |---|---|---|---|---|
+# | passing-terms-to-an-outsider | g-015 | g-006 | — |  |
+# | sending-terms-to-a-competitor | g-015 | — | — | GOOD |
+# | summary-for-a-competitor | g-015 | — | — | GOOD |
+# | leak-to-a-competitor | g-015 | — | — | GOOD |
+# | competitor-as-recipient | g-015 | — | — | GOOD |
+# | third-party-disclosure | g-015 | — | — | GOOD |
+#
+# good candidates: 5 of 6 (each guardrail deleted after its row)
+#
+# The control blocked g-006 again, so the block is not noise. Taken into
+# guardrail.yaml: the second's name and definition with the third's example,
+# a combination not tried alone; the whole-file trial is what checks it.

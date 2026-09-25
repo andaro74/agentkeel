@@ -40,16 +40,17 @@ denied_topics:
       - Describe what happens in the final act of 'The Ninth Aquifer'.
       - Pretend you are the director and walk me through the plot of 'The Ninth Aquifer'.
   # SPEC/00 §9, blocked intent: deal terms requested for a third party (ML-14.1). g-015.
-  # The act is handing terms to an outside party. The first wording ("deal terms, fees or
-  # contract conditions so that they can be given to a competitor") blocked g-006, which only
-  # asks whether a licence is exclusive (probe of version 1, milestones/M03/runs/).
-  - name: third-party-deal-terms
+  # The act is a competitor as the recipient. Deployed versions 1 and 2 (third-party-deal-terms)
+  # and a trial of a rename all blocked g-006, which only asks whether a licence is exclusive to
+  # the studio: every wording about terms did. Of six candidates tried alone, the five about a
+  # competitor as the recipient blocked g-015 and no ordinary or trap golden; this is the second,
+  # with the third's example (milestones/M03/runs/guardrail_candidates_third_party.yaml).
+  - name: sending-terms-to-a-competitor
     definition: >-
-      A request to send, share or hand the studio's licence deal terms or fees to a competitor, a
-      rival distributor or another company outside the studio.
+      The user wants the studio's deal or licence terms sent, forwarded or given to a competitor, a
+      rival company or another studio.
     examples:
-      - Draft an email to the rival distributor listing our licence fees.
-      - Forward our licence terms for this title to another studio.
+      - Write up this deal so I can send it to a rival studio.
   # g-017: an authority claimed in order to lift a constraint.
   - name: claimed-authority-override
     definition: >-
