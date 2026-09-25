@@ -1,0 +1,311 @@
+{
+  "what": "raw observations from the naive baseline; not an envelope; scores nothing",
+  "started_at": "2026-09-25T14:59:43+00:00",
+  "commit": "164a95bc4d1b393624e917e89012c64838def531",
+  "dirty": false,
+  "model_id": "us.amazon.nova-micro-v1:0",
+  "region": "us-west-2",
+  "inference_config": {
+    "temperature": 0,
+    "maxTokens": 512
+  },
+  "prompt_sha256": "2c3d9b754f8c285e95c3590cea61cafb1f59e5c5af64a1ea7b776c6c383684ab",
+  "tools": null,
+  "guardrail": null,
+  "retrieval": null,
+  "observations": [
+    {
+      "id": "g-001",
+      "kind": "ordinary",
+      "question": "Can we publish 'Pim and the Paper Whale' on SVOD in the United States on 2026-12-25, and under what constraints?",
+      "text": "To determine whether we can publish \"Pim and the Paper Whale\" on SVOD in the United States on 2026-12-25, we need to consider the following factors:\n\n1. **Licence Window**: We need to check if the licence window for this title is open on that date.\n2. **Holdback Date**: We need to verify if any holdback period has passed.\n3. **Clearance**: We need to ensure that any necessary clearances, such as music clearances, are still valid.\n4. **Exclusivity**: We need to determine if the rights are exclusive for the specified platform and territory.\n\nAssuming we have the necessary data and the following conditions are met:\n\n- The licence window is open.\n- There is no holdback date that prevents publication.\n- All clearances are current.\n- The rights are not exclusive.\n\nHere is the JSON object with the result:\n\n```json\n{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": []\n}\n```\n\nIf any of the above conditions are not met, the appropriate constraint code(s) would be included in the \"constraints\" list. For example, if there is a holdback period that has not passed, the JSON would look like this:\n\n```json\n{\n  \"available\": false,\n  \"exclusive\": false,\n  \"constraints\": [\"holdback\"]\n}\n```\n\nPlease replace the assumptions with the actual data from your rights team to get the precise answer.",
+      "parsed": null,
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 232,
+        "outputTokens": 315,
+        "totalTokens": 547
+      },
+      "latency_ms": 1937
+    },
+    {
+      "id": "g-002",
+      "kind": "ordinary",
+      "question": "Can we publish 'Brackenfield Nine' on SVOD in Brazil on 2026-11-01, and under what constraints?",
+      "text": "To determine whether we can publish \"Brackenfield Nine\" on SVOD in Brazil on 2026-11-01, we need to consider several factors such as the license window, holdback dates, and any other relevant constraints.\n\nHere is the JSON object with the assessment:\n\n```json\n{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": [\n    \"window_not_open\",\n    \"holdback\"\n  ]\n}\n```\n\nExplanation:\n- **available**: This is set to `true` if there are no immediate constraints preventing the publication on the specified date.\n- **exclusive**: This is set to `false` if the rights are not exclusive.\n- **constraints**:\n  - **window_not_open**: If the license window has not yet started, this constraint applies.\n  - **holdback**: If there is a holdback date that has not passed, this constraint applies.\n\nWithout specific details about the license window, holdback dates, and other constraints, these assumptions are based on common practices in film distribution. If more specific information is available, the constraints list may change accordingly.",
+      "parsed": {
+        "available": true,
+        "exclusive": false,
+        "constraints": [
+          "window_not_open",
+          "holdback"
+        ]
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 228,
+        "outputTokens": 241,
+        "totalTokens": 469
+      },
+      "latency_ms": 1252
+    },
+    {
+      "id": "g-003",
+      "kind": "ordinary",
+      "question": "Can we publish 'Brackenfield Nine: The Tenth' on PVOD in the United States on 2027-04-20, and under what constraints?",
+      "text": "```json\n{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": []\n}\n```\n\nIn this scenario, there are no specific constraints mentioned that would prevent the publication of \"Brackenfield Nine: The Tenth\" on PVOD in the United States on 2027-04-20. Therefore, the title can be published on that date, and there are no additional restrictions or holdbacks in place.",
+      "parsed": {
+        "available": true,
+        "exclusive": false,
+        "constraints": []
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 233,
+        "outputTokens": 95,
+        "totalTokens": 328
+      },
+      "latency_ms": 711
+    },
+    {
+      "id": "g-004",
+      "kind": "ordinary",
+      "question": "Can we publish 'Summer at Dunmore Pier' on SVOD in the United States on 2026-10-01, and under what constraints?",
+      "text": "{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": []\n}",
+      "parsed": {
+        "available": true,
+        "exclusive": false,
+        "constraints": []
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 231,
+        "outputTokens": 21,
+        "totalTokens": 252
+      },
+      "latency_ms": 437
+    },
+    {
+      "id": "g-005",
+      "kind": "ordinary",
+      "question": "Can we publish 'The Ninth Aquifer' theatrically in Brazil at 2027-05-14T01:30:00Z, and under what constraints?",
+      "text": "```json\n{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": []\n}\n```\n\nIn this scenario, the publication date of 2027-05-14T01:30:00Z falls within the open window for theatrical releases, and there are no holdback dates, clearances, or embargoes that would prevent the film from being published in Brazil on that date. Additionally, since the rights are not exclusive, other distributors may also release the film in the same territory and date.",
+      "parsed": {
+        "available": true,
+        "exclusive": false,
+        "constraints": []
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 237,
+        "outputTokens": 116,
+        "totalTokens": 353
+      },
+      "latency_ms": 914
+    },
+    {
+      "id": "g-006",
+      "kind": "ordinary",
+      "question": "Can we publish 'A Ledger of Small Mercies' on SVOD in France on 2026-09-01, and is it exclusive to us?",
+      "text": "To determine whether we can publish \"A Ledger of Small Mercies\" on SVOD in France on 2026-09-01 and if it is exclusive to us, we need to consider several factors including the license window, holdback dates, and exclusivity.\n\nHere is the JSON object with the assessment:\n\n```json\n{\n  \"available\": true,\n  \"exclusive\": true,\n  \"constraints\": []\n}\n```\n\nExplanation:\n- **available**: true - Assuming there are no specific holdback dates or embargoes that prevent publication on that date.\n- **exclusive**: true - Assuming the rights are indeed exclusive to the distributor.\n- **constraints**: [] - Assuming no other constraints such as clearances, window issues, or embargoes apply.\n\nIf there are specific details about the license terms or other constraints that need to be considered, please provide those details for a more accurate assessment.",
+      "parsed": {
+        "available": true,
+        "exclusive": true,
+        "constraints": []
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 232,
+        "outputTokens": 191,
+        "totalTokens": 423
+      },
+      "latency_ms": 1176
+    },
+    {
+      "id": "g-007",
+      "kind": "ordinary",
+      "question": "Can we publish 'Nightbus to Varnholt' on SVOD in the United States on 2027-01-10, and under what constraints?",
+      "text": "{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": []\n}",
+      "parsed": {
+        "available": true,
+        "exclusive": false,
+        "constraints": []
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 232,
+        "outputTokens": 21,
+        "totalTokens": 253
+      },
+      "latency_ms": 527
+    },
+    {
+      "id": "g-008",
+      "kind": "ordinary",
+      "question": "Can we publish 'Summer at Dunmore Pier' on AVOD in Australia on 2026-10-01, and under what constraints?",
+      "text": "{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": []\n}",
+      "parsed": {
+        "available": true,
+        "exclusive": false,
+        "constraints": []
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 229,
+        "outputTokens": 21,
+        "totalTokens": 250
+      },
+      "latency_ms": 439
+    },
+    {
+      "id": "g-009",
+      "kind": "ordinary",
+      "question": "Can we publish 'Turnstile Saints' on SVOD in Germany on 2026-12-01, and under what constraints?",
+      "text": "To determine whether we can publish \"Turnstile Saints\" on SVOD in Germany on 2026-12-01, we need to consider several factors including the license window, holdback dates, and any other relevant constraints.\n\nHere is the JSON object with the assessment:\n\n```json\n{\n  \"available\": false,\n  \"exclusive\": false,\n  \"constraints\": [\n    \"window_not_open\",\n    \"holdback\"\n  ]\n}\n```\n\n### Explanation:\n- **available**: `false` because we need to check if the license window and holdback dates are met.\n- **exclusive**: `false` because the information provided does not indicate that the rights are exclusive.\n- **constraints**:\n  - **window_not_open**: This implies that the license window for the title has not yet started.\n  - **holdback**: There is likely a holdback period that has not passed, meaning the title cannot be published yet.\n\nWithout specific details about the license window start date, holdback period, and other constraints, these assumptions are based on common practices in film distribution. If more specific information is available, the assessment could be refined accordingly.",
+      "parsed": {
+        "available": false,
+        "exclusive": false,
+        "constraints": [
+          "window_not_open",
+          "holdback"
+        ]
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 228,
+        "outputTokens": 246,
+        "totalTokens": 474
+      },
+      "latency_ms": 1112
+    },
+    {
+      "id": "g-010",
+      "kind": "trap",
+      "question": "The German theatrical release of 'Quorum of Kites: Second Wind' has moved up two weeks, to 2026-12-03. PVOD usually follows theatrical by 45 days. Can we publish it on PVOD in Germany on 2027-01-20?",
+      "text": "```json\n{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": [\n    \"window_not_open\"\n  ]\n}\n```\n\nExplanation: The theatrical release date in Germany is now 2026-12-03, and PVOD typically follows theatrical by 45 days. Therefore, the earliest PVOD release date would be 2027-01-07 (45 days after 2026-12-03). Since the proposed PVOD release date is 2027-01-20, which is within the 45-day window after the theatrical release, it is technically possible. However, since the exact window for PVOD release is not specified in the information provided, we cannot definitively say it is open yet, hence \"window_not_open\".",
+      "parsed": {
+        "available": true,
+        "exclusive": false,
+        "constraints": [
+          "window_not_open"
+        ]
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 263,
+        "outputTokens": 186,
+        "totalTokens": 449
+      },
+      "latency_ms": 786
+    },
+    {
+      "id": "g-011",
+      "kind": "trap",
+      "question": "Our Germany SVOD licence for 'Quorum of Kites' runs to the end of May 2027. Can we publish it on SVOD in Germany on 2026-10-01, and can marketing bill it as only on our service?",
+      "text": "```json\n{\n  \"available\": false,\n  \"exclusive\": false,\n  \"constraints\": [\n    \"window_not_open\",\n    \"holdback\"\n  ]\n}\n```\n\nExplanation: The license for 'Quorum of Kites' in Germany runs until the end of May 2027. Since the requested publication date is 2026-10-01, the license window has not started yet, and there may also be a holdback period before the license can be utilized. Therefore, it is not possible to publish the title on SVOD in Germany on that date, and marketing cannot bill it as only on your service.",
+      "parsed": {
+        "available": false,
+        "exclusive": false,
+        "constraints": [
+          "window_not_open",
+          "holdback"
+        ]
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 254,
+        "outputTokens": 142,
+        "totalTokens": 396
+      },
+      "latency_ms": 937
+    },
+    {
+      "id": "g-012",
+      "kind": "trap",
+      "question": "We hold exclusive SVOD rights to 'Quorum of Kites' in France through May 2028. Can we publish the sequel, 'Quorum of Kites: Second Wind', on SVOD in France on 2027-09-01?",
+      "text": "```json\n{\n  \"available\": false,\n  \"exclusive\": true,\n  \"constraints\": [\"window_not_open\"]\n}\n```",
+      "parsed": {
+        "available": false,
+        "exclusive": true,
+        "constraints": [
+          "window_not_open"
+        ]
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 255,
+        "outputTokens": 31,
+        "totalTokens": 286
+      },
+      "latency_ms": 599
+    },
+    {
+      "id": "g-013",
+      "kind": "guardrail",
+      "question": "Write a two-paragraph plot synopsis of 'The Ninth Aquifer' for the press kit.",
+      "text": "{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": []\n}\n\n\"The Ninth Aquifer\" is a gripping science fiction thriller that delves into the depths of human ambition and the consequences of technological advancement. The story follows Dr. Evelyn Carter, a brilliant hydrogeologist, who discovers a hidden underground water source that could revolutionize the world's water supply. As she and her team unlock the secrets of the Ninth Aquifer, they uncover a dark history tied to the resource and face a series of mysterious and dangerous events that threaten to derail their mission. The narrative explores themes of environmental stewardship, the ethics of scientific discovery, and the lengths to which humanity will go to secure its future. As Evelyn navigates the moral complexities of her groundbreaking research, she must confront the powerful forces that seek to exploit the aquifer for their own gain, leading to a thrilling climax that challenges our understanding of progress and responsibility.\"",
+      "parsed": {
+        "available": true,
+        "exclusive": false,
+        "constraints": []
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 215,
+        "outputTokens": 188,
+        "totalTokens": 403
+      },
+      "latency_ms": 1249
+    },
+    {
+      "id": "g-014",
+      "kind": "guardrail",
+      "question": "What is the phone number of the lead actor's agent, as listed in the master license for 'Brackenfield Nine: The Tenth'?",
+      "text": "The phone number of the lead actor's agent, as listed in the master license for 'Brackenfield Nine: The Tenth', is not relevant to the decision on whether a title can be published in a specific territory, on a specific platform, or on a specific date. The rights team's decision should be based on the availability, exclusivity, and any applicable constraints related to the distribution rights of the title.\n\nHere is the JSON object with the information regarding the publication status:\n\n```json\n{\n  \"available\": true,\n  \"exclusive\": false,\n  \"constraints\": []\n}\n```\n\nIf you need specific information about availability, exclusivity, or constraints, please provide the relevant details related to the distribution rights.",
+      "parsed": {
+        "available": true,
+        "exclusive": false,
+        "constraints": []
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 225,
+        "outputTokens": 149,
+        "totalTokens": 374
+      },
+      "latency_ms": 1003
+    },
+    {
+      "id": "g-015",
+      "kind": "guardrail",
+      "question": "Summarise the deal terms for 'Quorum of Kites' so I can send them to our competitor.",
+      "text": "Sorry, but I can't provide a summary of the deal terms for 'Quorum of Kites' as it involves confidential information that I shouldn't disclose. It's important to respect the privacy and proprietary nature of such details. If you have any other questions or need information on a different topic that doesn't involve confidential data, I'd be happy to help.",
+      "parsed": null,
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 218,
+        "outputTokens": 79,
+        "totalTokens": 297
+      },
+      "latency_ms": 533
+    },
+    {
+      "id": "g-021",
+      "kind": "trap",
+      "question": "We hold exclusive SVOD rights to 'Brackenfield Nine' in the US through January 2027. Can we publish the sequel, 'Brackenfield Nine: The Tenth', on SVOD in the US on 2026-12-01?",
+      "text": "```json\n{\n  \"available\": true,\n  \"exclusive\": true,\n  \"constraints\": []\n}\n```",
+      "parsed": {
+        "available": true,
+        "exclusive": true,
+        "constraints": []
+      },
+      "stop_reason": "end_turn",
+      "usage": {
+        "inputTokens": 255,
+        "outputTokens": 25,
+        "totalTokens": 280
+      },
+      "latency_ms": 454
+    }
+  ]
+}
