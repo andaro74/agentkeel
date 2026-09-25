@@ -142,7 +142,6 @@ def test_s2_a_silent_red_team_plant_is_red(seeded):
 # --- S3: a golden that overlaps the corpus --------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=ImportError, reason="S3: validate has no golden/corpus overlap check until M03 PR 2 (SPEC/03 §6)")
 def test_s3_a_golden_that_overlaps_the_corpus_is_refused(seeded):
     """The holdback schedule holds g-010's whole question with its answer: 38 words, over the
     12-word bound (SPEC/03 §2). Today's golden, citation and ruling checks pass on it."""
