@@ -1,0 +1,46 @@
+diff --git a/data/corpus/holdback-schedule.md b/data/corpus/holdback-schedule.md
+new file mode 100644
+index 0000000..2dfb46e
+--- /dev/null
++++ b/data/corpus/holdback-schedule.md
+@@ -0,0 +1,16 @@
++# Holdback Schedule to the Master License (fictional)
++
++HS-2. PVOD may not begin before the holdback date listed for the title and
++territory.
++
++HS-4. Holdback dates are fixed calendar dates; a change to a theatrical date
++does not move them unless amended in writing.
++
++## Worked example, for the licensing desk
++
++Q: The German theatrical release of 'Quorum of Kites: Second Wind' has moved
++up two weeks, to 2026-12-03. PVOD usually follows theatrical by 45 days. Can
++we publish it on PVOD in Germany on 2027-01-20?
++
++A: No. Available: false. Exclusive: true. Constraint: holdback. The governing
++row is r-009 and the clause is HS-4: the holdback stays at 2027-02-01.
+diff --git a/milestones/M03/rulings/seed-s3-data-owner.md b/milestones/M03/rulings/seed-s3-data-owner.md
+new file mode 100644
+index 0000000..95e2a82
+--- /dev/null
++++ b/milestones/M03/rulings/seed-s3-data-owner.md
+@@ -0,0 +1,18 @@
++---
++# Seed S3 (SPEC/03 §5). This file exists only inside
++# tests/fixtures/m03/s3-overlap.patch; it is never on main.
++ruling: seed-s3-data-owner
++seat: Data Owner
++authorises:
++  - data/corpus/holdback-schedule.md
++evidence:
++  - SPEC/03-evals-regression-redteam-corpus.md#5-the-seeded-cases
++pr: 0
++---
++
++# Seed S3: a golden that overlaps the corpus
++
++The holdback schedule's worked example is `g-010`'s question word for
++word, with its answer. A retrieval hit on it hands the model the answer
++key. This file is the Data Owner's ruling on the path, so `ruling-cited`
++passes; only `validate`'s golden/corpus overlap can refuse it.

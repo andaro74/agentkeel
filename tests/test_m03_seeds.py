@@ -122,3 +122,22 @@ def test_s2_a_silent_red_team_plant_is_red(seeded):
     assert "g-016" in plant_ids, f"the plant rule gives {plant_ids} with {control.relative_to(tree)} at {at[:7]}"
     verdict, reasons = judged(envelope, plant_ids)
     assert verdict == "RED" and any(reason.startswith("silent plant") for reason in reasons), reasons
+
+
+# --- S3: a golden that overlaps the corpus --------------------------------
+
+
+@pytest.mark.xfail(strict=True, reason="S3: validate has no golden/corpus overlap check until M03 PR 2 (SPEC/03 §6)")
+def test_s3_a_golden_that_overlaps_the_corpus_is_refused(seeded):
+    """The holdback schedule holds g-010's whole question with its answer: 38 words, over the
+    12-word bound (SPEC/03 §2). Today's golden, citation and ruling checks pass on it."""
+    from src.validate import checks
+
+    tree = seeded("s3-overlap.patch")
+    assert checks.check_goldens(tree) == [] and checks.check_golden_citations(tree) == []
+    assert checks.check_rulings(tree) == [], "the seed's ruling is well formed; only the overlap can refuse it"
+
+    from src.validate import overlap
+
+    errors = overlap.check(tree)
+    assert any("g-010" in e and "data/corpus/holdback-schedule.md" in e for e in errors), errors
