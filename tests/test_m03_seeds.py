@@ -141,3 +141,38 @@ def test_s3_a_golden_that_overlaps_the_corpus_is_refused(seeded):
 
     errors = overlap.check(tree)
     assert any("g-010" in e and "data/corpus/holdback-schedule.md" in e for e in errors), errors
+
+
+# --- S4: an envelope with no corpus fingerprint ----------------------------
+
+
+@pytest.mark.xfail(strict=True, reason="S4: the gate does not read the corpus fingerprint until M03 PR 2 (SPEC/03 §6)")
+def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
+    """Nothing new is planted: row 2's envelope says `corpus_fingerprint: null`, like every
+    envelope in history. Beside a tree that admits a corpus, the gate's own reading is not null,
+    and an envelope that disagrees with it is RED for that reason (SPEC/03 §2, ruling on F3)."""
+    import hashlib
+
+    import yaml
+
+    from src.verdict import gate, replay_history
+
+    envelope = recorded()
+    assert envelope["corpus_fingerprint"] is None, "the false state is already in evals/history/"
+
+    tree = seeded("s3-overlap.patch")  # S3's document is the corpus; admitted.yaml admits it here only
+    doc = tree / "data" / "corpus" / "holdback-schedule.md"
+    (tree / "data" / "corpus" / "admitted.yaml").write_text(yaml.safe_dump([{
+        "key": "holdback-schedule.md",
+        "sha256": hashlib.sha256(doc.read_bytes()).hexdigest(),
+        "ruling": "milestones/M03/rulings/seed-s3-data-owner.md",
+    }]), encoding="utf-8")  # fmt: skip
+
+    reading = gate.corpus_fingerprint(tree)  # the gate's own reading; `rule` takes it at the envelope's commit
+    assert reading is not None
+    history = replay_history.load(gate.HISTORY, exclude_commit=envelope["commit"])
+    kinds = {g: r["kind"] for g, r in envelope["goldens"].items()}
+    cap, _ = gate.cap_at(envelope["commit"])
+    verdict, reasons = gate.judge(envelope, kinds, history, [], cap, gate.required_checks(envelope["commit"]),
+                                  corpus=reading)  # fmt: skip
+    assert verdict == "RED" and any("corpus_fingerprint" in reason for reason in reasons), reasons
