@@ -275,6 +275,25 @@ def test_the_three_observations_are_made_and_handed_to_make_evals(workflow):
     assert steps.index(observe[0]) < steps.index(measuring_steps(workflow)[0])
 
 
+class _NoRepeatedKeys(yaml.SafeLoader):
+    """safe_load keeps the last of two equal keys; this loader refuses the file instead."""
+
+    def construct_mapping(self, node: yaml.MappingNode, deep: bool = False) -> dict[Any, Any]:
+        keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
+        repeated = {key for key in keys if keys.count(key) > 1}
+        assert not repeated, f"repeated keys {sorted(map(str, repeated))} at line {node.start_mark.line + 1}"
+        return super().construct_mapping(node, deep=deep)
+
+
+@pytest.mark.parametrize("name", ["f2_1_seed_prs.yaml", "f2_1_bypass.yaml", "f2_2_three_doors.yaml"])
+def test_the_observed_run_files_repeat_no_key(name):
+    """M03 open.md row 10 (Unsure C): the doors file had two `doors:` blocks and the observer read the second.
+
+    The human collapsed it to the filled block in M03 PR 2; the first is kept at tag m02.
+    """
+    yaml.load((ROOT / "milestones" / "M02" / "runs" / name).read_text(encoding="utf-8"), Loader=_NoRepeatedKeys)
+
+
 def test_ruleset_token_reaches_no_step_that_runs_code_from_the_pr(workflow):
     """pr2-security.md item 2: the fine-grained token is used by curl in one step and by nothing under src/ or scripts/."""
     for job in workflow["jobs"].values():
