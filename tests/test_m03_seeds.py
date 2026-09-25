@@ -246,3 +246,34 @@ def test_f3_6_guard_a_never_passed_golden_is_not_red():
     assert envelope["goldens"]["g-021"]["pass"] is False and "g-021" in envelope["never_passed"]
     verdict, reasons = judged(envelope, [])
     assert verdict == "GREEN" and not any("g-021" in reason for reason in reasons), reasons
+
+
+# --- S7: a pass recorded later re-rules an older envelope -----------------
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S7: history is not limited to the envelope's ancestors until M03 PR 2 (SPEC/03 section 6)")  # fmt: skip
+def test_s7_a_pass_recorded_later_does_not_re_rule_an_old_envelope(tmp_path):
+    """g-013 has never passed as of row 2's envelope. Put beside it, in a copy of history, one
+    envelope for a later commit (71eff00, the m02 merge, a descendant) in which g-013 passes, as
+    PR 2's guardrail is to make it. Row 2's envelope was written before that pass and must still
+    rule GREEN. Today the gate reads every envelope in the folder and calls g-013 regressed."""
+    import shutil
+
+    from src.verdict import gate, replay_history
+
+    seed = json.loads((FIXTURES / "s7-later-pass.json").read_text(encoding="utf-8"))
+    history = tmp_path / "history"
+    history.mkdir()
+    for path in replay_history.envelope_paths(gate.HISTORY):
+        shutil.copyfile(path, history / path.name)
+    later = recorded()
+    later["commit"] = seed["commit"]
+    for golden_id in seed["passes"]:
+        later["goldens"][golden_id].update(score=True, **{"pass": True})
+        later["never_passed"].remove(golden_id)
+    (history / f"{seed['commit']}.json").write_text(json.dumps(later), encoding="utf-8")
+
+    verdict, reasons = gate.rule(M02_ENVELOPE, history)
+    assert not any("regressed" in reason for reason in reasons), reasons
+    assert verdict == "GREEN", reasons

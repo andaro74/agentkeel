@@ -1,0 +1,5 @@
+{
+  "note": "Seed S7 (SPEC/03 section 5). Not an envelope: the change the test makes, in memory, to row 2's envelope to stand for a later run in which g-013 passed. Never copied to evals/history/.",
+  "commit": "71eff00435b1e987c5e447f355b6ee77a519a8f6",
+  "passes": ["g-013"]
+}
