@@ -1,0 +1,22 @@
+# The Data Owner's admitted documents (M03 PR 2; SPEC/03 section 6). The ingest
+# pipeline promotes an object to the production bucket only when this file names
+# its sha256; the corpus fingerprint is read from it. validate holds it to the
+# bytes, the file set and a Data Owner ruling (src/validate/corpus.py).
+- key: amendment-1.md
+  sha256: 33cfcad014117774c1903ac1f7a0c9c3cef687f651fe8104de8b67f069eb79f7
+  ruling: milestones/M03/rulings/pr2-data-owner.md
+- key: embargo-memo.md
+  sha256: 2e056c978cd7a96080974b45c0ef8118f7e43ed61b0821982b2674c54756c8bf
+  ruling: milestones/M03/rulings/pr2-data-owner.md
+- key: master-license.md
+  sha256: 58ee1f1d1e287a2304e52c1910207dc8c6c414a96255ba5bff4a23376399b085
+  ruling: milestones/M03/rulings/pr2-data-owner.md
+- key: music-clearance-sheet.md
+  sha256: 871650f580a6967c636825140d43b487fdc276a219d6c396457284f66d1d632f
+  ruling: milestones/M03/rulings/pr2-data-owner.md
+- key: ratings-letter.md
+  sha256: 60e15dfdc16326b78a5162d77a5644bea61b3f4130acf0164aa72d2da38e7d2c
+  ruling: milestones/M03/rulings/pr2-data-owner.md
+- key: schedule-of-holdbacks.md
+  sha256: a16fb0cfffbbcd46efb05520147ffd11a23bc4683c80413f923c80d40fcb8d81
+  ruling: milestones/M03/rulings/pr2-data-owner.md

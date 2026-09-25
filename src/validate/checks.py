@@ -27,7 +27,7 @@ from typing import Any
 import yaml
 
 from src.gates import pattern_regex, two_key
-from src.validate import codeowners, controls, edges, golden_ids, overlap, ruleset, semver
+from src.validate import codeowners, controls, corpus, edges, golden_ids, overlap, ruleset, semver
 
 GOLDEN_FIELDS = {"id", "kind", "question", "expected", "seat", "added", "retired"}
 GOLDEN_ID = re.compile(r"^g-\d{3}$")
@@ -379,4 +379,5 @@ CHECKS = {
     # M03 PR 2 (SPEC/03 section 6)
     "plant controls name live goldens of their kind": controls.check,
     "golden/corpus overlap (12 words), no row id in the corpus": overlap.check,
+    "admitted.yaml is the corpus, byte for byte, under a Data Owner ruling": corpus.check,
 }
