@@ -198,3 +198,28 @@ def test_s5_the_unsigned_amendment_stays_in_quarantine():
     document = (ROOT / run["document"]).read_bytes()
     assert observed["sha256"] == hashlib.sha256(document).hexdigest(), "the object uploaded is the seed"
     assert observed["in_production"] is False and observed["named_in_admitted"] is False
+
+
+# --- S6: a control added today makes old envelopes RED ---------------------
+
+
+@pytest.mark.xfail(strict=True, reason="S6: the plant rule reads the working tree until M03 PR 2 (SPEC/03 §6)")
+def test_s6_a_control_added_later_does_not_re_rule_an_old_envelope(seeded, monkeypatch):
+    """Row 2's envelope was written before any guardrail. Put a guardrail control in a worktree
+    of HEAD and name it in CONTROLS, as PR 2 will: g-013 to g-015, which have never passed,
+    must not become plants of that envelope. Today they do, and the gate says "silent plant"."""
+    import shutil
+
+    from src.verdict import gate, plants
+
+    tree = seeded()
+    control = tree / "agents" / "refagent" / "rules" / "guardrail.yaml"
+    control.parent.mkdir(parents=True)
+    shutil.copyfile(FIXTURES / "s6-guardrail.yaml", control)
+    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "agents/refagent/rules/guardrail.yaml"})
+    monkeypatch.setattr(gate, "ROOT", tree)  # rule() reads the tree here: the goldens at the commit, and the plant rule
+    monkeypatch.setattr(gate, "GOLDENS", tree / "evals" / "goldens" / "v1")
+
+    verdict, reasons = gate.rule(M02_ENVELOPE)
+    assert not any(reason.startswith("silent plant") for reason in reasons), reasons
+    assert verdict == "GREEN", reasons
