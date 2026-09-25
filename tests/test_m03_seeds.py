@@ -223,3 +223,26 @@ def test_s6_a_control_added_later_does_not_re_rule_an_old_envelope(seeded, monke
     verdict, reasons = gate.rule(M02_ENVELOPE)
     assert not any(reason.startswith("silent plant") for reason in reasons), reasons
     assert verdict == "GREEN", reasons
+
+
+# --- The two guards (SPEC/03 §5.2): no marker ------------------------------
+# Each calls `judge` with the plant ids passed in, not `rule`, so that no
+# change to the plant rule changes what it reads (ruling on B1).
+
+
+def test_f3_1_guard_a_regressed_golden_is_red():
+    """g-001 has passed in every agent envelope but one; failing now, it is a regression."""
+    envelope = recorded()
+    envelope["goldens"]["g-001"].update(score=False, **{"pass": False})
+    envelope["regressed"], envelope["verdict"] = ["g-001"], "RED"
+    verdict, reasons = judged(envelope, [])
+    assert verdict == "RED"
+    assert "regressed: g-001 has passed before and fails now" in reasons, reasons
+
+
+def test_f3_6_guard_a_never_passed_golden_is_not_red():
+    """g-021 fails, as it has in every run since it was added; never passed, it reports and does not gate."""
+    envelope = recorded()
+    assert envelope["goldens"]["g-021"]["pass"] is False and "g-021" in envelope["never_passed"]
+    verdict, reasons = judged(envelope, [])
+    assert verdict == "GREEN" and not any("g-021" in reason for reason in reasons), reasons
