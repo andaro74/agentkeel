@@ -58,14 +58,17 @@ def git(*args: str) -> str:
 def dirty() -> bool:
     """Is the tree other than what this commit names?
 
-    `evals/` is excluded, and it has to be: the control runs first and its
-    card is written into `evals/history/` before this runner starts, so
-    without the exclusion every CI run would see a dirty tree and `build`
-    would refuse the envelope. What this run writes is not what it ran.
-    `src/baseline/run.py` has no such line because nothing writes there
-    before it, and it is frozen at tag m00 either way.
+    `evals/history/` and `evals/local/` are excluded, and they have to be:
+    the control runs first and its card is written into one of them before
+    this runner starts, so without the exclusion every run would see a
+    dirty tree and `build` would refuse the envelope. What this run writes
+    is not what it ran. The goldens are not excluded: an edited golden is
+    what the run asked, and the commit must name it (M03 PR 2, `open.md`
+    row 11 item g; it was all of `evals/` before). `src/baseline/run.py`
+    has no such line because nothing writes there before it, and it is
+    frozen at tag m00 either way.
     """
-    return bool(git("status", "--porcelain", "--", ".", ":(exclude)evals"))
+    return bool(git("status", "--porcelain", "--", ".", ":(exclude)evals/history", ":(exclude)evals/local"))
 
 
 def invoke_deployed(client: Any, runtime_arn: str, question: str) -> dict[str, Any]:

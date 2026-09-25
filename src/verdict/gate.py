@@ -362,7 +362,11 @@ def control_drift(envelope: dict[str, Any], history: replay_history.History) -> 
 
 
 def tallies(label: str, results: dict[str, dict[str, Any]]) -> str:
-    """`label: traps a/3 (ids); ordinary b/9; guardrail c/3`, from results keyed by golden id."""
+    """`label: traps a/3 (ids); ordinary b/9; guardrail c/3; redteam d/5`, from results keyed by golden id.
+
+    The red-team tally is printed only where the results hold one (M03 PR 2): no envelope before
+    g-016 has any, and a cell `make ledger` already holds for rows 0 to 2 must not change.
+    """
 
     def tally(kind: str) -> str:
         of_kind = [r for r in results.values() if r["kind"] == kind]
@@ -372,6 +376,7 @@ def tallies(label: str, results: dict[str, dict[str, Any]]) -> str:
     return (
         f"{label}: traps {tally('trap')}" + (f" ({', '.join(traps)})" if traps else "")
         + f"; ordinary {tally('ordinary')}; guardrail {tally('guardrail')}"
+        + (f"; redteam {tally('redteam')}" if any(r["kind"] == "redteam" for r in results.values()) else "")
     )
 
 

@@ -102,7 +102,7 @@ def test_when_no_agent_ran_the_envelope_is_the_controls_in_m00s_form(chain):
     assert {r["scope"] for r in envelope["goldens"].values()} == {"control"}
     assert envelope["control_card_ref"] is None
     assert envelope["baseline_card_ref"]["path"] == card_path.resolve().as_posix()
-    assert (envelope["tokens_in"], envelope["tokens_out"]) == (3000, 1500)  # the control's own, counted once
+    assert (envelope["tokens_in"], envelope["tokens_out"]) == (4000, 2000)  # the control's own, counted once: 20 replies, each 200 in, 100 out
     assert "F1_4" not in envelope["checks"]
     assert envelope["verdict"] == "GREEN"
 
@@ -143,8 +143,8 @@ def test_an_over_cap_run_is_a_recorded_red(tmp_path, chain):
     """Threshold Owner, M01 item 22: the envelope is written, and it is RED."""
     envelope_path, card_path, raw_path = chain(agent=True, right={"g-001"})
     envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
-    # the run's spend, both subjects: 15 agent replies and 15 control replies, each 200 in, 100 out
-    assert (envelope["tokens_in"], envelope["tokens_out"]) == (6000, 3000)
+    # the run's spend, both subjects: 20 agent replies and 20 control replies, each 200 in, 100 out
+    assert (envelope["tokens_in"], envelope["tokens_out"]) == (8000, 4000)
     thresholds = tmp_path / "thresholds.yaml"
     pinned = build.load_thresholds(build.THRESHOLDS)["baseline_card"]
     thresholds.write_text(

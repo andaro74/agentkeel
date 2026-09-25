@@ -309,3 +309,15 @@ def test_ruleset_token_reaches_no_step_that_runs_code_from_the_pr(workflow):
     # the observer gets the files that step fetched, both of them
     assert observe["env"]["AGENTKEEL_LIVE_RULESET"].endswith("live-ruleset.json")
     assert observe["env"]["AGENTKEEL_RULE_SUITES"].endswith("rule-suites")
+
+
+def test_the_runner_counts_an_edited_golden_as_dirty(monkeypatch):
+    """M03 open.md row 11 item g: only what the chain writes is excluded, not the goldens the run asks."""
+    from src.agent import run
+
+    asked: list[tuple[str, ...]] = []
+    monkeypatch.setattr(run, "git", lambda *args: asked.append(args) or "")
+    assert run.dirty() is False
+    spec = asked[0]
+    assert ":(exclude)evals/history" in spec and ":(exclude)evals/local" in spec
+    assert ":(exclude)evals" not in spec and not any("goldens" in part for part in spec)
