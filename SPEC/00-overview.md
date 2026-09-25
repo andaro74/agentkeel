@@ -142,7 +142,8 @@ approval. The mechanical gates are, exhaustively:
   `SPEC/00-overview.md#8-MNN`;
 - `two-key` — a diff that relaxes a threshold, retires a rule or golden,
   changes retention, or is a human commit touching `evals/history/**`
-  cites rulings from two distinct seats;
+  cites rulings from two distinct seats (the closed list is SPEC/02 §2,
+  amended by ADR-0009 at M03 PR 1);
 - `regression` — the eval gate: RED on any regressed golden or any
   silent plant (`plants_expected ≠ plants_fired`), read on
   `scope: agent` results only. The baseline is the control
@@ -536,6 +537,13 @@ for real IP at M01 by hand; `legal-compliance` re-checks at M07.
   description so the goldens are checkable. Bedrock Knowledge Base built
   by the construct; embeddings computed once at ingest; corpus
   fingerprint in the envelope.
+
+  Amended at M03 PR 1 (`milestones/M03/rulings/pr1.md`; SPEC/03 §2, §9).
+  The documents were not written at M01 (SPEC/01 §10, cut 3) and are
+  written at M03 PR 2, with `data/corpus/admitted.yaml` naming each
+  admitted document by sha256. The Bedrock Knowledge Base, and refagent
+  retrieving from it, are M04 (SPEC/03 cut 6, taken at open). The
+  fingerprint is on the envelope from M03 PR 2, read from `admitted.yaml`.
 - **Rights table** — DynamoDB from M01, loaded from
   `data/rights_table.json`, ~40 rows: `title_id, territory, platform,
   window_start, window_end, exclusive, holdback_until, clearance_expiry,
@@ -675,7 +683,7 @@ finding on camera is the point.
 | 00 | Start from nothing | Before any guardrail, a plain model gets the trick questions wrong; every later number is measured against that. |
 | 01 | Nothing runs unsigned | An agent can only be deployed from a build the pipeline signed; a changed byte, or a laptop, is refused. |
 | 02 | Rules have owners | A rule, a test, or a threshold changes only when the person who owns it says so, and loosening one needs two owners. |
-| 03 | It can't get worse quietly | A test that used to pass and now fails stops the deploy; the attacks we planted must all be caught; a fake contract never reaches the agent. |
+| 03 | It can't get worse quietly | A test that used to pass and now fails stops the change from merging; every attack we planted must be caught, or the change stops; a contract nobody signed never reaches the agent's documents. |
 | 04 | Changing the model is safe or it's blocked | A new model version is tried in the shadows first; if it breaks anything, the PR stays red. |
 | 05 | The agent stays in its box | An agent can't reach the internet, other agents, secrets, or its own logs — and every attempt is recorded where it can't reach. |
 | 06 | A team can do this in a day | Marketing creates a governed agent from the template, without touching the safety pipeline. |

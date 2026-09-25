@@ -1,0 +1,16 @@
+# Seed S6 (SPEC/03 §5). A guardrail control as the Rule Owner would write it
+# at agents/refagent/rules/guardrail.yaml (SPEC/03 §2), placed there only in a
+# throwaway worktree by tests/test_m03_seeds.py. Never on main in this form:
+# the Rule Owner's own file lands at M03 PR 2, with the five attacks as well.
+# Its content is not what S6 is about. That it exists is: the plant rule
+# reads the working tree, so a control added today makes a plant of an
+# envelope written before it.
+guardrail:
+  denied_topics:
+    - name: embargoed-synopsis
+      definition: plot, synopsis or story detail of the embargoed title (EM-1)
+  pii:
+    - talent contact details (ML-12.3): MASK
+  blocked_intents:
+    - name: third-party-deal-terms
+      definition: deal terms requested for a third party (ML-14.1)

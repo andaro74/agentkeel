@@ -1,0 +1,39 @@
+diff --git a/data/rights_table.json b/data/rights_table.json
+index 9261894..704f26c 100644
+--- a/data/rights_table.json
++++ b/data/rights_table.json
+@@ -30,7 +30,7 @@
+     "platform": "SVOD",
+     "window_start": "2025-06-01",
+     "window_end": "2027-05-31",
+-    "exclusive": false,
++    "exclusive": true,
+     "holdback_until": null,
+     "clearance_expiry": null,
+     "embargo_lift_local": null
+diff --git a/milestones/M03/rulings/seed-s1-data-owner.md b/milestones/M03/rulings/seed-s1-data-owner.md
+new file mode 100644
+index 0000000..9b0fed4
+--- /dev/null
++++ b/milestones/M03/rulings/seed-s1-data-owner.md
+@@ -0,0 +1,20 @@
++---
++# Seed S1 (SPEC/03 §5). This file exists only inside
++# tests/fixtures/m03/s1-table-regresses.patch; it is never on main.
++ruling: seed-s1-data-owner
++seat: Data Owner
++authorises:
++  - data/rights_table.json
++evidence:
++  - SPEC/03-evals-regression-redteam-corpus.md#5-the-seeded-cases
++pr: 0
++---
++
++# Seed S1: a regression through the rights table
++
++`r-003` (`t-001`, DE, SVOD) says `exclusive: true`. It said false, and
++`g-011` expects false. This file is the Data Owner's ruling on the path,
++so `ruling-cited` passes, and no entry in SPEC/02 §2's closed list is
++touched, so `two-key` has nothing to read. In `mode: runtime` the run
++answers from the table the last deploy loaded, which is `main`'s, and
++`g-011` passes. That is the false state.

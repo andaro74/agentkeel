@@ -103,3 +103,25 @@ described in `milestones/M02/runs/f2_1_bypass.yaml` and is made by the
 human, as the repository owner, after M02 PR 2 merges and before PR 3's
 first CI run; PR 3's run looks it up (`scripts/observe_pr.py`). Its
 `observed:` is null at PR 1 and filled at PR 3.
+
+## M03 (SPEC/03 §5)
+
+Committed at M03 PR 1, one commit per seed, each with its test in
+`tests/test_m03_seeds.py`, before any code that reads them. Each test is
+`xfail(strict=True)` until its reader lands at PR 2, and asserts the
+planted reason, not only the verdict. The two guards in the same file
+carry no marker and are not seeds (SPEC/03 §5.2).
+
+The patches are `-text` in `.gitattributes`, as M02's are. The ruling
+file inside S1's patch carries `pr: 0` and exists only in the patch;
+no seed PR is opened at M03 (SPEC/03 §4).
+
+| Seed | File | What is wrong with it |
+|---|---|---|
+| S1 | `m03/s1-table-regresses.patch` | `r-003` (`t-001`, DE, SVOD) `exclusive` false → true in `data/rights_table.json`, with one Data Owner ruling. `g-011` reads `r-003` and expects false. `ruling-cited` passes and nothing is a relaxation; in `mode: runtime` the run answers from `main`'s table and `g-011` passes |
+| S2 | `m03/s2-g-016.yaml`, `m03/s2-g-016-result.json` | the first red-team attack (the embargoed synopsis through role-play) as a golden, and its result as the runner writes it when the attack gets through. The test adds the result to row 2's envelope in memory with a red-team control in a copy of the tree; `CONTROLS` is empty, so it lands in `never_passed` and the gate says GREEN. Not a golden: `g-016` lands under `evals/goldens/v1/` at PR 2 |
+| S3 | `m03/s3-overlap.patch` | `data/corpus/holdback-schedule.md`, whose worked example is `g-010`'s question word for word (38 words) with its answer (`available: false`, holdback, `r-009`, `HS-4`), and a Data Owner ruling on the path. Today's golden, citation and ruling checks pass on it |
+| S4 | none | the false state is already in `evals/history/`: row 2's envelope, `8033c2a`, says `corpus_fingerprint: null`, as every envelope does. The test puts S3's document and an `admitted.yaml` naming it in a copy of the tree and asks the gate to rule the envelope beside it. Nothing is copied or edited |
+| S5 | `m03/s5-unsigned-amendment.md` | "Amendment No. 2", its signature lines blank, granting `t-001` exclusive SVOD in DE against `r-003` and `ML-5.2`. Uploaded once to the quarantine bucket by the human during PR 2 (`milestones/M03/runs/f3_5_amendment.yaml`, `observed: null` until then); never under `data/corpus/`, never named in `admitted.yaml`. `-text` in `.gitattributes`, so the sha256 the run file records is the same on every checkout |
+| S6 | `m03/s6-guardrail.yaml` | a guardrail control as the Rule Owner would write it, placed at `agents/refagent/rules/guardrail.yaml` in a worktree of HEAD with `CONTROLS` naming it. The plant rule reads the working tree, so row 2's envelope, written before any guardrail, is re-ruled RED on `g-013` to `g-015`, which have never passed. Its content is not the seed; its existence is |
+| S7 | `m03/s7-later-pass.json` | not an envelope: the commit of a later run (`71eff00`, a descendant of row 2's `8033c2a`) and the golden that passes in it (`g-013`). The test builds that later envelope in memory from row 2's and writes it only into a temporary copy of history, never under `evals/history/`. Added after the cold review of PR 1 (F1): history is read whole, so a pass recorded later makes a golden that had never passed "regressed" in an older envelope |

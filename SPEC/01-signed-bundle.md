@@ -310,6 +310,15 @@ FINDING carried with a seat, not a claim.
 - Gateway targets and Identity credential providers calling out with no
   security group over them (ruling c, `feasibility.md` §2.6). Neither is
   wired at M01, and both are deferred to M05.
+- the agent boundary refusing a call outside its ceiling. **Observed
+  once, unplanned**: on the first deploy on which the runtime answered
+  (M02, run 35817173042) the boundary refused `dynamodb:Scan` fifteen
+  times, `AccessDeniedException` on every golden, until `c34da39` gave
+  the agent boundary that action. That is a refusal seen, not a control
+  measured: no seed asked for it and nothing reads it. A seeded case
+  where a construct grant outside the ceiling is refused at the call is
+  Security's, at M05. Added at M03 PR 1 (`milestones/M03/open.md` row 2,
+  Product; `milestones/M03/rulings/pr1.md`).
 
 ## 10. Cut list
 

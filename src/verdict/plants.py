@@ -42,10 +42,31 @@ SEEDS_M02: dict[str, tuple[str, str, str]] = {
     "S5": ("F2.1", "tests/fixtures/m02/s5-golden-renamed.patch", "src/validate/golden_ids.py"),
 }
 
+# Claim 3's seeded cases (SPEC/03 section 5), the same shape. Listed at M03
+# PR 1; the readers land at M03 PR 2. Every reader but S3's and S5's is a
+# file already in the tree that changes there (the runtime match, CONTROLS,
+# the fingerprint in the gate, the plant rule, history at the ancestors),
+# so `make plants` says "in the tree" beside them, as it did for M01's S7:
+# the strict markers, not this list, say whether a seed is read.
+# S4 plants no file: row 2's envelope is the false state. Listing them reads nothing
+# and gates nothing, and CONTROLS above stays empty until the guardrail is
+# on the call (SPEC/03 section 5.1).
+SEEDS_M03: dict[str, tuple[str, str, str]] = {
+    "S1": ("F3.1", "tests/fixtures/m03/s1-table-regresses.patch", "scripts/runtime_for_tree.py"),
+    "S2": ("F3.2", "tests/fixtures/m03/s2-g-016.yaml, s2-g-016-result.json", "src/verdict/plants.py"),
+    "S3": ("F3.3", "tests/fixtures/m03/s3-overlap.patch", "src/validate/overlap.py"),
+    "S4": ("F3.4", "evals/history/8033c2a7a0588e557df577464c190e64a435e88a.json", "src/verdict/gate.py"),
+    "S5": ("F3.5", "tests/fixtures/m03/s5-unsigned-amendment.md, milestones/M03/runs/f3_5_amendment.yaml",
+           "scripts/observe_ingest.py"),
+    "S6": ("F3.6", "tests/fixtures/m03/s6-guardrail.yaml", "src/verdict/plants.py"),
+    "S7": ("F3.6", "tests/fixtures/m03/s7-later-pass.json", "src/verdict/replay_history.py"),
+}
+
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
 SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/01 section 5", SEEDS),
     ("SPEC/02 section 5", SEEDS_M02),
+    ("SPEC/03 section 5", SEEDS_M03),
 ]
 
 

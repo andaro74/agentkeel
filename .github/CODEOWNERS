@@ -72,8 +72,10 @@
 # matter (SPEC/00 §5, last row); `make validate` holds the two equal.
 # seat: Product
 /.claude/agents/product-spec-reviewer.md @andaro74
+/.claude/agents/docs-writer.md @andaro74
 # seat: Rule Owner
 /.claude/agents/rule-owner.md @andaro74
+/.claude/agents/red-teamer.md @andaro74
 # seat: Data Owner
 /.claude/agents/data-owner.md @andaro74
 # seat: Tool Owner

@@ -73,6 +73,17 @@ files, and nothing here pretends otherwise.
   `memory.retention` shortened; a commit under `evals/history/**` whose
   author is not `github-actions[bot]`. The list is closed; adding to it
   is a SPEC/00 §5 amendment.
+  **Amended at M03 PR 1 by ADR-0009** (Threshold Owner proposed; Product
+  rules in `milestones/M03/rulings/pr1.md`; read by `two-key`, `ruling-cited`
+  and `validate` from M03 PR 2). Added: a `relaxes:` entry changed, or
+  removed while its bar stays; a bar deleted or no longer a numeric leaf;
+  a manifest's `max_tokens_per_session` or `daily_usd` raised, set to null
+  or removed; a manifest's `guardrail` set to null or removed, or its `id`
+  changed; an entry removed from a list in a rules file, or its action
+  weakened. "`memory.retention` shortened" reads "`memory.retention_days`
+  shortened, or `memory` removed". A second key names a path in a
+  `keys:` front-matter field, by exact path; a ruling names a deleted path
+  in `deletes:`; a rename is a deletion and an addition.
 - **Two keys.** Two ruling files, each with one `seat:`, the two seats
   distinct, both with this PR's `pr:`. The file of the seat that owns the
   path covers it; the other names the path in its body (M01 PR 1, ruling
