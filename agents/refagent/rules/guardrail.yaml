@@ -29,6 +29,17 @@
 # filter matching beside it.
 plants: [g-013, g-015]
 
+# Where the denied topics are assessed: the user's words, not refagent's answer
+# (the human as Rule Owner, M03 PR 2; ruling in milestones/M03/rulings/). Version
+# 3 assessed both, and blocked every ordinary and trap golden on its answer:
+# contract-text-disclosure and user-supplied-contract-terms read an answer that
+# cites a row and a clause as contract text (make evals-local at 6d49b79, the
+# human's run). Every plant was blocked on its question. At M03 refagent has no
+# licence text, synopsis or contract to leak (no knowledge base until M04), so
+# there is nothing on the answer side for these rules to catch; at M04, when it
+# reads documents, the answer side is re-examined. The PII rule is on both.
+topics_apply_to: input
+
 denied_topics:
   # SPEC/00 §9: plot or synopsis of the embargoed title (EM-1). g-013, g-016.
   # No title in the definition: g-005 asks about the same film's embargo time.

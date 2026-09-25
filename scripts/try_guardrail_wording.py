@@ -61,7 +61,9 @@ def create(bedrock, topics: list[dict], spec: dict, pii: bool) -> str:
         "name": f"agentkeel-wording-trial-{time.time_ns()}",
         "description": "temporary (scripts/try_guardrail_wording.py)",
         "topicPolicyConfig": {"topicsConfig": [
-            {"name": t["name"], "definition": t["definition"], "examples": t.get("examples", []), "type": "DENY"}
+            {"name": t["name"], "definition": t["definition"], "examples": t.get("examples", []), "type": "DENY",
+             "inputEnabled": True, "inputAction": "BLOCK", "outputEnabled": spec["on_output"],
+             "outputAction": "BLOCK" if spec["on_output"] else "NONE"}
             for t in topics]},
         "blockedInputMessaging": spec["messages"]["blocked_input"],
         "blockedOutputsMessaging": spec["messages"]["blocked_output"],

@@ -22,6 +22,7 @@ import fnmatch
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -778,4 +779,24 @@ def test_rule_files_the_guardrail_cannot_be_built_from_are_refused_at_synth(tmp_
     (tmp_path / "guardrail.yaml").write_text(yaml.safe_dump(guardrail), encoding="utf-8")
     (tmp_path / "redteam.yaml").write_text(yaml.safe_dump(redteam), encoding="utf-8")
     with pytest.raises(ValueError, match=refused):
+        bootstrap_module.guardrail_spec(tmp_path)
+
+
+def test_the_topics_are_assessed_on_the_question_only_and_the_pii_on_both(template):
+    """guardrail.yaml topics_apply_to: input (M03 PR 2, after make evals-local at 6d49b79 blocked every answer)."""
+    for topic in the_one(template, "AWS::Bedrock::Guardrail")["TopicPolicyConfig"]["TopicsConfig"]:
+        assert (topic["InputEnabled"], topic["InputAction"]) == (True, "BLOCK"), topic["Name"]
+        assert (topic["OutputEnabled"], topic["OutputAction"]) == (False, "NONE"), topic["Name"]
+    for entity in the_one(template, "AWS::Bedrock::Guardrail")["SensitiveInformationPolicyConfig"]["PiiEntitiesConfig"]:
+        assert not {"InputEnabled", "OutputEnabled"} & set(entity), "the PII rule keeps Bedrock's default: both sides"
+
+
+def test_where_the_topics_apply_must_be_said(tmp_path, bootstrap_module):
+    import yaml
+
+    guardrail = yaml.safe_load((RULES / "guardrail.yaml").read_text(encoding="utf-8"))
+    del guardrail["topics_apply_to"]
+    (tmp_path / "guardrail.yaml").write_text(yaml.safe_dump(guardrail), encoding="utf-8")
+    shutil.copy(RULES / "redteam.yaml", tmp_path / "redteam.yaml")
+    with pytest.raises(ValueError, match="topics_apply_to"):
         bootstrap_module.guardrail_spec(tmp_path)

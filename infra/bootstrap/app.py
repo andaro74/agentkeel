@@ -158,7 +158,11 @@ def guardrail_spec(rules_dir: Path = RULES_DIR) -> dict[str, Any]:
     # Line endings do not change it: the files are checked out CRLF on Windows and LF in CI.
     digest = hashlib.sha256(b"".join((rules_dir / name).read_bytes().replace(b"\r\n", b"\n")
                                      for name in ("guardrail.yaml", "redteam.yaml"))).hexdigest()  # fmt: skip
-    return {"topics": topics, "pii": guardrail["pii"], "messages": guardrail["messages"], "digest": digest}
+    applies_to = guardrail.get("topics_apply_to")
+    if applies_to not in ("input", "input and output"):
+        raise ValueError(f"guardrail.yaml: topics_apply_to is {applies_to!r}, not 'input' or 'input and output'")
+    return {"topics": topics, "pii": guardrail["pii"], "messages": guardrail["messages"], "digest": digest,
+            "on_output": applies_to == "input and output"}
 EVAL_WORKFLOWS = [
     f"{REPO}/.github/workflows/evals.yml@refs/pull/*/merge",
     f"{REPO}/.github/workflows/evals.yml@refs/heads/main",
@@ -822,7 +826,9 @@ class BootstrapStack(cdk.Stack):
             blocked_outputs_messaging=spec["messages"]["blocked_output"],
             topic_policy_config=bedrock.CfnGuardrail.TopicPolicyConfigProperty(topics_config=[
                 bedrock.CfnGuardrail.TopicConfigProperty(
-                    name=t["name"], definition=t["definition"], type="DENY", examples=t.get("examples"))
+                    name=t["name"], definition=t["definition"], type="DENY", examples=t.get("examples"),
+                    input_enabled=True, input_action="BLOCK",
+                    output_enabled=spec["on_output"], output_action="BLOCK" if spec["on_output"] else "NONE")
                 for t in spec["topics"]]),
             sensitive_information_policy_config=bedrock.CfnGuardrail.SensitiveInformationPolicyConfigProperty(
                 pii_entities_config=[bedrock.CfnGuardrail.PiiEntityConfigProperty(type=e["entity"], action=e["action"])
