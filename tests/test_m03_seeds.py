@@ -3,9 +3,13 @@
 Each test asks the reader to refuse its seed, and asserts the planted
 reason, not only the verdict. Until the reader is in the tree the test
 fails, and it is marked `xfail(strict=True, raises=...)` with the one
-exception its planted reason raises, so a failure for any other reason
-(a patch that no longer applies, a folder that now exists) is a failure,
-not an expected one (cold review of PR 1, F2): an expected failure now, and
+exception class its planted reason raises, so an exception of any other
+class (a patch that no longer applies, a folder that now exists) is a
+failure, not an expected one (cold review of PR 1, F2). The class is all
+the marker checks: S1, S2, S5, S6 and S7 raise AssertionError, and a
+sanity assertion failing in one of them would still read as expected,
+which is why each was run once with `--runxfail` and its message read
+(second cold read of PR 1, its one finding): an expected failure now, and
 a failure the first time it passes, so the marker has to come off in the
 commit that lands the reader.
 

@@ -74,3 +74,19 @@ uv run pytest tests/test_m03_seeds.py --runxfail   # S1..S7 each fail for the pl
 uv run pytest tests/test_gates.py -k "subagent_prompt or keeps_the_seat"
 git show 10452f9 -- src/gates/__init__.py          # the only change to a gate
 ```
+
+## The second cold read, of the repairs
+
+`engineering-cold-reviewer` read `git diff faed466...76b2623` (17 files,
+9 commits) with row 3, and ran the seed and gate tests and
+`ruling-cited --base main --pr 19` (exit 0): 0 BLOCK, 1 FINDING, 5 NOTE,
+in the PR body verbatim. S7 is a false state before any reader and fails
+for its planted reason; the `seats_of` change is sound (the base's
+`seat:` wins, a rename keeps the old path's seat, a new prompt still
+needs Security's CODEOWNERS line); each `raises=` matches; the four
+files cover the 35 paths exactly. **The finding**, that `raises=` checks
+the exception class only and five seeds raise AssertionError, is
+repaired in the docstring, which now says so. Its note on the stale
+comment in `plants.py` is repaired in the same commit. Recorded: an
+empty prompt on the base falls through to the PR's `seat:`, as an empty
+ruling file does; none exists.

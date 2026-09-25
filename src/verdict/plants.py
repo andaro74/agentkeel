@@ -43,10 +43,11 @@ SEEDS_M02: dict[str, tuple[str, str, str]] = {
 }
 
 # Claim 3's seeded cases (SPEC/03 section 5), the same shape. Listed at M03
-# PR 1; the readers land at M03 PR 2. S1's, S2's, S4's, S6's and S7's readers are files
-# already in the tree that change there (the runtime match, the plant
-# rule), so `make plants` says "in the tree" beside them, as it did for
-# M01's S7: the strict markers, not this list, say whether a seed is read.
+# PR 1; the readers land at M03 PR 2. Every reader but S3's and S5's is a
+# file already in the tree that changes there (the runtime match, CONTROLS,
+# the fingerprint in the gate, the plant rule, history at the ancestors),
+# so `make plants` says "in the tree" beside them, as it did for M01's S7:
+# the strict markers, not this list, say whether a seed is read.
 # S4 plants no file: row 2's envelope is the false state. Listing them reads nothing
 # and gates nothing, and CONTROLS above stays empty until the guardrail is
 # on the call (SPEC/03 section 5.1).
