@@ -612,7 +612,8 @@ def main(argv: list[str] | None = None) -> int:
             for i, p in args.check_doors:
                 checks = both(checks, i, check_from_doors(Path(p), args.run_url))
             kinds = {g: golden["kind"] for g, golden in goldens.items()}
-            history = replay_history.load(args.history_dir, exclude_commit=raw["commit"])
+            # The run's ancestors only, as the gate reads it (SPEC/03 §6, seed S7).
+            history = replay_history.load(args.history_dir, exclude_commit=raw["commit"], ancestors_of=raw["commit"])
             try:
                 # Each control as it stood at the run's commit, as the gate reads it (SPEC/03 §6).
                 plant_ids = plants.plant_ids(kinds, ROOT, raw["commit"])

@@ -93,7 +93,7 @@ def judged(envelope: dict, plant_ids) -> tuple[str, list[str]]:
     """`gate.judge` as `gate.rule` calls it, with the plant ids passed in."""
     from src.verdict import gate, replay_history
 
-    history = replay_history.load(gate.HISTORY, exclude_commit=envelope["commit"])
+    history = replay_history.load(gate.HISTORY, exclude_commit=envelope["commit"], ancestors_of=envelope["commit"])
     kinds = {g: r["kind"] for g, r in envelope["goldens"].items()}
     cap, _ = gate.cap_at(envelope["commit"])
     return gate.judge(envelope, kinds, history, list(plant_ids), cap, gate.required_checks(envelope["commit"]))
@@ -177,7 +177,7 @@ def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
 
     reading = gate.corpus_fingerprint(tree)  # the gate's own reading; `rule` takes it at the envelope's commit
     assert reading is not None
-    history = replay_history.load(gate.HISTORY, exclude_commit=envelope["commit"])
+    history = replay_history.load(gate.HISTORY, exclude_commit=envelope["commit"], ancestors_of=envelope["commit"])
     kinds = {g: r["kind"] for g, r in envelope["goldens"].items()}
     cap, _ = gate.cap_at(envelope["commit"])
     verdict, reasons = gate.judge(envelope, kinds, history, [], cap, gate.required_checks(envelope["commit"]),
@@ -258,13 +258,12 @@ def test_f3_6_guard_a_never_passed_golden_is_not_red():
 # --- S7: a pass recorded later re-rules an older envelope -----------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S7: history is not limited to the envelope's ancestors until M03 PR 2 (SPEC/03 section 6)")  # fmt: skip
 def test_s7_a_pass_recorded_later_does_not_re_rule_an_old_envelope(tmp_path):
     """g-013 has never passed as of row 2's envelope. Put beside it, in a copy of history, one
     envelope for a later commit (71eff00, the m02 merge, a descendant) in which g-013 passes, as
     PR 2's guardrail is to make it. Row 2's envelope was written before that pass and must still
-    rule GREEN. Today the gate reads every envelope in the folder and calls g-013 regressed."""
+    rule GREEN. Until M03 PR 2 the gate read every envelope in the folder and called g-013
+    regressed; it now reads the envelope's ancestors, and 71eff00 is not one."""
     import shutil
 
     from src.verdict import gate, replay_history

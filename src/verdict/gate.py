@@ -431,7 +431,9 @@ def latest(history_dir: Path = HISTORY) -> Path | None:
 def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
     envelope = read(path)
     try:
-        history = replay_history.load(history_dir, exclude_commit=envelope["commit"])
+        # Only envelopes for the commit's ancestors (SPEC/03 §6, seed S7).
+        history = replay_history.load(history_dir, exclude_commit=envelope["commit"], ancestors_of=envelope["commit"],
+                                      root=ROOT)  # fmt: skip
     except ValueError as exc:  # a bad file in history: the gate cannot rule, which is not RED
         raise Rejected(f"history cannot be replayed: {exc}") from exc
     # The goldens as they stood at the envelope's commit, retired ones left
@@ -522,7 +524,9 @@ def main(argv: list[str] | None = None) -> int:
     cap, where = cap_at(envelope["commit"])
     print(f"  note: cost_cap {cap} read at {where}")
     print(f"  note: the plant rule's controls read at {where_at(envelope['commit'])}")
-    history = replay_history.load(args.history_dir, exclude_commit=envelope["commit"])
+    history = replay_history.load(args.history_dir, exclude_commit=envelope["commit"], ancestors_of=envelope["commit"])
+    ancestors = "the envelope's ancestors" if replay_history.ancestry(envelope["commit"]) is not None else "every envelope"
+    print(f"  note: history read from {ancestors}")
     for golden_id in control_drift(envelope, history):
         print(f"  note: control {golden_id} has passed before and fails now; not gated (Finding F0.4)")
     if against := control_against_base(envelope, args.envelope):

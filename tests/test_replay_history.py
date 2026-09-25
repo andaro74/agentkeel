@@ -56,3 +56,25 @@ def test_the_pre_scope_envelope_is_kept_and_is_not_read(tmp_path):
     shutil.copy(kept[0], tmp_path / kept[0].name)  # put it where history is read: no tolerance flag
     with pytest.raises(ValueError, match="'scope' is a required property"):
         replay_history.load(tmp_path)
+
+
+# --- only the ancestors (SPEC/03 §6, seed S7) ------------------------------------
+
+HISTORY = ROOT / "evals" / "history"
+ROW_2 = "8033c2a7a0588e557df577464c190e64a435e88a"  # row 2's envelope
+LATER = "164a95bc4d1b393624e917e89012c64838def531"  # an envelope for a descendant (M03 PR 1)
+
+
+def test_history_holds_only_the_envelopes_for_ancestors():
+    commits = {commit for runs in replay_history.load(HISTORY).values() for commit, _ in runs}
+    before = {commit for runs in replay_history.load(HISTORY, ancestors_of=ROW_2).values() for commit, _ in runs}
+    assert LATER in commits and LATER not in before, "a later run is not a run before row 2"
+    assert ROW_2 in before, "the commit itself is its own ancestor; exclude_commit is what leaves it out"
+    assert before < commits
+    assert before <= replay_history.ancestry(ROW_2)
+
+
+def test_a_commit_git_cannot_resolve_reads_every_envelope():
+    """A test's made-up sha, a shallow clone: the whole folder, as text_at reads the tree."""
+    assert replay_history.ancestry("a" * 40) is None
+    assert replay_history.load(HISTORY, ancestors_of="a" * 40) == replay_history.load(HISTORY)
