@@ -199,9 +199,31 @@ entries ADR-0009 carries. `red-teamer`, its first exercise, on S2 (0
 BLOCK, 4 FINDING, 3 NOTE): drafts `g-016` to `g-020` and the two rule
 files for PR 2, keeps S2's `g-016` word for word, and finds that `g-014`
 (MASKED) may not be passable at M03 with no license text to read (Unsure
-A). `docs-writer`, its first exercise: the explainer draft. The
-`security-reviewer` and the cold review run on the diff before the PR
-opens; their reports are in the PR body.
+A; ruled in §2.5). `docs-writer`, its first exercise: the explainer
+draft. Both were run through a general-purpose agent handed the prompt
+file, since the two were not yet registered as agent types in the
+session that wrote them.
+
+### 2.5 Ruled after the seat reports on the diff
+
+The cold review and the three seat reports read the diff `71eff00...faed466`
+(1 BLOCK, 25 FINDING, 20 NOTE among them; all four in the PR body
+verbatim). The human ruled four items on 2026-09-25 before the PR
+opened; each repair is its own commit after the diff the reviewers read.
+
+| Item | Seat | Ruling |
+|---|---|---|
+| `security-reviewer` BLOCK 1: `ruling-cited` reads CODEOWNERS from the base, where no line owns the two new prompts, so no ruling could cover them | Product; Security, Engineering | **Ruled: the gate reads a prompt's own `seat:`** (`10452f9`), from the base when the file is there and from the PR when it is new, as it already did for ruling files (SPEC/00 §5, last row). Two tests fail without it. This PR changes the gate that judges it; the ruling files say so. |
+| cold review F1: history is read whole, so a later pass of a never-passed golden re-rules an older envelope RED | Product; Engineering names the reader | **Ruled: a seventh seed, S7** (`1e51666`), before any reader. Reader at PR 2: history limited to the envelope's ancestors. Verified by the call before the ruling: one later pass of `g-013` turns row 2 RED, `regressed: g-013`. |
+| `g-014` (MASKED) cannot fire at M03: `rule-owner` F2, `data-owner` F5, `red-teamer` | Product, with the Rule Owner and the Data Owner | **Ruled: 7 of 7, `g-014` not counted at M03** (SPEC/03 §5.1, `4d04332`). Not edited, not retired; each control names its plants by id, so the plant rule leaves `g-014` out until the knowledge base at M04. B3's ruling stands as amended: the count is stated before the run. |
+| ADR-0009, the additions the reports proposed | Product | **Ruled: entry 5 only** (`ce8f9e7`), a rule dropped from a control file or its action weakened (`rule-owner` F5). **Not added**, and so still one key: a boundary deny narrowed (`security-reviewer` F1), an Object Lock retention or mode weakened (F4), the overlap bound raised (`data-owner` F2), a rights-table row deleted (NOTE 5). Each is recorded in `rulings/pr1.md` with the seat that holds it. |
+
+The test repairs from the cold review (F2 and N3: `raises=` on each
+marker, `exist_ok` on two `mkdir` calls, S1 digesting a clean worktree
+of HEAD) are `c3f8c81`. No seed file was edited: S1's two non-UTF-8
+bytes (cold F5, `data-owner` N13) and S3's path, which the real holdback
+schedule must not take (`data-owner` F4), stand as planted, and
+`rulings/pr1.md` says what PR 2 does about each.
 
 ## 3. The false state
 
@@ -216,14 +238,17 @@ involved turning the gate RED; a cache state outside the enum. Not held
 and not seeded: a cached answer graded as fresh (B2; M04).
 
 The commits: `61ac95a` S1, `c5f5ca3` S2, `01876a7` S3, `2fd7128` S4,
-`149d352` S5, `d229601` S6, then the guards `92c7b2a`. `git show <seed>
+`149d352` S5, `d229601` S6, the guards `92c7b2a`, and `1e51666` S7 after
+the cold review, before any reader. `git show <seed>
 --stat` shows a fixture, a test and the fixtures README, and no reader.
 Each strict marker was checked with `--runxfail` to fail for its planted
 reason: S1 the same digest with and without the patch; S2 the plant rule
 giving `[]`; S3 no `src.validate.overlap`, after today's checks pass on
 the patch; S4 no `gate.corpus_fingerprint`; S5 `observed` null; S6
 "silent plant: expected 3, fired 0" on row 2's envelope, which the same
-call rules GREEN with no control in the tree.
+call rules GREEN with no control in the tree. S7 "regressed: g-013 has
+passed before and fails now" against a copy of history holding one later
+pass.
 
 ## 4. The code that reads the answer
 
