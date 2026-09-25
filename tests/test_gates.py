@@ -381,3 +381,29 @@ def test_a_ruling_file_is_owned_by_the_seat_in_its_own_front_matter(repo):
 def test_deleting_the_memory_key_outright_is_a_relaxation(repo):
     repo.write("agents/refagent/manifest.yaml", MANIFEST.replace("memory: {retention_days: 30, ttl_days: 7, per_user: true}\n", ""))
     assert "memory removed" in (repo.keys() or "")
+
+
+def test_a_new_subagent_prompt_is_owned_by_the_seat_in_its_own_front_matter(repo):
+    """No CODEOWNERS line on the base names a prompt that did not exist there, so the owner table
+    alone would say no seat owns it, and no ruling could cover it (M03 PR 1, security-reviewer B1).
+    A prompt is owned by its own `seat:` (SPEC/00 section 5, last row), read from the base when
+    the file is there and from the PR only when it is new."""
+    prompt = "---\nname: red-teamer\nseat: rule-owner\n---\n\nA prompt.\n"
+    repo.write(".claude/agents/red-teamer.md", prompt)
+    refused = repo.cited() or ""
+    assert "no seat owns it" not in refused
+    assert ".claude/agents/red-teamer.md (a subagent prompt, owned by its seat:): owned by Rule Owner" in refused
+    repo.write("milestones/M03/rulings/pr1-rule-owner.md", ruling("Rule Owner", [".claude/agents/red-teamer.md"]))
+    assert repo.cited() is None
+
+
+def test_an_existing_prompt_keeps_the_seat_the_base_gives_it(repo):
+    """Editing a prompt's `seat:` in the PR does not move it: the base's front matter decides."""
+    repo.write(".claude/agents/red-teamer.md", "---\nname: red-teamer\nseat: rule-owner\n---\n\nA prompt.\n")
+    repo.commit_as("t", "the prompt on the base")
+    git(repo.root, "worktree", "remove", "--force", str(repo.base))
+    git(repo.root, "worktree", "add", "-q", "--detach", str(repo.base), "HEAD")
+    repo.write(".claude/agents/red-teamer.md", "---\nname: red-teamer\nseat: product\n---\n\nMoved.\n")
+    repo.write("milestones/M03/rulings/pr1.md", ruling("Product", [".claude/agents/red-teamer.md"]))
+    refused = repo.cited() or ""
+    assert "owned by Rule Owner" in refused

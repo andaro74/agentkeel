@@ -48,6 +48,8 @@ from src.verdict import ROOT
 
 CODEOWNERS = ".github/CODEOWNERS"
 RULING_GLOB = re.compile(r"^milestones/[^/]+/rulings/[^/]+\.md$")
+# A subagent prompt, owned by the seat in its own front matter (SPEC/00 section 5, last row).
+AGENT_PROMPT = re.compile(r"^\.claude/agents/[^/]+\.md$")
 BOT = "github-actions[bot]"
 HISTORY = "evals/history/"
 
@@ -315,6 +317,15 @@ def seats_of(path: str, base: Tree, tree: Tree, owners: Owners) -> list[tuple[st
         # covers itself before this is reached.
         fm = front_matter(base.text(path) or tree.text(path) or "") or {}
         return [(canonical_seat(fm.get("seat")) or owner, " (a ruling file, owned by its seat:)")]
+    if AGENT_PROMPT.match(path):
+        # A prompt too (M03 PR 1, security-reviewer B1). The owner table is
+        # the base's, and a prompt that is new in this PR has no line there,
+        # so without this no ruling could cover it. Its seat is read from the
+        # base when the file is there, so a PR cannot move a prompt to the
+        # seat whose ruling it carries by editing `seat:`; from the PR only
+        # when it is new. `validate` still holds the CODEOWNERS line equal.
+        fm = front_matter(base.text(path) or tree.text(path) or "") or {}
+        return [(canonical_seat(fm.get("seat")) or owner, " (a subagent prompt, owned by its seat:)")]
     if not MANIFEST.match(path):
         return [(owner, "")]
     before = _yaml_mapping(base.text(path))
