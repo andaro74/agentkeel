@@ -191,3 +191,109 @@ human rules in `rulings/pr1.md` with the rest of the PR.
 | N2 three names for one check | Product | One name, **golden/corpus overlap**, in SPEC/03. CLAUDE.md's line is corrected with the check at PR 2 (row 6). |
 | N3 SPEC/00 §9 still says M01 | Product | SPEC/00 §9 amended inline in this PR: the documents land at M03 PR 2; the knowledge base is M04. |
 | N4 the cap re-rule | Threshold Owner | Row 7, at PR 2, against PR 2's measured spend: five goldens more per run, no retrieval. |
+
+### 2.4 The seat reports on this PR (in the PR body verbatim)
+
+`threshold-owner` on row 1 (0 BLOCK, 5 FINDING, 4 NOTE): proposed the six
+entries ADR-0009 carries. `red-teamer`, its first exercise, on S2 (0
+BLOCK, 4 FINDING, 3 NOTE): drafts `g-016` to `g-020` and the two rule
+files for PR 2, keeps S2's `g-016` word for word, and finds that `g-014`
+(MASKED) may not be passable at M03 with no license text to read (Unsure
+A). `docs-writer`, its first exercise: the explainer draft. The
+`security-reviewer` and the cold review run on the diff before the PR
+opens; their reports are in the PR body.
+
+## 3. The false state
+
+SPEC/03 §3, in full. Live today: a regression through the rights table,
+measured in the runtime against `main`'s table (S1); a silent plant with
+its control in the tree (S2); a golden that overlaps the corpus (S3); an
+envelope with no fingerprint (S4); the unsigned amendment reaching the
+production bucket (S5); a control added today re-ruling an older
+envelope RED on goldens that never passed (S6). Held today: a regressed
+golden, measured, merging; a never-passed golden with no control
+involved turning the gate RED; a cache state outside the enum. Not held
+and not seeded: a cached answer graded as fresh (B2; M04).
+
+The commits: `61ac95a` S1, `c5f5ca3` S2, `01876a7` S3, `2fd7128` S4,
+`149d352` S5, `d229601` S6, then the guards `92c7b2a`. `git show <seed>
+--stat` shows a fixture, a test and the fixtures README, and no reader.
+Each strict marker was checked with `--runxfail` to fail for its planted
+reason: S1 the same digest with and without the patch; S2 the plant rule
+giving `[]`; S3 no `src.validate.overlap`, after today's checks pass on
+the patch; S4 no `gate.corpus_fingerprint`; S5 `observed` null; S6
+"silent plant: expected 3, fired 0" on row 2's envelope, which the same
+call rules GREEN with no control in the tree.
+
+## 4. The code that reads the answer
+
+SPEC/03 §6, all PR 2, in the order the commits are to land: the plant
+rule at the envelope's commit (S6); the red-team goldens and
+`redteam.yaml`; the guardrail on the call; `CONTROLS` filled after it
+(S2); the runtime match covering the table, `deploy.yml` on
+`data/rights_table.json`, `load_rights_table.py` deleting (S1);
+`validate`'s golden/corpus overlap (S3); the corpus and `admitted.yaml`;
+the ingest pipeline, deployed by the human after `cdk diff`; the
+fingerprint in `build` and `gate` (S4); `scripts/observe_ingest.py`
+(S5); `CLAIM_3_CHECKS`. None of it is in this PR.
+
+## 5. Falsifiers, and what each would look like in the repo
+
+SPEC/03 §4. `F3_1`, `F3_3` and `F3_6` are test-only witnesses of a seed
+refused in a copy of the tree. `F3_2` is read on the run's own results.
+`F3_4` is read by the gate from the envelope and the tree. `F3_5` is read
+from AWS by the observer. F3.5's second half is not measured at M03.
+
+## 6. What M02 carried in (`milestones/M03/open.md`), row by row
+
+Every row is answered here or moved on with a seat and a date. None is
+dropped. Rows 1, 2, 9 and 11 were the four the human named for this PR,
+in that order; rows 3, 4, 5 and 8 are readers or bars and are PR 2's.
+
+| # | Seat | Now |
+|---|---|---|
+| 1 | Product, with the Threshold Owner | **Done here, for ruling**: ADR-0009 (`8ac5682`), from the `threshold-owner` proposal, six entries; SPEC/02 §2 and SPEC/00 §5 amended inline. Status Proposed until Product rules each entry in `rulings/pr1.md`. The readers (`two_key.py`, `ruling_cited.py`, `validate`) are Engineering's at M03 PR 2, before any commit that moves a bar. |
+| 2 | Product (the bullet); Security (the case) | **Done here** for the bullet: SPEC/01 §9, "observed once, unplanned", run 35817173042 (`a695ae9`). The seeded case: Security, **M05 open**. |
+| 3 | Engineering | **PR 2**: they are readers. `build.check_from_bypass` reads `ci_red_lines`; `gate.rule` prints `where`; `lines_naming` strips before it removes the timestamp; `judge`'s default of claim 1 only, which `CLAIM_3_CHECKS` makes worse if left. |
+| 4 | Threshold Owner, Engineering | **PR 2** for `bars` reading one level deep. `delta_max`: **M04** (ruling on F11; SPEC/03 §10). R10's N as `up`: PR 2, with its `relaxes:` entry. |
+| 5 | Data Owner, Tool Owner, Engineering | **PR 2**: how an absence trap cites and how scoring compares the cited row. `g-021` stays never passed (SPEC/03 §10) unless those rulings say otherwise. |
+| 6 | Product | **PR 2**, with the overlap check: CLAUDE.md's line is corrected in the commit that lands `validate`'s golden/corpus overlap (note N2). |
+| 7 | Threshold Owner | **PR 2**, against PR 2's measured spend: five goldens more per run, no retrieval (cut 6). The control answering the retired `g-012` every run: the same ruling. |
+| 8 | Security | **PR 2**: `read_back_grants.py` gains the two DynamoDB probes (Engineering); the human runs it once with admin and the rows go in `infra/bootstrap/README.md`. |
+| 9 | Product | **Done here**: the M02 video (`47d53c6`, 5:48, 6.0 MB, tag `m02`, LFS) and its row, which says it is 48 seconds over. The ruling on whether the ceiling or the recordings stand is in `rulings/pr1.md`, a draft for the human. |
+| 10 | Product, Security (the human) | Seed PRs 14 to 18: **closed unmerged, branches kept** (the human, 2026-09-24). The two `doors:` blocks in `f2_2_three_doors.yaml` and the image `822fe2b5` in ECR: not known to this session; **Unsure B**. |
+| 11 | Engineering | **Done here**: checked item by item against the code, `pr2-engineering.md` and `pr2-cold-review.md`. Neither ruling claims any item. **0 of 11 done**, 2 partly (e, f). Re-dated below. |
+| 12 | Threshold Owner | **M04 PR 1**, as dated. |
+| 13 | Tool Owner | **M06; M07**, as dated. |
+| 14 | Security | **M05 open**, as dated. |
+| 15 | Product, Engineering | **Done here**: row 2 read from the envelope `8033c2a`, and `make ledger` exits 0 against it. `12b4646`, `47258f2` and `6daf6c4` each rule RED ("checks.F2_2 is missing from an agent envelope"), read by the gate on 2026-09-25; no Measured cell cites them. From M03 PR 2's merge every agent envelope also carries claim 3's checks or is RED. |
+| (B2) | Engineering | New: `agents/refagent/agent.py` keeps `cacheReadInputTokens`, so `build`'s prompt-cache refusal can fire: **M04 PR 1**, with the knowledge base and the cached-answer seed. |
+
+**Row 11, item by item** (M02 open.md rows 12 and 13; file:line at
+`71eff00`):
+
+| Item | State | Evidence | Re-dated to |
+|---|---|---|---|
+| a. the CloudTrail check reads the refusing `principal` | not done | written at `scripts/observe_attempt.py:69`, never read by `build.py:293-306` | M05 open (Security, Engineering): evidence integrity |
+| b. agent raw replayable | not done | only the control's raw is committed (`evals.yml:482,487`); the agent's is an artifact | M05 open |
+| c. `both()` keeps F1.1's two halves apart | not done | `build.py:309-315` ANDs them and keeps the first URL | M05 open |
+| d. `message_must_contain` required | not done | `build.py:305-306` falls back to any AccessDenied | M05 open |
+| e. `thresholds_at` falls back to the tree | partly | fallback at `gate.py:124-125`; where it read is printed at `gate.py:513-515` | M03 PR 2, with S6's reader: the same reading at a commit |
+| f. `server.py` profile and docstring | partly | env-var test `tests/test_construct.py:191`; default still `server.py:30`; docstring still wrong, `server.py:11` against `:47` and `agent.py:65` | M04 PR 1, with the model fields |
+| g. `run.py`'s dirty check excludes the goldens | not done | `src/agent/run.py:68`, `:(exclude)evals` | M03 PR 2, when five goldens land |
+| h. the gate takes build's token sums as given | not done | `gate.py:340` | M04 PR 1 |
+| i. Makefile paths that write no envelope | not done | `Makefile:15` still says a run always writes one; `cost_cap.py:53-58` | M04 PR 1 |
+| j. `gate.manifest_at` falls back to the tree | not done | `gate.py:146-147` | M03 PR 2, with e |
+| k. IAM5 rows under one reason | not done | now four rows, `infra/construct/AwsSolutions--AgentkeelRefagent-NagReport.csv:7-10`, one reason | M05 open (Security) |
+
+## 7. What PR 1 does not do
+
+- It builds no reader: `CONTROLS` stays `{}`; no overlap check; the
+  runtime match still reads the bundle alone; no fingerprint; no
+  pipeline; no observer. The strict markers say so.
+- It adds no golden and no rule: `g-016` to `g-020`, `redteam.yaml` and
+  `guardrail.yaml` are PR 2's, drafted by `red-teamer` in the PR body.
+- It moves no bar: `thresholds.yaml` is untouched.
+- It touches no AWS and deploys nothing. The ingest stack is PR 2's, and
+  the human reads `cdk diff` and deploys it.
+- It does not change the ruleset.
