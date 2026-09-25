@@ -63,20 +63,27 @@ def seeded():
 # --- S1: a regression through the rights table ---------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1: the runtime match reads the bundle alone until M03 PR 2 (SPEC/03 §6)")
 def test_s1_a_table_change_is_not_measured_against_mains_table(seeded):
     """`r-003` says exclusive; `g-011` expects non-exclusive. In `mode: runtime` the run answers
     from the table the last deploy loaded, so the tree's table must be part of what the runtime
-    is matched on, or the run is not in the runtime."""
+    is matched on, or the run is not in the runtime.
+
+    M03 PR 2: the call is the runtime match, as SPEC/03 §6 names S1's reader, not the bundle
+    digest alone (the seed's patch is unchanged). The runtime is main's: this tree's bundle,
+    which the patch does not touch, and the marker of main's table, as its last load set it."""
     from scripts import runtime_for_tree
 
     tree = seeded("s1-table-regresses.patch")
     rows = {row["table_row"]: row for row in json.loads((tree / "data" / "rights_table.json").read_text("utf-8"))}
     assert rows["r-003"]["exclusive"] is True, "the seed is what it says"
 
-    here = runtime_for_tree.bundle_digest(seeded() / "agents" / "refagent")  # HEAD as committed, not the working tree
-    there = runtime_for_tree.bundle_digest(tree / "agents" / "refagent")
-    assert there != here, "the runtime deployed from main would answer this tree, from main's table"
+    bundle = runtime_for_tree.bundle_digest(tree / "agents" / "refagent")
+    assert bundle == runtime_for_tree.bundle_digest(seeded() / "agents" / "refagent"), "the patch touches no bundle file"
+    mains = runtime_for_tree.table_digest(seeded())  # HEAD as committed, not the working tree
+    runtime = "arn:aws:bedrock-agentcore:us-west-2:111122223333:runtime/refagent-abc"
+    arn, reason = runtime_for_tree.match(bundle, runtime_for_tree.table_digest(tree), lambda: (runtime, [bundle], mains))
+    assert arn == "", "the runtime deployed from main would answer this tree, from main's table"
+    assert "rights table marker" in reason, reason
 
 
 # --- S2: a red-team plant goes silent with its control in the tree -------

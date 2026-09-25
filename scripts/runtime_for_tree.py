@@ -11,7 +11,14 @@ runtime runs the same bytes as this tree. Otherwise the envelope would say
 2. read the runtime's ARN from the `agentkeel-refagent` stack's outputs;
 3. read the image digest that runtime runs (`GetAgentRuntime`);
 4. read that image's tags (`ecr:DescribeImages`). A match means the bundle
-   digest is among them.
+   digest is among them;
+5. from M03 PR 2 (seed S1's reader, SPEC/03 §6), read the rights table
+   marker (`ssm:GetParameter`), which `scripts/load_rights_table.py` sets to
+   the digest of the table it scanned back after a load. A match also means
+   the marker **equals** the digest of this tree's `data/rights_table.json`.
+   `unset`, `loading`, another digest, or a marker that cannot be read, is
+   the runner (security-reviewer on e2839f2, FINDING 5): the runtime answers
+   from its table, and a run on another table's answers is not this tree's.
 
 On a match it writes `arn=<runtime ARN>`. On anything else — no stack, other
 bytes, a refused call — it writes `arn=` and the reason. The run then
@@ -45,12 +52,14 @@ from botocore.exceptions import BotoCoreError, ClientError
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from src import rights_table  # noqa: E402
 from src.bundle import pack  # noqa: E402
 
 BUNDLE = ROOT / "agents" / "refagent"
 STACK = "agentkeel-refagent"
 REPOSITORY = "agentkeel-refagent"
 REGION = "us-west-2"
+MARKER = "/agentkeel/marker/refagent/rights-table-digest"
 
 
 def bundle_digest(bundle: Path = BUNDLE) -> str:
@@ -59,8 +68,21 @@ def bundle_digest(bundle: Path = BUNDLE) -> str:
         return pack.digest(pack.pack(bundle, Path(out) / pack.ARCHIVE_NAME))
 
 
-def deployed(session: boto3.session.Session | None = None) -> tuple[str, list[str]]:
-    """The runtime's ARN, and the tags on the image it runs."""
+def table_digest(root: Path = ROOT) -> str:
+    """The digest the marker must equal: this tree's rights table, as the table would store it."""
+    return rights_table.file_digest(root)
+
+
+def marker(session: boto3.session.Session) -> str | None:
+    """The table marker, or None when it cannot be read. None is the runner, never a match."""
+    try:
+        return session.client("ssm").get_parameter(Name=MARKER)["Parameter"]["Value"]
+    except (BotoCoreError, ClientError, KeyError):
+        return None
+
+
+def deployed(session: boto3.session.Session | None = None) -> tuple[str, list[str], str | None]:
+    """The runtime's ARN, the tags on the image it runs, and the table marker."""
     session = session or boto3.session.Session(region_name=REGION)
     outputs = session.client("cloudformation").describe_stacks(StackName=STACK)["Stacks"][0].get("Outputs", [])
     arn = next((o["OutputValue"] for o in outputs if o["OutputKey"] == "RuntimeArn"), None)
@@ -73,18 +95,25 @@ def deployed(session: boto3.session.Session | None = None) -> tuple[str, list[st
     images = session.client("ecr").describe_images(
         repositoryName=REPOSITORY, imageIds=[{"imageDigest": uri.split("@", 1)[1]}]
     )["imageDetails"]
-    return arn, [tag for image in images for tag in image.get("imageTags", [])]
+    return arn, [tag for image in images for tag in image.get("imageTags", [])], marker(session)
 
 
-def match(digest: str, lookup=deployed) -> tuple[str, str]:
-    """(ARN or "", reason). Never raises: a failed lookup is a reason, not an error."""
+def match(digest: str, table: str, lookup=deployed) -> tuple[str, str]:
+    """(ARN or "", reason). Never raises: a failed lookup is a reason, not an error.
+
+    The runtime only when it runs this tree's bundle and answers from this
+    tree's rights table; the marker must equal `table`, whatever else it says.
+    """
     try:
-        arn, tags = lookup()
+        arn, tags, held = lookup()
     except (BotoCoreError, ClientError, LookupError, KeyError, IndexError) as exc:
         return "", f"runner: the deployed runtime could not be read ({type(exc).__name__}: {exc})"
-    if digest in tags:
-        return arn, f"runtime: {arn} runs this tree's bundle {digest[:12]}"
-    return "", f"runner: the deployed runtime runs other bytes (tags {tags}), not this tree's {digest[:12]}"
+    if digest not in tags:
+        return "", f"runner: the deployed runtime runs other bytes (tags {tags}), not this tree's {digest[:12]}"
+    if held != table:
+        said = "could not be read" if held is None else f"says {held[:12]!r}"
+        return "", f"runner: the runtime's rights table marker {said}, not this tree's table {table[:12]}"
+    return arn, f"runtime: {arn} runs this tree's bundle {digest[:12]} and its rights table {table[:12]}"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -94,11 +123,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        digest = bundle_digest()
+        digest, table = bundle_digest(), table_digest()
     except Exception as exc:  # noqa: BLE001 - never fails the job; the reason is the output
-        arn, reason = "", f"runner: this tree's bundle could not be packed ({type(exc).__name__}: {exc})"
+        arn, reason = "", f"runner: this tree's bundle or table could not be read ({type(exc).__name__}: {exc})"
     else:
-        arn, reason = match(digest)
+        arn, reason = match(digest, table)
     print(reason)
     if args.github_output:
         with args.github_output.open("a", encoding="utf-8") as out:

@@ -17,6 +17,7 @@ from scripts import runtime_for_tree as rt
 from src.verdict import ROOT
 
 ARN = "arn:aws:bedrock-agentcore:us-west-2:111122223333:runtime/refagent-abc"
+TABLE = "t" * 64  # this tree's rights table digest, in these tests
 
 
 def test_the_digest_is_the_one_deploy_yml_tags_the_image_with(tmp_path):
@@ -29,12 +30,12 @@ def test_the_digest_is_the_one_deploy_yml_tags_the_image_with(tmp_path):
 
 
 def test_a_match_measures_the_runtime():
-    arn, reason = rt.match("d" * 64, lambda: (ARN, ["other", "d" * 64]))
+    arn, reason = rt.match("d" * 64, TABLE, lambda: (ARN, ["other", "d" * 64], TABLE))
     assert arn == ARN and reason.startswith("runtime:")
 
 
 def test_other_bytes_stay_in_the_runner_and_say_so():
-    arn, reason = rt.match("d" * 64, lambda: (ARN, ["e" * 64]))
+    arn, reason = rt.match("d" * 64, TABLE, lambda: (ARN, ["e" * 64], TABLE))
     assert arn == "" and reason.startswith("runner:") and "other bytes" in reason
 
 
@@ -49,13 +50,46 @@ def test_a_failed_lookup_is_a_reason_not_an_error(failure):
     def lookup():
         raise failure
 
-    arn, reason = rt.match("d" * 64, lookup)
+    arn, reason = rt.match("d" * 64, TABLE, lookup)
     assert arn == "" and reason.startswith("runner: the deployed runtime could not be read")
 
 
 def test_it_writes_the_output_and_the_summary_and_exits_0(tmp_path, monkeypatch):
-    monkeypatch.setattr(rt, "match", lambda digest: ("", "runner: test reason"))
+    monkeypatch.setattr(rt, "match", lambda digest, table: ("", "runner: test reason"))
     out, summary = tmp_path / "out", tmp_path / "summary"
     assert rt.main(["--github-output", str(out), "--summary", str(summary)]) == 0
     assert out.read_text(encoding="utf-8") == "arn=\n"
     assert "runner: test reason" in summary.read_text(encoding="utf-8")
+
+
+# --- the rights table (M03 PR 2, seed S1's reader) ---------------------------------
+
+
+@pytest.mark.parametrize(("held", "said"), [
+    ("unset", "says 'unset'"),
+    ("loading", "says 'loading'"),
+    (None, "could not be read"),
+    ("u" * 64, "says 'uuuuuuuuuuuu'"),
+])  # fmt: skip
+def test_the_runtime_is_the_runner_unless_its_table_marker_is_this_trees_table(held, said):
+    """security-reviewer on e2839f2, FINDING 5: equal to the tree's digest, or the runner; nothing else."""
+    arn, reason = rt.match("d" * 64, TABLE, lambda: (ARN, ["d" * 64], held))
+    assert arn == "" and reason.startswith("runner:") and said in reason and "rights table" in reason
+
+
+def test_a_marker_that_cannot_be_read_is_none_not_an_error():
+    class Refusing:
+        def client(self, name):
+            assert name == "ssm"
+            return self
+
+        def get_parameter(self, Name):  # noqa: N803 - boto3's keyword
+            raise ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "GetParameter")
+
+    assert rt.marker(Refusing()) is None
+
+
+def test_the_table_digest_is_the_trees_file():
+    from src import rights_table
+
+    assert rt.table_digest() == rights_table.file_digest(ROOT)

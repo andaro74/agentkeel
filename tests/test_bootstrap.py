@@ -560,7 +560,7 @@ DEPLOY_STEPS = {
     # created the stack and never called either; the second updated it and
     # was refused on GetTemplateSummary.
     "cloudformation deploy, update path": {"cloudformation:GetTemplateSummary", "cloudformation:DeleteChangeSet"},
-    "load_rights_table.py": {"dynamodb:PutItem", "dynamodb:DescribeTable"},
+    "load_rights_table.py": {"dynamodb:PutItem", "dynamodb:Scan", "dynamodb:DeleteItem", "ssm:PutParameter"},  # M03 PR 2
     "the load check": {"bedrock-agentcore:InvokeAgentRuntime", "cloudformation:DescribeStacks"},
 }  # fmt: skip
 
