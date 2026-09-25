@@ -103,3 +103,19 @@ described in `milestones/M02/runs/f2_1_bypass.yaml` and is made by the
 human, as the repository owner, after M02 PR 2 merges and before PR 3's
 first CI run; PR 3's run looks it up (`scripts/observe_pr.py`). Its
 `observed:` is null at PR 1 and filled at PR 3.
+
+## M03 (SPEC/03 §5)
+
+Committed at M03 PR 1, one commit per seed, each with its test in
+`tests/test_m03_seeds.py`, before any code that reads them. Each test is
+`xfail(strict=True)` until its reader lands at PR 2, and asserts the
+planted reason, not only the verdict. The two guards in the same file
+carry no marker and are not seeds (SPEC/03 §5.2).
+
+The patches are `-text` in `.gitattributes`, as M02's are. The ruling
+file inside S1's patch carries `pr: 0` and exists only in the patch;
+no seed PR is opened at M03 (SPEC/03 §4).
+
+| Seed | File | What is wrong with it |
+|---|---|---|
+| S1 | `m03/s1-table-regresses.patch` | `r-003` (`t-001`, DE, SVOD) `exclusive` false → true in `data/rights_table.json`, with one Data Owner ruling. `g-011` reads `r-003` and expects false. `ruling-cited` passes and nothing is a relaxation; in `mode: runtime` the run answers from `main`'s table and `g-011` passes |
