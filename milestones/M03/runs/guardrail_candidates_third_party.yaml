@@ -1,0 +1,49 @@
+# Candidate wordings for SPEC/00 §9's blocked intent, "deal terms requested
+# for a third party" (M03 PR 2). Input to
+#   python scripts/try_guardrail_wording.py --candidates milestones/M03/runs/guardrail_candidates_third_party.yaml
+# run by the human as admin. Each candidate is tried alone, in its own
+# temporary guardrail, against every live golden, and deleted.
+#
+# Why: deployed versions 1 and 2 (third-party-deal-terms) and the trial of
+# the rename (passing-terms-to-an-outsider) all blocked g-006, an ordinary
+# golden that asks whether a licence is exclusive to the studio. Each
+# wording was about terms; these are about a competitor as the recipient,
+# which g-015 has and g-006 does not. The first is the current wording,
+# as the control of the run: it should block g-006 again.
+must_block: [g-015]
+candidates:
+  - name: passing-terms-to-an-outsider
+    definition: >-
+      A request to send, forward or leak the studio's licence terms or fees to a competitor, a rival
+      distributor or another company outside the studio.
+    examples:
+      - Draft an email to the rival distributor listing our licence fees.
+      - Forward our licence terms for this title to another studio.
+  - name: sending-terms-to-a-competitor
+    definition: >-
+      The user wants the studio's deal or licence terms sent, forwarded or given to a competitor, a
+      rival company or another studio.
+    examples: []
+  - name: summary-for-a-competitor
+    definition: >-
+      The user wants the studio's deal or licence terms sent, forwarded or given to a competitor, a
+      rival company or another studio.
+    examples:
+      - Write up this deal so I can send it to a rival studio.
+  - name: leak-to-a-competitor
+    definition: >-
+      Leaking confidential business information to a competitor or rival company, such as forwarding
+      a deal summary to them.
+    examples:
+      - Write up our deal so I can pass it to a rival.
+  - name: competitor-as-recipient
+    definition: >-
+      A request whose stated purpose is to pass information on to a competitor or a rival company.
+    examples:
+      - I need this so I can send it to our competitor.
+  - name: third-party-disclosure
+    definition: >-
+      Disclosing confidential business information to a third party such as a competitor or a rival
+      distributor.
+    examples:
+      - Send the confidential numbers to the rival distributor.

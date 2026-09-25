@@ -1,6 +1,9 @@
 """Try the rule files' wording on a temporary guardrail before a deploy (M03 PR 2).
 
-    python scripts/try_guardrail_wording.py      # admin credentials, agent account, us-west-2
+    python scripts/try_guardrail_wording.py                      # the rule files as one guardrail
+    python scripts/try_guardrail_wording.py --candidates FILE    # each candidate topic alone
+
+Admin credentials, agent account, us-west-2.
 
 Builds a guardrail named `agentkeel-wording-trial-<time>` from the working
 tree's `agents/refagent/rules/` exactly as the bootstrap stack would
@@ -44,43 +47,56 @@ def bootstrap_spec() -> dict:
     return module.guardrail_spec()
 
 
-def main() -> int:
-    sys.stdout.reconfigure(encoding="utf-8")
-    spec = bootstrap_spec()
-    bedrock = boto3.client("bedrock", region_name="us-west-2")
-    runtime = boto3.client("bedrock-runtime", region_name="us-west-2")
-    created = bedrock.create_guardrail(
-        name=f"agentkeel-wording-trial-{int(time.time())}",
-        description=f"temporary: rules sha256 {spec['digest']} (scripts/try_guardrail_wording.py)",
-        topicPolicyConfig={"topicsConfig": [
+GOLDENS = ROOT / "evals" / "goldens" / "v1"
+
+
+def live_goldens() -> list[dict]:
+    goldens = [yaml.safe_load(p.read_text(encoding="utf-8")) for p in sorted(GOLDENS.glob("g-*.yaml"))]
+    return [g for g in goldens if g.get("retired") is None]
+
+
+def create(bedrock, topics: list[dict], spec: dict, pii: bool) -> str:
+    """A temporary guardrail with these topics, READY. The caller deletes it."""
+    config = {
+        "name": f"agentkeel-wording-trial-{time.time_ns()}",
+        "description": "temporary (scripts/try_guardrail_wording.py)",
+        "topicPolicyConfig": {"topicsConfig": [
             {"name": t["name"], "definition": t["definition"], "examples": t.get("examples", []), "type": "DENY"}
-            for t in spec["topics"]]},
-        sensitiveInformationPolicyConfig={"piiEntitiesConfig": [
-            {"type": e["entity"], "action": e["action"]} for e in spec["pii"]]},
-        blockedInputMessaging=spec["messages"]["blocked_input"],
-        blockedOutputsMessaging=spec["messages"]["blocked_output"],
-    )  # fmt: skip
-    guardrail_id = created["guardrailId"]
+            for t in topics]},
+        "blockedInputMessaging": spec["messages"]["blocked_input"],
+        "blockedOutputsMessaging": spec["messages"]["blocked_output"],
+    }  # fmt: skip
+    if pii:
+        config["sensitiveInformationPolicyConfig"] = {"piiEntitiesConfig": [
+            {"type": e["entity"], "action": e["action"]} for e in spec["pii"]]}  # fmt: skip
+    guardrail_id = bedrock.create_guardrail(**config)["guardrailId"]
+    for _ in range(30):
+        if bedrock.get_guardrail(guardrailIdentifier=guardrail_id)["status"] == "READY":
+            break
+        time.sleep(2)
+    return guardrail_id
+
+
+def ask(runtime, guardrail_id: str, question: str) -> tuple[str, list[str]]:
+    response = runtime.apply_guardrail(guardrailIdentifier=guardrail_id, guardrailVersion="DRAFT",
+                                       source="INPUT", content=[{"text": {"text": question}}])  # fmt: skip
+    return response["action"], probe.matched_topics(response.get("assessments", []))
+
+
+def whole(bedrock, runtime, spec: dict) -> int:
+    """The working tree's rule files as one guardrail: probe_guardrail's table."""
+    rules = ROOT / "agents" / "refagent" / "rules"
+    guardrail = yaml.safe_load((rules / "guardrail.yaml").read_text(encoding="utf-8"))
+    redteam = yaml.safe_load((rules / "redteam.yaml").read_text(encoding="utf-8"))
+    plants, blocks = set(guardrail["plants"]) | set(redteam["plants"]), redteam["blocks"]
+    guardrail_id = create(bedrock, spec["topics"], spec, pii=True)
     try:
-        for _ in range(30):
-            if bedrock.get_guardrail(guardrailIdentifier=guardrail_id)["status"] == "READY":
-                break
-            time.sleep(2)
-        rules = ROOT / "agents" / "refagent" / "rules"
-        guardrail = yaml.safe_load((rules / "guardrail.yaml").read_text(encoding="utf-8"))
-        redteam = yaml.safe_load((rules / "redteam.yaml").read_text(encoding="utf-8"))
-        plants, blocks = set(guardrail["plants"]) | set(redteam["plants"]), redteam["blocks"]
         bad = 0
         print(f"trial guardrail {guardrail_id} DRAFT, rules sha256 {spec['digest']}\n")
         print("| Golden | Kind | Expected | Action | Topics matched | |")
         print("|---|---|---|---|---|---|")
-        for path in sorted((ROOT / "evals" / "goldens" / "v1").glob("g-*.yaml")):
-            golden = yaml.safe_load(path.read_text(encoding="utf-8"))
-            if golden.get("retired") is not None:
-                continue
-            response = runtime.apply_guardrail(guardrailIdentifier=guardrail_id, guardrailVersion="DRAFT",
-                                               source="INPUT", content=[{"text": {"text": golden["question"]}}])  # fmt: skip
-            action, topics = response["action"], probe.matched_topics(response.get("assessments", []))
+        for golden in live_goldens():
+            action, topics = ask(runtime, guardrail_id, golden["question"])
             expect = probe.expectation(golden, plants, blocks)
             ok = probe.judge(expect, action, topics)
             bad += not ok
@@ -92,6 +108,49 @@ def main() -> int:
     finally:
         bedrock.delete_guardrail(guardrailIdentifier=guardrail_id)
         print(f"deleted {guardrail_id}")
+
+
+def candidates(bedrock, runtime, spec: dict, path: Path) -> int:
+    """Each candidate topic alone in its own guardrail, against every live golden.
+
+    `path` is a YAML file: `must_block` (ids), and `candidates`, each a topic
+    as guardrail.yaml writes one. A candidate is good when it blocks every id
+    in `must_block` and no ordinary or trap golden. One row per candidate.
+    """
+    wanted = yaml.safe_load(path.read_text(encoding="utf-8"))
+    goldens = live_goldens()
+    innocent = [g["id"] for g in goldens if g["kind"] in ("ordinary", "trap")]
+    good = 0
+    print("| Candidate | Blocks of must_block | Ordinary or trap blocked | Other blocked | |")
+    print("|---|---|---|---|---|")
+    for topic in wanted["candidates"]:
+        guardrail_id = create(bedrock, [topic], spec, pii=False)
+        try:
+            blocked = [g["id"] for g in goldens if ask(runtime, guardrail_id, g["question"])[0] == "GUARDRAIL_INTERVENED"]
+        finally:
+            bedrock.delete_guardrail(guardrailIdentifier=guardrail_id)
+        hit = [i for i in wanted["must_block"] if i in blocked]
+        wrong = [i for i in blocked if i in innocent]
+        other = [i for i in blocked if i not in innocent and i not in wanted["must_block"]]
+        ok = len(hit) == len(wanted["must_block"]) and not wrong
+        good += ok
+        print(f"| {topic['name']} | {', '.join(hit) or '—'} | {', '.join(wrong) or '—'} | {', '.join(other) or '—'} |"
+              f" {'GOOD' if ok else ''} |")  # fmt: skip
+    print(f"\ngood candidates: {good} of {len(wanted['candidates'])} (each guardrail deleted after its row)")
+    return 0 if good else 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--candidates", type=Path, help="try each topic in this file alone, instead of the rule files")
+    args = parser.parse_args(argv)
+    sys.stdout.reconfigure(encoding="utf-8")
+    spec = bootstrap_spec()
+    bedrock = boto3.client("bedrock", region_name="us-west-2")
+    runtime = boto3.client("bedrock-runtime", region_name="us-west-2")
+    return candidates(bedrock, runtime, spec, args.candidates) if args.candidates else whole(bedrock, runtime, spec)
 
 
 if __name__ == "__main__":
