@@ -7,7 +7,7 @@ import subprocess
 
 import pytest
 
-from src.verdict import ROOT, gate, load_golden_kinds, plants
+from src.verdict import ROOT, gate, load_golden_kinds, plants, text_at
 
 from .conftest import GOLDENS_DIR, URL
 
@@ -249,14 +249,42 @@ def test_scope_is_required_and_has_two_values(chain):
 
 def test_plants_expected_is_zero_at_m00():
     assert plants.CONTROLS == {}
-    assert plants.plant_ids(KINDS, ROOT) == []
+    assert plants.plant_ids(KINDS, ROOT, "HEAD") == []
 
 
-def test_the_plant_rule_counts_a_plant_once_its_control_exists(monkeypatch):
-    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "no/such/control"})
-    assert plants.plant_ids(KINDS, ROOT) == []
-    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "Makefile"})  # any path that exists
-    assert plants.plant_ids(KINDS, ROOT) == ["g-013", "g-014", "g-015"]
+def test_the_plant_rule_counts_the_plants_its_control_names(monkeypatch, tmp_path):
+    """SPEC/03 §5.1: a golden is a plant when its kind's control is there and names it by id.
+
+    `tmp_path` is not a repository, so the made-up commit is read from that tree, as a test's is.
+    """
+    commit = "a" * 40
+    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "rules/guardrail.yaml"})
+    assert plants.plant_ids(KINDS, tmp_path, commit) == []  # not there: no plants
+    (tmp_path / "rules").mkdir()
+    # g-014 is left out as it is at M03; g-001 is not the control's kind and is not counted.
+    (tmp_path / "rules" / "guardrail.yaml").write_text("plants: [g-013, g-015, g-001]\n", encoding="utf-8")
+    assert plants.plant_ids(KINDS, tmp_path, commit) == ["g-013", "g-015"]
+
+
+def test_a_control_that_lists_no_plants_is_refused(monkeypatch, tmp_path):
+    """Read as naming none, it would be a control whose plants nobody could see go silent."""
+    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "guardrail.yaml"})
+    (tmp_path / "guardrail.yaml").write_text("guardrail:\n  denied_topics: []\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="must list its plants by id"):
+        plants.plant_ids(KINDS, tmp_path, "a" * 40)
+
+
+def test_the_plant_rule_reads_the_control_at_the_commit_not_the_tree(monkeypatch):
+    """Seed S6's rule on a real commit: a file in today's tree that was not there at the commit is absent.
+
+    `Makefile` is in the tree; at M00's first commit it was not, and no golden could be a plant there.
+    """
+    first = subprocess.run(["git", "rev-list", "--max-parents=0", "HEAD"], cwd=ROOT, capture_output=True,
+                           text=True, check=True).stdout.split()[0]  # fmt: skip
+    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "Makefile"})
+    assert (ROOT / "Makefile").exists()
+    assert text_at(first, "Makefile", ROOT) == (None, f"{first[:12]}, the envelope's own commit")
+    assert plants.plant_ids(KINDS, ROOT, first) == []
 
 
 def test_a_silent_plant_is_red_for_the_agent_and_not_for_the_control(chain):

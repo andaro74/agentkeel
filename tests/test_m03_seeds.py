@@ -125,7 +125,7 @@ def test_s2_a_silent_red_team_plant_is_red(seeded):
     control.write_text("# S2: the red-team control is in the tree (SPEC/03 §2)\n", encoding="utf-8")
     at = commit_in(tree, "S2: the red-team control")  # the control is in the tree and at this commit
 
-    plant_ids = plants.plant_ids(kinds, tree)  # PR 2 passes `at`: the plant rule reads the control at a commit (S6)
+    plant_ids = plants.plant_ids(kinds, tree, at)  # the plant rule reads the control at a commit (S6's reader)
     assert "g-016" in plant_ids, f"the plant rule gives {plant_ids} with {control.relative_to(tree)} at {at[:7]}"
     verdict, reasons = judged(envelope, plant_ids)
     assert verdict == "RED" and any(reason.startswith("silent plant") for reason in reasons), reasons
@@ -210,11 +210,11 @@ def test_s5_the_unsigned_amendment_stays_in_quarantine():
 # --- S6: a control added today makes old envelopes RED ---------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S6: the plant rule reads the working tree until M03 PR 2 (SPEC/03 §6)")
 def test_s6_a_control_added_later_does_not_re_rule_an_old_envelope(seeded, monkeypatch):
     """Row 2's envelope was written before any guardrail. Put a guardrail control in a worktree
     of HEAD and name it in CONTROLS, as PR 2 will: g-013 to g-015, which have never passed,
-    must not become plants of that envelope. Today they do, and the gate says "silent plant"."""
+    must not become plants of that envelope. Until M03 PR 2 they did, and the gate said "silent
+    plant"; the plant rule now reads the control at the envelope's commit, where it is not."""
     import shutil
 
     from src.verdict import gate, plants

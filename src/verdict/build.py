@@ -613,11 +613,16 @@ def main(argv: list[str] | None = None) -> int:
                 checks = both(checks, i, check_from_doors(Path(p), args.run_url))
             kinds = {g: golden["kind"] for g, golden in goldens.items()}
             history = replay_history.load(args.history_dir, exclude_commit=raw["commit"])
+            try:
+                # Each control as it stood at the run's commit, as the gate reads it (SPEC/03 §6).
+                plant_ids = plants.plant_ids(kinds, ROOT, raw["commit"])
+            except ValueError as exc:
+                raise Refused(str(exc)) from exc
             if scope_of(raw, control) == "control":
                 # No agent ran: the control is the subject, in M00's form (ADR-0004
                 # amendment 2, ruling A). Its own card is the base; no control_card_ref.
                 envelope = compose_envelope(
-                    raw, results, "control", control_ref, history, plants.plant_ids(kinds, ROOT),
+                    raw, results, "control", control_ref, history, plant_ids,
                     checks, git_tag(raw["commit"]), cap=cap,
                 )  # fmt: skip
             else:
@@ -627,7 +632,7 @@ def main(argv: list[str] | None = None) -> int:
                     "agent",
                     load_base(thresholds),
                     history,
-                    plants.plant_ids(kinds, ROOT),
+                    plant_ids,
                     checks,
                     git_tag(raw["commit"]),
                     control_ref=control_ref,

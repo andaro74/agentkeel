@@ -48,6 +48,35 @@ def canonical_sha256(document: Any) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def where_at(commit: str, root: Path = ROOT) -> str:
+    """Where a reading at `commit` is taken: the commit itself, or the working tree when git cannot resolve it."""
+    import subprocess
+
+    done = subprocess.run(["git", "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}"], cwd=root,
+                          capture_output=True, check=False)  # fmt: skip
+    return f"{commit[:12]}, the envelope's own commit" if done.returncode == 0 else "the working tree"
+
+
+def text_at(commit: str, path: str, root: Path = ROOT) -> tuple[str | None, str]:
+    """The file at `path` as it stood at `commit`, None where it did not exist; and where it was read.
+
+    Only a commit git cannot resolve (a test's made-up sha, a shallow clone)
+    is read from the tree, and `where` says so. A file absent at a commit git
+    knows is absent. Reading the tree for it is how a control added today
+    makes plants of an envelope written before it (seed S6, SPEC/03 §5), and
+    how a cap or a manifest deleted at an old commit was read from today's
+    (M03 open.md row 11, items e and j).
+    """
+    import subprocess
+
+    where = where_at(commit, root)
+    if where == "the working tree":
+        file = root / path
+        return (file.read_text(encoding="utf-8") if file.is_file() else None), where
+    shown = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=root, capture_output=True, check=False)
+    return (shown.stdout.decode("utf-8") if shown.returncode == 0 else None), where
+
+
 def load_golden_kinds(goldens_dir: Path) -> dict[str, str]:
     """Golden id -> kind, for the goldens that are not retired. Reads nothing else from a golden.
 

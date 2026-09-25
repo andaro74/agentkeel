@@ -29,7 +29,13 @@ read from `thresholds.yaml` **as it stood at the envelope's commit**
 envelope does not record the cap — ADR-0004 has no amendment left — and a
 gate that read today's cap would re-rule an old envelope every time the
 Threshold Owner moved the number. A commit git cannot resolve falls back
-to the tree, and the gate says so.
+to the tree, and the gate says so. A file absent at a commit git knows is
+absent, not read from the tree (M03 PR 2; `open.md` row 11, items e, j).
+
+**Which plants** (SPEC/03 §6, seed S6). The plant rule reads each control
+the same way, at the envelope's commit, and counts only the goldens the
+control names by id. A control added later does not re-rule an envelope
+written before it.
 
 The pinned base card hash is read from the tree on purpose, and not this
 way. The base is frozen (ADR-0004 amendment 2): if it ever changes, every
@@ -65,6 +71,8 @@ from src.verdict import (
     plants,
     replay_history,
     schema_errors,
+    text_at,
+    where_at,
 )
 
 __all__ = ["Rejected", "cap_at", "control_drift", "judge", "measured", "measured_at", "read", "required_checks",
@@ -118,13 +126,9 @@ def thresholds_at(commit: str, root: Path = ROOT) -> tuple[dict[str, Any], str]:
     the old one. When git cannot resolve the commit — a test, a shallow
     clone — the tree is used and the caller says so in the output.
     """
-    done = subprocess.run(
-        ["git", "show", f"{commit}:thresholds.yaml"], cwd=root, capture_output=True, text=True
-    )
-    if done.returncode != 0:
-        return thresholds(root / "thresholds.yaml"), "the working tree"
-    loaded = yaml.safe_load(done.stdout)
-    return (loaded if isinstance(loaded, dict) else {}), f"{commit[:12]}, the envelope's own commit"
+    text, where = text_at(commit, "thresholds.yaml", root)
+    loaded = yaml.safe_load(text) if text is not None else None
+    return (loaded if isinstance(loaded, dict) else {}), where
 
 
 def cap_at(commit: str, root: Path = ROOT) -> tuple[int, str]:
@@ -140,12 +144,11 @@ def cap_at(commit: str, root: Path = ROOT) -> tuple[int, str]:
 
 def manifest_at(commit: str, bundle: str, root: Path = ROOT) -> tuple[dict[str, Any], str]:
     """The agent's manifest as it stood at `commit`, and where it was read. The same fallback as ruling m."""
-    done = subprocess.run(
-        ["git", "show", f"{commit}:{bundle}/manifest.yaml"], cwd=root, capture_output=True, text=True
-    )
-    if done.returncode != 0:
-        return yaml.safe_load((root / bundle / "manifest.yaml").read_text(encoding="utf-8")), "the working tree"
-    return yaml.safe_load(done.stdout), f"{commit[:12]}, the envelope's own commit"
+    text, where = text_at(commit, f"{bundle}/manifest.yaml", root)
+    manifest = yaml.safe_load(text) if text is not None else None
+    if not isinstance(manifest, dict):
+        raise Rejected(f"{bundle}/manifest.yaml is not there at {where}: an agent envelope for a commit with no agent")
+    return manifest, where
 
 
 def before_adr_0007(commit: str, root: Path = ROOT) -> bool:
@@ -435,7 +438,12 @@ def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
     # out (M02 PR 2): a golden added or retired since must not re-rule it.
     kinds, _ = golden_kinds_at(envelope["commit"], GOLDENS, ROOT)
     cap, _ = cap_at(envelope["commit"])
-    return judge(envelope, kinds, history, plants.plant_ids(kinds, ROOT), cap, required_checks(envelope["commit"]))
+    try:
+        # Each control as it stood at the envelope's commit (SPEC/03 §6, seed S6).
+        plant_ids = plants.plant_ids(kinds, ROOT, envelope["commit"])
+    except ValueError as exc:  # a control that lists no plants: the gate cannot count them, which is not GREEN
+        raise Rejected(str(exc)) from exc
+    return judge(envelope, kinds, history, plant_ids, cap, required_checks(envelope["commit"]))
 
 
 def control_card_of(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> dict[str, Any] | None:
@@ -466,7 +474,7 @@ def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT
 
 def print_plants() -> int:
     kinds = load_golden_kinds(GOLDENS)
-    plant_ids = plants.plant_ids(kinds, ROOT)
+    plant_ids = plants.plant_ids(kinds, ROOT, "HEAD")  # the controls as committed, as the next run reads them
     path = latest()
     try:
         results = read(path)["goldens"] if path else {}
@@ -513,6 +521,7 @@ def main(argv: list[str] | None = None) -> int:
     # Which cap ruled this envelope, and where it was read (ruling m).
     cap, where = cap_at(envelope["commit"])
     print(f"  note: cost_cap {cap} read at {where}")
+    print(f"  note: the plant rule's controls read at {where_at(envelope['commit'])}")
     history = replay_history.load(args.history_dir, exclude_commit=envelope["commit"])
     for golden_id in control_drift(envelope, history):
         print(f"  note: control {golden_id} has passed before and fails now; not gated (Finding F0.4)")
