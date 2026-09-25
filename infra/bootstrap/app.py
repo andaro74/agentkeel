@@ -91,7 +91,25 @@ MONTHLY_USD = DAILY_USD * 30
 MODELS = ["amazon.nova-micro-v1:0", "anthropic.claude-sonnet-4-6"]  # ruling p
 PROFILE_REGIONS = ["us-east-1", "us-east-2", "us-west-2"]
 INVOKE = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
-DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy"]
+# M03 PR 2 (SPEC/03 §6, security-reviewer F1 at M03 PR 1): the guardrail
+# must be on the agent's and the runner's call, so `bedrock:ApplyGuardrail`
+# is no longer denied. The wildcard `bedrock:*Guardrail*` becomes the four
+# actions that make, change, version or remove one, in all three places it
+# stood (this list, the agent boundary, the deploy boundary). Reading one
+# (`GetGuardrail`, `ListGuardrails`) is granted to no role here. One key
+# (milestones/M03/rulings/pr1.md ruling 5: a boundary deny narrowed is not on
+# ADR-0009's list). What it gives up: an admin action Bedrock adds later is
+# not denied by name until it is listed here.
+GUARDRAIL_ADMIN = ["bedrock:CreateGuardrail", "bedrock:UpdateGuardrail", "bedrock:DeleteGuardrail",
+                   "bedrock:CreateGuardrailVersion"]
+DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", *GUARDRAIL_ADMIN, "s3:PutBucketPolicy"]
+# The rights table marker (SPEC/03 §6, S1's reader; security-reviewer F6 at
+# M03 PR 1): the digest of the table the last load put in the runtime's
+# table. deploy.yml sets it to "loading" before `load_rights_table.py` and to
+# the digest after; `scripts/runtime_for_tree.py` reads it as the eval role.
+# Not under /agentkeel/security/, which the execution role reads, and no
+# agent role can read it: the agent boundary allows no ssm action.
+TABLE_MARKER_PARAM = "/agentkeel/marker/refagent/rights-table-digest"
 EVAL_WORKFLOWS = [
     f"{REPO}/.github/workflows/evals.yml@refs/pull/*/merge",
     f"{REPO}/.github/workflows/evals.yml@refs/heads/main",
@@ -203,14 +221,18 @@ class BootstrapStack(cdk.Stack):
                              # F1.3 a check that cannot fail. A ceiling is not a
                              # grant: no agent role's own policy allows it, and
                              # the key policy denies it by role path (ruling b).
-                             "kms:GetKeyPolicy"],
+                             "kms:GetKeyPolicy",
+                             # M03 PR 2: the guardrail on the runtime's converse
+                             # (SPEC/03 §6). A ceiling, not a grant: the construct
+                             # grants it on the one guardrail.
+                             "bedrock:ApplyGuardrail"],
                     resources=["*"],
                 ),
                 iam.PolicyStatement(
                     sid="NeverEscalateNeverEraseNeverOpenTheNetwork",
                     effect=iam.Effect.DENY,
                     actions=["iam:CreateUser", "iam:DeleteRolePermissionsBoundary", "iam:PutUserPolicy",
-                             "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy", "kms:PutKeyPolicy",
+                             "logs:Delete*", *GUARDRAIL_ADMIN, "s3:PutBucketPolicy", "kms:PutKeyPolicy",
                              "kms:ScheduleKeyDeletion", "kms:DisableKey",
                              # kms:GetKeyPolicy is not here, and it is in the Allow above:
                              # the key policy is what must refuse S6 (ruling t).
@@ -270,7 +292,7 @@ class BootstrapStack(cdk.Stack):
                     sid="NeverTouchAKeyPolicyNeverEraseEvidenceNeverOpenTheNetwork",
                     effect=iam.Effect.DENY,
                     actions=["kms:PutKeyPolicy", "kms:CreateGrant", "kms:ScheduleKeyDeletion", "kms:DisableKey",
-                             "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy",
+                             "logs:Delete*", *GUARDRAIL_ADMIN, "s3:PutBucketPolicy",
                              "ec2:CreateInternetGateway", "ec2:AttachInternetGateway",
                              "ec2:CreateNatGateway", "ec2:CreateVpcPeeringConnection"],
                     resources=["*"],
@@ -588,11 +610,24 @@ class BootstrapStack(cdk.Stack):
             resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel-*"],
         ))  # fmt: skip
         # `scripts/load_rights_table.py`: put_item per row, then describe_table.
-        # Not BatchWriteItem, which it does not call. Not DeleteItem.
+        # Not BatchWriteItem, which it does not call. From M03 PR 2 (S1's
+        # reader, security-reviewer F5): it scans the table and deletes each
+        # row the file no longer has, so the table is the file and not the
+        # file plus every row it ever held. DeleteItem on the rights tables
+        # only; never DeleteTable. One key (pr1.md ruling 5: a rights-table
+        # row deleted is not on ADR-0009's list; validate still refuses a
+        # golden whose row is gone).
         role.add_to_policy(iam.PolicyStatement(
             sid="LoadTheRightsTable",
-            actions=["dynamodb:PutItem", "dynamodb:DescribeTable"],
+            actions=["dynamodb:PutItem", "dynamodb:DescribeTable", "dynamodb:Scan", "dynamodb:DeleteItem"],
             resources=[f"arn:aws:dynamodb:{REGION}:{self.account}:table/agentkeel-*-rights"],
+        ))  # fmt: skip
+        # The table marker: "loading" before the load, the digest after. Put
+        # only; the parameter is this stack's and is never deleted.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="SetTheRightsTableMarker",
+            actions=["ssm:PutParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{self.account}:parameter{TABLE_MARKER_PARAM}"],
         ))  # fmt: skip
         # The load check: `src.agent.run` calls the runtime it just deployed,
         # once per golden. refagent's runtime, as the eval role's grant is.
@@ -684,6 +719,13 @@ class BootstrapStack(cdk.Stack):
             sid="ReadTheImagesTags",
             actions=["ecr:DescribeImages"],
             resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel-refagent"],
+        ))  # fmt: skip
+        # M03 PR 2 (S1's reader): and which rights table the runtime answers
+        # from. Read only; unreadable or "loading" means the run is in the runner.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadTheRightsTableMarker",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{self.account}:parameter{TABLE_MARKER_PARAM}"],
         ))  # fmt: skip
         # Ruling i: the human makes S4's and S6's attempts, and this role asks
         # CloudTrail whether AWS refused each request id
@@ -929,6 +971,11 @@ class BootstrapStack(cdk.Stack):
             self, "ParamSubnets", parameter_name=SUBNETS_PARAM,
             string_list_value=[subnet.subnet_id for subnet in vpc.isolated_subnets],
             description="agentkeel: the isolated subnets. No internet gateway, no NAT.",
+        )  # fmt: skip
+        # Written by deploy.yml after each load; "unset" until the first (M03 PR 2).
+        ssm.StringParameter(
+            self, "ParamRightsTableMarker", parameter_name=TABLE_MARKER_PARAM, string_value="unset",
+            description="agentkeel: the digest of the rights table refagent's runtime answers from.",
         )  # fmt: skip
         for name, group in self.endpoint_groups.items():
             ssm.StringParameter(

@@ -577,10 +577,63 @@ def test_the_deploy_role_may_do_what_each_step_of_deploy_yml_calls(template, ste
 
 
 def test_the_deploy_role_may_not_delete_or_batch_write(template):
+    """No image delete, no table delete, no batch write. DeleteItem only on the rights tables (M03 PR 2)."""
     granted = deploy_granted(template)
     assert not any(a.startswith("ecr:Delete") or a == "ecr:BatchDeleteImage" for a in granted)
-    assert not {"dynamodb:DeleteItem", "dynamodb:BatchWriteItem", "dynamodb:DeleteTable"} & granted
+    assert not {"dynamodb:BatchWriteItem", "dynamodb:DeleteTable"} & granted
     assert not any(a == "*" or a.endswith(":*") for a in granted)
+    deleting = [s for s in role_statements(template, "DeployRole") if "dynamodb:DeleteItem" in actions(s)]
+    assert len(deleting) == 1 and json.dumps(deleting[0]["Resource"]).endswith(':table/agentkeel-*-rights"]]}')
+
+
+def test_the_deploy_role_makes_the_table_the_file(template):
+    """S1's reader (SPEC/03 §6): load_rights_table.py scans and deletes rows the file lacks, and sets the marker."""
+    granted = deploy_granted(template)
+    assert {"dynamodb:Scan", "dynamodb:DeleteItem", "dynamodb:PutItem", "ssm:PutParameter"} <= granted
+    marker = [s for s in role_statements(template, "DeployRole") if "ssm:PutParameter" in actions(s)]
+    assert len(marker) == 1 and actions(marker[0]) == {"ssm:PutParameter"}
+    assert json.dumps(marker[0]["Resource"]).endswith(':parameter/agentkeel/marker/refagent/rights-table-digest"]]}')
+
+
+# --- the guardrail deny, narrowed (M03 PR 2, SPEC/03 §6) ------------------------
+
+GUARDRAIL_ADMIN = {"bedrock:CreateGuardrail", "bedrock:UpdateGuardrail", "bedrock:DeleteGuardrail",
+                   "bedrock:CreateGuardrailVersion"}
+
+
+def denies_by_pattern(denied_actions: set[str], action: str) -> bool:
+    """IAM's own matching: `*` in an action name matches any run of characters."""
+    import fnmatch
+
+    return any(fnmatch.fnmatchcase(action, pattern) for pattern in denied_actions)
+
+
+@pytest.mark.parametrize("where", ["agentkeel-boundary", "agentkeel-deploy-boundary", "the eval role"])
+def test_apply_guardrail_is_no_longer_denied_and_the_admin_actions_still_are(template, where):
+    """security-reviewer F1 at M03 PR 1: the guardrail cannot be on the call under `bedrock:*Guardrail*`."""
+    if where == "the eval role":
+        denied_here = {a for s in eval_role_policy(template) if s["Effect"] == "Deny" for a in actions(s)}
+    else:
+        denied_here = denied(named(template, where))
+    assert not denies_by_pattern(denied_here, "bedrock:ApplyGuardrail"), where
+    assert all(denies_by_pattern(denied_here, a) for a in GUARDRAIL_ADMIN), where
+    assert "bedrock:*Guardrail*" not in denied_here, where
+
+
+def test_the_agent_ceiling_allows_apply_guardrail_and_no_admin_action(template):
+    ceiling = allowed(named(template, "agentkeel-boundary"))
+    assert "bedrock:ApplyGuardrail" in ceiling
+    assert not any(denies_by_pattern(ceiling, a) for a in GUARDRAIL_ADMIN)
+
+
+def test_the_eval_role_reads_the_table_marker_and_writes_nothing_in_ssm(template):
+    allowed_here = {a for s in eval_role_policy(template) if s["Effect"] == "Allow" for a in actions(s)}
+    assert {a for a in allowed_here if a.startswith("ssm:")} == {"ssm:GetParameter"}
+
+
+def test_no_agent_role_can_read_the_table_marker(template):
+    """The agent must not answer from, or see, the marker that says which table it answers from."""
+    assert not any(a.startswith("ssm:") for a in allowed(named(template, "agentkeel-boundary")))
 
 
 def test_the_deploy_role_calls_refagents_runtime_and_no_other(template):
