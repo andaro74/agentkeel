@@ -32,7 +32,7 @@ pr: 19
 
 # Ruling: M03 PR 1, Product
 
-Drafted by the session; the human rules as Product before the merge.
+Ruled by andaro74 as Product, 2026-09-25.
 The rulings marked **ruled** in `feasibility.md` §2 were made by the
 human on 2026-09-25 before the seeds, or before the PR opened; this file
 carries them and the rest.

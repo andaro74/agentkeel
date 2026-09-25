@@ -1,7 +1,7 @@
 ---
 adr: ADR-0009
 title: The closed list of relaxations, amended; how a second key names a path and a ruling names a deletion
-status: Proposed
+status: Accepted
 date: 2026-09-25
 seat: Product
 authorises:
@@ -14,8 +14,8 @@ amendments: 0
 
 Proposed by the Threshold Owner at M03 PR 1 (`milestones/M03/open.md`
 row 1; the `threshold-owner` report is in the PR body). Product rules
-entry by entry in `milestones/M03/rulings/pr1.md`. Status stays
-Proposed until that ruling is on `main`.
+entry by entry in `milestones/M03/rulings/pr1.md`. Accepted by that ruling,
+2026-09-25, on `main` at the merge commit of #19 (ADR-0008).
 
 ## Context
 

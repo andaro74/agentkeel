@@ -13,8 +13,7 @@ pr: 19
 
 # Ruling: M03 PR 1, Rule Owner
 
-Drafted by the session; the human rules as the Rule Owner before the
-merge. The `rule-owner` report (0 BLOCK, 6 FINDING, 6 NOTE) is in the PR
+Ruled by andaro74 as the Rule Owner, 2026-09-25. The `rule-owner` report (0 BLOCK, 6 FINDING, 6 NOTE) is in the PR
 body verbatim; it read the diff.
 
 **`.claude/agents/red-teamer.md`** is the specialist R8 adds at M03,

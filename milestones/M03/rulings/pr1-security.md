@@ -12,7 +12,7 @@ pr: 19
 
 # Ruling: M03 PR 1, Security
 
-Drafted by the session; the human rules as Security before the merge.
+Ruled by andaro74 as Security, 2026-09-25.
 The `security-reviewer` report (1 BLOCK, 7 FINDING, 8 NOTE) is in the PR
 body verbatim; it read the diff.
 
