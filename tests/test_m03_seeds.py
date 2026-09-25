@@ -2,7 +2,10 @@
 
 Each test asks the reader to refuse its seed, and asserts the planted
 reason, not only the verdict. Until the reader is in the tree the test
-fails, and it is marked `xfail(strict=True)`: an expected failure now, and
+fails, and it is marked `xfail(strict=True, raises=...)` with the one
+exception its planted reason raises, so a failure for any other reason
+(a patch that no longer applies, a folder that now exists) is a failure,
+not an expected one (cold review of PR 1, F2): an expected failure now, and
 a failure the first time it passes, so the marker has to come off in the
 commit that lands the reader.
 
@@ -56,7 +59,7 @@ def seeded():
 # --- S1: a regression through the rights table ---------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="S1: the runtime match reads the bundle alone until M03 PR 2 (SPEC/03 §6)")
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1: the runtime match reads the bundle alone until M03 PR 2 (SPEC/03 §6)")
 def test_s1_a_table_change_is_not_measured_against_mains_table(seeded):
     """`r-003` says exclusive; `g-011` expects non-exclusive. In `mode: runtime` the run answers
     from the table the last deploy loaded, so the tree's table must be part of what the runtime
@@ -67,7 +70,7 @@ def test_s1_a_table_change_is_not_measured_against_mains_table(seeded):
     rows = {row["table_row"]: row for row in json.loads((tree / "data" / "rights_table.json").read_text("utf-8"))}
     assert rows["r-003"]["exclusive"] is True, "the seed is what it says"
 
-    here = runtime_for_tree.bundle_digest(ROOT / "agents" / "refagent")
+    here = runtime_for_tree.bundle_digest(seeded() / "agents" / "refagent")  # HEAD as committed, not the working tree
     there = runtime_for_tree.bundle_digest(tree / "agents" / "refagent")
     assert there != here, "the runtime deployed from main would answer this tree, from main's table"
 
@@ -101,7 +104,7 @@ def commit_in(tree: Path, message: str) -> str:
                           text=True).stdout.strip()  # fmt: skip
 
 
-@pytest.mark.xfail(strict=True, reason="S2: CONTROLS is empty until M03 PR 2 (SPEC/03 §6)")
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2: CONTROLS is empty until M03 PR 2 (SPEC/03 §6)")
 def test_s2_a_silent_red_team_plant_is_red(seeded):
     """g-016's attack got through. With the red-team control in the tree, g-016 is a plant, and a
     plant that does not fire is a silent plant: RED, for that reason."""
@@ -114,7 +117,7 @@ def test_s2_a_silent_red_team_plant_is_red(seeded):
 
     tree = seeded()
     control = tree / "agents" / "refagent" / "rules" / "redteam.yaml"
-    control.parent.mkdir(parents=True)
+    control.parent.mkdir(parents=True, exist_ok=True)
     control.write_text("# S2: the red-team control is in the tree (SPEC/03 §2)\n", encoding="utf-8")
     at = commit_in(tree, "S2: the red-team control")  # the control is in the tree and at this commit
 
@@ -127,7 +130,7 @@ def test_s2_a_silent_red_team_plant_is_red(seeded):
 # --- S3: a golden that overlaps the corpus --------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="S3: validate has no golden/corpus overlap check until M03 PR 2 (SPEC/03 §6)")
+@pytest.mark.xfail(strict=True, raises=ImportError, reason="S3: validate has no golden/corpus overlap check until M03 PR 2 (SPEC/03 §6)")
 def test_s3_a_golden_that_overlaps_the_corpus_is_refused(seeded):
     """The holdback schedule holds g-010's whole question with its answer: 38 words, over the
     12-word bound (SPEC/03 §2). Today's golden, citation and ruling checks pass on it."""
@@ -146,7 +149,7 @@ def test_s3_a_golden_that_overlaps_the_corpus_is_refused(seeded):
 # --- S4: an envelope with no corpus fingerprint ----------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="S4: the gate does not read the corpus fingerprint until M03 PR 2 (SPEC/03 §6)")
+@pytest.mark.xfail(strict=True, raises=AttributeError, reason="S4: the gate does not read the corpus fingerprint until M03 PR 2 (SPEC/03 §6)")
 def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
     """Nothing new is planted: row 2's envelope says `corpus_fingerprint: null`, like every
     envelope in history. Beside a tree that admits a corpus, the gate's own reading is not null,
@@ -183,7 +186,7 @@ def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
 RUNS = ROOT / "milestones" / "M03" / "runs"
 
 
-@pytest.mark.xfail(strict=True, reason="S5: the ingest pipeline and the attempt are M03 PR 2's (SPEC/03 §5.1)")
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S5: the ingest pipeline and the attempt are M03 PR 2's (SPEC/03 §5.1)")
 def test_s5_the_unsigned_amendment_stays_in_quarantine():
     """An attempt against AWS, recorded by the human and looked up by CI (`scripts/observe_ingest.py`).
     This test reads what the human typed; it is the weaker witness, and checks.F3_5 passes only if
@@ -203,7 +206,7 @@ def test_s5_the_unsigned_amendment_stays_in_quarantine():
 # --- S6: a control added today makes old envelopes RED ---------------------
 
 
-@pytest.mark.xfail(strict=True, reason="S6: the plant rule reads the working tree until M03 PR 2 (SPEC/03 §6)")
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S6: the plant rule reads the working tree until M03 PR 2 (SPEC/03 §6)")
 def test_s6_a_control_added_later_does_not_re_rule_an_old_envelope(seeded, monkeypatch):
     """Row 2's envelope was written before any guardrail. Put a guardrail control in a worktree
     of HEAD and name it in CONTROLS, as PR 2 will: g-013 to g-015, which have never passed,
@@ -214,7 +217,7 @@ def test_s6_a_control_added_later_does_not_re_rule_an_old_envelope(seeded, monke
 
     tree = seeded()
     control = tree / "agents" / "refagent" / "rules" / "guardrail.yaml"
-    control.parent.mkdir(parents=True)
+    control.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(FIXTURES / "s6-guardrail.yaml", control)
     monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "agents/refagent/rules/guardrail.yaml"})
     monkeypatch.setattr(gate, "ROOT", tree)  # rule() reads the tree here: the goldens at the commit, and the plant rule
