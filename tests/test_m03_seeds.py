@@ -176,3 +176,25 @@ def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
     verdict, reasons = gate.judge(envelope, kinds, history, [], cap, gate.required_checks(envelope["commit"]),
                                   corpus=reading)  # fmt: skip
     assert verdict == "RED" and any("corpus_fingerprint" in reason for reason in reasons), reasons
+
+
+# --- S5: the unsigned amendment dropped into the corpus bucket ------------
+
+RUNS = ROOT / "milestones" / "M03" / "runs"
+
+
+@pytest.mark.xfail(strict=True, reason="S5: the ingest pipeline and the attempt are M03 PR 2's (SPEC/03 §5.1)")
+def test_s5_the_unsigned_amendment_stays_in_quarantine():
+    """An attempt against AWS, recorded by the human and looked up by CI (`scripts/observe_ingest.py`).
+    This test reads what the human typed; it is the weaker witness, and checks.F3_5 passes only if
+    the lookup agrees. The expected refusal is no admission (SPEC/03 §2)."""
+    import hashlib
+
+    import yaml
+
+    run = yaml.safe_load((RUNS / "f3_5_amendment.yaml").read_text(encoding="utf-8"))
+    observed = run["observed"]
+    assert observed is not None, "the attempt has not been made"
+    document = (ROOT / run["document"]).read_bytes()
+    assert observed["sha256"] == hashlib.sha256(document).hexdigest(), "the object uploaded is the seed"
+    assert observed["in_production"] is False and observed["named_in_admitted"] is False

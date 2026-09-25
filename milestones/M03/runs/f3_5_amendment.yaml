@@ -1,0 +1,31 @@
+# Seed S5 (SPEC/03 §5, F3.5): the unsigned amendment dropped into the
+# corpus's quarantine bucket. It grants t-001 exclusive SVOD in DE, against
+# r-003 and clause ML-5.2; nobody signed it, so no Data Owner ruling names
+# it in data/corpus/admitted.yaml, and it must never reach the production
+# bucket.
+#
+# Planted at M03 PR 1 as the attempt to make. It is made by the human
+# during M03 PR 2, after reading `cdk diff` and deploying the ingest stack
+# by hand, and before PR 2's last CI run (SPEC/03 §5.1). The human fills
+# `observed` from what AWS returned; PR 2's CI run then looks the object up
+# (`scripts/observe_ingest.py`), and that lookup is what writes
+# `checks.F3_5`. A human-written file feeds no check by itself.
+#
+# The expected refusal is no admission (SPEC/03 §2, ruling on F7): the
+# guardrail and PII scan runs and is recorded, and is not expected to
+# refuse; promotion happens only for an object admitted.yaml names by
+# sha256. The second half of F3.5, "or changes an answer", is not measured
+# at M03: no agent reads the corpus until the knowledge base (cut 6, M04).
+#
+# Observed keys, one entry: quarantine_bucket, key, version_id, sha256 (of
+# the bytes uploaded; must be the fixture's), uploaded_at (ISO 8601, UTC),
+# scan_result, in_production (true or false, from a HEAD on the production
+# bucket after the pipeline has run), named_in_admitted (true or false).
+seed: S5
+falsifier: F3.5
+document: tests/fixtures/m03/s5-unsigned-amendment.md
+attempts:
+  - what: upload the unsigned amendment to the quarantine bucket and let the pipeline run
+    command: aws s3 cp tests/fixtures/m03/s5-unsigned-amendment.md s3://<quarantine bucket>/amendment-2.md
+    refused_when: the object stays in quarantine, is not in the production bucket, and admitted.yaml does not name it
+observed: null
