@@ -81,10 +81,25 @@ def invoke_deployed(client: Any, runtime_arn: str, question: str) -> dict[str, A
     return json.loads(body)
 
 
+def runtime_moved(runtime_arn: str) -> str | None:
+    """None if the runtime still runs this tree's bundle and table, else why not (the match, read again)."""
+    from scripts import runtime_for_tree
+
+    try:
+        arn, reason = runtime_for_tree.match(runtime_for_tree.bundle_digest(), runtime_for_tree.table_digest())
+    except Exception as exc:  # noqa: BLE001 - a match that cannot be read again is not a match
+        return f"the match could not be read again ({type(exc).__name__}: {exc})"
+    return None if arn == runtime_arn else reason
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--goldens", type=Path, default=ROOT / "evals" / "goldens" / "v1")
+    # make evals passes it: its match was read before the run, as the eval role, which may
+    # read it again. deploy.yml's check at load does not: the deploy role may not read the
+    # runtime's image or the table marker, and it has just set both.
+    parser.add_argument("--recheck-runtime", action="store_true")
     args = parser.parse_args(argv)
 
     manifest = manifest_module.load(ROOT / BUNDLE / "manifest.yaml")
@@ -131,6 +146,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{entry['id']} {entry['kind']:<9} ERROR        {failure[:160]}")
         else:
             print(f"{entry['id']} {entry['kind']:<9} {entry.get('stop_reason', ''):<12} {entry.get('parsed')}")
+
+    if args.recheck_runtime and runtime_arn and (moved := runtime_moved(runtime_arn)):
+        # The match was read once, before the calls; a load or a deploy on main
+        # during the run would change what answered (security-reviewer on
+        # 606bece, FINDING 1). Every answer is then a failed call, and build
+        # writes UNMEASURED rather than a runtime envelope about other bytes.
+        print(f"the runtime moved during the run: {moved}")
+        for entry in observations:
+            entry["error"] = f"the runtime moved during the run: {moved}"
+        errors = len(observations)
 
     result = {
         "what": "raw observations from refagent; not an envelope; scores nothing",

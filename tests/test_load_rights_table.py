@@ -81,3 +81,16 @@ def test_a_changed_row_changes_the_digest():
 def test_a_type_the_loader_never_writes_is_refused():
     with pytest.raises(ValueError, match="not a type load_rights_table writes"):
         rights_table.from_item({"table_row": {"S": "r-001"}, "n": {"N": "1"}})
+
+
+def test_a_load_that_fails_midway_leaves_the_marker_loading():
+    """security-reviewer on 606bece: a crash between the first and the last marker write is the runner."""
+
+    class Failing(Table):
+        def delete_item(self, TableName, Key):  # noqa: N803
+            raise RuntimeError("throttled")
+
+    table, marker = Failing([*FILE, {**FILE[0], "table_row": "r-999"}]), Marker()
+    with pytest.raises(RuntimeError):
+        loader.load(table, marker, "t", FILE)
+    assert marker.written == [loader.LOADING]

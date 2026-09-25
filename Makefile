@@ -74,7 +74,7 @@ ifneq ($(AGENT_RUNNER),)
 define chain
 	-uv run python -m src.baseline.run --out $(1)/$(2).baseline-raw.json
 	uv run python -m src.verdict.build card --raw $(1)/$(2).baseline-raw.json --out $(1)/$(2).baseline-card.json $(3)
-	-uv run python -m src.agent.run --out $(1)/$(2).agent-raw.json
+	-uv run python -m src.agent.run --out $(1)/$(2).agent-raw.json --recheck-runtime
 	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json
 	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS)
 	uv run python -m src.verdict.gate $(1)/$(2).json; code=$$?; $(if $(GATE_EXIT),echo $$code > "$(GATE_EXIT)";) exit $$code
