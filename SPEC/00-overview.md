@@ -142,7 +142,8 @@ approval. The mechanical gates are, exhaustively:
   `SPEC/00-overview.md#8-MNN`;
 - `two-key` — a diff that relaxes a threshold, retires a rule or golden,
   changes retention, or is a human commit touching `evals/history/**`
-  cites rulings from two distinct seats;
+  cites rulings from two distinct seats (the closed list is SPEC/02 §2,
+  amended by ADR-0009 at M03 PR 1);
 - `regression` — the eval gate: RED on any regressed golden or any
   silent plant (`plants_expected ≠ plants_fired`), read on
   `scope: agent` results only. The baseline is the control
