@@ -1,6 +1,6 @@
 # Stop A, read_back_grants.py before the first bootstrap deploy (M03 PR 2)
 
-Run by the human as admin, 2026-09-25, at 0bb1d4a, before `npx aws-cdk@2 deploy`. The expected column is the state after the deploy, so every MISMATCH is a row the deploy was to change: 8, all of them the narrowed guardrail deny, the rows delete and scan, and the table marker. No other row differed. Written to before.md by the human; moved here unchanged by the session.
+Run by the human as admin, 2026-09-25, with the script as of d57de59 (it has the row 4b81f47 added), before `npx aws-cdk@2 deploy`. The expected column is the state after the deploy, so every MISMATCH is a row the deploy was to change: 8, all of them the narrowed guardrail deny, the rows delete and scan, and the table marker. No other row differed. Written to before.md by the human; moved here unchanged by the session.
 
 note: /agentkeel/security/guardrail/refagent is not there yet; its ApplyGuardrail row is skipped
 
