@@ -1149,7 +1149,7 @@ SUPPRESSIONS = {
         "SPEC/01 §6: 'the eval role, absorbed from infra/eval-role/ under a new name, with its Deny "
         "statement (item 33) and trust conditions as they stand'. The two profiles and the foundation "
         "models are named by ARN; runtime/refagent* covers the versioned runtime name AgentCore assigns, "
-        "which does not exist until the deploy. The Deny (DENY: escalation, evidence deletion, and every guardrail action but Apply, M03 PR 2) is the ceiling. Seeds S4 and S6: "
+        "which does not exist until the deploy. The Deny (DENY: escalation, evidence deletion, and every guardrail action but Apply, M03 PR 2) is the ceiling. ApplyGuardrail is on refagent's guardrail and <arn>:*, its numbered versions only (M03 PR 2). Seeds S4 and S6: "
         "cloudtrail:LookupEvents is on * because CloudTrail takes no resource-level condition for it, "
         "and ruling i has this role ask CloudTrail whether the human's attempts were refused. It is the "
         "only cloudtrail action granted, so the instrument may read the record and may not change it. "
