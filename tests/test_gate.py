@@ -247,9 +247,10 @@ def test_scope_is_required_and_has_two_values(chain):
 # --- plants -----------------------------------------------------------------------
 
 
-def test_plants_expected_is_zero_at_m00():
-    assert plants.CONTROLS == {}
-    assert plants.plant_ids(KINDS, ROOT, "HEAD") == []
+def test_plants_expected_is_zero_at_m00_and_seven_from_m03_pr2():
+    """The controls are read at the commit: none existed at M00's last envelope (55dadb2)."""
+    assert plants.plant_ids(KINDS, ROOT, "55dadb2f221e60036bdba0b01fdb6eff025d74bc") == []
+    assert plants.plant_ids(KINDS, ROOT, "HEAD") == ["g-013", "g-015", "g-016", "g-017", "g-018", "g-019", "g-020"]
 
 
 def test_the_plant_rule_counts_the_plants_its_control_names(monkeypatch, tmp_path):

@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 import yaml
 
-from src.verdict import ROOT, build
+from src.verdict import ROOT, build, plants
 
 GOLDENS_DIR = ROOT / "evals" / "goldens" / "v1"
 COMMIT = "a" * 40
@@ -53,7 +53,7 @@ def make_raw(goldens: dict[str, dict[str, Any]], right: set[str] = frozenset(), 
 
 
 @pytest.fixture
-def chain(tmp_path: Path, goldens):
+def chain(tmp_path: Path, goldens, monkeypatch):
     """Run build end to end in tmp_path. Returns (envelope path, card path, raw path).
 
     By default no agent ran: one raw file, the control's, scored into the card and
@@ -62,7 +62,14 @@ def chain(tmp_path: Path, goldens):
     baseline that gets everything wrong, and the envelope from a second runner, the
     agent under test, so every result is scope `agent` and the envelope names the
     control card and the base at tag m00. Both go through build's command line.
+
+    With no controls (M03 PR 2). COMMIT is made up, so git cannot resolve it
+    and the plant rule reads the working tree, which has held the guardrail's
+    and the red-team suite's controls since CONTROLS was filled. These
+    envelopes model the gate's other rules, as they did before; a test of the
+    plants passes its plant ids to `judge` itself.
     """
+    monkeypatch.setattr(plants, "CONTROLS", {})
 
     def run(right: set[str] = frozenset(), history_dir: Path | None = None, agent: bool = False, **top: Any):
         raw_path = tmp_path / f"{COMMIT}.baseline-raw.json"

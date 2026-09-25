@@ -27,7 +27,7 @@ from typing import Any
 import yaml
 
 from src.gates import pattern_regex, two_key
-from src.validate import codeowners, edges, golden_ids, ruleset, semver
+from src.validate import codeowners, controls, edges, golden_ids, ruleset, semver
 
 GOLDEN_FIELDS = {"id", "kind", "question", "expected", "seat", "added", "retired"}
 GOLDEN_ID = re.compile(r"^g-\d{3}$")
@@ -376,4 +376,6 @@ CHECKS = {
     "golden ids against origin/main": golden_ids.check,
     "computed semver": semver.check,
     "live main ruleset equals its export, bypass_actors []": ruleset.check,
+    # M03 PR 2 (SPEC/03 section 6)
+    "plant controls name live goldens of their kind": controls.check,
 }

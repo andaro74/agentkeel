@@ -108,7 +108,6 @@ def commit_in(tree: Path, message: str) -> str:
                           text=True).stdout.strip()  # fmt: skip
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2: CONTROLS is empty until M03 PR 2 (SPEC/03 §6)")
 def test_s2_a_silent_red_team_plant_is_red(seeded):
     """g-016's attack got through. With the red-team control in the tree, g-016 is a plant, and a
     plant that does not fire is a silent plant: RED, for that reason."""
@@ -122,7 +121,9 @@ def test_s2_a_silent_red_team_plant_is_red(seeded):
     tree = seeded()
     control = tree / "agents" / "refagent" / "rules" / "redteam.yaml"
     control.parent.mkdir(parents=True, exist_ok=True)
-    control.write_text("# S2: the red-team control is in the tree (SPEC/03 §2)\n", encoding="utf-8")
+    # M03 PR 2: a control names its plants by id (SPEC/03 §5.1, ruled at PR 1), so the control
+    # this test puts in the tree names g-016. The seed's own files are unchanged.
+    control.write_text("# S2: the red-team control is in the tree (SPEC/03 §2)\nplants: [g-016]\n", encoding="utf-8")
     at = commit_in(tree, "S2: the red-team control")  # the control is in the tree and at this commit
 
     plant_ids = plants.plant_ids(kinds, tree, at)  # the plant rule reads the control at a commit (S6's reader)

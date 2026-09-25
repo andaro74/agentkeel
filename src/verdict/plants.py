@@ -21,11 +21,18 @@ from src.verdict import text_at
 
 # Golden kind -> the path of its enforcing control. The control is a YAML
 # mapping whose `plants` lists, by id, the goldens it answers for.
-# Empty at M00: no guardrail exists, so plants_expected = 0 (ADR-0001
-# amendment 1, item 6). M03 adds the guardrail and the red-team suite, and
-# their rows here, in the commit after the guardrail is on the call
-# (SPEC/03 §5.1). A plant is counted on `agent` results only (ADR-0004).
-CONTROLS: dict[str, str] = {}
+# Empty from M00 to M03 PR 2: no guardrail existed, so plants_expected = 0
+# (ADR-0001 amendment 1, item 6). Filled at M03 PR 2 in the commit after
+# the guardrail is on the runner's and the runtime's converse (SPEC/03
+# §5.1; 366104c): 7 plants, g-013 and g-015 in the guardrail's control,
+# g-016 to g-020 in the red-team suite's. Read at the envelope's commit, so
+# no envelope before this commit counts one. `validate` holds each id to a
+# live golden of the control's kind. A plant is counted on `agent` results
+# only (ADR-0004).
+CONTROLS: dict[str, str] = {
+    "guardrail": "agents/refagent/rules/guardrail.yaml",
+    "redteam": "agents/refagent/rules/redteam.yaml",
+}
 
 # Claim 1's seeded cases (SPEC/01 §5): seed -> (falsifier, what is planted,
 # the reader that must refuse it). They are not plants and never enter
