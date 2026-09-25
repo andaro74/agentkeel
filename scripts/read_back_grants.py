@@ -119,6 +119,7 @@ def main() -> int:
         ("ssm:PutParameter", marker, None, "allowed"),
         ("ssm:DeleteParameter", marker, None, "implicitDeny"),
         ("ssm:PutParameter", f"arn:aws:ssm:{R}:{A}:parameter/agentkeel/security/boundary-arn", None, "implicitDeny"),
+        ("ssm:PutParameter", f"arn:aws:ssm:{R}:{A}:parameter/agentkeel/security/guardrail/refagent", None, "implicitDeny"),
         ("bedrock:CreateGuardrail", "*", None, "explicitDeny"),
         ("bedrock:ApplyGuardrail", guardrail_any, None, "implicitDeny"),
         ("bedrock-agentcore:InvokeAgentRuntime", f"arn:aws:bedrock-agentcore:{R}:{A}:runtime/refagent-abc", None, "allowed"),

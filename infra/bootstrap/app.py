@@ -1,10 +1,11 @@
 """The M01 bootstrap stack (Security seat; SPEC/01 §6, feasibility.md §2.6 a, b, d, e, f).
 
-Deployed once, to the agent account, by a human with admin, during M01 PR 2
-and before PR 2's first CI run — as `infra/eval-role` was at M00. Nothing
-else may change it.
+Deployed by a human with admin, to the agent account: first during M01 PR 2,
+before PR 2's first CI run, as `infra/eval-role` was at M00; again at each
+stop `README.md` names (M03 PR 2: stop A). Nothing else may change it, and
+no workflow deploys it.
 
-    cd infra/bootstrap && npx cdk diff && npx cdk deploy
+    cd infra/bootstrap && npx aws-cdk@2 diff && npx aws-cdk@2 deploy
 
 What it makes:
 
@@ -832,16 +833,23 @@ class BootstrapStack(cdk.Stack):
             guardrail_identifier=guardrail.attr_guardrail_id,
             description=f"rules sha256 {spec['digest']}",
         )  # fmt: skip
+        # A rules change replaces this resource. Retained, so the version the
+        # manifest pinned and old envelopes name is not deleted with it
+        # (security-reviewer on 0bb1d4a, F1). Old versions are removed by hand.
+        version.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
         # The runner's converse, as the eval role: this guardrail, and no other.
         eval_role.add_to_policy(iam.PolicyStatement(
             sid="ApplyRefagentsGuardrailOnly",
             actions=["bedrock:ApplyGuardrail"],
-            resources=[guardrail.attr_guardrail_arn],
+            # The guardrail, and its numbered versions: which form Bedrock
+            # authorises a versioned call against is read by the first CI
+            # converse, not assumed (security-reviewer on 0bb1d4a, F2).
+            resources=[guardrail.attr_guardrail_arn, f"{guardrail.attr_guardrail_arn}:*"],
         ))  # fmt: skip
         # What the construct grants on and the manifest pins (Rule Owner copies id and version).
         ssm.StringParameter(
             self, "ParamGuardrail", parameter_name=GUARDRAIL_PARAM, string_value=guardrail.attr_guardrail_arn,
-            description="agentkeel: refagent's guardrail. GovernedAgent grants ApplyGuardrail on this ARN only.",
+            description="agentkeel: refagent's guardrail. For GovernedAgent's ApplyGuardrail grant (M03 PR 2, the construct's commit).",
         )  # fmt: skip
         cdk.CfnOutput(self, "GuardrailIdForTheManifest", value=guardrail.attr_guardrail_id)
         cdk.CfnOutput(self, "GuardrailVersionForTheManifest", value=version.attr_version)

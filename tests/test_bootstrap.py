@@ -752,8 +752,14 @@ def test_the_version_is_a_number_that_moves_with_the_rules(template, bootstrap_m
 def test_the_eval_role_applies_this_guardrail_and_no_other(template):
     applying = [s for s in eval_role_policy(template) if s["Effect"] == "Allow" and "bedrock:ApplyGuardrail" in actions(s)]
     assert len(applying) == 1 and actions(applying[0]) == {"bedrock:ApplyGuardrail"}
-    assert applying[0]["Resource"] == {"Fn::GetAtt": [next(iter(of_type(template, "AWS::Bedrock::Guardrail"))),
-                                                      "GuardrailArn"]}
+    arn = {"Fn::GetAtt": [next(iter(of_type(template, "AWS::Bedrock::Guardrail"))), "GuardrailArn"]}
+    assert applying[0]["Resource"] == [arn, {"Fn::Join": ["", [arn, ":*"]]}]
+
+
+def test_an_old_guardrail_version_is_kept_when_the_rules_change(template):
+    """security-reviewer on 0bb1d4a, F1: the version the manifest pins must outlive its replacement."""
+    (version,) = of_type(template, "AWS::Bedrock::GuardrailVersion").values()
+    assert version.get("DeletionPolicy") == "Retain" and version.get("UpdateReplacePolicy") == "Retain"
 
 
 @pytest.mark.parametrize(("change", "refused"), [
