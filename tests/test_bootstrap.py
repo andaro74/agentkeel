@@ -597,8 +597,9 @@ def test_the_deploy_role_makes_the_table_the_file(template):
 
 # --- the guardrail deny, narrowed (M03 PR 2, SPEC/03 §6) ------------------------
 
+# Every guardrail action the wildcard denied but Apply, by the names Bedrock has today.
 GUARDRAIL_ADMIN = {"bedrock:CreateGuardrail", "bedrock:UpdateGuardrail", "bedrock:DeleteGuardrail",
-                   "bedrock:CreateGuardrailVersion"}
+                   "bedrock:CreateGuardrailVersion", "bedrock:GetGuardrail", "bedrock:ListGuardrails"}
 
 
 def denies_by_pattern(denied_actions: set[str], action: str) -> bool:
@@ -618,6 +619,21 @@ def test_apply_guardrail_is_no_longer_denied_and_the_admin_actions_still_are(tem
     assert not denies_by_pattern(denied_here, "bedrock:ApplyGuardrail"), where
     assert all(denies_by_pattern(denied_here, a) for a in GUARDRAIL_ADMIN), where
     assert "bedrock:*Guardrail*" not in denied_here, where
+
+
+def test_the_developer_role_may_not_list_guardrails(template):
+    """security-reviewer on e2839f2, FINDING 2: its `bedrock:List*` reached ListGuardrails once the wildcard went."""
+    developer = {a for s in role_statements(template, "DeveloperRole") if s["Effect"] == "Allow" for a in actions(s)}
+    assert "bedrock:List*" in developer, "the grant the boundary has to cap"
+    assert denies_by_pattern(denied(named(template, "agentkeel-deploy-boundary")), "bedrock:ListGuardrails")
+
+
+def test_a_later_admin_verb_on_a_guardrail_is_denied_without_being_listed(template):
+    """FINDING 3: the verbs are patterns, so a Put or a new Create on a guardrail is denied as it lands."""
+    for where in ("agentkeel-boundary", "agentkeel-deploy-boundary"):
+        denied_here = denied(named(template, where))
+        for action in ("bedrock:PutGuardrailPolicy", "bedrock:CreateGuardrailAlias", "bedrock:DeleteGuardrailVersion"):
+            assert denies_by_pattern(denied_here, action), (where, action)
 
 
 def test_the_agent_ceiling_allows_apply_guardrail_and_no_admin_action(template):

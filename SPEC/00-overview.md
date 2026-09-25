@@ -421,7 +421,9 @@ unless a ruling changes it. One policy, not both.
 ### M05 — Containment and evidence
 Build: default-deny egress per agent; no shared surfaces (per-agent
 memory, prefixes, tables); credentials only via Identity; agent role
-denies `iam:*`, `bedrock:*Guardrail*`, `logs:Delete*`, `sts:AssumeRole`,
+denies `iam:*`, every guardrail action but `bedrock:ApplyGuardrail`
+(narrowed from `bedrock:*Guardrail*` at M03 PR 2, so the guardrail can be
+on the agent's call; SPEC/03 §6), `logs:Delete*`, `sts:AssumeRole`,
 `s3:PutBucketPolicy`; audit bucket in the security account with Object
 Lock and **retention seven years** (R5), write-once from the agent
 account; GuardDuty Runtime Monitoring and VPC Flow Logs; nightly

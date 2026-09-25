@@ -24,7 +24,7 @@ What it makes:
 - the **developer role**, boundary on: the laptop principal of S4
   (SPEC/01 §1). It may read, and may not deploy;
 - the **eval role** `agentkeel-evals`, absorbed from `infra/eval-role/`
-  (ruling f): the two pinned profiles, the five-action Deny,
+  (ruling f): the two pinned profiles, the escalation-and-evidence Deny,
   `bedrock-agentcore:InvokeAgentRuntime` on refagent's runtime only, and
   three reads of which bytes that runtime runs (ADR-0007, P1);
 - a **VPC with no internet gateway and no NAT**: interface endpoints for
@@ -93,16 +93,18 @@ PROFILE_REGIONS = ["us-east-1", "us-east-2", "us-west-2"]
 INVOKE = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
 # M03 PR 2 (SPEC/03 §6, security-reviewer F1 at M03 PR 1): the guardrail
 # must be on the agent's and the runner's call, so `bedrock:ApplyGuardrail`
-# is no longer denied. The wildcard `bedrock:*Guardrail*` becomes the four
-# actions that make, change, version or remove one, in all three places it
-# stood (this list, the agent boundary, the deploy boundary). Reading one
-# (`GetGuardrail`, `ListGuardrails`) is granted to no role here. One key
+# is no longer denied. The wildcard `bedrock:*Guardrail*` becomes everything
+# it denied but Apply, in all three places it stood (this list, the agent
+# boundary, the deploy boundary): any Create, Update, Delete or Put on a
+# guardrail, by verb pattern, so an admin action Bedrock adds later under
+# those verbs is denied without being listed; and Get and List by name, which
+# the developer role's `bedrock:List*` would otherwise reach
+# (security-reviewer on e2839f2, FINDINGS 2 and 3). One key
 # (milestones/M03/rulings/pr1.md ruling 5: a boundary deny narrowed is not on
-# ADR-0009's list). What it gives up: an admin action Bedrock adds later is
-# not denied by name until it is listed here.
-GUARDRAIL_ADMIN = ["bedrock:CreateGuardrail", "bedrock:UpdateGuardrail", "bedrock:DeleteGuardrail",
-                   "bedrock:CreateGuardrailVersion"]
-DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", *GUARDRAIL_ADMIN, "s3:PutBucketPolicy"]
+# ADR-0009's list).
+GUARDRAIL_DENIED = ["bedrock:Create*Guardrail*", "bedrock:Update*Guardrail*", "bedrock:Delete*Guardrail*",
+                    "bedrock:Put*Guardrail*", "bedrock:GetGuardrail", "bedrock:ListGuardrails"]
+DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", *GUARDRAIL_DENIED, "s3:PutBucketPolicy"]
 # The rights table marker (SPEC/03 §6, S1's reader; security-reviewer F6 at
 # M03 PR 1): the digest of the table the last load put in the runtime's
 # table. deploy.yml sets it to "loading" before `load_rights_table.py` and to
@@ -232,7 +234,7 @@ class BootstrapStack(cdk.Stack):
                     sid="NeverEscalateNeverEraseNeverOpenTheNetwork",
                     effect=iam.Effect.DENY,
                     actions=["iam:CreateUser", "iam:DeleteRolePermissionsBoundary", "iam:PutUserPolicy",
-                             "logs:Delete*", *GUARDRAIL_ADMIN, "s3:PutBucketPolicy", "kms:PutKeyPolicy",
+                             "logs:Delete*", *GUARDRAIL_DENIED, "s3:PutBucketPolicy", "kms:PutKeyPolicy",
                              "kms:ScheduleKeyDeletion", "kms:DisableKey",
                              # kms:GetKeyPolicy is not here, and it is in the Allow above:
                              # the key policy is what must refuse S6 (ruling t).
@@ -292,7 +294,7 @@ class BootstrapStack(cdk.Stack):
                     sid="NeverTouchAKeyPolicyNeverEraseEvidenceNeverOpenTheNetwork",
                     effect=iam.Effect.DENY,
                     actions=["kms:PutKeyPolicy", "kms:CreateGrant", "kms:ScheduleKeyDeletion", "kms:DisableKey",
-                             "logs:Delete*", *GUARDRAIL_ADMIN, "s3:PutBucketPolicy",
+                             "logs:Delete*", *GUARDRAIL_DENIED, "s3:PutBucketPolicy",
                              "ec2:CreateInternetGateway", "ec2:AttachInternetGateway",
                              "ec2:CreateNatGateway", "ec2:CreateVpcPeeringConnection"],
                     resources=["*"],
@@ -1035,7 +1037,7 @@ SUPPRESSIONS = {
         "role may do. cloudformation:* is scoped to stack/agentkeel-*, the set of stacks this platform "
         "deploys; AWS appends the stack id suffix, which cannot be named in advance. BLOCK F: "
         "ecr:GetAuthorizationToken takes no resource; the push is on repository/agentkeel-*, the table load "
-        "on table/agentkeel-*-rights, and the load check's InvokeAgentRuntime on runtime/refagent*, the "
+        "(put, scan, and the delete of rows the file lacks, M03 PR 2) on table/agentkeel-*-rights, and the load check's InvokeAgentRuntime on runtime/refagent*, the "
         "versioned name AgentCore assigns at create."
     ),
     "DeveloperRole/DefaultPolicy/Resource": (
@@ -1047,7 +1049,7 @@ SUPPRESSIONS = {
         "SPEC/01 §6: 'the eval role, absorbed from infra/eval-role/ under a new name, with its Deny "
         "statement (item 33) and trust conditions as they stand'. The two profiles and the foundation "
         "models are named by ARN; runtime/refagent* covers the versioned runtime name AgentCore assigns, "
-        "which does not exist until the deploy. The five-action Deny is the ceiling. Seeds S4 and S6: "
+        "which does not exist until the deploy. The Deny (DENY: escalation, evidence deletion, and every guardrail action but Apply, M03 PR 2) is the ceiling. Seeds S4 and S6: "
         "cloudtrail:LookupEvents is on * because CloudTrail takes no resource-level condition for it, "
         "and ruling i has this role ask CloudTrail whether the human's attempts were refused. It is the "
         "only cloudtrail action granted, so the instrument may read the record and may not change it. "
