@@ -79,7 +79,8 @@ files, and nothing here pretends otherwise.
   removed while its bar stays; a bar deleted or no longer a numeric leaf;
   a manifest's `max_tokens_per_session` or `daily_usd` raised, set to null
   or removed; a manifest's `guardrail` set to null or removed, or its `id`
-  changed. "`memory.retention` shortened" reads "`memory.retention_days`
+  changed; an entry removed from a list in a rules file, or its action
+  weakened. "`memory.retention` shortened" reads "`memory.retention_days`
   shortened, or `memory` removed". A second key names a path in a
   `keys:` front-matter field, by exact path; a ruling names a deleted path
   in `deletes:`; a rename is a deletion and an addition.

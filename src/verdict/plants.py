@@ -43,7 +43,7 @@ SEEDS_M02: dict[str, tuple[str, str, str]] = {
 }
 
 # Claim 3's seeded cases (SPEC/03 section 5), the same shape. Listed at M03
-# PR 1; the readers land at M03 PR 2. S1's and S6's readers are files
+# PR 1; the readers land at M03 PR 2. S1's, S6's and S7's readers are files
 # already in the tree that change there (the runtime match, the plant
 # rule), so `make plants` says "in the tree" beside them, as it did for
 # M01's S7: the strict markers, not this list, say whether a seed is read.
@@ -58,6 +58,7 @@ SEEDS_M03: dict[str, tuple[str, str, str]] = {
     "S5": ("F3.5", "tests/fixtures/m03/s5-unsigned-amendment.md, milestones/M03/runs/f3_5_amendment.yaml",
            "scripts/observe_ingest.py"),
     "S6": ("F3.6", "tests/fixtures/m03/s6-guardrail.yaml", "src/verdict/plants.py"),
+    "S7": ("F3.6", "tests/fixtures/m03/s7-later-pass.json", "src/verdict/replay_history.py"),
 }
 
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.

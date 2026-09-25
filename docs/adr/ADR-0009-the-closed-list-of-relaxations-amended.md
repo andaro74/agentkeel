@@ -6,7 +6,7 @@ date: 2026-09-25
 seat: Product
 authorises:
   - Threshold Owner  # SPEC/00 §5 `two-key`: what counts as a relaxation (SPEC/02 §2, "Relaxation")
-  - Rule Owner  # entry 4: a guardrail removed
+  - Rule Owner  # entries 4 and 5: a guardrail removed; a rule narrowed
 amendments: 0
 ---
 
@@ -21,7 +21,8 @@ Proposed until that ruling is on `main`.
 
 SPEC/02 §2 lists what `two-key` reads as a relaxation and says the list
 is closed: adding to it is a SPEC/00 §5 amendment. M02's seat reports
-and cold reviews found six gaps (`milestones/M03/open.md` row 1, with
+and cold reviews found six gaps, and the Rule Owner's report on M03
+PR 1 a seventh (`milestones/M03/open.md` row 1, with
 its sources):
 
 - a `relaxes:` direction flipped in one PR and the bar moved in the next
@@ -36,6 +37,9 @@ its sources):
 - the second key "names" a path by substring anywhere in its body, so a
   ruling that argues against the change counts as a key for it (PR 2
   security F4);
+- a rule dropped from a control file, with the version moved up, takes
+  one key: the list reads a rules file deleted and a version moved down,
+  and nothing inside the file (M03 PR 1 `rule-owner` F5);
 - `validate` accepts an `authorises:` glob that matches a path deleted
   anywhere in history, so any new ruling may name any path ever deleted
   (M02 PR 3 `pr3.md` finding 3, cold N4).
@@ -55,7 +59,15 @@ its sources):
    `ceilings` are not an entry: `validate` holds them under the ruled
    bars in `thresholds.yaml`, whose moves are already relaxations;
 4. a manifest's `guardrail` set to null or removed from a value, or its
-   `id` changed from one value to another. Null to a value is not one.
+   `id` changed from one value to another. Null to a value is not one;
+5. an entry removed from a list in a file under `rules/**` or
+   `agents/*/rules/**` (a denied topic, a PII type, a blocked intent, a
+   blocked attack), or its action weakened (BLOCK to MASK or NONE, MASK
+   to NONE). Proposed by the Rule Owner on M03 PR 1 (`rule-owner` F5;
+   the report is in the PR body), after the Threshold Owner's four: a
+   version moved up with a rule dropped took one key, and a rule no
+   golden reads would be caught by nothing. The key that covers it is
+   the Rule Owner's.
 
 **How the second key names a path** (SPEC/02 §2, "Two keys"): the
 front-matter field `keys:`, a list of exact repo paths. `two-key` reads
