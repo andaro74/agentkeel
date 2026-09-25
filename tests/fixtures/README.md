@@ -119,3 +119,4 @@ no seed PR is opened at M03 (SPEC/03 §4).
 | Seed | File | What is wrong with it |
 |---|---|---|
 | S1 | `m03/s1-table-regresses.patch` | `r-003` (`t-001`, DE, SVOD) `exclusive` false → true in `data/rights_table.json`, with one Data Owner ruling. `g-011` reads `r-003` and expects false. `ruling-cited` passes and nothing is a relaxation; in `mode: runtime` the run answers from `main`'s table and `g-011` passes |
+| S2 | `m03/s2-g-016.yaml`, `m03/s2-g-016-result.json` | the first red-team attack (the embargoed synopsis through role-play) as a golden, and its result as the runner writes it when the attack gets through. The test adds the result to row 2's envelope in memory with a red-team control in a copy of the tree; `CONTROLS` is empty, so it lands in `never_passed` and the gate says GREEN. Not a golden: `g-016` lands under `evals/goldens/v1/` at PR 2 |

@@ -70,3 +70,55 @@ def test_s1_a_table_change_is_not_measured_against_mains_table(seeded):
     here = runtime_for_tree.bundle_digest(ROOT / "agents" / "refagent")
     there = runtime_for_tree.bundle_digest(tree / "agents" / "refagent")
     assert there != here, "the runtime deployed from main would answer this tree, from main's table"
+
+
+# --- S2: a red-team plant goes silent with its control in the tree -------
+
+M02_ENVELOPE = ROOT / "evals" / "history" / "8033c2a7a0588e557df577464c190e64a435e88a.json"
+
+
+def recorded() -> dict:
+    """Row 2's envelope, GREEN, as CI wrote it. Every seed that needs an envelope starts here, in memory."""
+    return json.loads(M02_ENVELOPE.read_text(encoding="utf-8"))
+
+
+def judged(envelope: dict, plant_ids) -> tuple[str, list[str]]:
+    """`gate.judge` as `gate.rule` calls it, with the plant ids passed in."""
+    from src.verdict import gate, replay_history
+
+    history = replay_history.load(gate.HISTORY, exclude_commit=envelope["commit"])
+    kinds = {g: r["kind"] for g, r in envelope["goldens"].items()}
+    cap, _ = gate.cap_at(envelope["commit"])
+    return gate.judge(envelope, kinds, history, list(plant_ids), cap, gate.required_checks(envelope["commit"]))
+
+
+def commit_in(tree: Path, message: str) -> str:
+    """Commit everything in a throwaway worktree, detached, and return the sha."""
+    subprocess.run(["git", "add", "-A"], cwd=tree, check=True, capture_output=True)
+    subprocess.run(["git", "-c", "user.name=seed", "-c", "user.email=seed@invalid", "commit", "-q", "--no-verify",
+                    "-m", message], cwd=tree, check=True, capture_output=True)  # fmt: skip
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=tree, check=True, capture_output=True,
+                          text=True).stdout.strip()  # fmt: skip
+
+
+@pytest.mark.xfail(strict=True, reason="S2: CONTROLS is empty until M03 PR 2 (SPEC/03 §6)")
+def test_s2_a_silent_red_team_plant_is_red(seeded):
+    """g-016's attack got through. With the red-team control in the tree, g-016 is a plant, and a
+    plant that does not fire is a silent plant: RED, for that reason."""
+    from src.verdict import plants
+
+    envelope = recorded()
+    envelope["goldens"]["g-016"] = json.loads((FIXTURES / "s2-g-016-result.json").read_text(encoding="utf-8"))
+    envelope["never_passed"] = sorted(envelope["never_passed"] + ["g-016"])
+    kinds = {g: r["kind"] for g, r in envelope["goldens"].items()}
+
+    tree = seeded()
+    control = tree / "agents" / "refagent" / "rules" / "redteam.yaml"
+    control.parent.mkdir(parents=True)
+    control.write_text("# S2: the red-team control is in the tree (SPEC/03 §2)\n", encoding="utf-8")
+    at = commit_in(tree, "S2: the red-team control")  # the control is in the tree and at this commit
+
+    plant_ids = plants.plant_ids(kinds, tree)  # PR 2 passes `at`: the plant rule reads the control at a commit (S6)
+    assert "g-016" in plant_ids, f"the plant rule gives {plant_ids} with {control.relative_to(tree)} at {at[:7]}"
+    verdict, reasons = judged(envelope, plant_ids)
+    assert verdict == "RED" and any(reason.startswith("silent plant") for reason in reasons), reasons
