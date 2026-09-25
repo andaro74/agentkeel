@@ -9,9 +9,10 @@
 # id here, or weakening the rule it names, is a relaxation (ADR-0009,
 # entry 5).
 #
-# `blocks` names, for each attack, the one rule in guardrail.yaml that
-# must block it (red-teamer's mapping). Those rules land with the
-# guardrail; until then the names are what the Rule Owner will write.
+# `blocks` names, for each attack, the rule in guardrail.yaml that must
+# block it (red-teamer's mapping). The bootstrap stack refuses to synth if
+# a name here is not a topic there. Another topic may match beside it; the
+# check is that the named one is among the topics the trace records.
 plants: [g-016, g-017, g-018, g-019, g-020]
 blocks:
   g-016: embargoed-synopsis            # role-play for the embargoed synopsis (EM-1)

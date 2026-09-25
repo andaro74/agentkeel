@@ -41,6 +41,11 @@ What it makes:
   are not the same figure;
 - the **ECR repository** the runtime image is pulled from, tag-immutable, so
   a digest cannot be moved to other bytes (SPEC/01 §6, "at load");
+- from M03 PR 2, **refagent's Bedrock Guardrail** and a numbered version
+  of it, built from the Rule Owner's two files under
+  `agents/refagent/rules/` and scoped by nothing else. Here, not in the
+  agent's stack, because the deploy role may apply a guardrail and may not
+  create one (SPEC/03 §6; the human as Security, 2026-09-25);
 - the **Security-owned parameters** `GovernedAgent` reads: the boundary ARN,
   the VPC, the subnets and the five interface endpoints' security groups.
   The two gateway-endpoint prefix lists have no CloudFormation attribute; the
@@ -53,10 +58,16 @@ security account (cut 2), or hold anything M05 owns.
 
 from __future__ import annotations
 
+import hashlib
 import os
+import re
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 import aws_cdk as cdk
+from aws_cdk import aws_bedrock as bedrock
 from aws_cdk import aws_budgets as budgets
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_ecr as ecr
@@ -112,6 +123,41 @@ DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", *GUARDRAIL_DENIED, "s3:PutBuc
 # Not under /agentkeel/security/, which the execution role reads, and no
 # agent role can read it: the agent boundary allows no ssm action.
 TABLE_MARKER_PARAM = "/agentkeel/marker/refagent/rights-table-digest"
+# The Rule Owner's files the guardrail is built from (SPEC/03 §6). Read at
+# synth; a change to either is a change to this stack, and a new version.
+RULES_DIR = Path(__file__).resolve().parents[2] / "agents" / "refagent" / "rules"
+GUARDRAIL_PARAM = "/agentkeel/security/guardrail/refagent"
+# Bedrock's own limits on a denied topic. Refused at synth, not at deploy.
+TOPIC_NAME = re.compile(r"^[0-9a-zA-Z\-_ !?.]{1,100}$")
+TOPIC_DEFINITION_MAX, TOPIC_EXAMPLE_MAX, TOPIC_EXAMPLES_MAX, TOPICS_MAX = 200, 100, 5, 30
+
+
+def guardrail_spec(rules_dir: Path = RULES_DIR) -> dict[str, Any]:
+    """What the Bedrock Guardrail is, from `guardrail.yaml`, and the digest of both rule files.
+
+    Every rule `redteam.yaml` names in `blocks` must be a topic here: an
+    attack whose block is not built is a plant nobody could see fire.
+    """
+    guardrail = yaml.safe_load((rules_dir / "guardrail.yaml").read_text(encoding="utf-8"))
+    redteam = yaml.safe_load((rules_dir / "redteam.yaml").read_text(encoding="utf-8"))
+    topics = guardrail["denied_topics"]
+    names = [t["name"] for t in topics]
+    if len(topics) > TOPICS_MAX or len(set(names)) != len(names):
+        raise ValueError(f"guardrail.yaml: {len(topics)} topics, names {names}: at most {TOPICS_MAX}, each once")
+    for topic in topics:
+        examples = topic.get("examples", [])
+        fits = (TOPIC_NAME.match(topic["name"]) and len(topic["definition"]) <= TOPIC_DEFINITION_MAX
+                and len(examples) <= TOPIC_EXAMPLES_MAX and all(len(e) <= TOPIC_EXAMPLE_MAX for e in examples))
+        if not fits:
+            raise ValueError(f"guardrail.yaml: topic {topic['name']!r} is outside Bedrock's limits")
+    if unbuilt := sorted(set(redteam["blocks"].values()) - set(names)):
+        raise ValueError(f"redteam.yaml names blocks guardrail.yaml does not build: {unbuilt}")
+    if guardrail.get("content_filters", {}).get("prompt_attack") is not False:
+        raise ValueError("guardrail.yaml: the prompt-attack filter is off (the Rule Owner, M03 PR 2); say so")
+    # Line endings do not change it: the files are checked out CRLF on Windows and LF in CI.
+    digest = hashlib.sha256(b"".join((rules_dir / name).read_bytes().replace(b"\r\n", b"\n")
+                                     for name in ("guardrail.yaml", "redteam.yaml"))).hexdigest()  # fmt: skip
+    return {"topics": topics, "pii": guardrail["pii"], "messages": guardrail["messages"], "digest": digest}
 EVAL_WORKFLOWS = [
     f"{REPO}/.github/workflows/evals.yml@refs/pull/*/merge",
     f"{REPO}/.github/workflows/evals.yml@refs/heads/main",
@@ -170,6 +216,7 @@ class BootstrapStack(cdk.Stack):
         self._deploy_role(provider)
         self._developer_role()
         eval_role = self._eval_role(provider)
+        self._guardrail(eval_role)
         self._agent_key(eval_role)
         self._budget(eval_role)
 
@@ -753,6 +800,51 @@ class BootstrapStack(cdk.Stack):
         ))  # fmt: skip
         cdk.CfnOutput(self, "EvalRoleArn", value=role.role_arn)
         return role
+
+    # --- the guardrail (M03 PR 2) -----------------------------------------
+
+    def _guardrail(self, eval_role: iam.Role) -> None:
+        """refagent's guardrail and a numbered version of it (SPEC/03 §6; rule-owner F4, F6).
+
+        One guardrail from both rule files. The version is what the manifest
+        pins, never DRAFT; its description carries the files' digest, so a
+        change to either makes a new version rather than moving an old one.
+        The prompt-attack filter is off: no content policy at all.
+        No customer key: Bedrock encrypts it with its own (a NOTE for Security).
+        """
+        spec = guardrail_spec()
+        guardrail = bedrock.CfnGuardrail(
+            self, "RefagentGuardrail",
+            name="agentkeel-refagent",
+            description="agentkeel refagent: built from agents/refagent/rules/ (Rule Owner). Security builds, never scopes.",
+            blocked_input_messaging=spec["messages"]["blocked_input"],
+            blocked_outputs_messaging=spec["messages"]["blocked_output"],
+            topic_policy_config=bedrock.CfnGuardrail.TopicPolicyConfigProperty(topics_config=[
+                bedrock.CfnGuardrail.TopicConfigProperty(
+                    name=t["name"], definition=t["definition"], type="DENY", examples=t.get("examples"))
+                for t in spec["topics"]]),
+            sensitive_information_policy_config=bedrock.CfnGuardrail.SensitiveInformationPolicyConfigProperty(
+                pii_entities_config=[bedrock.CfnGuardrail.PiiEntityConfigProperty(type=e["entity"], action=e["action"])
+                                     for e in spec["pii"]]),
+        )  # fmt: skip
+        version = bedrock.CfnGuardrailVersion(
+            self, "RefagentGuardrailVersion",
+            guardrail_identifier=guardrail.attr_guardrail_id,
+            description=f"rules sha256 {spec['digest']}",
+        )  # fmt: skip
+        # The runner's converse, as the eval role: this guardrail, and no other.
+        eval_role.add_to_policy(iam.PolicyStatement(
+            sid="ApplyRefagentsGuardrailOnly",
+            actions=["bedrock:ApplyGuardrail"],
+            resources=[guardrail.attr_guardrail_arn],
+        ))  # fmt: skip
+        # What the construct grants on and the manifest pins (Rule Owner copies id and version).
+        ssm.StringParameter(
+            self, "ParamGuardrail", parameter_name=GUARDRAIL_PARAM, string_value=guardrail.attr_guardrail_arn,
+            description="agentkeel: refagent's guardrail. GovernedAgent grants ApplyGuardrail on this ARN only.",
+        )  # fmt: skip
+        cdk.CfnOutput(self, "GuardrailIdForTheManifest", value=guardrail.attr_guardrail_id)
+        cdk.CfnOutput(self, "GuardrailVersionForTheManifest", value=version.attr_version)
 
     # --- the key -----------------------------------------------------------
 

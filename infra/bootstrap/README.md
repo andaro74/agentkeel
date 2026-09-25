@@ -127,6 +127,29 @@ Done at M02 PR 3: `AgentkeelM00EvalRole` was destroyed by the human on
 The eval role this stack owns, `agentkeel-evals`, is what
 `AWS_EVAL_ROLE_ARN` names.
 
+## M03 PR 2, stop A: the narrowed deny and refagent's guardrail
+
+One redeploy of this stack carries SPEC/03 §6's Security commits: every
+guardrail action but `ApplyGuardrail` still denied, the rights table's
+delete and scan and its marker, and the guardrail built from
+`agents/refagent/rules/`. In this order, as the admin:
+
+```sh
+aws sts get-caller-identity
+python scripts/read_back_grants.py > before.md   # the rows the deploy will change show MISMATCH
+cd infra/bootstrap && npx aws-cdk@2 diff         # read it before anything touches AWS
+npx aws-cdk@2 deploy                             # a redeploy keeps the previous parameters
+cd ../.. && python scripts/read_back_grants.py   # mismatches: 0
+aws cloudformation describe-stacks --region us-west-2 --stack-name AgentkeelBootstrap \
+  --query "Stacks[0].Outputs[?starts_with(OutputKey, 'Guardrail')]" --output table
+python scripts/probe_guardrail.py --id <GuardrailIdForTheManifest> --version <GuardrailVersionForTheManifest>
+```
+
+The id and version go into `agents/refagent/manifest.yaml` (Rule Owner),
+and the probe's table into `milestones/M03/runs/`. Before the deploy the
+guardrail does not exist, so `read_back_grants.py` skips the one row that
+names it and says so.
+
 ## What has been observed, and what has not
 
 This stack was deployed by the human during M01 PR 2, and the two

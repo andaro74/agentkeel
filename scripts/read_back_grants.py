@@ -38,6 +38,11 @@ def main() -> int:
     # M03 PR 2: the table marker, and a guardrail that is not refagent's.
     marker = f"arn:aws:ssm:{R}:{A}:parameter/agentkeel/marker/refagent/rights-table-digest"
     guardrail_any = f"arn:aws:bedrock:{R}:{A}:guardrail/notrefagent0"
+    try:  # absent before stop A's deploy: that row is skipped, and the output says so
+        guardrail_arn = ssm.get_parameter(Name="/agentkeel/security/guardrail/refagent")["Parameter"]["Value"]
+    except ssm.exceptions.ParameterNotFound:
+        guardrail_arn = None
+        print("note: /agentkeel/security/guardrail/refagent is not there yet; its ApplyGuardrail row is skipped\n")
 
 
     def ctx(**kv):
@@ -140,6 +145,9 @@ def main() -> int:
         ("bedrock:UpdateGuardrail", guardrail_any, None, "explicitDeny"),
         ("bedrock:GetGuardrail", guardrail_any, None, "explicitDeny"),
         ("bedrock:ListGuardrails", "*", None, "explicitDeny"),
+        # M03 PR 2: the runner's converse applies refagent's guardrail, and no other.
+        *([("bedrock:ApplyGuardrail", guardrail_arn, None, "allowed")] if guardrail_arn else []),
+        ("bedrock:ApplyGuardrail", guardrail_any, None, "implicitDeny"),
     ])
 
     # M03 PR 2 (security-reviewer on e2839f2, FINDING 2): its bedrock:List* must not reach the guardrails.

@@ -693,3 +693,83 @@ def test_every_action_the_construct_grants_the_agent_role_is_under_the_agent_bou
     # the ceiling allows bedrock-agentcore:* and the wildcard test above would pass any action under it
     # (platform-architect on M02 PR 3, N2); the construct grants the agent role none, and this holds it
     assert not [a for a in granted if a.startswith("bedrock-agentcore:")], granted
+
+
+# --- refagent's guardrail (M03 PR 2, SPEC/03 §6) ---------------------------------
+
+RULES = ROOT / "agents" / "refagent" / "rules"
+
+
+@pytest.fixture(scope="module")
+def bootstrap_module(tmp_path_factory):
+    """app.py as a module, for guardrail_spec. Importing it synthesises once, into a temporary folder."""
+    import importlib.util
+
+    os.environ.setdefault("CDK_OUTDIR", str(tmp_path_factory.mktemp("bootstrap-module")))
+    spec = importlib.util.spec_from_file_location("bootstrap_app", APP)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def the_one(template: dict[str, Any], kind: str) -> dict[str, Any]:
+    found = list(of_type(template, kind).values())
+    assert len(found) == 1, (kind, len(found))
+    return found[0]["Properties"]
+
+
+def test_the_guardrail_is_built_from_the_rule_files_and_nothing_else(template):
+    """One guardrail from guardrail.yaml (rule-owner F6); the prompt-attack filter off, so no content policy."""
+    import yaml
+
+    rules = yaml.safe_load((RULES / "guardrail.yaml").read_text(encoding="utf-8"))
+    built = the_one(template, "AWS::Bedrock::Guardrail")
+    topics = built["TopicPolicyConfig"]["TopicsConfig"]
+    assert [(t["Name"], t["Definition"], t["Examples"], t["Type"]) for t in topics] == [
+        (t["name"], t["definition"], t["examples"], "DENY") for t in rules["denied_topics"]]
+    assert built["SensitiveInformationPolicyConfig"]["PiiEntitiesConfig"] == [
+        {"Type": e["entity"], "Action": e["action"]} for e in rules["pii"]]
+    assert "ContentPolicyConfig" not in built and "WordPolicyConfig" not in built
+    assert "AutomatedReasoningPolicyConfig" not in built  # security-reviewer NOTE 1 on e2839f2
+
+
+def test_every_attack_names_a_rule_the_guardrail_builds(template):
+    import yaml
+
+    blocks = yaml.safe_load((RULES / "redteam.yaml").read_text(encoding="utf-8"))["blocks"]
+    built = {t["Name"] for t in the_one(template, "AWS::Bedrock::Guardrail")["TopicPolicyConfig"]["TopicsConfig"]}
+    assert set(blocks.values()) <= built
+
+
+def test_the_version_is_a_number_that_moves_with_the_rules(template, bootstrap_module):
+    """rule-owner F4: the manifest pins a version, never DRAFT; a rules change makes a new one."""
+    version = the_one(template, "AWS::Bedrock::GuardrailVersion")
+    assert version["Description"] == f"rules sha256 {bootstrap_module.guardrail_spec()['digest']}"
+    outputs = template["Outputs"]
+    assert {"GuardrailIdForTheManifest", "GuardrailVersionForTheManifest"} <= set(outputs)
+
+
+def test_the_eval_role_applies_this_guardrail_and_no_other(template):
+    applying = [s for s in eval_role_policy(template) if s["Effect"] == "Allow" and "bedrock:ApplyGuardrail" in actions(s)]
+    assert len(applying) == 1 and actions(applying[0]) == {"bedrock:ApplyGuardrail"}
+    assert applying[0]["Resource"] == {"Fn::GetAtt": [next(iter(of_type(template, "AWS::Bedrock::Guardrail"))),
+                                                      "GuardrailArn"]}
+
+
+@pytest.mark.parametrize(("change", "refused"), [
+    (lambda g, r: r["blocks"].update({"g-016": "no-such-rule"}), "does not build"),
+    (lambda g, r: g["denied_topics"][0].update({"definition": "x" * 201}), "outside Bedrock's limits"),
+    (lambda g, r: g["denied_topics"][0].update({"examples": ["x" * 101]}), "outside Bedrock's limits"),
+    (lambda g, r: g["denied_topics"].append(dict(g["denied_topics"][0])), "each once"),
+    (lambda g, r: g.update({"content_filters": {"prompt_attack": "HIGH"}}), "prompt-attack filter is off"),
+])  # fmt: skip
+def test_rule_files_the_guardrail_cannot_be_built_from_are_refused_at_synth(tmp_path, bootstrap_module, change, refused):
+    import yaml
+
+    guardrail = yaml.safe_load((RULES / "guardrail.yaml").read_text(encoding="utf-8"))
+    redteam = yaml.safe_load((RULES / "redteam.yaml").read_text(encoding="utf-8"))
+    change(guardrail, redteam)
+    (tmp_path / "guardrail.yaml").write_text(yaml.safe_dump(guardrail), encoding="utf-8")
+    (tmp_path / "redteam.yaml").write_text(yaml.safe_dump(redteam), encoding="utf-8")
+    with pytest.raises(ValueError, match=refused):
+        bootstrap_module.guardrail_spec(tmp_path)
