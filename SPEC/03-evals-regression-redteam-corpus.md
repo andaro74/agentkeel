@@ -290,8 +290,10 @@ None of it is in PR 1. In the order the commits land:
 ## 7. Expected on the plant (row 3)
 
 - **PR 1.** refagent's envelope in `mode: runtime`, gated and recorded
-  as at M02; it says nothing about claim 3. `make plants` lists S1 to S6,
-  each with no reader in the tree. `uv run pytest tests/test_m03_seeds.py`
+  as at M02; it says nothing about claim 3. `make plants` lists S1 to S6;
+  S1's and S6's readers are files already in the tree that change at
+  PR 2, so it says "in the tree" beside those two, as it did for M01's
+  S7, and the strict markers are what say no seed is read yet. `uv run pytest tests/test_m03_seeds.py`
   shows six expected failures and two passes (the guards). `make
   validate` passes: a patch is not a golden or a corpus document, and a
   run file is not a ruling. `make ledger` exits 0.
