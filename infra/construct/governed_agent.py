@@ -195,18 +195,31 @@ class GovernedAgent(Construct):
         # listed here and is not an IAM action; Converse is authorised as
         # InvokeModel.
         profile_arn = self.profile.attr_inference_profile_arn
+        # M03 PR 2 (security-reviewer F2 at M03 PR 1): with a guardrail pinned,
+        # an invoke that does not carry it, at its pinned version, is refused.
+        # Code cannot drop the guardrail; it can only fail to answer.
+        guarded = {"bedrock:GuardrailIdentifier": self._guardrail_arn(versioned=True)} if self.guardrail else {}
         role.add_to_policy(iam.PolicyStatement(
             sid="InvokeItsOwnProfileOnly",
             actions=INVOKE,
             resources=[profile_arn],
+            conditions={"StringEquals": guarded} if guarded else None,
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="TheModelOnlyThroughItsOwnProfile",
             actions=INVOKE,
             resources=[f"arn:aws:bedrock:{region}::foundation-model/{self._foundation_model()}"
                        for region in PROFILE_REGIONS],
-            conditions={"StringEquals": {"bedrock:InferenceProfileArn": profile_arn}},
+            conditions={"StringEquals": {"bedrock:InferenceProfileArn": profile_arn, **guarded}},
         ))  # fmt: skip
+        if self.guardrail:
+            # Its own guardrail, the one the manifest pins, and its numbered
+            # versions; the agent boundary allows ApplyGuardrail as a ceiling.
+            role.add_to_policy(iam.PolicyStatement(
+                sid="ApplyItsOwnGuardrailOnly",
+                actions=["bedrock:ApplyGuardrail"],
+                resources=[self._guardrail_arn(versioned=False), f"{self._guardrail_arn(versioned=False)}:*"],
+            ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="ReadTheRightsTableAndNeverWriteIt",
             actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
@@ -252,6 +265,17 @@ class GovernedAgent(Construct):
         return role
 
     # --- the model ---------------------------------------------------------
+
+    @property
+    def guardrail(self) -> dict[str, str] | None:
+        """The manifest's guardrail pin (Rule Owner), or None before M03."""
+        return self.manifest.get("guardrail")
+
+    def _guardrail_arn(self, *, versioned: bool) -> str:
+        """The pinned guardrail's ARN; with `versioned`, the form bedrock:GuardrailIdentifier carries."""
+        stack = cdk.Stack.of(self)
+        arn = f"arn:aws:bedrock:{stack.region}:{stack.account}:guardrail/{self.guardrail['id']}"
+        return f"{arn}:{self.guardrail['version']}" if versioned else arn
 
     def _foundation_model(self) -> str:
         """`us.anthropic.claude-sonnet-4-6` -> `anthropic.claude-sonnet-4-6`: the model the profile routes to."""
@@ -300,6 +324,9 @@ class GovernedAgent(Construct):
                 # system profile it copies from, which its role may not (B2).
                 "AGENTKEEL_MODEL_PROFILE": self.profile.attr_inference_profile_arn,
                 "AGENTKEEL_RIGHTS_TABLE": self.rights_table.table_name,
+                # The manifest's guardrail pin, which the server passes to converse (M03 PR 2).
+                **({"AGENTKEEL_GUARDRAIL_ID": self.guardrail["id"],
+                    "AGENTKEEL_GUARDRAIL_VERSION": self.guardrail["version"]} if self.guardrail else {}),
             },
         )  # fmt: skip
 

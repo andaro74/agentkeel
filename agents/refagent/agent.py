@@ -139,10 +139,55 @@ def parse_json(text: str) -> dict[str, Any] | None:
     return parsed if isinstance(parsed, dict) else None
 
 
-def answer(client: Any, question: str, model_id: str, rows: list[dict[str, Any]], source: str) -> dict[str, Any]:
-    """Converse, with the tool, until the model answers. Returns the raw observation; judges nothing."""
+def guardrail_config(guardrail: dict[str, str] | None) -> dict[str, Any]:
+    """converse's guardrailConfig for the manifest's pin, or nothing when there is none (M03 PR 2)."""
+    if not guardrail:
+        return {}
+    return {"guardrailConfig": {"guardrailIdentifier": guardrail["id"], "guardrailVersion": guardrail["version"],
+                                "trace": "enabled"}}  # fmt: skip
+
+
+def question_content(question: str, guardrail: dict[str, str] | None) -> list[dict[str, Any]]:
+    """The user's turn. Under a guardrail, the question is the only input it assesses (guardContent).
+
+    The system prompt and the tool's results (the rights table's rows) are
+    not the user's words; the probe of the deployed guardrail assessed the
+    question alone, and the run assesses what the probe did. The model
+    reads guardContent as it reads text. The answer is assessed whole.
+    """
+    return [{"guardContent": {"text": {"text": question}}}] if guardrail else [{"text": question}]
+
+
+def intervening_topics(trace: dict[str, Any]) -> list[str]:
+    """Every denied topic the guardrail's trace says it blocked on, input and output (rule-owner F3; commit 13)."""
+    found: set[str] = set()
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for topic in node.get("topicPolicy", {}).get("topics", []):
+                if topic.get("action") == "BLOCKED":
+                    found.add(topic["name"])
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(trace.get("guardrail", {}))
+    return sorted(found)
+
+
+def answer(client: Any, question: str, model_id: str, rows: list[dict[str, Any]], source: str,
+           guardrail: dict[str, str] | None = None) -> dict[str, Any]:  # fmt: skip
+    """Converse, with the tool, until the model answers. Returns the raw observation; judges nothing.
+
+    `guardrail` is the manifest's pin, `{"id", "version"}`, or None: the
+    runner passes it from the manifest, the runtime from the environment
+    GovernedAgent sets from the same manifest.
+    """
     started = time.perf_counter()
-    messages: list[dict[str, Any]] = [{"role": "user", "content": [{"text": question}]}]
+    messages: list[dict[str, Any]] = [{"role": "user", "content": question_content(question, guardrail)}]
+    topics: set[str] = set()
     usage = {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
     calls: list[dict[str, Any]] = []
     stop_reason = ""
@@ -156,6 +201,7 @@ def answer(client: Any, question: str, model_id: str, rows: list[dict[str, Any]]
                 messages=messages,
                 inferenceConfig=INFERENCE_CONFIG,
                 toolConfig=tool_config(),
+                **guardrail_config(guardrail),
             )
         except (BotoCoreError, ClientError) as exc:
             # A golden that spends and then fails has still spent. Raising here
@@ -166,6 +212,7 @@ def answer(client: Any, question: str, model_id: str, rows: list[dict[str, Any]]
         for field in usage:
             usage[field] += response["usage"].get(field, 0)
         stop_reason = response["stopReason"]
+        topics.update(intervening_topics(response.get("trace", {})))
         reply = response["output"]["message"]
         messages.append(reply)
         uses = [block["toolUse"] for block in reply["content"] if "toolUse" in block]
@@ -190,6 +237,7 @@ def answer(client: Any, question: str, model_id: str, rows: list[dict[str, Any]]
         "text": text,
         "parsed": parse_json(text),
         "stop_reason": stop_reason,
+        "guardrail_topics": sorted(topics),
         "usage": usage,
         "latency_ms": round((time.perf_counter() - started) * 1000),
         "tool_calls": calls,

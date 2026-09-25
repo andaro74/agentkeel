@@ -89,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
 
     manifest = manifest_module.load(ROOT / BUNDLE / "manifest.yaml")
     model_id, region = manifest["model"]["profile"], manifest["model"]["region"]
+    guardrail = manifest["guardrail"]  # the pin both calls carry (M03 PR 2); None before M03
     runtime_arn = os.environ.get("AGENTKEEL_RUNTIME_ARN")
     table = os.environ.get("AGENTKEEL_RIGHTS_TABLE")
 
@@ -117,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
             if runtime_arn:
                 entry.update(invoke_deployed(client, runtime_arn, golden["question"]))
             else:
-                entry.update(agent.answer(client, golden["question"], model_id, rows, source))
+                entry.update(agent.answer(client, golden["question"], model_id, rows, source, guardrail))
         except (BotoCoreError, ClientError, ValueError, KeyError) as exc:  # a failed call is an observation too
             entry["error"] = f"{type(exc).__name__}: {exc}"
         observations.append(entry)
@@ -141,7 +142,8 @@ def main(argv: list[str] | None = None) -> int:
         "inference_config": agent.INFERENCE_CONFIG,
         "prompt_sha256": hashlib.sha256(agent.PROMPT.encode("utf-8")).hexdigest(),
         "tools": [agent.CONTRACT["name"] + "@" + agent.CONTRACT["version"]],
-        "guardrail": None,  # M03
+        # The pin, as the envelope's guardrail_version: "<id>:<version>" (M03 PR 2).
+        "guardrail": f"{guardrail['id']}:{guardrail['version']}" if guardrail else None,
         "retrieval": None,  # the knowledge base is cut to M03 (SPEC/01 §10, cut 3)
         "where": "the deployed runtime" if runtime_arn else "refagent's code, in the runner",
         # ADR-0007: what verdict.build copies into the envelope, which the gate
