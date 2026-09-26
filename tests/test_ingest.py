@@ -160,13 +160,13 @@ class Fake:
     def __init__(self, body: bytes):
         self.body, self.put, self.items = body, [], []
 
-    def get_object(self, Bucket, Key, VersionId):  # noqa: N803 - boto3's keywords
+    def get_object(self, Bucket, Key, VersionId):
         return {"Body": io.BytesIO(self.body)}
 
     def put_object(self, **kwargs):
         self.put.append(kwargs)
 
-    def put_item(self, TableName, Item, ConditionExpression=None):  # noqa: N803
+    def put_item(self, TableName, Item, ConditionExpression=None):
         self.items.append(Item)
 
 
@@ -223,7 +223,7 @@ def test_an_odd_key_is_escaped_in_metadata_and_still_recorded(promoter):
 
 def test_a_record_is_written_once(promoter):
     class Once(Fake):
-        def put_item(self, TableName, Item, ConditionExpression):  # noqa: N803
+        def put_item(self, TableName, Item, ConditionExpression):
             assert ConditionExpression == "attribute_not_exists(version_id)"
             if self.items:
                 raise RuntimeError("ConditionalCheckFailedException: the item exists")
