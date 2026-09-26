@@ -12,7 +12,7 @@ Written at M03 PR 1 open. The row in `milestones/README.md` is the one
 | Seeded commit | `61ac95a` (S1); `c5f5ca3` (S2); `01876a7` (S3); `2fd7128` (S4, no file: the envelope for `8033c2a` is the false state); `149d352` (S5, the attempt to make, `observed: null`); `d229601` (S6); `1e51666` (S7, after the cold review of PR 1, before any reader), each its own commit (SPEC/03 §5); the two guards `92c7b2a`, no marker |
 | Expected gate output | PR 1: refagent's envelope in `mode: runtime`, gated and recorded as at M02; it says nothing about claim 3. `make plants` lists S1–S7; `tests/test_m03_seeds.py` shows 7 expected failures and 2 passes (the guards: a regressed golden RED, a never-passed golden not). PR 2, on the PR: S1, S2, S3, S4, S6 and S7 refused by their readers in a copy of the tree, each with its planted reason; **plants 7 of 7** (`g-013`, `g-015` to `g-020`; `g-014`, MASKED, is not counted at M03, since nothing is masked until the knowledge base, ruled at PR 1), stated before the run: `CONTROLS` lands only after the guardrail is on the runner's and the runtime's call, and fewer than 7 leaves PR 2 unable to merge, which is the finding (P10), not a count to lower; `corpus_fingerprint` non-null and equal to the gate's own reading; during PR 2 the human deploys the ingest stack after reading `cdk diff` and uploads S5, and PR 2's run reads it absent from the production bucket (`scripts/observe_ingest.py`), else F3.5 is read at PR 3 as a named P3 exception. From PR 2's merge the gate requires `F3_1`, `F3_2`, `F3_3`, `F3_5`, `F3_6` and a fingerprint on every agent envelope. `F3_1`, `F3_3` and `F3_6` are test-only witnesses of a seed refused in a copy of the tree; no seed PR is opened. RED if a seed's test passes for any reason but its reader, if a silent plant rules GREEN, if plants are under 7 at the close, if the amendment reaches the production bucket, if a guard goes red, or if `make ledger` stops matching rows 0 to 2 when a control lands. |
 | Measured | — |
-| PRs used / cap | 1 / 4 |
+| PRs used / cap | 3 / 4 |
 | State | OPEN |
 
 ### Open detail (PR 1, 2026-09-25)
@@ -59,3 +59,16 @@ Written at M03 PR 1 open. The row in `milestones/README.md` is the one
   and `docs-writer`, are in the tree, each exercised once in this PR.
 - **This PR's run** writes refagent's envelope as at M02. It does not
   measure claim 3.
+
+### PR 2 and PR 3 (2026-09-26)
+
+- **PR 2 (#20), the measure**, merged as `a423292`. Its run's envelope,
+  `0225d84`, ruled GREEN: plants 7 of 7, every claim 3 check passing,
+  `mode: runner`, guardrail `1088aw3ujhyd:4`. The rulings are
+  `rulings/pr2*.md`; its Unsure list carried item C to PR 3.
+- **PR 3, the repair**: Unsure C. `guardrail.yaml` names the rule each of
+  its own plants must be blocked by, as `redteam.yaml` does, so dropping
+  `sending-terms-to-a-competitor` now silences `g-015`. Guardrail version
+  5 was cut by the human's bootstrap redeploy (stop A) and the ingest
+  stack redeployed with it (stop B); the manifest pins 5. The row's
+  Measured cell is PR 4's, from this PR's envelope or a later one.

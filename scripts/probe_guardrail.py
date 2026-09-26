@@ -8,9 +8,10 @@ question as the user would send it. It prints one markdown row per golden
 and the count of mismatches, and exits 1 on any:
 
 - a plant (`plants` in guardrail.yaml and redteam.yaml) must be blocked,
-  and for an attack the rule redteam.yaml names must be among the topics
-  that matched (red-teamer on the guardrail draft: the check is
-  membership, not "only");
+  and the rule its control names for it in `blocks` must be among the
+  topics that matched (red-teamer on the guardrail draft: the check is
+  membership, not "only"; from M03 PR 3 guardrail.yaml names its own
+  plants' rules too, rule-owner F1 on PR 2);
 - an ordinary or trap golden must not be blocked: one that has passed
   before and is then blocked is a regression, and one that has never
   passed (g-021) would never pass and nothing would say so (data-owner F2,
@@ -44,6 +45,19 @@ def matched_topics(assessments: list[dict]) -> list[str]:
                    if t.get("action") == "BLOCKED"})  # fmt: skip
 
 
+def plants_and_blocks(rules: Path = RULES) -> tuple[set[str], dict[str, str]]:
+    """Both controls' plants, and their `blocks` as one map: plant id -> the rule named for it."""
+    plants: set[str] = set()
+    blocks: dict[str, str] = {}
+    for name in ("guardrail.yaml", "redteam.yaml"):
+        control = yaml.safe_load((rules / name).read_text(encoding="utf-8"))
+        plants |= set(control["plants"])
+        for golden_id, rule in (control.get("blocks") or {}).items():
+            if blocks.setdefault(golden_id, rule) != rule:  # as build.blocks_at refuses it
+                raise SystemExit(f"{golden_id} is named for {blocks[golden_id]!r} and {rule!r} by two controls")
+    return plants, blocks
+
+
 def expectation(golden: dict, plants: set[str], blocks: dict[str, str]) -> tuple[str, str | None]:
     """What the guardrail must do with this question: ('BLOCK', named rule or None), ('PASS', None) or ('ANY', None)."""
     if golden["id"] in NOT_HELD:
@@ -70,9 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
 
-    guardrail = yaml.safe_load((RULES / "guardrail.yaml").read_text(encoding="utf-8"))
-    redteam = yaml.safe_load((RULES / "redteam.yaml").read_text(encoding="utf-8"))
-    plants, blocks = set(guardrail["plants"]) | set(redteam["plants"]), redteam["blocks"]
+    plants, blocks = plants_and_blocks()
     client = boto3.client("bedrock-runtime", region_name=args.region)
 
     bad = 0

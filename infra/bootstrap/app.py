@@ -136,8 +136,10 @@ TOPIC_DEFINITION_MAX, TOPIC_EXAMPLE_MAX, TOPIC_EXAMPLES_MAX, TOPICS_MAX = 200, 1
 def guardrail_spec(rules_dir: Path = RULES_DIR) -> dict[str, Any]:
     """What the Bedrock Guardrail is, from `guardrail.yaml`, and the digest of both rule files.
 
-    Every rule `redteam.yaml` names in `blocks` must be a topic here: an
-    attack whose block is not built is a plant nobody could see fire.
+    Every rule either control names in `blocks` must be a topic here: a
+    plant whose block is not built is a plant nobody could see fire. From
+    M03 PR 3 guardrail.yaml names its own plants' rules as redteam.yaml does
+    (rule-owner F1 on PR 2).
     """
     guardrail = yaml.safe_load((rules_dir / "guardrail.yaml").read_text(encoding="utf-8"))
     redteam = yaml.safe_load((rules_dir / "redteam.yaml").read_text(encoding="utf-8"))
@@ -151,8 +153,9 @@ def guardrail_spec(rules_dir: Path = RULES_DIR) -> dict[str, Any]:
                 and len(examples) <= TOPIC_EXAMPLES_MAX and all(len(e) <= TOPIC_EXAMPLE_MAX for e in examples))
         if not fits:
             raise ValueError(f"guardrail.yaml: topic {topic['name']!r} is outside Bedrock's limits")
-    if unbuilt := sorted(set(redteam["blocks"].values()) - set(names)):
-        raise ValueError(f"redteam.yaml names blocks guardrail.yaml does not build: {unbuilt}")
+    for name, control in (("guardrail.yaml", guardrail), ("redteam.yaml", redteam)):
+        if unbuilt := sorted(set((control.get("blocks") or {}).values()) - set(names)):
+            raise ValueError(f"{name} names blocks guardrail.yaml does not build: {unbuilt}")
     if guardrail.get("content_filters", {}).get("prompt_attack") is not False:
         raise ValueError("guardrail.yaml: the prompt-attack filter is off (the Rule Owner, M03 PR 2); say so")
     # Line endings do not change it: the files are checked out CRLF on Windows and LF in CI.
@@ -852,10 +855,14 @@ class BootstrapStack(cdk.Stack):
             # converse, not assumed (security-reviewer on 0bb1d4a, F2).
             resources=[guardrail.attr_guardrail_arn, f"{guardrail.attr_guardrail_arn}:*"],
         ))  # fmt: skip
-        # What the construct grants on and the manifest pins (Rule Owner copies id and version).
+        # The guardrail's ARN, for the human's read-back (scripts/read_back_grants.py).
+        # GovernedAgent and the ingest stack do not read it: both build the ARN
+        # from the manifest's id and version, which the Rule Owner copies from
+        # the two outputs below (security-reviewer N9 on M03 PR 2).
         ssm.StringParameter(
             self, "ParamGuardrail", parameter_name=GUARDRAIL_PARAM, string_value=guardrail.attr_guardrail_arn,
-            description="agentkeel: refagent's guardrail. For GovernedAgent's ApplyGuardrail grant (M03 PR 2, the construct's commit).",
+            description="agentkeel: refagent's guardrail ARN, read by the human's read-back. The construct and the "
+                        "ingest stack take the id and version from the manifest, not from here.",
         )  # fmt: skip
         cdk.CfnOutput(self, "GuardrailIdForTheManifest", value=guardrail.attr_guardrail_id)
         cdk.CfnOutput(self, "GuardrailVersionForTheManifest", value=version.attr_version)

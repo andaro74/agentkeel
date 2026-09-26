@@ -46,3 +46,22 @@ def test_a_control_that_would_drop_a_plant_without_a_word_is_refused(tree, name,
 def test_a_control_named_in_controls_must_be_in_the_tree(tree):
     (tree / plants.CONTROLS["redteam"]).unlink()
     assert any("not in the tree" in error for error in controls.check(tree))
+
+
+@pytest.mark.parametrize("name", ["guardrail.yaml", "redteam.yaml"])
+def test_a_control_with_no_blocks_is_refused(tree, name):
+    """M03 PR 3 (rule-owner F3): `blocks` deleted whole, with the rule it named, would score a plant on any
+    intervention and silence nothing. Every control must name the rule for each plant."""
+    import yaml
+
+    path = tree / "agents" / "refagent" / "rules" / name
+    control = yaml.safe_load(path.read_text(encoding="utf-8"))
+    del control["blocks"]
+    path.write_text(yaml.safe_dump(control), encoding="utf-8")
+    assert any(f"{name}: blocks names None" in error for error in controls.check(tree)), controls.check(tree)
+
+
+def test_a_blocks_entry_that_names_no_rule_is_refused(tree):
+    """The cold review of M03 PR 3, F1: `g-015: null` keeps the key and unnames the plant."""
+    rewrite(tree, "guardrail.yaml", "g-015: sending-terms-to-a-competitor", "g-015: null")
+    assert any("blocks names no rule for ['g-015']" in error for error in controls.check(tree)), controls.check(tree)
