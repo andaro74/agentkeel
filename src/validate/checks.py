@@ -267,6 +267,7 @@ def check_manifests(root: Path) -> list[str]:
 STACKS = {
     "AgentkeelBootstrap": "infra/bootstrap",
     "AgentkeelRefagent": "infra/construct",
+    "AgentkeelIngest": "infra/ingest",  # M03 PR 2
 }
 NAG_REPORT = "AwsSolutions--{stack}-NagReport.csv"
 
@@ -330,8 +331,11 @@ def _nag_rows(path: Path, rel: str) -> list[str]:
 
 
 def _names_its_case(reason: str) -> bool:
-    """`seed S3`, not `the S3 gateway endpoint`: the service name is not the seed."""
-    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason)
+    """`seed S3`, not `the S3 gateway endpoint`: the service name is not the seed.
+
+    From M03 PR 2 a line of SPEC/03 §6 serves as SPEC/01 §6's does, for the ingest stack.
+    """
+    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason or "SPEC/03 §6" in reason)
 
 
 THRESHOLDS = "thresholds.yaml"
