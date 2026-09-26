@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 
 import aws_cdk as cdk
@@ -50,6 +51,10 @@ from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from constructs import Construct
+
+# cdk runs this file from infra/ingest (cdk.json), where the repo root is not on
+# the path; make validate runs it from the root. Both must find src/.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.verdict import fingerprint_of
 

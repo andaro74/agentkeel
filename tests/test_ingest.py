@@ -256,3 +256,11 @@ def test_the_ingest_citation_serves_the_ingest_stack_only():
 
 def test_the_promoter_fits_inline():
     assert len((ROOT / "infra" / "ingest" / "promoter.py").read_bytes()) <= 4096
+
+
+def test_the_app_synthesises_the_way_cdk_runs_it(tmp_path):
+    """cdk.json runs app.py from infra/ingest with no PYTHONPATH; the first stop B failed on `import src`."""
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    done = subprocess.run([sys.executable, "app.py"], cwd=APP.parent, capture_output=True, text=True, check=False,
+                          env={**env, "CDK_OUTDIR": str(tmp_path)})  # fmt: skip
+    assert done.returncode == 0, done.stderr
