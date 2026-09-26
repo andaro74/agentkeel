@@ -20,15 +20,18 @@ holds the cell to that line. What these six gate is `git tag m03`.
 **1. Engineering — the evidence is CI-written and unedited.**
 
 The envelope `evals/history/cb06c0dbf0019088c664c6df1ce7d67cc64f7d58.json`,
-its control card and its raw observations were written by
-`src/verdict/build.py`, `src/baseline/run.py` and `src/agent/run.py` inside
-CI run 36270471757, and committed by `github-actions[bot]` in `013a1c5`.
-No human edited any of them after CI wrote them. Every commit under
+its control card and the control's raw observations were written by
+`src/verdict/build.py` and `src/baseline/run.py` inside CI run
+36270471757, and committed by `github-actions[bot]` in `013a1c5`. No human
+edited any of them after CI wrote them. The agent's raw observations,
+from which `build` counted each plant by its named rule, are a CI
+artifact of that run, not committed (M04 `open.md` row 34, item b). Every commit under
 `evals/history/` in M03 is `github-actions[bot]`'s (three: `2b2229e`,
 `506c8ed`, `013a1c5`). `src/baseline/` is unchanged since tag `m00`
 (ADR-0002, `tests/test_baseline_frozen.py`). Each seed's strict marker came
-off in the commit that landed its reader, and with each reader switched
-off its seed failed again for its planted reason.
+off in the commit that landed its reader (`pr2-engineering.md`); S1's and
+S2's test bodies changed with their readers (its N1). At the close the
+seven seed tests and the two guards pass.
 
 Signed: ______  Date: ______
 
@@ -41,11 +44,12 @@ reading `cdk diff`: at PR 2's stops A and B (guardrail versions 1 to 4,
 and the ingest stack from `0ee873e`), and at PR 3's (version 5 from
 `0a90d52`, the promoter's pin from `70e7d53`, each a checkout with no
 tracked change). The read-backs matched the expected grants: 79 cases
-after PR 2's stop A, 81 before and after PR 3's, 0 mismatches. The production bucket has Object Lock in COMPLIANCE mode for
-1 day. The seed amendment was put in quarantine on 2026-09-26 at
+after PR 2's stop A, 81 before and after PR 3's, 0 mismatches. The production bucket is configured with Object Lock in
+COMPLIANCE mode for 1 day. The seed amendment was put in quarantine on 2026-09-26 at
 03:34:52Z and is not in the production bucket, read by CI in run
 36270471757. The merge deploy (run 36272077619) moved the runtime to
-guardrail version 5; its load check wrote 20 observations with 0 errors.
+guardrail version 5; its load check wrote 20 observations with 0 errors
+(`runs/pr3_merge_deploy_load_check.md`, a log, not an envelope).
 None of the ingest stack's own refusals has been attempted in AWS, and
 this line does not say they work.
 
@@ -53,7 +57,7 @@ Signed: ______  Date: ______
 
 ---
 
-**3. Rule Owner — each plant is blocked by the rule named for it, and no
+**3. Rule Owner — each plant names the rule that must block it, and no
 rule was relaxed on `main`.**
 
 `agents/refagent/rules/guardrail.yaml` and `redteam.yaml` name, in

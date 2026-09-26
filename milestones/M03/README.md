@@ -97,13 +97,16 @@ GREEN without spending. This PR changes only `docs/**` and
 `milestones/**/*.md`, which `evals.yml` does not measure, so its run
 does the same. **No envelope reads the runtime at version 5.** The merge
 deploy's load check (run 36272077619: 20 observations, 0 errors, the
-seven plants `guardrail_intervened`, `g-014` `end_turn`) is a deploy log,
-and it prints no topics and no version. The first `mode: runtime`
+seven plants `guardrail_intervened`, `g-014` `end_turn`; transcribed in
+`runs/pr3_merge_deploy_load_check.md`) is a deploy log, and it prints no
+topics and no version. The first `mode: runtime`
 envelope at `:5` is `milestones/M04/open.md` row 10.
 
 **Row 3's RED conditions, each checked at the close:** no seed's test
 passes but by its reader (`uv run pytest tests/test_m03_seeds.py`, 9
-passed; at PR 2 each reader was switched off and its seed failed again);
+passed; each strict marker came off in the commit that landed its reader,
+`pr2-engineering.md`, and S1's and S2's test bodies changed with their
+readers, its N1);
 no silent plant ruled GREEN (7 of 7); plants are not under 7; the
 amendment is not in the production bucket (F3_5, CI's lookup in run
 36270471757); both guards green; `make ledger` matches rows 0 to 2.
@@ -135,7 +138,7 @@ names; cut 5, Promptfoo, to M05. `milestones/M04/open.md` rows 19 and 25.
 | Unsure, #19 (A to G) | 7 | A, B ruled (`pr1.md` rulings 6, 5); C ruled (`pr2.md` ruling 1); D M04 `open.md` row 30 (M05); E closed: `red-teamer` was exercised twice more in PR 2 (#20's first comment); F done at PR 2 (the deny narrowed, 79 cases); G done (#19) |
 | Unsure, #20 (A to G) | 7 | A, B, E M04 `open.md` rows 1, 2, 3; C repaired at PR 3; D read by the merge deploy's load check, a log; F done (`a9c8ff6`); G row 29 (M05) |
 | Unsure, #21 (A to G) | 7 | A row 4; B the eval role read by `cb06c0d`, the runtime's condition by run 36272077619's load check (a log; row 10); C closed here, negatively: no `mode: runtime` envelope at `:5` exists (row 10); D row 6; E ruled, M05 (row 28); F row 5; G ruled in `pr3-security.md` (rows 7, 8, 26, 27) |
-| M03 `open.md` rows 1 to 15 | 15 | `feasibility.md` §6 answered each at PR 1; rows 3 to 8 at PR 2 and PR 3; what was dated M04 or later, and row 11's items f, h, i and a to d, k, are M04 `open.md` rows 12 to 15, 22, 34 and 36 |
+| M03 `open.md` rows 1 to 15 | 15 | `feasibility.md` §6 answered each at PR 1; rows 3 to 8 at PR 2 and PR 3; row 11's items e and j done at PR 2 (`src/verdict/__init__.py`, the readers at a commit) and g done (`src/agent/run.py`, the goldens no longer excluded); what was dated M04 or later, and row 11's items f, h, i and a to d, k, are M04 `open.md` rows 12 to 15, 22, 34 and 36 |
 
 **Still open, for the human after the merge:** sign
 `milestones/M03/attestations.md`; `git tag m03` on `main`; record the M03
