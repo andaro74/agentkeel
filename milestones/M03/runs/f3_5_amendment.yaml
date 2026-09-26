@@ -41,3 +41,8 @@ observed:
   scan_result: GUARDRAIL_INTERVENED appliedGuardrailDetails,invocationMetrics,topicPolicy
   in_production: false
   named_in_admitted: false
+  # Added at the cold review of PR 2 (F4): the commit the human deployed the
+  # ingest stack from at stop B (git log -1 showed it, per the steps given),
+  # whose admitted.yaml the promoter was built with. Its fingerprint,
+  # e12988c5..., is the record's admitted_fingerprint for this version.
+  admitted_at: 0ee873eaa5d29c3d461adba24b6ed42cff166971
