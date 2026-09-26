@@ -1,6 +1,6 @@
 ---
 # M03 PR 3 (#21), Security's key. Drafted by the session from the
-# security-reviewer reports on this PR; for the human to rule as Security.
+# security-reviewer reports on this PR; ruled by the human as Security, 2026-09-26.
 # Product's file is pr3.md.
 ruling: pr3-security
 seat: Security
@@ -23,7 +23,7 @@ pr: 21
 
 # Ruling: M03 PR 3, Security
 
-DRAFT. For the human to rule as Security. `security-reviewer` read this PR
+Ruled by andaro74 as Security, 2026-09-26, as written. `security-reviewer` read this PR
 three times, each report in the PR body: before stop A, from the tree at
 `9ff9f95` (0 BLOCK, 4 FINDING, 16 NOTE); before stop B, from the tree at
 `47ee02d` (0 BLOCK, 2 FINDING, 16 NOTE); for the cold review, the diff
@@ -63,7 +63,7 @@ reading, `json.dumps` compact of the synth).
 | before A, F1 | `cdk diff` must show nothing but the version, the parameter and the output | **held**: the diff, pasted whole |
 | before A, F2 | the manifest moves only after `get-guardrail` of the new version is read | **held**: `47ee02d` after `9736c66` |
 | before A, F3 | the read-back simulates `ApplyGuardrail` on the unversioned ARN only | **read**: the eval role applied version 5 in run [36270471757](https://github.com/andaro74/agentkeel/actions/runs/36270471757) (`cb06c0d…`, GREEN, plants 7 of 7) |
-| before A, F4 / N8 | the eval role's invoke is not conditioned on the guardrail; the plants (F3_2) catch a dropped `guardrailConfig`, IAM does not | recorded; **proposed M05** (IAM ceilings, R5) |
+| before A, F4 / N8 | the eval role's invoke is not conditioned on the guardrail; the plants (F3_2) catch a dropped `guardrailConfig`, IAM does not | recorded; **M05** (ruled) (IAM ceilings, R5) |
 | before B, F1 | the ingest inputs since `0ee873e` not all diffed | **read**: only the manifest (and a README) changed; `fingerprint_of`, `pyproject.toml`, `uv.lock` unchanged; templates compared |
 | before B, F2 | a stop B read-back owed | **done** `0966593` |
 | cold, F1 | stop B cited `pr3.md`, not in the tree | **held**: `pr3.md` ruling C, in this PR |
@@ -73,9 +73,9 @@ reading, `json.dumps` compact of the synth).
 | cold, N4 (Eng.) | "clean checkout" with untracked files present | **repaired** `e88259c` |
 | N9 (PR 2) | the parameter's description | **settled** `d02be78`, deployed at stop A |
 | F3 (PR 2) | the 10 omitted changes | **settled** as metadata only |
-| N10 | `<arn>:*` lets the eval role, the agent role and the promoter apply DRAFT and versions 1 to 5; only the runtime's invoke is pinned (to 5 after the merge) | recorded, wider in fact; **proposed M05** |
-| N16 | the template at 47,601 of 51,200 bytes | recorded; **proposed M04 PR 1**, before any addition to this stack |
-| NOTE | the promoter's record keeps no guardrail version; S5's scan is version 4's by `admitted_at` | recorded; **proposed M04 PR 1**, when refagent first reads the corpus |
+| N10 | `<arn>:*` lets the eval role, the agent role and the promoter apply DRAFT and versions 1 to 5; only the runtime's invoke is pinned (to 5 after the merge) | recorded, wider in fact; **M05** (ruled) |
+| N16 | the template at 47,601 of 51,200 bytes | recorded; **M04 PR 1** (ruled), before any addition to this stack |
+| NOTE | the promoter's record keeps no guardrail version; S5's scan is version 4's by `admitted_at` | recorded; **M04 PR 1** (ruled), when refagent first reads the corpus |
 | NOTE | nothing mechanical compares deployed pins with the manifest (the promoter, the guardrail version) | recorded; M05 |
 | N6, N7, N11, N13, N14, F4 (PR 2) | as `pr2-security.md` | unchanged |
 

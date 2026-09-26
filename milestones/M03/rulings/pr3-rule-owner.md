@@ -1,6 +1,6 @@
 ---
 # M03 PR 3 (#21), the Rule Owner's key. Drafted by the session from the
-# rule-owner reports on this PR; for the human to rule as Rule Owner.
+# rule-owner reports on this PR; ruled by the human as Rule Owner, 2026-09-26.
 # Product's file is pr3.md.
 ruling: pr3-rule-owner
 seat: Rule Owner
@@ -20,7 +20,7 @@ pr: 21
 
 # Ruling: M03 PR 3, Rule Owner
 
-DRAFT. For the human to rule as Rule Owner. `rule-owner` read this PR three
+Ruled by andaro74 as Rule Owner, 2026-09-26, as written. `rule-owner` read this PR three
 times, each report in the PR body: before stop A, from the tree at
 `9ff9f95` (0 BLOCK, 3 FINDING, 13 NOTE); before stop B, from the tree at
 `47ee02d` (0 BLOCK, 3 FINDING, 5 NOTE); for the cold review, the diff

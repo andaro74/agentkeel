@@ -2,7 +2,7 @@
 # M03 PR 3 (#21), Engineering's key and the cold review, one file. The
 # cold review was drafted by engineering-cold-reviewer from the diff
 # a423292...62e7980 and row 3 only; its report is in the PR body verbatim.
-# Drafted by the session; for the human to rule as Engineering.
+# Drafted by the session; ruled by the human as Engineering, 2026-09-26.
 ruling: pr3-engineering
 seat: Engineering
 authorises:
@@ -22,7 +22,7 @@ pr: 21
 
 # Ruling: M03 PR 3, Engineering, with the cold review
 
-DRAFT. For the human to rule as Engineering.
+Ruled by andaro74 as Engineering, 2026-09-26, as written.
 
 ## The cold review
 

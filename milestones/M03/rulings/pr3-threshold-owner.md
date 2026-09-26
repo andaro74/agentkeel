@@ -1,7 +1,7 @@
 ---
 # M03 PR 3 (#21), the Threshold Owner's key. Drafted by the session from
-# the threshold-owner report on this PR; for the human to rule as Threshold
-# Owner. It changes no bar: `thresholds.yaml` is named because this file
+# the threshold-owner report on this PR; ruled by the human as Threshold
+# Owner, 2026-09-26. It changes no bar: `thresholds.yaml` is named because this file
 # rules on its cap (Product, pr3.md ruling B: a ruling file only).
 ruling: pr3-threshold-owner
 seat: Threshold Owner
@@ -19,7 +19,7 @@ pr: 21
 
 # Ruling: M03 PR 3, Threshold Owner
 
-DRAFT. For the human to rule as Threshold Owner. `milestones/M03/open.md`
+Ruled by andaro74 as Threshold Owner, 2026-09-26, as written. `milestones/M03/open.md`
 row 7, dated PR 2 in `feasibility.md` §6 and not done there, done here as a
 ruling file (`pr3.md` ruling B). `threshold-owner`'s report (0 BLOCK, 1
 FINDING, 11 NOTE) is in the PR body; it read the tree and the envelopes.
@@ -70,8 +70,8 @@ re-ruling, not here.
 entry". It is not in `thresholds.yaml`, and `two_key.py` defers it ("R10's
 N and M04's `delta_max` land as bars when their milestones write them").
 The date slipped without a record. Nothing moves, since no N exists.
-**Re-dated to M05**, where claim 5 first reads it (proposed; the human
-rules), and carried in `pr3.md` Unsure E.
+**Re-dated to M05**, where claim 5 first reads it (ruled by the Threshold Owner,
+2026-09-26), and carried in `pr3.md` Unsure E.
 
 `delta_max`, the relative regression bar, is M04's (ruling on F11). Today
 the regression bar is P7 and R2 as `judge` holds them: any regressed golden

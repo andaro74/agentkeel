@@ -3,7 +3,7 @@
 # One seat per file: the Rule Owner's is pr3-rule-owner.md, Security's
 # pr3-security.md, Engineering's pr3-engineering.md (with the cold review),
 # the Threshold Owner's pr3-threshold-owner.md. No Data Owner or Tool Owner
-# path. Drafted by the session; for the human to rule as Product.
+# path. Drafted by the session; ruled by the human as Product, 2026-09-26.
 ruling: pr3
 seat: Product
 authorises:
@@ -26,7 +26,7 @@ pr: 21
 
 # Ruling: M03 PR 3, Product
 
-DRAFT. For the human to rule as Product.
+Ruled by andaro74 as Product, 2026-09-26, as written.
 
 ## What this PR is
 
