@@ -66,6 +66,8 @@ import yaml
 from src.verdict import (
     ROOT,
     canonical_sha256,
+    fingerprint_at,
+    fingerprint_of,
     golden_kinds_at,
     load_golden_kinds,
     plants,
@@ -75,7 +77,7 @@ from src.verdict import (
     where_at,
 )
 
-__all__ = ["Rejected", "cap_at", "control_drift", "judge", "measured", "measured_at", "read", "required_checks",
+__all__ = ["Rejected", "cap_at", "control_drift", "corpus_fingerprint", "judge", "measured", "measured_at", "read", "required_checks",
            "rule", "schema_errors", "thresholds_at"]
 
 # What an agent envelope must carry from M01 (SPEC/01 §4). A check that is
@@ -281,14 +283,22 @@ def judge(
     plant_ids: list[str],
     cap: int | None = None,
     required: tuple[str, ...] = CLAIM_1_CHECKS,  # a direct caller gets claim 1 only; `rule` passes `required_checks`
+    corpus: str | None = None,
 ) -> tuple[str, list[str]]:
     """The gate's own verdict and its reasons. `envelope` has passed `read`.
+
+    `corpus` is the gate's own reading of the corpus fingerprint (SPEC/03 §2),
+    which `rule` takes from `admitted.yaml` at the envelope's commit: None where
+    no corpus was admitted. An envelope that says otherwise is RED (seed S4).
 
     `required` is what an agent envelope must carry (`required_checks`):
     claim 1's four, and from M02 PR 2's merge claim 2's two as well.
     """
     results = envelope["goldens"]
     reasons: list[str] = []
+    if envelope["corpus_fingerprint"] != corpus:
+        reasons.append(f"corpus_fingerprint: the envelope says {envelope['corpus_fingerprint']!r}, "
+                       f"the gate reads {corpus!r} from admitted.yaml")  # fmt: skip
 
     if {g: r["kind"] for g, r in results.items()} != kinds:
         reasons.append("the envelope's goldens are not the goldens in the tree")
@@ -450,7 +460,14 @@ def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
         plant_ids = plants.plant_ids(kinds, ROOT, envelope["commit"])
     except ValueError as exc:  # a control that lists no plants: the gate cannot count them, which is not GREEN
         raise Rejected(str(exc)) from exc
-    return judge(envelope, kinds, history, plant_ids, cap, required_checks(envelope["commit"]))
+    corpus, _ = fingerprint_at(envelope["commit"], ROOT)  # admitted.yaml at the envelope's commit (S4)
+    return judge(envelope, kinds, history, plant_ids, cap, required_checks(envelope["commit"]), corpus=corpus)
+
+
+def corpus_fingerprint(root: Path = ROOT) -> str | None:
+    """The fingerprint of the corpus `root`'s tree admits, as it is now (a test's copy of the tree)."""
+    admitted = root / "data" / "corpus" / "admitted.yaml"
+    return fingerprint_of(admitted.read_text(encoding="utf-8") if admitted.is_file() else None)
 
 
 def control_card_of(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> dict[str, Any] | None:

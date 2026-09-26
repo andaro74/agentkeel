@@ -53,7 +53,14 @@ from typing import Any
 
 import yaml
 
-from src.verdict import ROOT, canonical_sha256, plants, replay_history, schema_errors
+from src.verdict import (
+    ROOT,
+    canonical_sha256,
+    fingerprint_at,
+    plants,
+    replay_history,
+    schema_errors,
+)
 
 CARD_WHAT = "baseline card: the naive baseline scored against the goldens; not an envelope"
 CITING_KINDS = {"ordinary", "trap"}
@@ -449,6 +456,7 @@ def compose_envelope(
     control_tokens: tuple[int, int] = (0, 0),
     cap: int | None = None,
     run_url: str | None = None,
+    corpus_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     observations = raw["observations"]
     usage = [o.get("usage", {}) for o in observations]
@@ -503,7 +511,8 @@ def compose_envelope(
         "model_id": raw["model_id"],
         "guardrail_version": raw.get("guardrail"),
         "judge_model_id": None,
-        "corpus_fingerprint": None,
+        # From admitted.yaml at the run's commit (SPEC/03 §2; M03 PR 2). The gate reads it again.
+        "corpus_fingerprint": corpus_fingerprint,
         "cache_state": "disabled",
         "baseline_card_ref": card_ref,
         **one_subject,
@@ -619,12 +628,13 @@ def main(argv: list[str] | None = None) -> int:
                 plant_ids = plants.plant_ids(kinds, ROOT, raw["commit"])
             except ValueError as exc:
                 raise Refused(str(exc)) from exc
+            corpus, _ = fingerprint_at(raw["commit"], ROOT)  # admitted.yaml at the run's commit
             if scope_of(raw, control) == "control":
                 # No agent ran: the control is the subject, in M00's form (ADR-0004
                 # amendment 2, ruling A). Its own card is the base; no control_card_ref.
                 envelope = compose_envelope(
                     raw, results, "control", control_ref, history, plant_ids,
-                    checks, git_tag(raw["commit"]), cap=cap,
+                    checks, git_tag(raw["commit"]), cap=cap, corpus_fingerprint=corpus,
                 )  # fmt: skip
             else:
                 envelope = compose_envelope(
@@ -640,6 +650,7 @@ def main(argv: list[str] | None = None) -> int:
                     control_tokens=(control.get("tokens_in", 0), control.get("tokens_out", 0)),
                     cap=cap,
                     run_url=args.run_url,
+                    corpus_fingerprint=corpus,
                 )
             emit(envelope, args.out, envelope=True)
     except Refused as refusal:

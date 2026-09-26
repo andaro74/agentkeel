@@ -77,6 +77,31 @@ def text_at(commit: str, path: str, root: Path = ROOT) -> tuple[str | None, str]
     return (shown.stdout.decode("utf-8") if shown.returncode == 0 else None), where
 
 
+ADMITTED = "data/corpus/admitted.yaml"
+
+
+def fingerprint_of(admitted: str | None) -> str | None:
+    """The corpus fingerprint (SPEC/03 §2): sha256 over `key sha256` lines, sorted by key; None with no corpus.
+
+    `admitted` is the text of `data/corpus/admitted.yaml`, or None where
+    there is none. build writes this; the gate works it out again at the
+    envelope's commit (seed S4's reader, M03 PR 2).
+    """
+    import yaml
+
+    if admitted is None:
+        return None
+    entries = yaml.safe_load(admitted) or []
+    lines = "".join(f"{e['key']} {e['sha256']}\n" for e in sorted(entries, key=lambda e: e["key"]))
+    return hashlib.sha256(lines.encode("utf-8")).hexdigest()
+
+
+def fingerprint_at(commit: str, root: Path = ROOT) -> tuple[str | None, str]:
+    """The corpus fingerprint as `admitted.yaml` stood at `commit`, and where it was read."""
+    text, where = text_at(commit, ADMITTED, root)
+    return fingerprint_of(text), where
+
+
 def load_golden_kinds(goldens_dir: Path) -> dict[str, str]:
     """Golden id -> kind, for the goldens that are not retired. Reads nothing else from a golden.
 

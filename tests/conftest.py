@@ -70,6 +70,12 @@ def chain(tmp_path: Path, goldens, monkeypatch):
     plants passes its plant ids to `judge` itself.
     """
     monkeypatch.setattr(plants, "CONTROLS", {})
+    # And with no corpus, for the same reason: the tree has admitted one since M03 PR 2.
+    # A test of the fingerprint passes `corpus` to `judge` itself.
+    from src.verdict import gate
+
+    monkeypatch.setattr(build, "fingerprint_at", lambda commit, root=ROOT: (None, "no corpus in the fixture"))
+    monkeypatch.setattr(gate, "fingerprint_at", lambda commit, root=ROOT: (None, "no corpus in the fixture"))
 
     def run(right: set[str] = frozenset(), history_dir: Path | None = None, agent: bool = False, **top: Any):
         raw_path = tmp_path / f"{COMMIT}.baseline-raw.json"

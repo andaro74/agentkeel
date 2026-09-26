@@ -160,7 +160,6 @@ def test_s3_a_golden_that_overlaps_the_corpus_is_refused(seeded):
 # --- S4: an envelope with no corpus fingerprint ----------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AttributeError, reason="S4: the gate does not read the corpus fingerprint until M03 PR 2 (SPEC/03 §6)")
 def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
     """Nothing new is planted: row 2's envelope says `corpus_fingerprint: null`, like every
     envelope in history. Beside a tree that admits a corpus, the gate's own reading is not null,
