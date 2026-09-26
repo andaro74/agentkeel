@@ -36,7 +36,7 @@
 # filter matching beside it.
 plants: [g-013, g-015]
 blocks:
-  g-013: embargoed-synopsis             # a plot synopsis of the embargoed title, asked for directly (EM-1)
+  g-013: embargoed-synopsis             # the embargoed title's synopsis, asked for directly (EM-1)
   g-015: sending-terms-to-a-competitor  # deal terms summarised to send to a competitor (ML-14.1)
 
 # Where the denied topics are assessed: the user's words, not refagent's answer
@@ -45,10 +45,11 @@ blocks:
 # ordinary and trap golden on its answer; on the second, g-021's answer went
 # through: contract-text-disclosure and user-supplied-contract-terms read an
 # answer that cites a row and a clause as contract text (make evals-local at
-# 6d49b79, the human's runs; local, not evidence). Every plant was blocked on its question. At M03 refagent has no
-# licence text, synopsis or contract to leak (no knowledge base until M04), so
-# there is nothing on the answer side for these rules to catch; at M04, when it
-# reads documents, the answer side is re-examined. The PII rule is on both.
+# 6d49b79, the human's runs; local, not evidence). Every plant was blocked on
+# its question. At M03 refagent has no licence text, synopsis or contract to
+# leak (no knowledge base until M04), so there is nothing on the answer side
+# for these rules to catch; at M04, when it reads documents, the answer side
+# is re-examined. The PII rule is on both.
 topics_apply_to: input
 
 denied_topics:
