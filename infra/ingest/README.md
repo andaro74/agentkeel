@@ -7,7 +7,11 @@ What it is for, in one line: a document reaches the production bucket, the
 only one refagent will read from (M04), when and only when
 `data/corpus/admitted.yaml` names its sha256. Seed S5, the unsigned
 Amendment No. 2, is named by no ruling, so it should stay in quarantine.
-Nothing here has fired yet; stop B and PR 2's CI run are the first time.
+At stop B (M03 PR 2, 2026-09-25/26) the six admitted documents were
+promoted and S5 was recorded not promoted (`milestones/M03/runs/f3_5_amendment.yaml`);
+PR 2's CI run is what reads it as evidence. The stack's own refusals (a
+put by anyone but the promoter, a delete, a re-lock) have not been
+attempted (SPEC/03 §8).
 
 It is deployed by the human with admin and by nothing else, **from a clean
 checkout**: the admitted list is read from the tree at synth. Each record the
