@@ -17,9 +17,9 @@ For *Summer at Dunmore Pier* (1987), the cleared cues are:
 
 | Cue | Title of the song | Publisher |
 |---|---|---|
-| 1M3 | "Low Tide at Carrick" | Seaboard Songs (fictional) |
-| 2M1 | "The Pier Lights" | Halden Music (fictional) |
-| 4M6 | "Come Home by the Ferry" | Seaboard Songs (fictional) |
+| 1M3 | "Saltmarrow Quay" | Tamsbury Tidewater Songs (fictional) |
+| 2M1 | "Lanterns over Pellick Sound" | Orrindale Music (fictional) |
+| 4M6 | "The Grebeston Ferry Waltz" | Tamsbury Tidewater Songs (fictional) |
 
 ## MC-3. Expiry
 

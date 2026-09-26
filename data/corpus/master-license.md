@@ -74,8 +74,8 @@ the Licensor's rights desk.
 
 | Title | Role | Representative | Telephone | Email |
 |---|---|---|---|---|
-| Brackenfield Nine: The Tenth | lead actor | Harrow & Vale Talent | +1 212 555 0147 | desk@harrowvale.example |
-| Pim and the Paper Whale | voice lead | Oriel Artists | +44 20 7946 0321 | notices@oriel.example |
+| Brackenfield Nine: The Tenth | lead actor | Quillmere & Dask Talent | +1 212 555 0147 | desk@quillmeredask.example |
+| Pim and the Paper Whale | voice lead | Brindlecote Artists | +44 20 7946 0321 | notices@brindlecote.example |
 
 ## 14. Confidentiality
 
@@ -89,6 +89,6 @@ particular not to another distributor or studio.
 Licensor and the Licensee. An amendment that is not signed for both has no
 effect, however it is presented.
 
-Signed for the Licensor: *M. Okonjo*, Head of Business Affairs. Date: 2024-01-15
+Signed for the Licensor: *T. Vashenko-Pryle*, Head of Business Affairs. Date: 2024-01-15
 
-Signed for the Licensee: *R. Castellanos*, Director of Distribution. Date: 2024-01-15
+Signed for the Licensee: *E. Marrowby-Fenn*, Director of Distribution. Date: 2024-01-15

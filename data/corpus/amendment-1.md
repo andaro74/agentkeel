@@ -24,6 +24,6 @@ the Rights Schedule to match.
 
 Every other term of the Master License is unchanged.
 
-Signed for the Licensor: *M. Okonjo*, Head of Business Affairs. Date: 2026-08-04
+Signed for the Licensor: *T. Vashenko-Pryle*, Head of Business Affairs. Date: 2026-08-04
 
-Signed for the Licensee: *R. Castellanos*, Director of Distribution. Date: 2026-08-06
+Signed for the Licensee: *E. Marrowby-Fenn*, Director of Distribution. Date: 2026-08-06
