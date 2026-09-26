@@ -324,8 +324,10 @@ class GovernedAgent(Construct):
                 # system profile it copies from, which its role may not (B2).
                 "AGENTKEEL_MODEL_PROFILE": self.profile.attr_inference_profile_arn,
                 "AGENTKEEL_RIGHTS_TABLE": self.rights_table.table_name,
-                # The manifest's guardrail pin, which the server passes to converse (M03 PR 2).
-                **({"AGENTKEEL_GUARDRAIL_ID": self.guardrail["id"],
+                # The manifest's guardrail pin, which the server passes to converse (M03 PR 2), as
+                # the ARN, not the bare id: the invoke grants' GuardrailIdentifier condition names the
+                # ARN, and the request then carries the same string (security-reviewer on PR 2, F1).
+                **({"AGENTKEEL_GUARDRAIL_ARN": self._guardrail_arn(versioned=False),
                     "AGENTKEEL_GUARDRAIL_VERSION": self.guardrail["version"]} if self.guardrail else {}),
             },
         )  # fmt: skip

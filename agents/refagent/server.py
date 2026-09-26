@@ -30,9 +30,11 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 MODEL_ID = os.environ.get("AGENTKEEL_MODEL_PROFILE", "us.anthropic.claude-sonnet-4-6")
 TABLE = os.environ.get("AGENTKEEL_RIGHTS_TABLE")
 # The manifest's guardrail pin, which GovernedAgent sets from the same manifest
-# (M03 PR 2). Both or neither; the image has no YAML reader to read it itself.
-GUARDRAIL = ({"id": os.environ["AGENTKEEL_GUARDRAIL_ID"], "version": os.environ["AGENTKEEL_GUARDRAIL_VERSION"]}
-             if os.environ.get("AGENTKEEL_GUARDRAIL_ID") else None)  # fmt: skip
+# (M03 PR 2), as the guardrail's ARN: converse takes an id or an ARN, and the
+# agent role's invoke is conditioned on the ARN at the pinned version. Both or
+# neither; the image has no YAML reader to read it itself.
+GUARDRAIL = ({"id": os.environ["AGENTKEEL_GUARDRAIL_ARN"], "version": os.environ["AGENTKEEL_GUARDRAIL_VERSION"]}
+             if os.environ.get("AGENTKEEL_GUARDRAIL_ARN") else None)  # fmt: skip
 
 
 class Handler(BaseHTTPRequestHandler):

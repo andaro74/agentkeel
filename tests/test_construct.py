@@ -281,4 +281,7 @@ def test_the_runtime_is_given_the_guardrail_pin(template):
     pin = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))["guardrail"]
     runtime = next(r for r in template["Resources"].values() if r["Type"] == "AWS::BedrockAgentCore::Runtime")
     env = runtime["Properties"]["EnvironmentVariables"]
-    assert (env["AGENTKEEL_GUARDRAIL_ID"], env["AGENTKEEL_GUARDRAIL_VERSION"]) == (pin["id"], pin["version"])
+    # The ARN, the string the invoke grants' GuardrailIdentifier condition names (security-reviewer on PR 2, F1).
+    assert env["AGENTKEEL_GUARDRAIL_ARN"] == {"Fn::Join": ["", ["arn:aws:bedrock:us-west-2:", {"Ref": "AWS::AccountId"},
+                                                                f":guardrail/{pin['id']}"]]}  # fmt: skip
+    assert env["AGENTKEEL_GUARDRAIL_VERSION"] == pin["version"] and "AGENTKEEL_GUARDRAIL_ID" not in env
