@@ -160,15 +160,15 @@ names it and says so.
 
 ## M03 PR 3, stop A: guardrail version 5
 
-One redeploy, from a clean checkout of `0a90d52`, the same commands as
-above with `cdk diff --strict`. `guardrail.yaml` gained a `blocks` map
-naming the rule for each of its plants (rule-owner F1 on M03 PR 2), so the
-rules digest changed and the version was replaced: version **5**,
-`rules sha256 b2cff2a1…`, READY; version 4 retained. The guardrail itself,
-every IAM policy document and the VPC did not change; `ParamGuardrail`'s
-description was corrected (security-reviewer N9 on PR 2). The ten
-metadata-only changes `--strict` printed are the suppression reasons'
-`§`, which the deployed template read as `?`
+One redeploy, from a checkout of `0a90d52` with no tracked change, the
+same commands as above with `cdk diff --strict`. `guardrail.yaml` gained a
+`blocks` map naming the rule for each of its plants (rule-owner F1 on M03
+PR 2), so the rules digest changed and the version was replaced: version
+**5**, `rules sha256 b2cff2a1…`, READY; version 4 retained. The guardrail
+itself, every IAM policy document and the VPC did not change;
+`ParamGuardrail`'s description was corrected (security-reviewer N9 on PR
+2). The ten metadata-only changes `--strict` printed are the suppression
+reasons' `§`, which the deployed template read as `?`
 (`milestones/M03/runs/pr3_stop_a_cdk_diff.md`).
 
 `read_back_grants.py`, before and after, byte-identical: 81 cases,

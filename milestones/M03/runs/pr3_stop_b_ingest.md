@@ -1,10 +1,11 @@
 # Stop B, the ingest stack redeployed with guardrail version 5 (M03 PR 3)
 
-Run by the human as admin, 2026-09-26, from a clean checkout of `70e7d53`
-(`before.md` and `after.md` untracked in the tree, read by nothing that
-synthesises), after `rule-owner` and `security-reviewer` read `47ee02d`.
-Pasted by the human, transcribed by the session; the session's reading
-first, then the outputs whole.
+Run by the human as admin, 2026-09-26, from a checkout of `70e7d53` with
+no tracked change (stop A's `before.md` and `after.md` untracked in the
+tree, read by nothing that synthesises; engineering-cold-reviewer N4),
+after `rule-owner` and `security-reviewer` read `47ee02d`. Pasted by the
+human, transcribed by the session; the session's reading first, then the
+outputs whole.
 
 - **Why.** `infra/ingest/app.py` reads the manifest's guardrail pin at
   synth into the promoter's environment. After the pin moved from 4 to 5

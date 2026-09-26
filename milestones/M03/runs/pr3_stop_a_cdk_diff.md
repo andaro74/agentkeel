@@ -1,9 +1,10 @@
 # Stop A, `cdk diff --strict AgentkeelBootstrap` before the redeploy (M03 PR 3)
 
-Run by the human as admin, 2026-09-26, from a clean checkout of `0a90d52`
-(`cd infra/bootstrap && npx aws-cdk@2 diff --strict AgentkeelBootstrap`),
-after the read-back before (`pr3_stop_a_read_back.md`) and before the
-deploy. Pasted by the human, transcribed whole below by the session.
+Run by the human as admin, 2026-09-26, from a checkout of `0a90d52` with
+no tracked change (`cd infra/bootstrap && npx aws-cdk@2 diff --strict
+AgentkeelBootstrap`), after the read-back before
+(`pr3_stop_a_read_back.md`) and before the deploy. Pasted by the human,
+transcribed whole below by the session.
 
 What it shows, read by the session before the deploy was run:
 

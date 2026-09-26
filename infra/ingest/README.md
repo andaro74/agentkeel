@@ -58,14 +58,14 @@ what the human writes feeds no check by itself.
 
 ## Stop B (M03 PR 3): the promoter configured with guardrail version 5
 
-The manifest's pin moved from 4 to 5 (`47ee02d`), and this stack reads it at
-synth, so the human redeployed it by hand on 2026-09-26 from a clean
-checkout of `70e7d53`. `cdk diff --strict` (a read-only change set) showed one
-change, the promoter's `GUARDRAIL_VERSION` from 4 to 5, in place; nothing
-else under this stack changed since `0ee873e`, the commit PR 2's stop B
-deployed from. After the deploy the promoter's configuration read
-`1088aw3ujhyd`, `5` and the admitted fingerprint `e12988c5…`, unchanged
-(`milestones/M03/runs/pr3_stop_b_ingest.md`).
+The manifest's pin moved from 4 to 5 (`47ee02d`), and this stack reads it
+at synth, so the human redeployed it by hand on 2026-09-26 from a checkout
+of `70e7d53` with no tracked change. `cdk diff --strict` (a read-only
+change set) showed one change, the promoter's `GUARDRAIL_VERSION` from 4
+to 5, in place; nothing else under this stack changed since `0ee873e`, the
+commit PR 2's stop B deployed from. After the deploy the promoter's
+configuration read `1088aw3ujhyd`, `5` and the admitted fingerprint
+`e12988c5…`, unchanged (`milestones/M03/runs/pr3_stop_b_ingest.md`).
 
 The promoter is configured with version 5; it first scans with it on the
 next upload. The record keeps no guardrail version, so seed S5's scan

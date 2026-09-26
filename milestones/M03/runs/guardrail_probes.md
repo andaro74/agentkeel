@@ -126,10 +126,10 @@ mismatches: 0
 
 ## Version 5 (M03 PR 3)
 
-Stop A of M03 PR 3, run by the human as admin on 2026-09-26 from a clean
-checkout of `0a90d52`, after reading `cdk diff --strict`
-(`pr3_stop_a_cdk_diff.md`: the version replaced, the guardrail itself
-unchanged). `guardrail.yaml` now names the rule for its own plants
+Stop A of M03 PR 3, run by the human as admin on 2026-09-26 from a
+checkout of `0a90d52` with no tracked change, after reading `cdk diff
+--strict` (`pr3_stop_a_cdk_diff.md`: the version replaced, the guardrail
+itself unchanged). `guardrail.yaml` now names the rule for its own plants
 (`blocks`: `g-013` embargoed-synopsis, `g-015`
 sending-terms-to-a-competitor; rule-owner F1 on PR 2, Unsure C), so the
 probe holds `g-013` and `g-015` to a named rule, as it holds `g-016` to

@@ -1,11 +1,13 @@
 # Stop A, read_back_grants.py before and after the bootstrap redeploy (M03 PR 3)
 
-Run by the human as admin, 2026-09-26, from a clean checkout of `0a90d52`:
-once before the deploy of `AgentkeelBootstrap` (`before.md`) and once after
-it (`after.md`). The two outputs are byte-identical (`diff before.md
+Run by the human as admin, 2026-09-26, from a checkout of `0a90d52` with
+no tracked change: the two outputs written as untracked `before.md` and
+`after.md` in the repo root, read by nothing that synthesises; once before
+the deploy of `AgentkeelBootstrap` (`before.md`) and once after it
+(`after.md`). The two outputs are byte-identical (`diff before.md
 after.md` printed nothing; `cmp` read by the session), so one table stands
-for both. 81 cases, every one the decision expected (mismatches: 0): PR 2's
-79 and, first run here, the agent ceiling's two DynamoDB rows that
+for both. 81 cases, every one the decision expected (mismatches: 0): PR
+2's 79 and, first run here, the agent ceiling's two DynamoDB rows that
 `5871122` added for `milestones/M03/open.md` row 8 (`dynamodb:Scan`
 allowed, `dynamodb:PutItem` implicitDeny; the last two rows).
 
