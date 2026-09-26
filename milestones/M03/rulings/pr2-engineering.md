@@ -1,8 +1,8 @@
 ---
-# M03 PR 2 (#20, expected), Engineering's key and the cold review, one file. The
+# M03 PR 2 (#20), Engineering's key and the cold review, one file. The
 # cold review was drafted by engineering-cold-reviewer from the diff
 # d2d1e6d...5871122 and row 3 only; its report is in the PR body verbatim.
-# Drafted by the session; the human rules it as Engineering.
+# Drafted by the session; ruled by the human as Engineering, 2026-09-26.
 ruling: pr2-engineering
 seat: Engineering
 authorises:
@@ -25,7 +25,7 @@ pr: 20
 
 # Ruling: M03 PR 2, Engineering, with the cold review
 
-**Draft.** The human rules it as Engineering.
+Ruled by andaro74 as Engineering, 2026-09-26, as written.
 
 ## The cold review
 
@@ -56,7 +56,7 @@ their own commits; the diff the reviewer read is unchanged beneath them.
 | N5 | schema.json's "M03 makes null a failure" | recorded: the gate fails a mismatch at the commit; null before `55c5b07` is right |
 | N6 | the doors file needs Product's ruling | `pr2.md` ruling 1 |
 | N7 | the promoter records assessment keys, `invocationMetrics` among them, as policies | recorded; changing it is an ingest redeploy |
-| N8 | SPEC/00's deny wording; `pr: 20` expected | **repaired** `df975d2`; `pr` corrected when the PR opens |
+| N8 | SPEC/00's deny wording; `pr: 20` expected | **repaired** `df975d2`; the PR opened as #20 |
 | N9 | nothing keeps the guardrail's examples away from the attacks | recorded: at most 4 shared words today |
 
 ## Also repaired after the cold review, from the seat reports

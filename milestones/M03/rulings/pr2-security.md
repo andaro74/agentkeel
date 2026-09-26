@@ -1,6 +1,6 @@
 ---
-# M03 PR 2 (#20, expected), Security's key. Drafted by the session from the
-# security-reviewer reports in this PR; the human rules it as Security.
+# M03 PR 2 (#20), Security's key. Drafted by the session from the
+# security-reviewer reports in this PR; ruled by the human as Security, 2026-09-26.
 ruling: pr2-security
 seat: Security
 authorises:
@@ -23,7 +23,7 @@ pr: 20
 
 # Ruling: M03 PR 2, Security
 
-**Draft.** The human rules it as Security. `security-reviewer` read this PR
+Ruled by andaro74 as Security, 2026-09-26, as written. `security-reviewer` read this PR
 six times (e2839f2; before stop A; 606bece; ad4ab14 and 2e93d27, with
 `platform-architect`; the whole diff `d2d1e6d...5871122`: 0 BLOCK,
 4 FINDING, 14 NOTE). Every report is in the PR body.

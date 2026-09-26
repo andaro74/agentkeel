@@ -1,5 +1,5 @@
 ---
-# M03 PR 2 (#20, expected; corrected when the PR opens), the Data Owner's key.
+# M03 PR 2 (#20), the Data Owner's key.
 # Drafted by the session; ruled by the human as Data Owner, 2026-09-25.
 ruling: pr2-data-owner
 seat: Data Owner

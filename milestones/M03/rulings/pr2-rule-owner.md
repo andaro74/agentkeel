@@ -1,6 +1,6 @@
 ---
-# M03 PR 2 (#20, expected), the Rule Owner's key. Drafted by the session from the
-# rule-owner report; the human rules it as Rule Owner. Product's file is pr2.md.
+# M03 PR 2 (#20), the Rule Owner's key. Drafted by the session from the
+# rule-owner report; ruled by the human as Rule Owner, 2026-09-26. Product's file is pr2.md.
 ruling: pr2-rule-owner
 seat: Rule Owner
 authorises:
@@ -20,7 +20,7 @@ pr: 20
 
 # Ruling: M03 PR 2, Rule Owner
 
-**Draft.** The human rules it as Rule Owner. The `rule-owner` report on the
+Ruled by andaro74 as Rule Owner, 2026-09-26, as written. The `rule-owner` report on the
 diff `d2d1e6d...5871122` (1 BLOCK, 5 FINDING, 8 NOTE) is in the PR body.
 On `agents/refagent/manifest.yaml` this file covers the `guardrail` field
 only; ruling-cited attributes the manifest field by field.

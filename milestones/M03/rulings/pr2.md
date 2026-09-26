@@ -1,9 +1,9 @@
 ---
-# M03 PR 2 (#20, expected; corrected when the PR opens), the measure. Product's key.
+# M03 PR 2 (#20), the measure. Product's key.
 # One seat per file: the Rule Owner's is pr2-rule-owner.md, Security's
 # pr2-security.md, Engineering's pr2-engineering.md (with the cold review), the
 # Data Owner's pr2-data-owner.md (ruled). No Tool Owner or Threshold Owner path.
-# Drafted by the session; the human rules it as Product.
+# Drafted by the session; ruled by the human as Product, 2026-09-26.
 ruling: pr2
 seat: Product
 authorises:
@@ -29,7 +29,7 @@ pr: 20
 
 # Ruling: M03 PR 2, Product
 
-**Draft.** Written by the session for the human, who rules it as Product.
+Ruled by andaro74 as Product, 2026-09-26, as written.
 
 ## What this PR is
 
