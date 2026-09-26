@@ -263,3 +263,12 @@ def test_check_from_pr(tmp_path, change, status):
     path = tmp_path / "observation.json"
     path.write_text(json.dumps({**HELD, **change}), encoding="utf-8")
     assert build.check_from_pr(path)["status"] == status
+
+
+def test_f3_5_is_read_from_the_ingest_lookup_not_the_run_file(tmp_path):
+    """M03 PR 2: check_from_ingest passes only on observe_ingest's own pass."""
+    obs = tmp_path / "f3_5.json"
+    obs.write_text('{"falsifier": "F3.5", "pass": true, "reasons": []}', encoding="utf-8")
+    assert build.check_from_ingest(obs, "u") == {"status": "pass", "url": "u"}
+    obs.write_text('{"falsifier": "F3.5", "pass": false, "reasons": ["no record"]}', encoding="utf-8")
+    assert build.check_from_ingest(obs, "u")["status"] == "fail"

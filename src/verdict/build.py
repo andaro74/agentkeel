@@ -313,6 +313,17 @@ def _refused_by_the_right_thing(attempt: dict[str, Any]) -> bool:
     return not wanted or wanted.lower() in (attempt.get("error_message") or "").lower()
 
 
+def check_from_ingest(path: Path, run_url: str | None) -> dict[str, str]:
+    """pass when CI's lookup shows seed S5 refused (SPEC/03 §4, F3.5): `scripts/observe_ingest.py`'s `pass`.
+
+    The human made the attempt and wrote what AWS returned; this reads the
+    CI lookup of the record, quarantine and production, never the run file.
+    """
+    if not run_url:
+        raise Refused("a check needs the CI run URL (--run-url)")
+    return {"status": "pass" if load_json(path).get("pass") is True else "fail", "url": run_url}
+
+
 def both(checks: dict[str, dict[str, str]], falsifier: str, result: dict[str, str]) -> dict[str, dict[str, str]]:
     """Add one source to a falsifier. Two sources pass only if both do (SPEC/01 §4, F1.1)."""
     if falsifier not in checks:
@@ -578,6 +589,9 @@ def main(argv: list[str] | None = None) -> int:
                         metavar=("ID", "MODULE", "JUNIT_XML"))  # fmt: skip
     parser.add_argument("--check-cases", nargs=3, action="append", default=[],
                         metavar=("ID", "NAMES", "JUNIT_XML"))  # fmt: skip
+    # M03 PR 2 (SPEC/03 §4): F3_5, from scripts/observe_ingest.py.
+    parser.add_argument("--check-ingest", nargs=2, action="append", default=[],
+                        metavar=("ID", "OBSERVATION"))  # fmt: skip
     parser.add_argument("--check-attempt", nargs=2, action="append", default=[],
                         metavar=("ID", "OBSERVATION"))  # fmt: skip
     parser.add_argument("--check-pr", nargs=2, action="append", default=[],
@@ -612,6 +626,8 @@ def main(argv: list[str] | None = None) -> int:
             checks |= {i: check_from_pr(Path(p)) for i, p in args.check_pr}
             for i, names, p in args.check_cases:
                 checks = both(checks, i, check_from_cases(Path(p), names, args.run_url))
+            for i, p in args.check_ingest:
+                checks = both(checks, i, check_from_ingest(Path(p), args.run_url))
             for i, p in args.check_attempt:
                 checks = both(checks, i, check_from_attempt(Path(p), args.run_url))
             for i, p in args.check_seed_prs:

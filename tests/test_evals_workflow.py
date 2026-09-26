@@ -321,3 +321,15 @@ def test_the_runner_counts_an_edited_golden_as_dirty(monkeypatch):
     spec = asked[0]
     assert ":(exclude)evals/history" in spec and ":(exclude)evals/local" in spec
     assert ":(exclude)evals" not in spec and not any("goldens" in part for part in spec)
+
+
+def test_every_claim_3_case_the_makefile_names_is_a_seed_test():
+    """A name with no case fails the check (build.check_from_cases); a typo would fail F3 for no reason."""
+    import re
+
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    seeds = (ROOT / "tests" / "test_m03_seeds.py").read_text(encoding="utf-8")
+    for falsifier in ("F3_1", "F3_2", "F3_3", "F3_6"):
+        names = re.search(rf"^{falsifier}_CASES := (.+)$", makefile, re.M).group(1).split(",")
+        assert names and all(f"def {name}(" in seeds for name in names), (falsifier, names)
+    assert "--check-ingest F3_5" in makefile

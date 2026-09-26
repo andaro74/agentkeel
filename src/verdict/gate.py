@@ -92,6 +92,15 @@ CLAIM_1_CHECKS = ("F1_1", "F1_2", "F1_3", "F1_4")
 # merge commit is held to it; a commit git cannot place is held to it too.
 CLAIM_2_CHECKS = ("F2_1", "F2_2")
 M02_PR2_MERGE = "97d3c761bc561b9a33949a6d3d5a193aeb88debf"
+# What an agent envelope must carry from M03 PR 2 (SPEC/03 §4 and §5.1): the
+# seeds' tests, read in a copy of the tree (F3_1, F3_2, F3_3, F3_6), and CI's
+# lookup of seed S5's attempt (F3_5). F3.4 is the gate's own: the fingerprint,
+# read at the commit, which `judge` holds every envelope to. Held from the
+# commit that landed the last reader, f82a02a, and every descendant: known
+# now, unlike PR 2's merge, so no later PR has to set it (as M02 PR 3 set
+# CLAIM_2_CHECKS). Every CI run of PR 2 from here carries them.
+CLAIM_3_CHECKS = ("F3_1", "F3_2", "F3_3", "F3_5", "F3_6")
+M03_READERS = "f82a02a"
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -165,9 +174,22 @@ def before_m02_pr2(commit: str, root: Path = ROOT) -> bool:
     return done.returncode == 0
 
 
+def from_m03_readers(commit: str, root: Path = ROOT) -> bool:
+    """True when `commit` is M03's last reader commit or a descendant of it. False when git cannot say."""
+    done = subprocess.run(["git", "merge-base", "--is-ancestor", M03_READERS, commit], cwd=root, capture_output=True,
+                          check=False)  # fmt: skip
+    return done.returncode == 0
+
+
 def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
-    """What an agent envelope for `commit` must carry: claim 1's checks, and claim 2's from PR 2's merge on."""
-    return CLAIM_1_CHECKS if before_m02_pr2(commit, root) else CLAIM_1_CHECKS + CLAIM_2_CHECKS
+    """What an agent envelope for `commit` must carry: claim 1's; claim 2's from M02 PR 2's merge; claim 3's from M03's readers.
+
+    A commit git cannot place is held to claims 1 and 2, as before; claim 3's
+    are required only where git shows the readers in its history.
+    """
+    if before_m02_pr2(commit, root):
+        return CLAIM_1_CHECKS
+    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + (CLAIM_3_CHECKS if from_m03_readers(commit, root) else ())
 
 
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:

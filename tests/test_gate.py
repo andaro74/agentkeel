@@ -178,8 +178,8 @@ def test_an_agent_envelope_after_pr_2s_merge_must_carry_claim_2s_checks(chain):
     before = "e97125e970ccfc6d044612eb006cdbdbcdb99337"  # M01's Measured envelope, an ancestor of the merge
     assert gate.required_checks(before) == gate.CLAIM_1_CHECKS
     assert gate.required_checks(gate.M02_PR2_MERGE) == gate.CLAIM_1_CHECKS
-    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
-    assert gate.required_checks(head) == gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS
+    m03_open = "d2d1e6de29d85d2e566afb913c46c7780ec3467c"  # after the merge, before M03's readers
+    assert gate.required_checks(m03_open) == gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS
     assert gate.required_checks("a" * 40) == gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS
 
     envelope_path, _, _ = chain(agent=True)
@@ -192,6 +192,21 @@ def test_an_agent_envelope_after_pr_2s_merge_must_carry_claim_2s_checks(chain):
         assert f"checks.{name} is missing from an agent envelope" not in gate.judge(forgot, KINDS, {}, [])[1]  # claim 1 alone
         verdict, reasons = gate.judge(forgot, KINDS, {}, [], required=gate.required_checks("a" * 40))
         assert verdict == "RED" and f"checks.{name} is missing from an agent envelope" in reasons
+
+
+def test_an_agent_envelope_from_m03s_readers_must_carry_claim_3s_checks():
+    """SPEC/03 section 4: F3_1, F3_2, F3_3, F3_5, F3_6, from f82a02a (the last reader) and every descendant."""
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    everything = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_3_CHECKS
+    assert gate.required_checks(head) == everything
+    assert gate.required_checks(gate.M03_READERS) == everything
+    assert gate.CLAIM_3_CHECKS == ("F3_1", "F3_2", "F3_3", "F3_5", "F3_6")
+    envelope = json.loads((ROOT / "evals" / "history" / "8033c2a7a0588e557df577464c190e64a435e88a.json")
+                          .read_text(encoding="utf-8"))  # fmt: skip
+    kinds = {g: r["kind"] for g, r in envelope["goldens"].items()}
+    verdict, reasons = gate.judge(envelope, kinds, {}, [], required=everything)
+    assert verdict == "RED" and all(f"checks.{n} is missing from an agent envelope" in reasons
+                                    for n in gate.CLAIM_3_CHECKS)  # fmt: skip
 
 
 def test_the_three_branch_envelopes_before_the_constant_are_red_under_it():
