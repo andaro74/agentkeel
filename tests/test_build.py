@@ -321,6 +321,10 @@ def test_a_guardrail_plant_whose_named_rule_is_gone_does_not_pass():
 def test_the_blocks_are_read_at_the_commit():
     assert build.blocks_at("d2d1e6de29d85d2e566afb913c46c7780ec3467c") == {}, "no redteam.yaml on main before PR 2"
     assert build.blocks_at("HEAD")["g-019"] == "rule-override"
+    # M03 PR 3: the guardrail's own plants are named (rule-owner F1 on PR 2).
+    assert build.blocks_at("HEAD")["g-015"] == "sending-terms-to-a-competitor"
+    assert build.blocks_at("HEAD")["g-013"] == "embargoed-synopsis"
+    assert "g-015" not in build.blocks_at("a423292c7589b14b1ac977128e6caf2ee02a70ae"), "unnamed at PR 2's merge"
 
 
 def _controls_at(monkeypatch, texts: dict[str, str]):
