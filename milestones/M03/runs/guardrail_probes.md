@@ -189,5 +189,12 @@ and 10 changes were omitted as likely mangled non-ASCII characters (the
 templates' `§` signs, most likely, in descriptions and suppression
 reasons). `--strict` would print them; it was not run.
 
-**AgentkeelIngest**: the human reported no differences; the output was not
-pasted, a weaker witness than the diff itself.
+**AgentkeelIngest**, pasted: a read-only change set (the exact method), no
+differences, nothing omitted.
+
+```
+Stack AgentkeelIngest
+There were no differences
+
+✨  Number of stacks with differences: 0
+```
