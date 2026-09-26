@@ -185,7 +185,11 @@ def rule_relaxations(before_text: str | None, after_text: str | None) -> list[st
             found.append(f"{path} removed")
             continue
         was, now = old[path], new[path]
-        if was is True and now is False:  # a rule's switch turned off (prompt_attack: on -> off)
+        if ".blocks." in f".{path}" and was != now:
+            # Any value, not only a rule name: `g-015: null` unnames the plant, and build then
+            # scores it on any intervention (the cold review of M03 PR 3, F1).
+            found.append(f"{path} {was} -> {now} pointed at another rule")
+        elif was is True and now is False:  # a rule's switch turned off (prompt_attack: on -> off)
             found.append(f"{path} on -> off weakened")
         elif isinstance(was, str) and isinstance(now, str) and was.upper() in FILTER_STRENGTH \
                 and now.upper() in FILTER_STRENGTH and was.upper() not in ACTION_STRENGTH:
@@ -198,8 +202,6 @@ def rule_relaxations(before_text: str | None, after_text: str | None) -> list[st
                     found.append(f"{path} {was} -> {now} weakened")
             elif key == "topics_apply_to" and APPLIES_TO_STRENGTH.get(now, 0) < APPLIES_TO_STRENGTH.get(was, 0):
                 found.append(f"{path} {was!r} -> {now!r} narrowed")
-            elif ".blocks." in f".{path}" and was != now:
-                found.append(f"{path} {was} -> {now} pointed at another rule")
     return found
 
 

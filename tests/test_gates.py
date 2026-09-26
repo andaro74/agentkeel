@@ -464,6 +464,7 @@ def rules_repo(tmp_path: Path):
     (("    action: ANONYMIZE", "    action: NONE"), "pii[PHONE].action ANONYMIZE -> NONE weakened"),
     (("topics_apply_to: input and output", "topics_apply_to: input"), "topics_apply_to 'input and output' -> 'input' narrowed"),
     (("  g-016: embargoed-synopsis", "  g-016: third-party"), "blocks.g-016 embargoed-synopsis -> third-party pointed at another rule"),
+    (("  g-016: embargoed-synopsis", "  g-016: null"), "blocks.g-016 embargoed-synopsis -> None pointed at another rule"),
     (("name: third-party", "name: sending-terms"), "denied_topics[third-party] removed"),
 ])  # fmt: skip
 def test_entry_5_a_rule_removed_weakened_or_repointed_needs_two_keys(rules_repo, change, said):

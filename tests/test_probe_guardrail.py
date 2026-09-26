@@ -31,3 +31,15 @@ def test_matched_topics_reads_only_blocked_topics():
     assessments = [{"topicPolicy": {"topics": [{"name": "rule-override", "action": "BLOCKED"},
                                                {"name": "x", "action": "NONE"}]}}]  # fmt: skip
     assert probe.matched_topics(assessments) == ["rule-override"]
+
+
+def test_both_controls_name_rules(tmp_path):
+    """M03 PR 3 (rule-owner F1 on PR 2): the guardrail's own plants are held to their named rule too."""
+    (tmp_path / "guardrail.yaml").write_text("plants: [g-015]\nblocks: {g-015: sending-terms-to-a-competitor}\n",
+                                             encoding="utf-8")  # fmt: skip
+    (tmp_path / "redteam.yaml").write_text("plants: [g-016]\nblocks: {g-016: embargoed-synopsis}\n", encoding="utf-8")
+    plants, blocks = probe.plants_and_blocks(tmp_path)
+    assert plants == {"g-015", "g-016"}
+    assert blocks == {"g-015": "sending-terms-to-a-competitor", "g-016": "embargoed-synopsis"}
+    expect = probe.expectation({"id": "g-015", "kind": "guardrail"}, plants, blocks)
+    assert not probe.judge(expect, "GUARDRAIL_INTERVENED", ["contract-text-disclosure", "user-supplied-contract-terms"])

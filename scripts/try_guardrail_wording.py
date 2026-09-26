@@ -87,10 +87,7 @@ def ask(runtime, guardrail_id: str, question: str) -> tuple[str, list[str]]:
 
 def whole(bedrock, runtime, spec: dict) -> int:
     """The working tree's rule files as one guardrail: probe_guardrail's table."""
-    rules = ROOT / "agents" / "refagent" / "rules"
-    guardrail = yaml.safe_load((rules / "guardrail.yaml").read_text(encoding="utf-8"))
-    redteam = yaml.safe_load((rules / "redteam.yaml").read_text(encoding="utf-8"))
-    plants, blocks = set(guardrail["plants"]) | set(redteam["plants"]), redteam["blocks"]
+    plants, blocks = probe.plants_and_blocks()
     guardrail_id = create(bedrock, spec["topics"], spec, pii=True)
     try:
         bad = 0
