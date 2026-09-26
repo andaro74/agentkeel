@@ -169,7 +169,9 @@ def main() -> int:
                            ("kms:GetKeyPolicy", "allowed"), ("kms:PutKeyPolicy", "explicitDeny"),
                            # M03 PR 2: Apply under the ceiling, nothing else on a guardrail, no ssm.
                            ("bedrock:ApplyGuardrail", "allowed"), ("bedrock:CreateGuardrail", "explicitDeny"),
-                           ("bedrock:GetGuardrail", "explicitDeny"), ("ssm:GetParameter", "implicitDeny")]:
+                           ("bedrock:GetGuardrail", "explicitDeny"), ("ssm:GetParameter", "implicitDeny"),
+                           # M03 open.md row 8 (M02 PR 3 platform N1): the runtime reads the table, never writes it.
+                           ("dynamodb:Scan", "allowed"), ("dynamodb:PutItem", "implicitDeny")]:
         r = iam.simulate_custom_policy(PolicyInputList=[allow_all], PermissionsBoundaryPolicyInputList=[boundary_doc],
                                        ActionNames=[action], ResourceArns=["*"])["EvaluationResults"][0]
         ceiling.append(("agentkeel-boundary (ceiling)", action, "*", None, r["EvalDecision"], expect))

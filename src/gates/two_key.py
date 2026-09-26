@@ -63,14 +63,25 @@ def _load(text: str | None) -> dict[str, Any]:
 
 
 def bars(thresholds: dict[str, Any]) -> dict[str, Any]:
-    """`section.name` -> value for every numeric leaf. `baseline_card` is a pin, not a bar; `relaxes` is the map."""
+    """`section.name[.more]` -> value for every numeric leaf, at any depth. `baseline_card` is a pin, not a bar;
+    `relaxes` is the map.
+
+    It read one level deep until M03 PR 2 (M03 open.md row 4): a bar nested
+    deeper could move with no key. R10's N and M04's `delta_max` land as bars
+    with their `relaxes:` entries when their milestones write them.
+    """
     out: dict[str, Any] = {}
+
+    def walk(prefix: str, value: Any) -> None:
+        if isinstance(value, dict):
+            for name, leaf in value.items():
+                walk(f"{prefix}.{name}", leaf)
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            out[prefix] = value
+
     for section, value in thresholds.items():
-        if section in ("baseline_card", "relaxes") or not isinstance(value, dict):
-            continue
-        for name, leaf in value.items():
-            if isinstance(leaf, (int, float)) and not isinstance(leaf, bool):
-                out[f"{section}.{name}"] = leaf
+        if section not in ("baseline_card", "relaxes") and isinstance(value, dict):
+            walk(section, value)
     return out
 
 

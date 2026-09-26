@@ -304,7 +304,7 @@ def judge(
     history: replay_history.History,
     plant_ids: list[str],
     cap: int | None = None,
-    required: tuple[str, ...] = CLAIM_1_CHECKS,  # a direct caller gets claim 1 only; `rule` passes `required_checks`
+    required: tuple[str, ...] | None = None,  # None: what the envelope's own commit requires (required_checks)
     corpus: str | None = None,
 ) -> tuple[str, list[str]]:
     """The gate's own verdict and its reasons. `envelope` has passed `read`.
@@ -314,10 +314,14 @@ def judge(
     no corpus was admitted. An envelope that says otherwise is RED (seed S4).
 
     `required` is what an agent envelope must carry (`required_checks`):
-    claim 1's four, and from M02 PR 2's merge claim 2's two as well.
+    claim 1's four, from M02 PR 2's merge claim 2's two, from M03's readers
+    claim 3's five. Left out, it is the envelope's own commit's: a direct
+    caller no longer skips claim 2 and 3 by default (M03 open.md row 3).
     """
     results = envelope["goldens"]
     reasons: list[str] = []
+    if required is None:
+        required = required_checks(envelope["commit"])
     if envelope["corpus_fingerprint"] != corpus:
         reasons.append(f"corpus_fingerprint: the envelope says {envelope['corpus_fingerprint']!r}, "
                        f"the gate reads {corpus!r} from admitted.yaml")  # fmt: skip
@@ -567,6 +571,7 @@ def main(argv: list[str] | None = None) -> int:
     # Which cap ruled this envelope, and where it was read (ruling m).
     cap, where = cap_at(envelope["commit"])
     print(f"  note: cost_cap {cap} read at {where}")
+    print(f"  note: the goldens read at {golden_kinds_at(envelope['commit'], GOLDENS, ROOT)[1]}")
     print(f"  note: the plant rule's controls read at {where_at(envelope['commit'])}")
     history = replay_history.load(args.history_dir, exclude_commit=envelope["commit"], ancestors_of=envelope["commit"])
     ancestors = "the envelope's ancestors" if replay_history.ancestry(envelope["commit"]) is not None else "every envelope"

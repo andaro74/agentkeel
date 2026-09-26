@@ -189,7 +189,10 @@ def test_an_agent_envelope_after_pr_2s_merge_must_carry_claim_2s_checks(chain):
     for name in gate.CLAIM_2_CHECKS:
         forgot = json.loads(json.dumps(envelope))
         del forgot["checks"][name]
-        assert f"checks.{name} is missing from an agent envelope" not in gate.judge(forgot, KINDS, {}, [])[1]  # claim 1 alone
+        # The default is the envelope's own commit's checks (M03 open.md row 3): a direct caller no longer skips claim 2.
+        assert f"checks.{name} is missing from an agent envelope" in gate.judge(forgot, KINDS, {}, [])[1]
+        assert f"checks.{name} is missing from an agent envelope" not in gate.judge(
+            forgot, KINDS, {}, [], required=gate.CLAIM_1_CHECKS)[1]  # fmt: skip
         verdict, reasons = gate.judge(forgot, KINDS, {}, [], required=gate.required_checks("a" * 40))
         assert verdict == "RED" and f"checks.{name} is missing from an agent envelope" in reasons
 
@@ -376,3 +379,12 @@ def test_the_cap_is_the_one_that_stood_at_the_envelopes_commit():
     assert gate.thresholds(gate.THRESHOLDS)["cost_cap"]["tokens_per_run"] == 150000
     # A commit git cannot resolve falls back to the tree, and says so.
     assert gate.cap_at("a" * 40) == (150000, "the working tree")
+
+
+def test_bars_reads_every_level():
+    """M03 open.md row 4: a bar nested deeper than one level moved with no key."""
+    from src.gates import two_key
+
+    assert two_key.bars({"a": {"b": 1, "c": {"d": 2.5, "e": True}}, "relaxes": {"a.b": "up"}}) == {"a.b": 1, "a.c.d": 2.5}
+    before, after = {"a": {"c": {"d": 5}}, "relaxes": {"a.c.d": "up"}}, {"a": {"c": {"d": 6}}}
+    assert two_key.threshold_moves(before, after) == ["a.c.d 5 -> 6 relaxes it (relaxes: up)"]

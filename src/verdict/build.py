@@ -391,10 +391,12 @@ def check_from_bypass(path: Path, run_url: str | None) -> dict[str, str]:
         first.get("found") is True and first.get("merged") is False
         and (first.get("rule_suite_fail_found") is True or first.get("human_message_contains") is True)
     )  # fmt: skip
-    refused_ruleset = (
-        (second.get("human_said") or {}).get("validate_result") == "RED"
-        and (second.get("live_now") or {}).get("bypass_actors") == []
-    )  # fmt: skip
+    # Attempt 2's witness (M03 open.md row 3): validate's RED line in the
+    # recorded CI job's log (`ci_red_lines`, the stronger), or the human's
+    # record of it. Either, not both: GitHub keeps a job's log 90 days, and a
+    # check that needed the log would turn every later F2_1 red.
+    red = bool(second.get("ci_red_lines")) or (second.get("human_said") or {}).get("validate_result") == "RED"
+    refused_ruleset = red and (second.get("live_now") or {}).get("bypass_actors") == []
     return {"status": "pass" if refused_merge and refused_ruleset else "fail", "url": run_url}
 
 

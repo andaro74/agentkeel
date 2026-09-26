@@ -306,3 +306,16 @@ def test_a_plant_with_no_named_rule_is_scored_on_the_intervention_alone():
 def test_the_blocks_are_read_at_the_commit():
     assert build.blocks_at("d2d1e6de29d85d2e566afb913c46c7780ec3467c") == {}, "no redteam.yaml on main before PR 2"
     assert build.blocks_at("HEAD")["g-019"] == "rule-override"
+
+
+def test_attempt_2_reads_the_ci_line_or_the_humans_record(tmp_path):
+    """M03 open.md row 3: ci_red_lines is read, not only recorded; either witness, since job logs expire."""
+    first = {"found": True, "merged": False, "rule_suite_fail_found": True}
+    for second in ({"ci_red_lines": ["FAIL somebody can bypass main"], "live_now": {"bypass_actors": []}},
+                   {"human_said": {"validate_result": "RED"}, "live_now": {"bypass_actors": []}}):
+        obs = tmp_path / "bypass.json"
+        obs.write_text(json.dumps({"attempt_1": first, "attempt_2": second}), encoding="utf-8")
+        assert build.check_from_bypass(obs, "u")["status"] == "pass"
+    obs.write_text(json.dumps({"attempt_1": first, "attempt_2": {"ci_red_lines": [], "live_now": {"bypass_actors": []}}}),
+                   encoding="utf-8")  # fmt: skip
+    assert build.check_from_bypass(obs, "u")["status"] == "fail"

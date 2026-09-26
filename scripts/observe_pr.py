@@ -161,7 +161,9 @@ def lines_naming(log: str, path: str, check: str) -> list[str]:
     """The log lines in which the gate or validate named the seed's path."""
     wanted = []
     for raw in log.splitlines():
-        line = re.sub(r"^\S+T\S+Z ", "", raw.strip())  # the timestamp GitHub prefixes
+        # The timestamp GitHub prefixes, removed before anything is stripped: validate's
+        # detail lines are indented, and that indent is how they are told (M03 open.md row 3).
+        line = re.sub(r"^\S+T\S+Z ", "", raw.rstrip())
         gate_named = check in ("ruling-cited", "two-key") and re.search(rf"\b(uncovered|unkeyed) {re.escape(path)}\b", line)
         validate_named = check == "checks" and path in line and ("FAIL" in line or line.startswith("     ") or "retired" in line or "one-sided" in line)
         if gate_named or validate_named:
