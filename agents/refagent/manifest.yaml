@@ -52,7 +52,9 @@ judge_model_id: null
 # (milestones/M03/runs/guardrail_probes.md). Version 4 is retained.
 # A numbered version, never DRAFT. The runner's and the runtime's converse
 # both carry it; the construct conditions the agent role's invoke on it, and
-# the ingest stack's promoter scans with it (both read it here, at synth).
+# the ingest stack's promoter scans with it. Both stacks read it here at
+# synth, so each carries a new pin from its next deploy, not before: until
+# then the deployed runtime and promoter keep the version they were built with.
 guardrail:
   id: 1088aw3ujhyd
   version: "5"
