@@ -13,6 +13,8 @@ evidence:
   - milestones/M03/rulings/pr2-rule-owner.md
   - milestones/M03/runs/guardrail_probes.md
   - milestones/M03/runs/pr3_stop_a_cdk_diff.md
+  - https://github.com/andaro74/agentkeel/actions/runs/36270471757
+  - evals/history/cb06c0dbf0019088c664c6df1ce7d67cc64f7d58.json
 pr: 21
 ---
 
@@ -72,6 +74,6 @@ counted (M04).
 | F4, before stop A | nothing mechanical ties the pin's description to the tree's digest | recorded: read by hand at each deploy; a mechanical check is a proposal for Security or Engineering (M05) |
 | F3, before stop B | rules unchanged since `0a90d52` not verified | **read** by the session: exit 0, digest at the head `b2cff2a1…` |
 | F4, before stop B | the manifest comment said, in the present tense, that the deployed stacks carry the pin | **repaired** `d294826` |
-| FINDING, cold review | no envelope shows version 5 applied by the eval role | open until this PR's run; this file is to cite its envelope before the human rules |
+| FINDING, cold review | no envelope shows version 5 applied by the eval role | **measured**: run [36270471757](https://github.com/andaro74/agentkeel/actions/runs/36270471757), envelope `cb06c0d…`, GREEN, guardrail `1088aw3ujhyd:5`, plants 7 of 7, `g-013` and `g-015` passing by their named rules |
 | NOTE | `g-015.yaml`'s stale comment (Data Owner path) | `pr3.md` Unsure A, M04 PR 1 |
 | NOTE | the drop of `sending-terms-to-a-competitor` is witnessed by a unit test, not a seed | recorded: enough for Unsure C |

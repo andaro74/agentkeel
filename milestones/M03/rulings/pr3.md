@@ -19,6 +19,8 @@ evidence:
   - milestones/M03/runs/pr3_stop_a_cdk_diff.md
   - milestones/M03/runs/pr3_stop_a_read_back.md
   - milestones/M03/runs/pr3_stop_b_ingest.md
+  - https://github.com/andaro74/agentkeel/actions/runs/36270471757
+  - evals/history/cb06c0dbf0019088c664c6df1ce7d67cc64f7d58.json
 pr: 21
 ---
 
@@ -73,7 +75,7 @@ change, in place; the promoter configured with 5; version 4 READY).
 | # | Item | Seat | When |
 |---|---|---|---|
 | A | `evals/goldens/v1/g-015.yaml` line 1: "deal terms requested for a third party"; "no guardrail exists before M03". Both stale since SPEC/00 §9's amendment at PR 2 and the guardrail. A comment; id and question unchanged | Data Owner | M04 PR 1 |
-| B | The eval role applying version 5 is first read by this PR's CI run; the runtime's `GuardrailIdentifier` condition at `:5` by this PR's merge deploy's load check (a deploy log, not an envelope) | Security, Engineering | this PR's run; the merge |
+| B | The eval role applying version 5: **read** by this PR's run ([36270471757](https://github.com/andaro74/agentkeel/actions/runs/36270471757), plants 7 of 7). The runtime's `GuardrailIdentifier` condition at `:5`: this PR's merge deploy's load check (a deploy log, not an envelope) | Security | the merge |
 | C | The first envelope in `mode: runtime` with version 5, if PR 4 cites one: a run after this PR's merge deploy | Product | PR 4 |
 | D | Whether the deployed bootstrap template now reads `§` where it read `?` (metadata only) | Security | the next bootstrap `cdk diff --strict` |
 | E | R10's N is not in `thresholds.yaml`; dated to PR 2 and slipped unrecorded (`threshold-owner` F7) | Threshold Owner | re-dated in `pr3-threshold-owner.md` |
@@ -93,6 +95,14 @@ git diff --exit-code 0a90d52 HEAD -- agents/refagent/rules/  # the rules version
 
 ## The measurement
 
-To be filled from this PR's CI run and its envelope: guardrail
-`1088aw3ujhyd:5`, plants 7 of 7, `g-013` and `g-015` fired by their named
-rules, every claim 3 check passing.
+This PR's CI run [36270471757](https://github.com/andaro74/agentkeel/actions/runs/36270471757), envelope `evals/history/cb06c0dbf0019088c664c6df1ce7d67cc64f7d58.json` (the bot's commit
+`013a1c5`), ruled **GREEN** by the gate at its own commit: `mode: runner`,
+guardrail `1088aw3ujhyd:5`; **plants 7 of 7**, `guardrail_hits` 7, `g-013` and
+`g-015` passing with their named rules among the trace's topics (`build`
+scores a named plant no other way); F0_2 to F3_6, thirteen checks, pass;
+`corpus_fingerprint` `e12988c5…`, the gate's reading; no regression; `g-014`
+and `g-021` never passed; 47,034 + 5,097 = 52,131 tokens against 150,000.
+It is the eval role's first `converse` with version 5. `make ledger` still
+exits 0. The runtime is not read here: it moves to `:5` at the merge deploy,
+whose load check is a deploy log, not an envelope. The row's Measured cell
+is PR 4's to write from this envelope, or from a later one.

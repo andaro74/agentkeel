@@ -16,6 +16,8 @@ evidence:
   - milestones/M03/runs/pr3_stop_a_read_back.md
   - milestones/M03/runs/pr3_stop_b_ingest.md
   - milestones/M03/runs/guardrail_probes.md
+  - https://github.com/andaro74/agentkeel/actions/runs/36270471757
+  - evals/history/cb06c0dbf0019088c664c6df1ce7d67cc64f7d58.json
 pr: 21
 ---
 
@@ -60,12 +62,12 @@ reading, `json.dumps` compact of the synth).
 |---|---|---|
 | before A, F1 | `cdk diff` must show nothing but the version, the parameter and the output | **held**: the diff, pasted whole |
 | before A, F2 | the manifest moves only after `get-guardrail` of the new version is read | **held**: `47ee02d` after `9736c66` |
-| before A, F3 | the read-back simulates `ApplyGuardrail` on the unversioned ARN only | recorded: the eval role's first use of version 5 is this PR's CI run (to cite) |
+| before A, F3 | the read-back simulates `ApplyGuardrail` on the unversioned ARN only | **read**: the eval role applied version 5 in run [36270471757](https://github.com/andaro74/agentkeel/actions/runs/36270471757) (`cb06c0d…`, GREEN, plants 7 of 7) |
 | before A, F4 / N8 | the eval role's invoke is not conditioned on the guardrail; the plants (F3_2) catch a dropped `guardrailConfig`, IAM does not | recorded; **proposed M05** (IAM ceilings, R5) |
 | before B, F1 | the ingest inputs since `0ee873e` not all diffed | **read**: only the manifest (and a README) changed; `fingerprint_of`, `pyproject.toml`, `uv.lock` unchanged; templates compared |
 | before B, F2 | a stop B read-back owed | **done** `0966593` |
 | cold, F1 | stop B cited `pr3.md`, not in the tree | **held**: `pr3.md` ruling C, in this PR |
-| cold, F2 | no non-admin principal has read version 5 | open: this PR's run (the eval role), and the merge deploy's load check (the runtime's condition at `:5`), named as pending, not claimed |
+| cold, F2 | no non-admin principal has read version 5 | the eval role: **read** by this PR's run (`cb06c0d…`). The runtime's condition at `:5`: the merge deploy's load check, **pending**, not claimed |
 | before B, NOTE | "the earlier deploy stored `?`" was an inference | **repaired** `70e7d53`; whether the deployed template reads `§` now: the next bootstrap diff |
 | before B, NOTE | "version 4 retained" rested on RETAIN | **read** at stop B: READY |
 | cold, N4 (Eng.) | "clean checkout" with untracked files present | **repaired** `e88259c` |
@@ -77,6 +79,7 @@ reading, `json.dumps` compact of the synth).
 | NOTE | nothing mechanical compares deployed pins with the manifest (the promoter, the guardrail version) | recorded; M05 |
 | N6, N7, N11, N13, N14, F4 (PR 2) | as `pr2-security.md` | unchanged |
 
-Nothing here may say the version 5 grants or the named-rule scoring work
-in AWS until this PR's envelope, and the merge deploy's load check, show
-them.
+This PR's envelope shows the eval role applying version 5 and the named
+rules scoring all seven plants. Nothing here may say the runtime carries
+version 5 until the merge deploy's load check, and an envelope in
+`mode: runtime`, show it.
