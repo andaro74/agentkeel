@@ -18,7 +18,8 @@ evidence:
   - SPEC/03-evals-regression-redteam-corpus.md#6-the-code-that-reads-the-answer-pr-2
   - milestones/README.md
   - milestones/M03/rulings/pr1-engineering.md
-  # PR 2's CI run URL and its envelope are added here before the merge.
+  - https://github.com/andaro74/agentkeel/actions/runs/36252383220
+  - evals/history/0225d84ee58dc34bb8a3031edcea5f07c19529ec.json
 pr: 20
 ---
 
@@ -47,7 +48,7 @@ their own commits; the diff the reviewer read is unchanged beneath them.
 | F4 | F3_5 fails on every run once `admitted.yaml` changes | **repaired** `9ac4e2a`: compared at the run file's `admitted_at` |
 | F5 | nothing ties the pinned version to the rule files | **read back** `a9c8ff6`: the description and the files both 9cbefa08; no check reads it in CI (no platform role may read a guardrail) |
 | F6 | `make plants` said SILENT for an envelope ruled GREEN | **repaired** `dadf78e` |
-| F7 | PR 2's measurement not on the branch | PR 2's CI run; cited here before the merge |
+| F7 | PR 2's measurement not on the branch | **measured**: run 36252383220, envelope `0225d84…`, GREEN, plants 7 of 7, every F3 check passing |
 | N1 | S1's and S2's test bodies changed with their readers | recorded: the seeds' files are unchanged; S1's PR 1 assertion could never pass, the new one depends on the reader |
 | N2 | claim 3 required from `f82a02a`, before PR 2's merge | recorded: stricter than row 3's words, with no envelope between |
 | N3 | the runtime half of the guardrail not fired | recorded: PR 2's run is expected in `mode: runner` (the bundle changed); no prose says the runtime carries it before a runtime envelope shows it |

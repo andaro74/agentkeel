@@ -22,7 +22,8 @@ evidence:
   - milestones/M03/feasibility.md
   - milestones/M03/runs/guardrail_probes.md
   - milestones/M03/runs/f3_5_amendment.yaml
-  # PR 2's CI run URL and its envelope are added here before the merge.
+  - https://github.com/andaro74/agentkeel/actions/runs/36252383220
+  - evals/history/0225d84ee58dc34bb8a3031edcea5f07c19529ec.json
 pr: 20
 ---
 
@@ -84,6 +85,16 @@ make plants                                        # 0 in the last run, 7 in the
 uv run python -m src.gates.ruling_cited --base d2d1e6d --pr 20
 ```
 
-PR 2's CI run is the measurement: plants 7 of 7, `corpus_fingerprint`
-non-null and equal to the gate's reading, F3_1, F3_2, F3_3, F3_5 and F3_6
-passing. A count under 7 is the finding (P10), not a count to lower.
+## The measurement
+
+PR 2's CI run [36252383220](https://github.com/andaro74/agentkeel/actions/runs/36252383220),
+envelope `evals/history/0225d84ee58dc34bb8a3031edcea5f07c19529ec.json`
+(the bot's commit `506c8ed`), ruled **GREEN** by the gate at its own
+commit: **plants 7 of 7** (`g-013`, `g-015` to `g-020`; `guardrail_hits`
+7); `corpus_fingerprint` `e12988c5…`, equal to the gate's reading; F3_1,
+F3_2, F3_3, F3_5 and F3_6 pass, F3_5 from CI's own lookup of seed S5 in
+AWS; no regression; `g-014` and `g-021` never passed; `mode: runner`,
+guardrail `1088aw3ujhyd:4`; 46,991 + 5,424 tokens against the cap of
+150,000. `make ledger` still matches rows 0 to 2. The row's Measured cell
+is PR 4's to write from this envelope, or from a later one if the tree
+that ships changes.
