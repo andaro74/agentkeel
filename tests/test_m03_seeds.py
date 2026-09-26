@@ -196,7 +196,7 @@ def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
 RUNS = ROOT / "milestones" / "M03" / "runs"
 
 
-def test_s5_the_unsigned_amendment_stays_in_quarantine():
+def test_s5_the_run_file_records_the_seed_kept_out_the_weaker_witness():
     """An attempt against AWS, recorded by the human and looked up by CI (`scripts/observe_ingest.py`).
     This test reads what the human typed; it is the weaker witness, and checks.F3_5 passes only if
     the lookup agrees. The expected refusal is no admission (SPEC/03 §2).

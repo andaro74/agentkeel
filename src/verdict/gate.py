@@ -100,6 +100,10 @@ M02_PR2_MERGE = "97d3c761bc561b9a33949a6d3d5a193aeb88debf"
 # now, unlike PR 2's merge, so no later PR has to set it (as M02 PR 3 set
 # CLAIM_2_CHECKS). Every CI run of PR 2 from here carries them.
 CLAIM_3_CHECKS = ("F3_1", "F3_2", "F3_3", "F3_5", "F3_6")
+# A commit on PR 2's branch. It stays in main's history only because PRs land
+# as merge commits, never squashed or rebased (ADR-0004 amendment 1); a squash
+# would orphan it and claim 3 would stop being required. `rule` refuses a
+# shallow clone, where git cannot place it at all (the cold review of PR 2, F3).
 M03_READERS = "f82a02a"
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
@@ -469,7 +473,20 @@ def latest(history_dir: Path = HISTORY) -> Path | None:
     return next((have[c] for c in commits if c in have), None)
 
 
+def shallow(root: Path = ROOT) -> bool:
+    """True in a shallow clone: git cannot place old commits, so the readers would fall back to the tree."""
+    done = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=root, capture_output=True, text=True,
+                          check=False)  # fmt: skip
+    return done.stdout.strip() == "true"
+
+
 def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
+    # The readers at a commit (the cap, the goldens, the controls, the fingerprint, the history's
+    # ancestors, claim 3's anchor) each fall back to the working tree when git cannot place a
+    # commit. In a shallow clone that would read today's tree as the past and shrink the history
+    # without a word, so the gate refuses to rule there (the cold review of PR 2, F3).
+    if shallow():
+        raise Rejected("a shallow clone: git cannot place the commits the gate reads at; fetch the full history")
     envelope = read(path)
     try:
         # Only envelopes for the commit's ancestors (SPEC/03 §6, seed S7).
@@ -524,16 +541,22 @@ def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT
 
 def print_plants() -> int:
     kinds = load_golden_kinds(GOLDENS)
-    plant_ids = plants.plant_ids(kinds, ROOT, "HEAD")  # the controls as committed, as the next run reads them
     path = latest()
     try:
-        results = read(path)["goldens"] if path else {}
+        envelope = read(path) if path else None
     except Rejected as rejection:
         print(f"REJECTED {rejection}")
         return 2
-    print(f"plants_expected = {len(plant_ids)}")
+    results = envelope["goldens"] if envelope else {}
+    # The last run's plants are the controls at its own commit, as the gate rules it; the
+    # next run's are the controls at HEAD. Reading HEAD's against the last run's results
+    # called plants SILENT that the gate ruled GREEN (the cold review of PR 2, F6).
+    ruled = plants.plant_ids(kinds, ROOT, envelope["commit"]) if envelope else []
+    plant_ids = plants.plant_ids(kinds, ROOT, "HEAD")
+    print(f"plants_expected = {len(ruled)} in the last run, {len(plant_ids)} in the next (the controls at HEAD)")
     for g in plant_ids:
-        fired = {True: "fired", False: "SILENT", None: "not run"}[results.get(g, {}).get("pass")]
+        fired = {True: "fired", False: "SILENT", None: "not run"}[results.get(g, {}).get("pass")] if g in ruled \
+            else "a plant from the next run"  # fmt: skip
         print(f"  {g} {kinds[g]:<9} {fired}")
     waiting = sorted(g for g, k in kinds.items() if k in ("guardrail", "redteam") and g not in plant_ids)
     if waiting:

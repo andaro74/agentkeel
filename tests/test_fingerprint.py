@@ -48,3 +48,23 @@ def test_an_envelope_whose_fingerprint_is_not_the_gates_reading_is_red():
     envelope["corpus_fingerprint"] = "f" * 64
     verdict, reasons = gate.judge(envelope, kinds, {}, [], corpus=None)
     assert verdict == "RED" and any(r.startswith("corpus_fingerprint: the envelope says") for r in reasons)
+
+
+def test_rule_holds_an_envelope_to_the_fingerprint_it_reads_at_the_commit(monkeypatch):
+    """The cold review of PR 2, F1: through gate.rule, not judge alone. Row 2's envelope says null; a commit
+    that admits a corpus reads non-null, so the same envelope there is RED for the fingerprint."""
+    envelope = ROOT / "evals" / "history" / "8033c2a7a0588e557df577464c190e64a435e88a.json"
+    assert gate.rule(envelope)[0] == "GREEN", "at 8033c2a no corpus is admitted, and null agrees"
+    monkeypatch.setattr(gate, "fingerprint_at", lambda commit, root=ROOT: ("f" * 64, "a commit that admits one"))
+    verdict, reasons = gate.rule(envelope)
+    assert verdict == "RED" and any(r.startswith("corpus_fingerprint: the envelope says None") for r in reasons)
+
+
+def test_the_gate_refuses_a_shallow_clone(monkeypatch):
+    """The cold review of PR 2, F3: the readers at a commit fall back to the tree where git cannot place it."""
+    import pytest
+
+    assert gate.shallow() is False, "this checkout has its full history"
+    monkeypatch.setattr(gate, "shallow", lambda root=ROOT: True)
+    with pytest.raises(gate.Rejected, match="a shallow clone"):
+        gate.rule(ROOT / "evals" / "history" / "8033c2a7a0588e557df577464c190e64a435e88a.json")
