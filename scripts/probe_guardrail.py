@@ -52,7 +52,9 @@ def plants_and_blocks(rules: Path = RULES) -> tuple[set[str], dict[str, str]]:
     for name in ("guardrail.yaml", "redteam.yaml"):
         control = yaml.safe_load((rules / name).read_text(encoding="utf-8"))
         plants |= set(control["plants"])
-        blocks |= control.get("blocks") or {}
+        for golden_id, rule in (control.get("blocks") or {}).items():
+            if blocks.setdefault(golden_id, rule) != rule:  # as build.blocks_at refuses it
+                raise SystemExit(f"{golden_id} is named for {blocks[golden_id]!r} and {rule!r} by two controls")
     return plants, blocks
 
 

@@ -7,11 +7,14 @@ no golden, a golden of another kind, or a retired one. That would lower
 must be there, must list its plants, and every id it lists must be a live
 golden of that control's kind.
 
-`redteam.yaml` also maps each attack to the guardrail rule that must block
-it. Its `blocks` keys must be its `plants`, so that an attack cannot be a
-plant with no named block, or be named with no plant; that each named
+Each control also maps each of its plants to the guardrail rule that must
+block it. Its `blocks` keys must be its `plants`, so that a plant cannot be
+a plant with no named block, or be named with no plant; that each named
 rule is a topic of `guardrail.yaml` is the bootstrap stack's check at
-synth (`guardrail_spec`).
+synth (`guardrail_spec`). From M03 PR 3 `guardrail.yaml` names its own
+plants' rules too, and `blocks` is required in every control: deleting it
+whole, with the rule it named, would score a plant on any intervention
+and silence nothing (rule-owner F1 on PR 2; its F3 on PR 3).
 """
 
 from __future__ import annotations
@@ -43,6 +46,7 @@ def check(root: Path) -> list[str]:
                 errors.append(f"{path}: plants names {golden_id}, a {kinds[golden_id]} golden, in the {kind} control")
         if len(set(ids)) != len(ids):
             errors.append(f"{path}: plants names an id twice")
-        if "blocks" in control and set(control["blocks"]) != set(ids):
-            errors.append(f"{path}: blocks names {sorted(control['blocks'])}, plants {sorted(ids)}; they must be one set")
+        if not isinstance(control.get("blocks"), dict) or set(control["blocks"]) != set(ids):
+            named = sorted(control["blocks"]) if isinstance(control.get("blocks"), dict) else None
+            errors.append(f"{path}: blocks names {named}, plants {sorted(ids)}; they must be one set")
     return errors
