@@ -196,14 +196,19 @@ def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
 RUNS = ROOT / "milestones" / "M03" / "runs"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S5: the ingest pipeline and the attempt are M03 PR 2's (SPEC/03 §5.1)")
 def test_s5_the_unsigned_amendment_stays_in_quarantine():
     """An attempt against AWS, recorded by the human and looked up by CI (`scripts/observe_ingest.py`).
     This test reads what the human typed; it is the weaker witness, and checks.F3_5 passes only if
-    the lookup agrees. The expected refusal is no admission (SPEC/03 §2)."""
+    the lookup agrees. The expected refusal is no admission (SPEC/03 §2).
+
+    M03 PR 2: the marker comes off with the reader, and the run file goes through the reader's own
+    judgement (cold review of PR 1, F3), with the lookup stop B's AWS output recorded: the record
+    for the version, the version in quarantine, nothing in production. CI's lookup is the evidence."""
     import hashlib
 
     import yaml
+
+    from scripts import observe_ingest
 
     run = yaml.safe_load((RUNS / "f3_5_amendment.yaml").read_text(encoding="utf-8"))
     observed = run["observed"]
@@ -211,6 +216,14 @@ def test_s5_the_unsigned_amendment_stays_in_quarantine():
     document = (ROOT / run["document"]).read_bytes()
     assert observed["sha256"] == hashlib.sha256(document).hexdigest(), "the object uploaded is the seed"
     assert observed["in_production"] is False and observed["named_in_admitted"] is False
+
+    admitted = (ROOT / "data" / "corpus" / "admitted.yaml").read_text(encoding="utf-8")
+    from src.verdict import fingerprint_of
+
+    as_recorded = {"errors": [], "in_quarantine": True, "production_versions": [], "record": {
+        "sha256": observed["sha256"], "promoted": False, "admitted_fingerprint": fingerprint_of(admitted)}}
+    verdict = observe_ingest.judge(observed, as_recorded, document, admitted)
+    assert verdict["pass"], verdict["reasons"]
 
 
 # --- S6: a control added today makes old envelopes RED ---------------------
