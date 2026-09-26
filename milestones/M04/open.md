@@ -53,3 +53,4 @@ the envelope `cb06c0d`, not this file's prose. That envelope is in
 | 35 | **N14: an admin can remove the production bucket's policy, or change the promoter or its admitted list.** An SCP, deferred with the landing zone (SPEC/00 §2, §12). | `pr2-security.md`; SPEC/03 §8 | Security | M05 open |
 | 36 | **Ceilings computed from the org graph; the rest of `ratings-helper`'s tool work.** | M03 `open.md` row 13 | Tool Owner | M06; M07 |
 | 37 | **Injection aimed at the judge.** | SPEC/03 §8 | Rule Owner | M08 |
+| 38 | **S1's and S2's shipped tests have never been seen failing without their readers.** Their bodies changed with their readers at M03 PR 2 (`pr2-engineering.md` N1), so the strict xfail at PR 1 tested other bodies. Row 3's condition "no seed's test passes but by its reader" is, for these two, recorded, not measured. A test that switches each reader off and asserts the planted reason. | M03 PR 4 second cold read, F3 | Engineering | at M04 open |

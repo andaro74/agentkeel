@@ -7,7 +7,10 @@ ruling: pr4
 seat: Product
 authorises:
   - milestones/README.md
-  - milestones/M03/**
+  - milestones/M03/README.md
+  - milestones/M03/attestations.md
+  - milestones/M03/rulings/pr4.md
+  - milestones/M03/runs/pr3_merge_deploy_load_check.md
   - milestones/M04/open.md
   - docs/milestones/M03.md
   - docs/milestones/README.md
@@ -94,14 +97,21 @@ runtime envelope at version 5; the workflow's skip rule says it cannot be.
   the admin able to go around them (cold review F5).
 - The seed claim "each reader switched off, its seed failed again" was
   removed: the tree records the markers coming off with their readers,
-  not a switch-off run (cold review F1).
+  not a switch-off run (cold review F1). For S1 and S2 the close detail
+  says it is recorded, not measured (second read F3).
+- "Four of the seven planted routes were refused only in a copy" became
+  six: row 3 lists S1, S2, S3, S4, S6 and S7 as refused in a copy; only
+  S5 was tried for real (second read N1).
 
 ## The cold review
 
 `engineering-cold-reviewer` read `git diff c73eb9e...e20d3c9` (7 files)
 and row 3: 0 BLOCK, 6 FINDING, 6 NOTE. The table is in
 `pr4-engineering.md`; the report is in the PR body verbatim. Every finding
-is repaired in `ae2debf` or `e240864`, or by this file (F2). No other seat
+is repaired in `ae2debf` or `e240864`, or by this file (F2). A second
+cold read of the repairs, `e20d3c9...bab1e0b` (8 files), found 0 BLOCK, 3
+FINDING, 6 NOTE, repaired in the commit after it; its F3 is carried as
+M04 `open.md` row 38. No other seat
 subagent applies: the diff touches no Rule Owner, Data Owner, Tool Owner,
 Threshold Owner or Security path.
 

@@ -76,8 +76,8 @@ Written at M03 PR 1 open. The row in `milestones/README.md` is the one
 ### Close detail (PR 4, the close, 2026-09-26)
 
 **Row 3 is GREEN.** The cap was four and four were used. Every seed was
-refused by its reader, the seven plants fired by their named rules, and
-no guard went red.
+refused by its reader, `build` counted the seven plants as fired, each
+only with its named rule among the topics, and no guard went red.
 
 **The measurement.** The Measured cell is copied from `make ledger`'s
 reading of the envelope for `cb06c0dbf0019088c664c6df1ce7d67cc64f7d58`,
@@ -105,8 +105,9 @@ envelope at `:5` is `milestones/M04/open.md` row 10.
 **Row 3's RED conditions, each checked at the close:** no seed's test
 passes but by its reader (`uv run pytest tests/test_m03_seeds.py`, 9
 passed; each strict marker came off in the commit that landed its reader,
-`pr2-engineering.md`, and S1's and S2's test bodies changed with their
-readers, its N1);
+`pr2-engineering.md`. **For S1 and S2 this is recorded, not measured**:
+their test bodies changed with their readers (its N1), so no commit shows
+the shipped test failing without its reader; M04 `open.md` row 38);
 no silent plant ruled GREEN (7 of 7); plants are not under 7; the
 amendment is not in the production bucket (F3_5, CI's lookup in run
 36270471757); both guards green; `make ledger` matches rows 0 to 2.
@@ -138,6 +139,7 @@ names; cut 5, Promptfoo, to M05. `milestones/M04/open.md` rows 19 and 25.
 | Unsure, #19 (A to G) | 7 | A, B ruled (`pr1.md` rulings 6, 5); C ruled (`pr2.md` ruling 1); D M04 `open.md` row 30 (M05); E closed: `red-teamer` was exercised twice more in PR 2 (#20's first comment); F done at PR 2 (the deny narrowed, 79 cases); G done (#19) |
 | Unsure, #20 (A to G) | 7 | A, B, E M04 `open.md` rows 1, 2, 3; C repaired at PR 3; D read by the merge deploy's load check, a log; F done (`a9c8ff6`); G row 29 (M05) |
 | Unsure, #21 (A to G) | 7 | A row 4; B the eval role read by `cb06c0d`, the runtime's condition by run 36272077619's load check (a log; row 10); C closed here, negatively: no `mode: runtime` envelope at `:5` exists (row 10); D row 6; E ruled, M05 (row 28); F row 5; G ruled in `pr3-security.md` (rows 7, 8, 26, 27) |
+| PR 4 (this PR) cold reads | 0/6/6; second read 0/3/6 | `rulings/pr4-engineering.md` table, each repaired or held; the second read's F3 is M04 `open.md` row 38 |
 | M03 `open.md` rows 1 to 15 | 15 | `feasibility.md` §6 answered each at PR 1; rows 3 to 8 at PR 2 and PR 3; row 11's items e and j done at PR 2 (`src/verdict/__init__.py`, the readers at a commit) and g done (`src/agent/run.py`, the goldens no longer excluded); what was dated M04 or later, and row 11's items f, h, i and a to d, k, are M04 `open.md` rows 12 to 15, 22, 34 and 36 |
 
 **Still open, for the human after the merge:** sign

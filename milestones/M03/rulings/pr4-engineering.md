@@ -47,6 +47,25 @@ nothing under `src/`, `evals/`, `data/`, `rules/`, `thresholds.yaml` or
 | N5 | sources in PR bodies and comments cannot be checked from the tree | recorded; the ledger's design |
 | N6 | numbers checked against their sources | recorded; no change |
 
+## The second cold read, of the repairs
+
+`engineering-cold-reviewer` read `git diff e20d3c9...bab1e0b` (8 files, 3
+commits) and row 3, ran `src.ledger` (exit 0), `validate` (15 ok) and
+`ruling_cited --base main --pr 22` (exit 0): **0 BLOCK, 3 FINDING, 6
+NOTE**, in the PR body verbatim. Every first-read repair holds.
+
+| # | Finding | Status |
+|---|---|---|
+| F1 | the close detail still said "fired by their named rules" | **repaired** in the commit after `bab1e0b`: `build` counted them, each only with its named rule |
+| F2 | `pr4.md` authorised `milestones/M03/**`, wider than the diff and over this file | **repaired**: the five exact paths |
+| F3 | for S1 and S2, "no seed's test passes but by its reader" is recorded, not measured | **said so** in the close detail; M04 `open.md` row 38 (Engineering, at M04 open) |
+| N1 | S2's and S4's refusals are test-only too | **repaired**: the explainer says six of seven, only S5 tried for real |
+| N2 | the log transcription has no digest | recorded in the run file itself |
+| N3 | "0 errors means the condition did not refuse" is an inference | **repaired**: said as what not refusing would look like |
+| N4 | the drafts carry their final slugs before the human rules | recorded; `pr2-engineering.md`'s precedent |
+| N5 | the video row plans a switch-off shot | recorded: a plan, and the first record of a switch-off when made |
+| N6 | the numbers in this file checked | recorded |
+
 ## What a reader can run
 
 ```

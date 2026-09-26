@@ -43,6 +43,7 @@ wrote /home/runner/work/_temp/after-deploy.json (20 observations, 0 errors)
 
 Read beside it: the runtime's invoke is conditioned on
 `bedrock:GuardrailIdentifier` at `1088aw3ujhyd:5` from this deploy
-(`pr3-security.md`, cold F2). Twenty answers with 0 errors means the
-condition did not refuse the runtime's calls. It is the condition's first
-read in AWS, and it is a log.
+(`pr3-security.md`, cold F2). Twenty answers with 0 errors is what that
+condition not refusing would look like; nothing in the tree shows the
+deployed policy carried the `:5` condition at that moment. It is a log,
+transcribed without a digest of the original.
