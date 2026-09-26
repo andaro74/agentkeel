@@ -76,8 +76,10 @@ green through everything M03 adds (§5.2).
   reads them does not.
 - **Admitted.** A document is admitted when it is in the production
   bucket. It gets there from the quarantine bucket only, and only when
-  `data/corpus/admitted.yaml` on `main` (Data Owner) names its key and
-  its sha256 with the ruling that admitted it. The guardrail and PII scan
+  `data/corpus/admitted.yaml` on `main` (Data Owner) names its sha256
+  with the ruling that admitted it; the same bytes are admitted whatever
+  key they are uploaded under, and the admitted key gives the extension
+  (amended at PR 2). The guardrail and PII scan
   runs on every object in quarantine and its result is recorded, but the
   refusal an unsigned amendment is expected to meet is **no admission**:
   nobody signed it, so no ruling names it (ruling on F7). The production
@@ -244,7 +246,8 @@ wrong answer arriving through the table instead.
   `cdk diff`, deploys the ingest stack by hand, uploads
   `s5-unsigned-amendment.md` to the quarantine bucket, and fills
   `observed:` with the object key, version id and time. PR 2's run looks
-  the object up: in quarantine, with its scan result; absent from the
+  the object up: its version in quarantine (S3's own versions) and its
+  scan result (the promoter's record); absent from the
   production bucket; not named in `admitted.yaml`. That is how M01 read
   S4 and S6. If the stack cannot be deployed before PR 2's last run,
   F3.5 is read at PR 3, named here as a P3 exception.
@@ -318,19 +321,24 @@ None of it is in PR 1. In the order the commits land:
   **Named before the stack, as `security-reviewer` F3 and F4 at PR 1
   asked (amended at PR 2; the human as Security, 2026-09-25):**
   - *The stack*: `AgentkeelIngest` (`infra/ingest/`), its own stack,
-    deployed by the human with admin, as the bootstrap stack is. No
-    workflow and no platform role deploys it. Its roles carry the deploy
-    boundary.
+    deployed by the human with admin from a clean checkout, as the
+    bootstrap stack is. No workflow and no platform role deploys it. Its
+    roles carry the deploy boundary. Every name is refagent's
+    (`agentkeel-refagent-*`): the corpus is one agent's, and M05 allows no
+    shared surface (`platform-architect` on the stack, F5).
   - *Quarantine*: a versioned, private bucket, TLS only. The human
     uploads to it; every new object version triggers the promoter.
   - *The promoter*: one Lambda function, trusted by
     `lambda.amazonaws.com` only. It reads the new version, takes its
-    sha256, runs `ApplyGuardrail` on its text with refagent's pinned
-    guardrail and records the result, and copies the bytes to the
-    production bucket under the key `<sha256>` **only if** that sha256 is
-    one `admitted.yaml` names. The admitted list is read at synth, so a
-    change to `admitted.yaml` reaches the promoter only by the human's
-    deploy. A scan hit is recorded and never decides promotion (the Data
+    sha256, runs `ApplyGuardrail` on its text (the first 20,000
+    characters, and the record says when there were more) with refagent's
+    pinned guardrail and records the result, and copies the bytes to the
+    production bucket under the key `<sha256><extension>` **only if** that
+    sha256 is one `admitted.yaml` names. The admitted list is read at
+    synth, so a change to `admitted.yaml` reaches the promoter only by the
+    human's deploy; each record carries the fingerprint of the list the
+    promoter held, which `observe_ingest.py` compares with `admitted.yaml`
+    at the envelope's commit. A scan hit is recorded and never decides promotion (the Data
     Owner's ruling on F7: the master license's invented contact details
     are a PII hit and are admitted). Its role may read quarantine, write
     production, write the record, and apply that one guardrail; nothing
@@ -340,16 +348,20 @@ None of it is in PR 1. In the order the commits land:
     2026-09-25: a demo setting; no one, root included, changes or deletes
     a promoted object for a day, and the stack can be torn down after
     it). Its bucket policy denies `s3:PutObject` to every principal but
-    the promoter's role: the human's admin cannot promote by hand. A
+    the promoter's role, and denies every principal a delete, a
+    replication into it, a legal hold, a new retention date and a new lock
+    configuration. No platform role can promote by hand. The human's admin
+    can still remove the policy or change the promoter: see §8. A
     shorter period or GOVERNANCE mode is a relaxation, one key
     (`rulings/pr1.md` ruling 5); M05's audit bucket (R5) is not this one.
   - *The record*: a DynamoDB table, one item per object version that
-    reached quarantine (key, version id, sha256, scan result, promoted
-    or not, time).
-  - *How CI reads it*: the eval role reads the record and the production
-    bucket (get, list) through the table's and the bucket's resource
-    policies, which name `agentkeel-evals`; the bootstrap stack does not
-    change. `scripts/observe_ingest.py` finds the record of the run
+    reached quarantine, written once (key, version id, sha256, scan
+    result, promoted or not, the production key, the admitted list's
+    fingerprint, time), with deletion protection.
+  - *How CI reads it*: the eval role reads the record, the production
+    bucket's objects and versions, and quarantine's versions, through
+    the table's and the buckets' resource policies, which name
+    `agentkeel-evals`; the bootstrap stack does not change. `scripts/observe_ingest.py` finds the record of the run
     file's version first, then asks the production bucket for the
     object's sha256 by key (`security-reviewer` F7 at PR 1).
 - **The fingerprint**: `build` writes it from `admitted.yaml`; `gate`
@@ -397,7 +409,22 @@ SPEC/00 §10.5: no document describes these as working.
 - anyone with write editing `src/verdict/`, `src/gates/` or the Makefile
   so that its own envelope, or its own gate, says GREEN
   (`security-reviewer` NOTE 3) (the `evals.yml` header; M05 takes the reader
-  from `main`).
+  from `main`);
+- the ingest stack's own refusals, amended at PR 2 on the
+  `security-reviewer` and `platform-architect` reports on it: that the
+  production bucket refuses a put by anyone but the promoter, a delete, a
+  replication, a hold or a re-lock; that Object Lock refuses a change to
+  a promoted version for its day; that the promoter's role is held to its
+  five grants. The template is tested; none has been attempted in AWS.
+  Seed S5 reads only that an unadmitted document is not promoted;
+- an admin who removes the production bucket's policy, or changes the
+  promoter's code or its admitted list, or deploys it from a tree that
+  is not `main`: the fingerprint in each record shows the list, and
+  nothing refuses the admin. A landing-zone control (an SCP), deferred
+  (SPEC/00 §2, §12);
+- the promoter's network: it runs outside the platform VPC, with
+  Lambda's own egress, on uploads it does not trust. It is not an agent
+  and M05's per-agent egress does not cover it (M05 to rule).
 
 ## 9. Cut list
 

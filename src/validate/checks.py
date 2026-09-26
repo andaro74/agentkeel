@@ -273,7 +273,7 @@ NAG_REPORT = "AwsSolutions--{stack}-NagReport.csv"
 
 
 def check_cdk_nag(root: Path) -> list[str]:
-    """Both stacks synthesise, cdk-nag finds nothing non-compliant, and the committed report matches.
+    """Every stack synthesises, cdk-nag finds nothing non-compliant, and the committed report matches.
 
     cdk-nag runs as an aspect inside each app, so a Non-Compliant error
     fails the synth and this check reads a non-zero exit. What this adds is
@@ -324,18 +324,21 @@ def _nag_rows(path: Path, rel: str) -> list[str]:
         where = f"{rel}: {row['Rule ID']} on {row['Resource ID']}"
         if row["Compliance"] == "Non-Compliant":
             errors.append(f"{where}: non-compliant")
-        elif row["Compliance"] == "Suppressed" and not _names_its_case(row["Exception Reason"]):
+        elif row["Compliance"] == "Suppressed" and not _names_its_case(row["Exception Reason"], row["Resource ID"]):
             errors.append(f"{where}: the suppression names no seeded case (S3, S4, S5, S6, S8) and no "
-                          f"SPEC/01 §6 line. That is a finding, not a suppression.")  # fmt: skip
+                          f"SPEC/01 §6 line (SPEC/03 §6 for the ingest stack). That is a finding, not a "
+                          f"suppression.")  # fmt: skip
     return errors
 
 
-def _names_its_case(reason: str) -> bool:
+def _names_its_case(reason: str, resource: str = "") -> bool:
     """`seed S3`, not `the S3 gateway endpoint`: the service name is not the seed.
 
-    From M03 PR 2 a line of SPEC/03 §6 serves as SPEC/01 §6's does, for the ingest stack.
+    From M03 PR 2 a line of SPEC/03 §6 serves as SPEC/01 §6's does, on the ingest stack's rows only
+    (security-reviewer on 2e93d27): SPEC/03 §6 names that stack and no other.
     """
-    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason or "SPEC/03 §6" in reason)
+    ingest = resource.startswith("AgentkeelIngest/") and "SPEC/03 §6" in reason
+    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason or ingest)
 
 
 THRESHOLDS = "thresholds.yaml"
@@ -372,7 +375,7 @@ CHECKS = {
     "ruling front matter": check_rulings,
     "workflow-hash": check_workflow_hashes,
     "manifest schema": check_manifests,
-    "cdk-nag, both stacks": check_cdk_nag,
+    "cdk-nag, every stack": check_cdk_nag,
     # M02 PR 2 (SPEC/02 section 6)
     "CODEOWNERS complete, single-owner, logins real": codeowners.check,
     "relaxes: on every bar": check_relaxes,
