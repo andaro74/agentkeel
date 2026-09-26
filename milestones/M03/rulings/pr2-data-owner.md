@@ -1,6 +1,6 @@
 ---
 # M03 PR 2 (#20, expected; corrected when the PR opens), the Data Owner's key.
-# A draft by the session; the human rules as Data Owner before the merge.
+# Drafted by the session; ruled by the human as Data Owner, 2026-09-25.
 ruling: pr2-data-owner
 seat: Data Owner
 authorises:
@@ -23,8 +23,11 @@ pr: 20
 
 # Ruling: M03 PR 2, Data Owner
 
-**Draft.** Written by the session for the human, who rules each item below
-as Data Owner. Nothing here is ruled until the human says so.
+Ruled by andaro74 as Data Owner, 2026-09-25, as written. Before ruling,
+the human searched the invented names in the corpus and found the first
+set real; they were replaced by coinages each searched first (`92a5201`),
+and `admitted.yaml` was re-hashed. The ruling covers the corpus as it
+stands at that commit.
 
 ## The red-team goldens `g-016` to `g-020`
 
