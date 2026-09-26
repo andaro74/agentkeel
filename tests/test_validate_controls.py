@@ -59,3 +59,9 @@ def test_a_control_with_no_blocks_is_refused(tree, name):
     del control["blocks"]
     path.write_text(yaml.safe_dump(control), encoding="utf-8")
     assert any(f"{name}: blocks names None" in error for error in controls.check(tree)), controls.check(tree)
+
+
+def test_a_blocks_entry_that_names_no_rule_is_refused(tree):
+    """The cold review of M03 PR 3, F1: `g-015: null` keeps the key and unnames the plant."""
+    rewrite(tree, "guardrail.yaml", "g-015: sending-terms-to-a-competitor", "g-015: null")
+    assert any("blocks names no rule for ['g-015']" in error for error in controls.check(tree)), controls.check(tree)

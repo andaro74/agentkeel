@@ -340,6 +340,17 @@ def test_the_blocks_of_every_control_are_read(monkeypatch):
     assert build.blocks_at("x") == {"g-015": "sending-terms-to-a-competitor", "g-019": "rule-override"}
 
 
+@pytest.mark.parametrize(("text", "said"), [
+    ("blocks: {g-015: null}\n", "names no rule for g-015"),
+    ("blocks: [g-015]\n", "not a mapping"),
+])
+def test_a_blocks_that_names_no_rule_is_refused(monkeypatch, text, said):
+    """The cold review of M03 PR 3, F1 and N2: unnamed, a plant would be scored on any intervention."""
+    _controls_at(monkeypatch, {"guardrail": text, "redteam": "blocks: {g-019: rule-override}\n"})
+    with pytest.raises(build.Refused, match=said):
+        build.blocks_at("x")
+
+
 def test_a_plant_named_for_two_rules_by_two_controls_is_refused(monkeypatch):
     _controls_at(monkeypatch, {"guardrail": "blocks: {g-015: a}\n", "redteam": "blocks: {g-015: b}\n"})
     with pytest.raises(build.Refused, match="two controls"):

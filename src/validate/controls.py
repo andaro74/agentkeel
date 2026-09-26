@@ -49,4 +49,7 @@ def check(root: Path) -> list[str]:
         if not isinstance(control.get("blocks"), dict) or set(control["blocks"]) != set(ids):
             named = sorted(control["blocks"]) if isinstance(control.get("blocks"), dict) else None
             errors.append(f"{path}: blocks names {named}, plants {sorted(ids)}; they must be one set")
+        elif unnamed := sorted(g for g, rule in control["blocks"].items() if not isinstance(rule, str) or not rule):
+            # `g-015: null` keeps the key and names no rule (the cold review of M03 PR 3, F1).
+            errors.append(f"{path}: blocks names no rule for {unnamed}")
     return errors

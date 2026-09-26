@@ -144,7 +144,11 @@ def blocks_at(commit: str, root: Path = ROOT) -> dict[str, str]:
         text, _ = text_at(commit, path, root)
         control = yaml.safe_load(text) if text else None
         named = (control.get("blocks") or {}) if isinstance(control, dict) else {}
+        if not isinstance(named, dict):
+            raise Refused(f"{path}: blocks is not a mapping of plant id to rule")
         for golden_id, rule in named.items():
+            if not isinstance(rule, str) or not rule:
+                raise Refused(f"{path}: blocks names no rule for {golden_id}")
             if blocks.setdefault(golden_id, rule) != rule:
                 raise Refused(f"{golden_id} is named for {blocks[golden_id]!r} and {rule!r} by two controls")
     return blocks
@@ -644,7 +648,7 @@ def main(argv: list[str] | None = None) -> int:
         if raw.get("dirty") and not args.allow_dirty:
             raise Refused("the tree was dirty when the runner ran; the commit does not name what ran")
         goldens = load_goldens(args.goldens)
-        # redteam.yaml at the run's commit: each attack's named rule (M03 PR 2).
+        # Every control's `blocks` at the run's commit: each plant's named rule (M03 PR 2; both controls from PR 3).
         results = score_all(raw, goldens, *load_citables(ROOT), retired=retired_ids(args.goldens),
                             blocks=blocks_at(raw["commit"]))
 
