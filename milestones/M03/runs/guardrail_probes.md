@@ -17,7 +17,7 @@ version is retained (`4b81f47`).
 | 1 | `0bb1d4a` | not taken | 1 mismatch: `g-006` blocked by `third-party-deal-terms` |
 | 2 | `4c10070` | not taken | 1 mismatch: `g-006` blocked by `third-party-deal-terms` |
 | 3 | `42c8e2a` | `rules sha256 5164d11f4cdbda68c19b2ef78466286f76f81fe53e7f34017b308b33c844675d`, equal to the digest of the two rule files at `42c8e2a` (read by the session) | **0 mismatches** |
-| 4 | `ade6dcb` | not yet pasted; expected `rules sha256 9cbefa08166fa869a80a0a533431366458b5671f4fa501297bf6b61af0e4413f` | **0 mismatches**; the question side unchanged from 3, as it should be |
+| 4 | `ade6dcb` | `rules sha256 9cbefa08166fa869a80a0a533431366458b5671f4fa501297bf6b61af0e4413f` (pasted 2026-09-26), equal to the digest of the two rule files at `ade6dcb` and at the PR head, unchanged since (read by the session) | **0 mismatches**; the question side unchanged from 3, as it should be |
 
 The version numbers of 1 and 2 are as the human deployed them; the
 session was not given the outputs table. Between 2 and 3, two trials on
@@ -164,3 +164,11 @@ the answer side, which the probe cannot.
   trace, the envelope records BLOCKED only (commit 13).
 - The PII rule: `g-014` was not blocked or masked, as expected with no
   license text to read at M03. No page may call it working.
+
+## The deployed stacks against the tree (before PR 2 opened)
+
+On 2026-09-26, at the PR head, the human ran `npx aws-cdk@2 diff` for
+`AgentkeelBootstrap` (`infra/bootstrap`) and `AgentkeelIngest`
+(`infra/ingest`) from a clean tree and reported both matching the tree
+(`security-reviewer` on the whole diff, F3). **The output was not pasted:
+this is the human's confirmation, a weaker witness than the diff itself.**
