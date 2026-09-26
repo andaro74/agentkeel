@@ -168,7 +168,7 @@ rules digest changed and the version was replaced: version **5**,
 every IAM policy document and the VPC did not change; `ParamGuardrail`'s
 description was corrected (security-reviewer N9 on PR 2). The ten
 metadata-only changes `--strict` printed are the suppression reasons'
-`§`, stored as `?` by the earlier deploy
+`§`, which the deployed template read as `?`
 (`milestones/M03/runs/pr3_stop_a_cdk_diff.md`).
 
 `read_back_grants.py`, before and after, byte-identical: 81 cases,

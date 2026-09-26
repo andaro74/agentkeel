@@ -22,9 +22,10 @@ What it shows, read by the session before the deploy was run:
   against `?` in the deployed template (the `[-]` side). These are the "10
   changes omitted because they are likely mangled non-ASCII characters"
   of PR 2's diff (`guardrail_probes.md`; security-reviewer F3 on PR 2),
-  now printed by `--strict`. The earlier deploy stored `?` in place of `§`.
-  Metadata grants and denies nothing. Whether this deploy stored `§` is
-  read by the next `cdk diff`.
+  now printed by `--strict`. The deployed template, as CloudFormation
+  returns it, reads `?` where the tree has `§`; the CLI calls them
+  "likely mangled". Metadata grants and denies nothing. Whether this
+  deploy's template reads `§` is read by the next `cdk diff`.
 
 ```
 Stack AgentkeelBootstrap
