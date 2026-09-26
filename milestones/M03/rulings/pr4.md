@@ -29,8 +29,7 @@ pr: 22
 
 # Ruling: M03 PR 4, Product
 
-Drafted by the session through `/close-milestone M03`; to be ruled by
-andaro74 as Product.
+Ruled by andaro74 as Product, 2026-09-26, as written.
 
 ## What this PR is
 

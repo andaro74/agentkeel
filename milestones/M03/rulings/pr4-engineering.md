@@ -3,7 +3,7 @@
 # e20d3c9, by engineering-cold-reviewer from the diff and row 3 only; its
 # report is in the PR body verbatim. The diff touches no Engineering path, so
 # this file names only itself and takes no key over anything. Drafted by the
-# session; to be ruled by andaro74 as Engineering.
+# session; ruled by andaro74 as Engineering, 2026-09-26, as written.
 ruling: pr4-engineering
 seat: Engineering
 authorises:
@@ -19,6 +19,8 @@ pr: 22
 ---
 
 # Cold review: M03 PR 4 (the close)
+
+Ruled by andaro74 as Engineering, 2026-09-26, as written.
 
 `engineering-cold-reviewer` read `git diff c73eb9e...e20d3c9` (7 files, 6
 commits) and row 3, not the PR body or the commit bodies. It ran

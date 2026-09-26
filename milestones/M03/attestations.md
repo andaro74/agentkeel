@@ -33,7 +33,7 @@ off in the commit that landed its reader (`pr2-engineering.md`); S1's and
 S2's test bodies changed with their readers (its N1). At the close the
 seven seed tests and the two guards pass.
 
-Signed: ______  Date: ______
+Signed: andaro74  Date: 2026-09-26
 
 ---
 
@@ -53,7 +53,7 @@ guardrail version 5; its load check wrote 20 observations with 0 errors
 None of the ingest stack's own refusals has been attempted in AWS, and
 this line does not say they work.
 
-Signed: ______  Date: ______
+Signed: andaro74  Date: 2026-09-26
 
 ---
 
@@ -69,7 +69,7 @@ the head. `two-key` found no relaxation against `d2d1e6d` (PR 2) or
 `main` or on an envelope. `g-014`'s PII rule is in the file and not
 counted; no page calls it working.
 
-Signed: ______  Date: ______
+Signed: andaro74  Date: 2026-09-26
 
 ---
 
@@ -83,7 +83,7 @@ unsigned amendment. The longest run of words shared by a live golden's
 question and a document is 5, under the bound of 12. Every name in the
 corpus is invented and was searched before the ruling.
 
-Signed: ______  Date: ______
+Signed: andaro74  Date: 2026-09-26
 
 ---
 
@@ -95,7 +95,7 @@ refagent ran as `us.anthropic.claude-sonnet-4-6` in `us-west-2`, version
 measured run spent 52,131 (47,034 in, 5,097 out), and the cap was
 re-ruled against PR 2's 52,415 without moving (`pr3-threshold-owner.md`).
 
-Signed: ______  Date: ______
+Signed: andaro74  Date: 2026-09-26
 
 ---
 
@@ -111,4 +111,4 @@ date. SPEC/03 cuts 1 to 4 were not built and are recorded as taken at the
 close, not before. Nothing in this milestone is described as governed,
 secure or proven.
 
-Signed: ______  Date: ______
+Signed: andaro74  Date: 2026-09-26
