@@ -421,7 +421,11 @@ unless a ruling changes it. One policy, not both.
 ### M05 — Containment and evidence
 Build: default-deny egress per agent; no shared surfaces (per-agent
 memory, prefixes, tables); credentials only via Identity; agent role
-denies `iam:*`, `bedrock:*Guardrail*`, `logs:Delete*`, `sts:AssumeRole`,
+denies `iam:*`, any Create, Update, Delete or Put action on a guardrail
+and `GetGuardrail` and `ListGuardrails` (narrowed from
+`bedrock:*Guardrail*` at M03 PR 2, so that `bedrock:ApplyGuardrail` can be
+on the agent's call; a guardrail action under another verb is not denied;
+SPEC/03 §6), `logs:Delete*`, `sts:AssumeRole`,
 `s3:PutBucketPolicy`; audit bucket in the security account with Object
 Lock and **retention seven years** (R5), write-once from the agent
 account; GuardDuty Runtime Monitoring and VPC Flow Logs; nightly
@@ -579,7 +583,11 @@ for real IP at M01 by hand; `legal-compliance` re-checks at M07.
   `agents/ratings-helper/` does not exist in the tree.
 - **Guardrail** — denied topic: plot or synopsis of the embargoed title;
   PII: talent contact details present in the license; blocked intent:
-  deal terms requested for a third party.
+  deal terms requested for a competitor. (Amended at M03 PR 2, Product:
+  it read "for a third party", and every wording about deal terms in
+  general also blocked `g-006`, an ordinary question about exclusivity;
+  the rule built, probed and measured is `sending-terms-to-a-competitor`,
+  `milestones/M03/runs/guardrail_probes.md`.)
 
 ### Golden set v1 (Data Owner, M00)
 Fifteen goldens at M00 (`g-001` to `g-015`: 9 ordinary, 3 traps, 3

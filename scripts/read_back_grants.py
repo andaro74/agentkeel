@@ -6,7 +6,8 @@ What `milestones/M01/rulings/pr3.md` transcribes: `simulate-principal-policy`
 on `agentkeel-cfn-exec`, `agentkeel-deploy` and `agentkeel-evals`, and
 `simulate-custom-policy` on `agentkeel-boundary` as a ceiling, under an
 allow-all identity policy, because no agent role exists before the first
-deploy. Each grant has a negative beside it: the wrong VPC, the wrong subnet,
+deploy. From M03 PR 2 also `agentkeel-developer`, and the rows for the
+narrowed guardrail deny and the rights table marker. Each grant has a negative beside it: the wrong VPC, the wrong subnet,
 no boundary, the wrong service, a delete where only a write is granted. It
 prints one markdown row per case and the count of mismatches, and exits 1 on
 any mismatch.
@@ -34,6 +35,14 @@ def main() -> int:
     boundary = ssm.get_parameter(Name="/agentkeel/security/boundary-arn")["Parameter"]["Value"]
     vpc_arn = f"arn:aws:ec2:{R}:{A}:vpc/{vpc}"
     agent_role = f"arn:aws:iam::{A}:role/agentkeel/agents/refagent-x"
+    # M03 PR 2: the table marker, and a guardrail that is not refagent's.
+    marker = f"arn:aws:ssm:{R}:{A}:parameter/agentkeel/marker/refagent/rights-table-digest"
+    guardrail_any = f"arn:aws:bedrock:{R}:{A}:guardrail/notrefagent0"
+    try:  # absent before stop A's deploy: that row is skipped, and the output says so
+        guardrail_arn = ssm.get_parameter(Name="/agentkeel/security/guardrail/refagent")["Parameter"]["Value"]
+    except ssm.exceptions.ParameterNotFound:
+        guardrail_arn = None
+        print("note: /agentkeel/security/guardrail/refagent is not there yet; its ApplyGuardrail row is skipped\n")
 
 
     def ctx(**kv):
@@ -91,13 +100,28 @@ def main() -> int:
         ("bedrock-agentcore:GetAgentRuntime", f"arn:aws:bedrock-agentcore:{R}:{A}:runtime/refagent-abc", None, "allowed"),
         ("kms:PutKeyPolicy", "*", None, "explicitDeny"),
         ("ec2:CreateInternetGateway", "*", None, "explicitDeny"),
+        # M03 PR 2: the guardrail deny narrowed to everything but Apply (SPEC/03 §6).
+        ("bedrock:CreateGuardrail", "*", None, "explicitDeny"),
+        ("bedrock:ApplyGuardrail", guardrail_any, None, "implicitDeny"),
+        ("ssm:PutParameter", marker, None, "implicitDeny"),
     ])
     deploy = principal("agentkeel-deploy", [
         ("ecr:GetAuthorizationToken", "*", None, "allowed"),
         ("ecr:PutImage", f"arn:aws:ecr:{R}:{A}:repository/agentkeel-refagent", None, "allowed"),
         ("ecr:BatchDeleteImage", f"arn:aws:ecr:{R}:{A}:repository/agentkeel-refagent", None, "implicitDeny"),
         ("dynamodb:PutItem", f"arn:aws:dynamodb:{R}:{A}:table/agentkeel-refagent-rights", None, "allowed"),
-        ("dynamodb:DeleteItem", f"arn:aws:dynamodb:{R}:{A}:table/agentkeel-refagent-rights", None, "implicitDeny"),
+        # M03 PR 2 (S1's reader): the table is the file, so rows the file lacks are deleted.
+        ("dynamodb:DeleteItem", f"arn:aws:dynamodb:{R}:{A}:table/agentkeel-refagent-rights", None, "allowed"),
+        ("dynamodb:Scan", f"arn:aws:dynamodb:{R}:{A}:table/agentkeel-refagent-rights", None, "allowed"),
+        ("dynamodb:DeleteItem", f"arn:aws:dynamodb:{R}:{A}:table/other", None, "implicitDeny"),
+        ("dynamodb:DeleteTable", f"arn:aws:dynamodb:{R}:{A}:table/agentkeel-refagent-rights", None, "implicitDeny"),
+        ("dynamodb:BatchWriteItem", f"arn:aws:dynamodb:{R}:{A}:table/agentkeel-refagent-rights", None, "implicitDeny"),
+        ("ssm:PutParameter", marker, None, "allowed"),
+        ("ssm:DeleteParameter", marker, None, "implicitDeny"),
+        ("ssm:PutParameter", f"arn:aws:ssm:{R}:{A}:parameter/agentkeel/security/boundary-arn", None, "implicitDeny"),
+        ("ssm:PutParameter", f"arn:aws:ssm:{R}:{A}:parameter/agentkeel/security/guardrail/refagent", None, "implicitDeny"),
+        ("bedrock:CreateGuardrail", "*", None, "explicitDeny"),
+        ("bedrock:ApplyGuardrail", guardrail_any, None, "implicitDeny"),
         ("bedrock-agentcore:InvokeAgentRuntime", f"arn:aws:bedrock-agentcore:{R}:{A}:runtime/refagent-abc", None, "allowed"),
         ("bedrock-agentcore:InvokeAgentRuntime", f"arn:aws:bedrock-agentcore:{R}:{A}:runtime/other-abc", None, "implicitDeny"),
         ("cloudformation:CreateChangeSet", f"arn:aws:cloudformation:{R}:{A}:stack/agentkeel-refagent/x", None, "allowed"),
@@ -114,6 +138,24 @@ def main() -> int:
         ("ecr:DescribeImages", f"arn:aws:ecr:{R}:{A}:repository/agentkeel-refagent", None, "allowed"),
         ("ecr:PutImage", f"arn:aws:ecr:{R}:{A}:repository/agentkeel-refagent", None, "implicitDeny"),
         ("bedrock-agentcore:InvokeAgentRuntime", f"arn:aws:bedrock-agentcore:{R}:{A}:runtime/refagent-abc", None, "allowed"),
+        # M03 PR 2: the table marker, read only; the guardrail's admin actions still denied.
+        ("ssm:GetParameter", marker, None, "allowed"),
+        ("ssm:PutParameter", marker, None, "implicitDeny"),
+        ("ssm:GetParameter", f"arn:aws:ssm:{R}:{A}:parameter/agentkeel/security/vpc-id", None, "implicitDeny"),
+        ("bedrock:CreateGuardrail", "*", None, "explicitDeny"),
+        ("bedrock:UpdateGuardrail", guardrail_any, None, "explicitDeny"),
+        ("bedrock:GetGuardrail", guardrail_any, None, "explicitDeny"),
+        ("bedrock:ListGuardrails", "*", None, "explicitDeny"),
+        # M03 PR 2: the runner's converse applies refagent's guardrail, and no other.
+        *([("bedrock:ApplyGuardrail", guardrail_arn, None, "allowed")] if guardrail_arn else []),
+        ("bedrock:ApplyGuardrail", guardrail_any, None, "implicitDeny"),
+    ])
+
+    # M03 PR 2 (security-reviewer on e2839f2, FINDING 2): its bedrock:List* must not reach the guardrails.
+    developer = principal("agentkeel-developer", [
+        ("bedrock:ListGuardrails", "*", None, "explicitDeny"),
+        ("bedrock:CreateGuardrail", "*", None, "explicitDeny"),
+        ("ssm:PutParameter", marker, None, "implicitDeny"),
     ])
 
     # The agent boundary as a ceiling: an allow-all identity policy under it.
@@ -124,7 +166,12 @@ def main() -> int:
     for action, expect in [("ecr:BatchGetImage", "allowed"), ("ecr:GetDownloadUrlForLayer", "allowed"),
                            ("ecr:GetAuthorizationToken", "allowed"), ("logs:CreateLogGroup", "allowed"),
                            ("ecr:PutImage", "implicitDeny"), ("ecr:BatchDeleteImage", "implicitDeny"),
-                           ("kms:GetKeyPolicy", "allowed"), ("kms:PutKeyPolicy", "explicitDeny")]:
+                           ("kms:GetKeyPolicy", "allowed"), ("kms:PutKeyPolicy", "explicitDeny"),
+                           # M03 PR 2: Apply under the ceiling, nothing else on a guardrail, no ssm.
+                           ("bedrock:ApplyGuardrail", "allowed"), ("bedrock:CreateGuardrail", "explicitDeny"),
+                           ("bedrock:GetGuardrail", "explicitDeny"), ("ssm:GetParameter", "implicitDeny"),
+                           # M03 open.md row 8 (M02 PR 3 platform N1): the runtime reads the table, never writes it.
+                           ("dynamodb:Scan", "allowed"), ("dynamodb:PutItem", "implicitDeny")]:
         r = iam.simulate_custom_policy(PolicyInputList=[allow_all], PermissionsBoundaryPolicyInputList=[boundary_doc],
                                        ActionNames=[action], ResourceArns=["*"])["EvaluationResults"][0]
         ceiling.append(("agentkeel-boundary (ceiling)", action, "*", None, r["EvalDecision"], expect))
@@ -132,7 +179,7 @@ def main() -> int:
     bad = 0
     print("| Principal | Action | Resource | Context | Decision | Expected |")
     print("|---|---|---|---|---|---|")
-    for role, action, resource, context, got, expect in cfn + deploy + evals + ceiling:
+    for role, action, resource, context, got, expect in cfn + deploy + evals + developer + ceiling:
         c = ", ".join(f"{e['ContextKeyName']}={'/'.join(v.split(':')[-1] for v in e['ContextKeyValues'])}" for e in context or []) or "—"
         res = resource.replace(f"arn:aws:", "").replace(A, "<acct>")
         mark = "" if got == expect else " **MISMATCH**"

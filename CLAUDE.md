@@ -54,7 +54,8 @@ the diff; you do not merge.
 - Never write a claim whose false state is not already in the repo.
 - Never build the machinery that reads a claim in the last PR.
 - Never let the corpus that judges an answer also supply the answer.
-  (`validate` checks golden/retrieval overlap; do not route around it.)
+  (`validate` checks golden/corpus overlap: 12 shared words, or a row id
+  in `data/corpus/`; do not route around it.)
 - Never edit `src/baseline/` after tag `m00`. It is the control.
 - Never write an envelope by hand or from a runner. Only
   `src/verdict/build.py` writes envelopes; only `src/verdict/gate.py`

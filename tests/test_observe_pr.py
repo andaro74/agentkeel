@@ -226,3 +226,11 @@ def test_attempt_1_is_witnessed_by_the_recorded_suite_when_the_list_is_empty(tmp
     run["observed"][0]["at"] = "2026-10-30T13:34:13Z"  # the same suite, a month after the attempt: not its witness
     seen = observe_pr.observe_bypass("andaro74/agentkeel", run, None, None)
     assert seen["attempt_1"]["rule_suite_fail_found"] is False
+
+
+def test_an_indented_validate_line_keeps_its_indent_with_or_without_a_timestamp():
+    """M03 open.md row 3 (PR 2 cold N7): strip only after the timestamp is gone, so the indent is still read."""
+    detail = "     evals/goldens/v1/g-099.yaml: a golden id reused"
+    stamped = "2026-09-25T10:00:00.0000000Z " + detail
+    for log in (detail, stamped):
+        assert observe_pr.lines_naming(log, "evals/goldens/v1/g-099.yaml", "checks") == [detail]

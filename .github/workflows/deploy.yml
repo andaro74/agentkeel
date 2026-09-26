@@ -54,6 +54,10 @@ on:
       - agents/refagent/**
       - infra/construct/**
       - .github/workflows/deploy.yml
+      # M03 PR 2 (SPEC/03 §6, seed S1's reader): a change to the rights table
+      # alone reloads it, so the runtime answers from the table on main.
+      # load_rights_table.py sets the marker the runtime match reads.
+      - data/rights_table.json
 
 permissions: {}
 
@@ -220,6 +224,9 @@ jobs:
             --role-arn "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/agentkeel-cfn-exec" \
             --no-fail-on-empty-changeset
 
+      # The copy is the file: rows it lacks are deleted, and the marker is set
+      # to the digest of the table scanned back, or left "loading" and the job
+      # fails (M03 PR 2). A failed load leaves every run in the runner.
       - name: Load the rights table
         run: uv run python scripts/load_rights_table.py --table "$IMAGE-rights"
 

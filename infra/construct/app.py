@@ -70,7 +70,9 @@ NagSuppressions.add_resource_suppressions_by_path(
                 "named by ARN. B1 (M01 PR 3): "
                 "ecr:GetAuthorizationToken and logs:DescribeLogGroups take no resource-level permission; "
                 "the image pull is on this agent's repository and the log group under "
-                "/aws/bedrock-agentcore/runtimes/*, whose suffix AgentCore assigns."}],
+                "/aws/bedrock-agentcore/runtimes/*, whose suffix AgentCore assigns. M03 PR 2: ApplyGuardrail is "
+                "on the guardrail the manifest pins and <arn>:*, its numbered versions, and every model invoke "
+                "is conditioned on bedrock:GuardrailIdentifier at the pinned version."}],
 )
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

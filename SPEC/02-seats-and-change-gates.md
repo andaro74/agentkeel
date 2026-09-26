@@ -86,8 +86,9 @@ files, and nothing here pretends otherwise.
   in `deletes:`; a rename is a deletion and an addition.
 - **Two keys.** Two ruling files, each with one `seat:`, the two seats
   distinct, both with this PR's `pr:`. The file of the seat that owns the
-  path covers it; the other names the path in its body (M01 PR 1, ruling
-  B). **Engineering's file counts as a key like any other seat's**
+  path covers it; the other names the path, exactly, in its `keys:`
+  front-matter field (ADR-0009, read from M03 PR 2; it was the body,
+  M01 PR 1 ruling B, and a body mention no longer counts). **Engineering's file counts as a key like any other seat's**
   (open.md row 21, Product): R1 makes any two seats one person, so
   excluding Engineering would buy nothing and would make the seat with
   the most files the one that can never say yes. M01 PR 1's two keys on

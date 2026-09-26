@@ -5,6 +5,13 @@ file, no subfolder. `evals/history/pre-scope/` holds the one envelope written
 before `scope` existed; it does not validate now and is not read.
 A file that is not a valid envelope stops the replay; it is never skipped.
 
+**Only the ancestors** (SPEC/03 §6, seed S7). Given `ancestors_of`, a
+past envelope counts only when its commit is an ancestor of that one: a
+pass recorded later, on a descendant or on another branch, is not a pass
+"before" the envelope being ruled, and must not turn it RED. When git
+cannot resolve `ancestors_of` (a test's made-up sha, a shallow clone) the
+whole folder is read, as `text_at` reads the tree, and `ancestry` says so.
+
 Control history gates nothing. It is kept for the M04 A-vs-A comparison and
 so the gate can report when the control drifts (Finding F0.4).
 """
@@ -13,9 +20,10 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
-from src.verdict import schema_errors
+from src.verdict import ROOT, schema_errors
 
 ENVELOPE_NAME = re.compile(r"^([0-9a-f]{40})\.json$")
 
@@ -29,7 +37,16 @@ def envelope_paths(history_dir: Path) -> list[Path]:
     return sorted(p for p in history_dir.iterdir() if ENVELOPE_NAME.match(p.name))
 
 
-def load(history_dir: Path, *, exclude_commit: str | None = None) -> History:
+def ancestry(commit: str, root: Path = ROOT) -> set[str] | None:
+    """Every commit reachable from `commit`, itself included; None when git cannot resolve it."""
+    done = subprocess.run(["git", "rev-list", f"{commit}^{{commit}}", "--"], cwd=root, capture_output=True,
+                          text=True, check=False)  # fmt: skip
+    return set(done.stdout.split()) if done.returncode == 0 else None
+
+
+def load(history_dir: Path, *, exclude_commit: str | None = None, ancestors_of: str | None = None,
+         root: Path = ROOT) -> History:  # fmt: skip
+    keep = ancestry(ancestors_of, root) if ancestors_of is not None else None
     history: History = {}
     for path in envelope_paths(history_dir):
         envelope = json.loads(path.read_text(encoding="utf-8"))
@@ -37,7 +54,7 @@ def load(history_dir: Path, *, exclude_commit: str | None = None) -> History:
             raise ValueError(f"{path}: not a valid envelope: {errors[0]}")
         if envelope["commit"] != path.stem:
             raise ValueError(f"{path}: commit {envelope['commit']} is not the file name")
-        if envelope["commit"] == exclude_commit:
+        if envelope["commit"] == exclude_commit or (keep is not None and envelope["commit"] not in keep):
             continue
         for golden_id, result in envelope["goldens"].items():
             key = (result["scope"], golden_id)

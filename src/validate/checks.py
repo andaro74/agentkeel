@@ -27,7 +27,17 @@ from typing import Any
 import yaml
 
 from src.gates import pattern_regex, two_key
-from src.validate import codeowners, edges, golden_ids, ruleset, semver
+from src.gates import pr_number as two_key_pr
+from src.validate import (
+    codeowners,
+    controls,
+    corpus,
+    edges,
+    golden_ids,
+    overlap,
+    ruleset,
+    semver,
+)
 
 GOLDEN_FIELDS = {"id", "kind", "question", "expected", "seat", "added", "retired"}
 GOLDEN_ID = re.compile(r"^g-\d{3}$")
@@ -153,18 +163,26 @@ def front_matter(text: str) -> dict[str, Any] | None:
     return doc if isinstance(doc, dict) else None
 
 
-def deleted_paths(root: Path) -> set[str]:
-    """Every path deleted from the tree somewhere in HEAD's history. Empty when git cannot say.
+def merged_trees(root: Path, pr: int) -> list[set[str]]:
+    """The file sets of PR `pr`'s merge commit and its first parent; [] when it has not merged (ADR-0009).
 
-    A ruling is a record of the PR it merged with, and the paths it named can
-    be deleted later (`infra/eval-role/` at M02 PR 3, authorised by four M00
-    and M01 rulings). The front-matter check exists to catch a glob that
-    names nothing; a glob that names something the tree once had is not
-    that, and a past ruling is not edited to keep a check green.
+    Found from "Merge pull request #N": PRs land as merge commits only
+    (ADR-0004 amendment 1). `ls-tree` lists a snapshot, so there are no
+    renames to follow: a renamed path is simply absent from one tree and
+    present in the other (ADR-0009's `--no-renames` holds by construction).
     """
-    done = subprocess.run(["git", "log", "--diff-filter=D", "--name-only", "--format="], cwd=root,
-                          capture_output=True, text=True)  # fmt: skip
-    return set(done.stdout.split()) if done.returncode == 0 else set()
+    done = subprocess.run(["git", "log", "--merges", "--format=%H", "--fixed-strings",
+                           f"--grep=Merge pull request #{pr} ", "HEAD"], cwd=root, capture_output=True, text=True,
+                          check=False)  # fmt: skip
+    commits = done.stdout.split() if done.returncode == 0 else []
+    if not commits:
+        return []
+    trees = []
+    for rev in (commits[-1], f"{commits[-1]}^1"):
+        listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", "-z", rev], cwd=root, capture_output=True,
+                                text=True, check=False)  # fmt: skip
+        trees.append({path for path in listed.stdout.split("\0") if path})
+    return trees
 
 
 def check_rulings(root: Path) -> list[str]:
@@ -172,7 +190,6 @@ def check_rulings(root: Path) -> list[str]:
     if not paths:
         return ["milestones/*/rulings/: no ruling files found"]
     errors = []
-    gone: set[str] | None = None  # read once, only if a glob matches nothing in the tree
     for path in paths:
         rel = path.relative_to(root).as_posix()
         fm = front_matter(path.read_text(encoding="utf-8"))
@@ -185,18 +202,22 @@ def check_rulings(root: Path) -> list[str]:
         for field in ("authorises", "evidence"):
             if fm.get(field) and not isinstance(fm[field], list):
                 errors.append(f"{rel}: {field} must be a list")
+        for field in ("keys", "deletes"):  # ADR-0009: exact paths, a list
+            if field in fm and not isinstance(fm[field], list):
+                errors.append(f"{rel}: {field} must be a list of exact paths")
         if isinstance(fm.get("authorises"), list):
+            # ADR-0009 (read from M03 PR 2): a glob must match the tree at its own PR's merge
+            # commit or that commit's first parent, where its paths existed; until then, the
+            # tree. It no longer matches anything deleted anywhere in history (M02 PR 3 finding 3).
+            merged = merged_trees(root, pr) if (pr := two_key_pr(fm.get("pr"))) is not None else []
             for pattern in fm["authorises"]:
-                if glob.glob(str(pattern), root_dir=root, recursive=True):
-                    continue
-                if gone is None:
-                    gone = deleted_paths(root)
                 regex = pattern_regex(str(pattern), anchored=True)
-                if any(regex.match(path) for path in gone):
-                    continue  # named something the tree once had (M02 PR 3)
-                errors.append(
-                    f"{rel}: authorises path {pattern!r} matches nothing in the tree, nor anything deleted from it"
-                )
+                if merged and any(any(regex.match(f) for f in files) for files in merged):
+                    continue
+                if not merged and glob.glob(str(pattern), root_dir=root, recursive=True):
+                    continue
+                where = f"PR {pr}'s merge commit or its first parent" if merged else "the tree"
+                errors.append(f"{rel}: authorises path {pattern!r} matches nothing in {where}")
     return errors
 
 
@@ -267,12 +288,13 @@ def check_manifests(root: Path) -> list[str]:
 STACKS = {
     "AgentkeelBootstrap": "infra/bootstrap",
     "AgentkeelRefagent": "infra/construct",
+    "AgentkeelIngest": "infra/ingest",  # M03 PR 2
 }
 NAG_REPORT = "AwsSolutions--{stack}-NagReport.csv"
 
 
 def check_cdk_nag(root: Path) -> list[str]:
-    """Both stacks synthesise, cdk-nag finds nothing non-compliant, and the committed report matches.
+    """Every stack synthesises, cdk-nag finds nothing non-compliant, and the committed report matches.
 
     cdk-nag runs as an aspect inside each app, so a Non-Compliant error
     fails the synth and this check reads a non-zero exit. What this adds is
@@ -323,15 +345,21 @@ def _nag_rows(path: Path, rel: str) -> list[str]:
         where = f"{rel}: {row['Rule ID']} on {row['Resource ID']}"
         if row["Compliance"] == "Non-Compliant":
             errors.append(f"{where}: non-compliant")
-        elif row["Compliance"] == "Suppressed" and not _names_its_case(row["Exception Reason"]):
+        elif row["Compliance"] == "Suppressed" and not _names_its_case(row["Exception Reason"], row["Resource ID"]):
             errors.append(f"{where}: the suppression names no seeded case (S3, S4, S5, S6, S8) and no "
-                          f"SPEC/01 §6 line. That is a finding, not a suppression.")  # fmt: skip
+                          f"SPEC/01 §6 line (SPEC/03 §6 for the ingest stack). That is a finding, not a "
+                          f"suppression.")  # fmt: skip
     return errors
 
 
-def _names_its_case(reason: str) -> bool:
-    """`seed S3`, not `the S3 gateway endpoint`: the service name is not the seed."""
-    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason)
+def _names_its_case(reason: str, resource: str = "") -> bool:
+    """`seed S3`, not `the S3 gateway endpoint`: the service name is not the seed.
+
+    From M03 PR 2 a line of SPEC/03 §6 serves as SPEC/01 §6's does, on the ingest stack's rows only
+    (security-reviewer on 2e93d27): SPEC/03 §6 names that stack and no other.
+    """
+    ingest = resource.startswith("AgentkeelIngest/") and "SPEC/03 §6" in reason
+    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason or ingest)
 
 
 THRESHOLDS = "thresholds.yaml"
@@ -368,7 +396,7 @@ CHECKS = {
     "ruling front matter": check_rulings,
     "workflow-hash": check_workflow_hashes,
     "manifest schema": check_manifests,
-    "cdk-nag, both stacks": check_cdk_nag,
+    "cdk-nag, every stack": check_cdk_nag,
     # M02 PR 2 (SPEC/02 section 6)
     "CODEOWNERS complete, single-owner, logins real": codeowners.check,
     "relaxes: on every bar": check_relaxes,
@@ -376,4 +404,8 @@ CHECKS = {
     "golden ids against origin/main": golden_ids.check,
     "computed semver": semver.check,
     "live main ruleset equals its export, bypass_actors []": ruleset.check,
+    # M03 PR 2 (SPEC/03 section 6)
+    "plant controls name live goldens of their kind": controls.check,
+    "golden/corpus overlap (12 words), no row id in the corpus": overlap.check,
+    "admitted.yaml is the corpus, byte for byte, under a Data Owner ruling": corpus.check,
 }

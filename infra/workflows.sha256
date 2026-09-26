@@ -22,8 +22,10 @@
 # evals.yml at M02 PR 3: the evals job gains actions: read and one step that runs scripts/observe_pr.py on the
 # three M02 run files, and hands make evals SEED_PRS_OBS, BYPASS_OBS and DOORS_OBS (SPEC/02 §4, §5.1); the
 # RULESET_TOKEN step also fetches the rule-suites record into files, so the observer never sees the secret.
+# Rewritten at M03 PR 2 when deploy.yml began to run on data/rights_table.json (S1's reader).
+# Rewritten at M03 PR 2 when evals.yml began to look up seed S5's attempt (F3_5).
 0d938815e7d3756e05659beb95a82f490b521a183bf34f9584cd98874cf36567  .github/workflows/cold-review-ruling.yml
-c1957b9cf7d8e68a3da10631fac98cc2bc1b5d6045fa09167f76aa87a3a2b8c4  .github/workflows/deploy.yml
-766f7b1d515c6e57f582eca5409f7a3ce1fe50c0303c8744b3bb1aee5dba4b5b  .github/workflows/evals.yml
+084903a2fc9104a22e7a4dd6bd216e625c75d9ef702b374bba9f71a2024e2ca2  .github/workflows/deploy.yml
+d5f15e6719b784e443d2eebc71c27095a718e5b5873fc243b9603e563fe854a8  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml

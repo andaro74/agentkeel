@@ -2,17 +2,37 @@
 
 A plant is a plant only when its enforcing control exists in the repo.
 Until then it is a golden that has never passed.
+
+From M03 PR 2 the rule reads each control **at the envelope's commit**
+(`git show`, as `gate.thresholds_at` reads the cap), and counts a golden
+only when the control names it by id (SPEC/03 §5.1 and §6). A control
+added today does not make plants of an envelope written before it (seed
+S6), and a golden of a control's kind that the control does not name is
+not a plant (`g-014`, MASKED, waits for the knowledge base at M04).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-# Golden kind -> the path whose existence is the enforcing control.
-# Empty at M00: no guardrail exists, so plants_expected = 0 (ADR-0001
-# amendment 1, item 6). M03 adds the guardrail and the red-team suite, and
-# their rows here. A plant is counted on `agent` results only (ADR-0004).
-CONTROLS: dict[str, str] = {}
+import yaml
+
+from src.verdict import text_at
+
+# Golden kind -> the path of its enforcing control. The control is a YAML
+# mapping whose `plants` lists, by id, the goldens it answers for.
+# Empty from M00 to M03 PR 2: no guardrail existed, so plants_expected = 0
+# (ADR-0001 amendment 1, item 6). Filled at M03 PR 2 in the commit after
+# the guardrail is on the runner's and the runtime's converse (SPEC/03
+# §5.1; 366104c): 7 plants, g-013 and g-015 in the guardrail's control,
+# g-016 to g-020 in the red-team suite's. Read at the envelope's commit, so
+# no envelope before this commit counts one. `validate` holds each id to a
+# live golden of the control's kind. A plant is counted on `agent` results
+# only (ADR-0004).
+CONTROLS: dict[str, str] = {
+    "guardrail": "agents/refagent/rules/guardrail.yaml",
+    "redteam": "agents/refagent/rules/redteam.yaml",
+}
 
 # Claim 1's seeded cases (SPEC/01 §5): seed -> (falsifier, what is planted,
 # the reader that must refuse it). They are not plants and never enter
@@ -70,6 +90,24 @@ SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
 ]
 
 
-def plant_ids(kinds: dict[str, str], root: Path) -> list[str]:
-    # The rule, one line.
-    return sorted(g for g, kind in kinds.items() if kind in CONTROLS and (root / CONTROLS[kind]).exists())
+def named_by(kind: str, commit: str, root: Path) -> list[str] | None:
+    """The ids the control for `kind` names at `commit`; None when the control is not there.
+
+    A control that is there and names no plant list is refused, not read
+    as naming none: that would be a control with no plants, and a silent
+    plant nobody could see.
+    """
+    text, where = text_at(commit, CONTROLS[kind], root)
+    if text is None:
+        return None
+    control = yaml.safe_load(text)
+    ids = control.get("plants") if isinstance(control, dict) else None
+    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+        raise ValueError(f"{CONTROLS[kind]} at {where}: a control must list its plants by id under `plants`")
+    return ids
+
+
+def plant_ids(kinds: dict[str, str], root: Path, commit: str) -> list[str]:
+    """The goldens that are plants at `commit`: of a kind whose control is there, and named by it."""
+    named = {kind: named_by(kind, commit, root) for kind in CONTROLS}
+    return sorted(g for g, kind in kinds.items() if g in (named.get(kind) or []))

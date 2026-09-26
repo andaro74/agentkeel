@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 from infra.construct import synth_refusal
 
@@ -180,10 +181,19 @@ def profile_arn(template: dict) -> dict:
     return {"Fn::GetAtt": [logical, "InferenceProfileArn"]}
 
 
+def guardrail_identifier() -> dict:
+    """The pinned guardrail at its pinned version, as bedrock:GuardrailIdentifier carries it (M03 PR 2)."""
+    pin = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))["guardrail"]
+    return {"Fn::Join": ["", ["arn:aws:bedrock:us-west-2:", {"Ref": "AWS::AccountId"},
+                              f":guardrail/{pin['id']}:{pin['version']}"]]}  # fmt: skip
+
+
 def test_the_role_may_call_the_profile_aws_actually_made(template):
-    invoke = [s for s in agent_statements(template) if "bedrock:InvokeModel" in s["Action"] and "Condition" not in s]
+    invoke = [s for s in agent_statements(template)
+              if "bedrock:InvokeModel" in s["Action"] and "foundation-model" not in json.dumps(s["Resource"])]  # fmt: skip
     assert len(invoke) == 1
     assert invoke[0]["Resource"] == profile_arn(template), "a profile ARN built from its name names nothing"
+    assert invoke[0]["Condition"] == {"StringEquals": {"bedrock:GuardrailIdentifier": guardrail_identifier()}}
 
 
 def test_the_runtime_is_given_the_profile_its_role_may_call(template):
@@ -195,7 +205,8 @@ def test_the_model_is_reachable_only_through_the_agents_own_profile(template):
     direct = [s for s in agent_statements(template)
               if "bedrock:InvokeModel" in s["Action"] and "foundation-model" in json.dumps(s["Resource"])]  # fmt: skip
     assert len(direct) == 1
-    assert direct[0]["Condition"] == {"StringEquals": {"bedrock:InferenceProfileArn": profile_arn(template)}}
+    assert direct[0]["Condition"] == {"StringEquals": {"bedrock:InferenceProfileArn": profile_arn(template),
+                                                       "bedrock:GuardrailIdentifier": guardrail_identifier()}}
     assert all(arn.endswith("::foundation-model/anthropic.claude-sonnet-4-6") for arn in direct[0]["Resource"])
 
 
@@ -248,3 +259,29 @@ def test_the_roles_logs_and_key_are_its_own_not_the_accounts(template):
     assert not [s for s in agent_statements(template) if s["Resource"] == "*"
                 and {"kms:Decrypt", "logs:PutLogEvents"} & set(s["Action"] if isinstance(s["Action"], list)
                                                               else [s["Action"]])]  # fmt: skip
+
+
+# --- the guardrail on the runtime's call (M03 PR 2, SPEC/03 §6) --------------------
+
+
+def test_every_model_invoke_is_conditioned_on_the_pinned_guardrail(template):
+    """security-reviewer F2 at M03 PR 1: code must not be able to drop the guardrail."""
+    for statement in agent_statements(template):
+        if "bedrock:InvokeModel" in statement["Action"]:
+            assert statement["Condition"]["StringEquals"]["bedrock:GuardrailIdentifier"] == guardrail_identifier()
+
+
+def test_the_role_applies_its_own_guardrail_and_no_other(template):
+    applying = [s for s in agent_statements(template) if "bedrock:ApplyGuardrail" in s["Action"]]
+    assert len(applying) == 1 and applying[0]["Action"] == "bedrock:ApplyGuardrail"
+    assert all("guardrail/1088aw3ujhyd" in json.dumps(r) for r in applying[0]["Resource"])
+
+
+def test_the_runtime_is_given_the_guardrail_pin(template):
+    pin = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))["guardrail"]
+    runtime = next(r for r in template["Resources"].values() if r["Type"] == "AWS::BedrockAgentCore::Runtime")
+    env = runtime["Properties"]["EnvironmentVariables"]
+    # The ARN, the string the invoke grants' GuardrailIdentifier condition names (security-reviewer on PR 2, F1).
+    assert env["AGENTKEEL_GUARDRAIL_ARN"] == {"Fn::Join": ["", ["arn:aws:bedrock:us-west-2:", {"Ref": "AWS::AccountId"},
+                                                                f":guardrail/{pin['id']}"]]}  # fmt: skip
+    assert env["AGENTKEEL_GUARDRAIL_VERSION"] == pin["version"] and "AGENTKEEL_GUARDRAIL_ID" not in env

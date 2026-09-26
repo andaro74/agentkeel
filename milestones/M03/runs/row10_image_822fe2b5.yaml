@@ -1,0 +1,33 @@
+# M03 open.md row 10, second half (M02 PR 12 Unsure F; M03 PR 1 Unsure C):
+# the amd64 image 822fe2b5 left in ECR after M01's failed first deploy.
+# Ruled by the human as Security during M03 PR 2: deleted. It sat under
+# the tag of M01's failed bundle (26ed38d1...), which no bundle since
+# produces, so the deploy's refusal by name could never fire at it in the
+# account (milestones/M02/runs/row10_first_deploy.yaml, lines 92-102); the
+# refusal is held by tests/test_deploy_image_architecture.py. The deploy
+# role has no ecr:Delete* (infra/bootstrap/app.py), so the human deleted it
+# with admin. The session wrote this file from the output the human pasted;
+# a human-written file feeds no check.
+image:
+  repository: agentkeel-refagent
+  digest: sha256:822fe2b593fecbb1e209b9612aec75f2ce1b07045ec9dce3403b0c221422e493
+  tag: 26ed38d150044927d8aa0c684966366001928041bf87d3dbc4e086e1276e99de
+  architecture: amd64
+command: >-
+  aws ecr batch-delete-image --repository-name agentkeel-refagent
+  --image-ids imageDigest=sha256:822fe2b593fecbb1e209b9612aec75f2ce1b07045ec9dce3403b0c221422e493
+observed:
+  on: 2026-09-25  # the date only; the time was not given
+  by: the human, admin credentials
+  deleted:
+    - imageDigest: sha256:822fe2b593fecbb1e209b9612aec75f2ce1b07045ec9dce3403b0c221422e493
+      imageTag: 26ed38d150044927d8aa0c684966366001928041bf87d3dbc4e086e1276e99de
+  failures: []
+  runtime_referenced_it: false
+  # Read by the human after the delete (get-agent-runtime, not before it):
+  # the runtime pulls by digest, and that digest is the arm64 image M02 PR 2's
+  # merge built under tag 187c6bec (milestones/M02/runs/row10_first_deploy.yaml,
+  # observed_at_pr2_merge), not 822fe2b5.
+  runtime:
+    agent_runtime_id: refagent-Du2VJx6xWc
+    container_uri: 581208540944.dkr.ecr.us-west-2.amazonaws.com/agentkeel-refagent@sha256:17e087c7d098f34a209f010d4c56a8041bd23c8cff974bf5fc4bed5f04be72cc

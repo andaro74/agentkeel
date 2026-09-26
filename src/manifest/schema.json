@@ -43,7 +43,10 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["id", "version"],
-          "properties": {"id": {"type": "string"}, "version": {"type": "string"}}
+          "properties": {
+            "id": {"type": "string", "pattern": "^[a-z0-9]{12}$"},
+            "version": {"description": "A numbered version, never DRAFT (rule-owner F4, M03 PR 1).", "type": "string", "pattern": "^[1-9][0-9]*$"}
+          }
         }
       ]
     },

@@ -12,6 +12,12 @@ matches the path. A ruling file with this PR's `pr:` covers itself
 (SPEC/02 §2). A path under `evals/history/**` whose commits are all
 `github-actions[bot]`'s is exempt. A manifest is attributed field by field.
 
+A seat-owned path the PR deletes is covered only when the owning seat's
+ruling also names it, exactly, in `deletes:` (ADR-0009, read from M03 PR
+2): an `authorises:` glob that happens to match a deleted path no longer
+rules the deletion. A rename is a deletion of the old path and an addition
+of the new one.
+
 Exit 1 with **every** uncovered path listed, never the first alone. Each
 is a line `uncovered <path>: ...` in the job log, which
 `scripts/observe_pr.py` reads for the seed PRs at M02 PR 3.
@@ -51,11 +57,15 @@ def uncovered(tree: Tree, base: Tree, pr: int) -> tuple[list[str], str]:
             continue
         if RULING_GLOB.match(path) and path in own:
             continue  # a ruling file with this PR's pr: covers itself
+        deleted = path in base.files() and path not in tree.files()
         for seat, detail in seats_of(path, base, tree, owners):
             if seat is None:
                 lines.append(f"{path}: no seat owns it (SPEC/00 section 5: a file no seat owns is deleted, not adopted)")
             elif not any(k.covers(path, seat) for k in keys):
                 lines.append(f"{path}{detail}: owned by {seat}; no ruling file with pr: {pr} and seat: {seat} authorises it")
+            elif deleted and not any(k.covers(path, seat) and path in k.deletes for k in keys):
+                lines.append(f"{path}{detail}: deleted, and no ruling file with pr: {pr} and seat: {seat} names it in "
+                             f"deletes: (ADR-0009)")  # fmt: skip
     return lines, where
 
 

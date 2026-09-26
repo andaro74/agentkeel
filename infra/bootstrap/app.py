@@ -1,10 +1,11 @@
 """The M01 bootstrap stack (Security seat; SPEC/01 §6, feasibility.md §2.6 a, b, d, e, f).
 
-Deployed once, to the agent account, by a human with admin, during M01 PR 2
-and before PR 2's first CI run — as `infra/eval-role` was at M00. Nothing
-else may change it.
+Deployed by a human with admin, to the agent account: first during M01 PR 2,
+before PR 2's first CI run, as `infra/eval-role` was at M00; again at each
+stop `README.md` names (M03 PR 2: stop A). Nothing else may change it, and
+no workflow deploys it.
 
-    cd infra/bootstrap && npx cdk diff && npx cdk deploy
+    cd infra/bootstrap && npx aws-cdk@2 diff && npx aws-cdk@2 deploy
 
 What it makes:
 
@@ -24,7 +25,7 @@ What it makes:
 - the **developer role**, boundary on: the laptop principal of S4
   (SPEC/01 §1). It may read, and may not deploy;
 - the **eval role** `agentkeel-evals`, absorbed from `infra/eval-role/`
-  (ruling f): the two pinned profiles, the five-action Deny,
+  (ruling f): the two pinned profiles, the escalation-and-evidence Deny,
   `bedrock-agentcore:InvokeAgentRuntime` on refagent's runtime only, and
   three reads of which bytes that runtime runs (ADR-0007, P1);
 - a **VPC with no internet gateway and no NAT**: interface endpoints for
@@ -41,6 +42,11 @@ What it makes:
   are not the same figure;
 - the **ECR repository** the runtime image is pulled from, tag-immutable, so
   a digest cannot be moved to other bytes (SPEC/01 §6, "at load");
+- from M03 PR 2, **refagent's Bedrock Guardrail** and a numbered version
+  of it, built from the Rule Owner's two files under
+  `agents/refagent/rules/` and scoped by nothing else. Here, not in the
+  agent's stack, because the deploy role may apply a guardrail and may not
+  create one (SPEC/03 §6; the human as Security, 2026-09-25);
 - the **Security-owned parameters** `GovernedAgent` reads: the boundary ARN,
   the VPC, the subnets and the five interface endpoints' security groups.
   The two gateway-endpoint prefix lists have no CloudFormation attribute; the
@@ -53,10 +59,16 @@ security account (cut 2), or hold anything M05 owns.
 
 from __future__ import annotations
 
+import hashlib
 import os
+import re
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 import aws_cdk as cdk
+from aws_cdk import aws_bedrock as bedrock
 from aws_cdk import aws_budgets as budgets
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_ecr as ecr
@@ -91,7 +103,66 @@ MONTHLY_USD = DAILY_USD * 30
 MODELS = ["amazon.nova-micro-v1:0", "anthropic.claude-sonnet-4-6"]  # ruling p
 PROFILE_REGIONS = ["us-east-1", "us-east-2", "us-west-2"]
 INVOKE = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
-DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy"]
+# M03 PR 2 (SPEC/03 §6, security-reviewer F1 at M03 PR 1): the guardrail
+# must be on the agent's and the runner's call, so `bedrock:ApplyGuardrail`
+# is no longer denied. The wildcard `bedrock:*Guardrail*` becomes everything
+# it denied but Apply, in all three places it stood (this list, the agent
+# boundary, the deploy boundary): any Create, Update, Delete or Put on a
+# guardrail, by verb pattern, so an admin action Bedrock adds later under
+# those verbs is denied without being listed; and Get and List by name, which
+# the developer role's `bedrock:List*` would otherwise reach
+# (security-reviewer on e2839f2, FINDINGS 2 and 3). One key
+# (milestones/M03/rulings/pr1.md ruling 5: a boundary deny narrowed is not on
+# ADR-0009's list).
+GUARDRAIL_DENIED = ["bedrock:Create*Guardrail*", "bedrock:Update*Guardrail*", "bedrock:Delete*Guardrail*",
+                    "bedrock:Put*Guardrail*", "bedrock:GetGuardrail", "bedrock:ListGuardrails"]
+DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", *GUARDRAIL_DENIED, "s3:PutBucketPolicy"]
+# The rights table marker (SPEC/03 §6, S1's reader; security-reviewer F6 at
+# M03 PR 1): the digest of the table the last load put in the runtime's
+# table. deploy.yml sets it to "loading" before `load_rights_table.py` and to
+# the digest after; `scripts/runtime_for_tree.py` reads it as the eval role.
+# Not under /agentkeel/security/, which the execution role reads, and no
+# agent role can read it: the agent boundary allows no ssm action.
+TABLE_MARKER_PARAM = "/agentkeel/marker/refagent/rights-table-digest"
+# The Rule Owner's files the guardrail is built from (SPEC/03 §6). Read at
+# synth; a change to either is a change to this stack, and a new version.
+RULES_DIR = Path(__file__).resolve().parents[2] / "agents" / "refagent" / "rules"
+GUARDRAIL_PARAM = "/agentkeel/security/guardrail/refagent"
+# Bedrock's own limits on a denied topic. Refused at synth, not at deploy.
+TOPIC_NAME = re.compile(r"^[0-9a-zA-Z\-_ !?.]{1,100}$")
+TOPIC_DEFINITION_MAX, TOPIC_EXAMPLE_MAX, TOPIC_EXAMPLES_MAX, TOPICS_MAX = 200, 100, 5, 30
+
+
+def guardrail_spec(rules_dir: Path = RULES_DIR) -> dict[str, Any]:
+    """What the Bedrock Guardrail is, from `guardrail.yaml`, and the digest of both rule files.
+
+    Every rule `redteam.yaml` names in `blocks` must be a topic here: an
+    attack whose block is not built is a plant nobody could see fire.
+    """
+    guardrail = yaml.safe_load((rules_dir / "guardrail.yaml").read_text(encoding="utf-8"))
+    redteam = yaml.safe_load((rules_dir / "redteam.yaml").read_text(encoding="utf-8"))
+    topics = guardrail["denied_topics"]
+    names = [t["name"] for t in topics]
+    if len(topics) > TOPICS_MAX or len(set(names)) != len(names):
+        raise ValueError(f"guardrail.yaml: {len(topics)} topics, names {names}: at most {TOPICS_MAX}, each once")
+    for topic in topics:
+        examples = topic.get("examples", [])
+        fits = (TOPIC_NAME.match(topic["name"]) and len(topic["definition"]) <= TOPIC_DEFINITION_MAX
+                and len(examples) <= TOPIC_EXAMPLES_MAX and all(len(e) <= TOPIC_EXAMPLE_MAX for e in examples))
+        if not fits:
+            raise ValueError(f"guardrail.yaml: topic {topic['name']!r} is outside Bedrock's limits")
+    if unbuilt := sorted(set(redteam["blocks"].values()) - set(names)):
+        raise ValueError(f"redteam.yaml names blocks guardrail.yaml does not build: {unbuilt}")
+    if guardrail.get("content_filters", {}).get("prompt_attack") is not False:
+        raise ValueError("guardrail.yaml: the prompt-attack filter is off (the Rule Owner, M03 PR 2); say so")
+    # Line endings do not change it: the files are checked out CRLF on Windows and LF in CI.
+    digest = hashlib.sha256(b"".join((rules_dir / name).read_bytes().replace(b"\r\n", b"\n")
+                                     for name in ("guardrail.yaml", "redteam.yaml"))).hexdigest()  # fmt: skip
+    applies_to = guardrail.get("topics_apply_to")
+    if applies_to not in ("input", "input and output"):
+        raise ValueError(f"guardrail.yaml: topics_apply_to is {applies_to!r}, not 'input' or 'input and output'")
+    return {"topics": topics, "pii": guardrail["pii"], "messages": guardrail["messages"], "digest": digest,
+            "on_output": applies_to == "input and output"}
 EVAL_WORKFLOWS = [
     f"{REPO}/.github/workflows/evals.yml@refs/pull/*/merge",
     f"{REPO}/.github/workflows/evals.yml@refs/heads/main",
@@ -150,6 +221,7 @@ class BootstrapStack(cdk.Stack):
         self._deploy_role(provider)
         self._developer_role()
         eval_role = self._eval_role(provider)
+        self._guardrail(eval_role)
         self._agent_key(eval_role)
         self._budget(eval_role)
 
@@ -203,14 +275,18 @@ class BootstrapStack(cdk.Stack):
                              # F1.3 a check that cannot fail. A ceiling is not a
                              # grant: no agent role's own policy allows it, and
                              # the key policy denies it by role path (ruling b).
-                             "kms:GetKeyPolicy"],
+                             "kms:GetKeyPolicy",
+                             # M03 PR 2: the guardrail on the runtime's converse
+                             # (SPEC/03 §6). A ceiling, not a grant: the construct
+                             # grants it on the one guardrail.
+                             "bedrock:ApplyGuardrail"],
                     resources=["*"],
                 ),
                 iam.PolicyStatement(
                     sid="NeverEscalateNeverEraseNeverOpenTheNetwork",
                     effect=iam.Effect.DENY,
                     actions=["iam:CreateUser", "iam:DeleteRolePermissionsBoundary", "iam:PutUserPolicy",
-                             "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy", "kms:PutKeyPolicy",
+                             "logs:Delete*", *GUARDRAIL_DENIED, "s3:PutBucketPolicy", "kms:PutKeyPolicy",
                              "kms:ScheduleKeyDeletion", "kms:DisableKey",
                              # kms:GetKeyPolicy is not here, and it is in the Allow above:
                              # the key policy is what must refuse S6 (ruling t).
@@ -270,7 +346,7 @@ class BootstrapStack(cdk.Stack):
                     sid="NeverTouchAKeyPolicyNeverEraseEvidenceNeverOpenTheNetwork",
                     effect=iam.Effect.DENY,
                     actions=["kms:PutKeyPolicy", "kms:CreateGrant", "kms:ScheduleKeyDeletion", "kms:DisableKey",
-                             "logs:Delete*", "bedrock:*Guardrail*", "s3:PutBucketPolicy",
+                             "logs:Delete*", *GUARDRAIL_DENIED, "s3:PutBucketPolicy",
                              "ec2:CreateInternetGateway", "ec2:AttachInternetGateway",
                              "ec2:CreateNatGateway", "ec2:CreateVpcPeeringConnection"],
                     resources=["*"],
@@ -588,11 +664,24 @@ class BootstrapStack(cdk.Stack):
             resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel-*"],
         ))  # fmt: skip
         # `scripts/load_rights_table.py`: put_item per row, then describe_table.
-        # Not BatchWriteItem, which it does not call. Not DeleteItem.
+        # Not BatchWriteItem, which it does not call. From M03 PR 2 (S1's
+        # reader, security-reviewer F5): it scans the table and deletes each
+        # row the file no longer has, so the table is the file and not the
+        # file plus every row it ever held. DeleteItem on the rights tables
+        # only; never DeleteTable. One key (pr1.md ruling 5: a rights-table
+        # row deleted is not on ADR-0009's list; validate still refuses a
+        # golden whose row is gone).
         role.add_to_policy(iam.PolicyStatement(
             sid="LoadTheRightsTable",
-            actions=["dynamodb:PutItem", "dynamodb:DescribeTable"],
+            actions=["dynamodb:PutItem", "dynamodb:DescribeTable", "dynamodb:Scan", "dynamodb:DeleteItem"],
             resources=[f"arn:aws:dynamodb:{REGION}:{self.account}:table/agentkeel-*-rights"],
+        ))  # fmt: skip
+        # The table marker: "loading" before the load, the digest after. Put
+        # only; the parameter is this stack's and is never deleted.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="SetTheRightsTableMarker",
+            actions=["ssm:PutParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{self.account}:parameter{TABLE_MARKER_PARAM}"],
         ))  # fmt: skip
         # The load check: `src.agent.run` calls the runtime it just deployed,
         # once per golden. refagent's runtime, as the eval role's grant is.
@@ -685,6 +774,13 @@ class BootstrapStack(cdk.Stack):
             actions=["ecr:DescribeImages"],
             resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel-refagent"],
         ))  # fmt: skip
+        # M03 PR 2 (S1's reader): and which rights table the runtime answers
+        # from. Read only; unreadable or "loading" means the run is in the runner.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadTheRightsTableMarker",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{self.account}:parameter{TABLE_MARKER_PARAM}"],
+        ))  # fmt: skip
         # Ruling i: the human makes S4's and S6's attempts, and this role asks
         # CloudTrail whether AWS refused each request id
         # (`scripts/observe_attempt.py`). Without this the instrument cannot
@@ -709,6 +805,60 @@ class BootstrapStack(cdk.Stack):
         ))  # fmt: skip
         cdk.CfnOutput(self, "EvalRoleArn", value=role.role_arn)
         return role
+
+    # --- the guardrail (M03 PR 2) -----------------------------------------
+
+    def _guardrail(self, eval_role: iam.Role) -> None:
+        """refagent's guardrail and a numbered version of it (SPEC/03 §6; rule-owner F4, F6).
+
+        One guardrail from both rule files. The version is what the manifest
+        pins, never DRAFT; its description carries the files' digest, so a
+        change to either makes a new version rather than moving an old one.
+        The prompt-attack filter is off: no content policy at all.
+        No customer key: Bedrock encrypts it with its own (a NOTE for Security).
+        """
+        spec = guardrail_spec()
+        guardrail = bedrock.CfnGuardrail(
+            self, "RefagentGuardrail",
+            name="agentkeel-refagent",
+            description="agentkeel refagent: built from agents/refagent/rules/ (Rule Owner). Security builds, never scopes.",
+            blocked_input_messaging=spec["messages"]["blocked_input"],
+            blocked_outputs_messaging=spec["messages"]["blocked_output"],
+            topic_policy_config=bedrock.CfnGuardrail.TopicPolicyConfigProperty(topics_config=[
+                bedrock.CfnGuardrail.TopicConfigProperty(
+                    name=t["name"], definition=t["definition"], type="DENY", examples=t.get("examples"),
+                    input_enabled=True, input_action="BLOCK",
+                    output_enabled=spec["on_output"], output_action="BLOCK" if spec["on_output"] else "NONE")
+                for t in spec["topics"]]),
+            sensitive_information_policy_config=bedrock.CfnGuardrail.SensitiveInformationPolicyConfigProperty(
+                pii_entities_config=[bedrock.CfnGuardrail.PiiEntityConfigProperty(type=e["entity"], action=e["action"])
+                                     for e in spec["pii"]]),
+        )  # fmt: skip
+        version = bedrock.CfnGuardrailVersion(
+            self, "RefagentGuardrailVersion",
+            guardrail_identifier=guardrail.attr_guardrail_id,
+            description=f"rules sha256 {spec['digest']}",
+        )  # fmt: skip
+        # A rules change replaces this resource. Retained, so the version the
+        # manifest pinned and old envelopes name is not deleted with it
+        # (security-reviewer on 0bb1d4a, F1). Old versions are removed by hand.
+        version.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+        # The runner's converse, as the eval role: this guardrail, and no other.
+        eval_role.add_to_policy(iam.PolicyStatement(
+            sid="ApplyRefagentsGuardrailOnly",
+            actions=["bedrock:ApplyGuardrail"],
+            # The guardrail, and its numbered versions: which form Bedrock
+            # authorises a versioned call against is read by the first CI
+            # converse, not assumed (security-reviewer on 0bb1d4a, F2).
+            resources=[guardrail.attr_guardrail_arn, f"{guardrail.attr_guardrail_arn}:*"],
+        ))  # fmt: skip
+        # What the construct grants on and the manifest pins (Rule Owner copies id and version).
+        ssm.StringParameter(
+            self, "ParamGuardrail", parameter_name=GUARDRAIL_PARAM, string_value=guardrail.attr_guardrail_arn,
+            description="agentkeel: refagent's guardrail. For GovernedAgent's ApplyGuardrail grant (M03 PR 2, the construct's commit).",
+        )  # fmt: skip
+        cdk.CfnOutput(self, "GuardrailIdForTheManifest", value=guardrail.attr_guardrail_id)
+        cdk.CfnOutput(self, "GuardrailVersionForTheManifest", value=version.attr_version)
 
     # --- the key -----------------------------------------------------------
 
@@ -930,6 +1080,11 @@ class BootstrapStack(cdk.Stack):
             string_list_value=[subnet.subnet_id for subnet in vpc.isolated_subnets],
             description="agentkeel: the isolated subnets. No internet gateway, no NAT.",
         )  # fmt: skip
+        # Written by deploy.yml after each load; "unset" until the first (M03 PR 2).
+        ssm.StringParameter(
+            self, "ParamRightsTableMarker", parameter_name=TABLE_MARKER_PARAM, string_value="unset",
+            description="agentkeel: the digest of the rights table refagent's runtime answers from.",
+        )  # fmt: skip
         for name, group in self.endpoint_groups.items():
             ssm.StringParameter(
                 self, f"ParamEndpoint{endpoint_id(name)}",
@@ -988,7 +1143,7 @@ SUPPRESSIONS = {
         "role may do. cloudformation:* is scoped to stack/agentkeel-*, the set of stacks this platform "
         "deploys; AWS appends the stack id suffix, which cannot be named in advance. BLOCK F: "
         "ecr:GetAuthorizationToken takes no resource; the push is on repository/agentkeel-*, the table load "
-        "on table/agentkeel-*-rights, and the load check's InvokeAgentRuntime on runtime/refagent*, the "
+        "(put, scan, and the delete of rows the file lacks, M03 PR 2) on table/agentkeel-*-rights, and the load check's InvokeAgentRuntime on runtime/refagent*, the "
         "versioned name AgentCore assigns at create."
     ),
     "DeveloperRole/DefaultPolicy/Resource": (
@@ -1000,7 +1155,7 @@ SUPPRESSIONS = {
         "SPEC/01 §6: 'the eval role, absorbed from infra/eval-role/ under a new name, with its Deny "
         "statement (item 33) and trust conditions as they stand'. The two profiles and the foundation "
         "models are named by ARN; runtime/refagent* covers the versioned runtime name AgentCore assigns, "
-        "which does not exist until the deploy. The five-action Deny is the ceiling. Seeds S4 and S6: "
+        "which does not exist until the deploy. The Deny (DENY: escalation, evidence deletion, and every guardrail action but Apply, M03 PR 2) is the ceiling. ApplyGuardrail is on refagent's guardrail and <arn>:*, its numbered versions only (M03 PR 2). Seeds S4 and S6: "
         "cloudtrail:LookupEvents is on * because CloudTrail takes no resource-level condition for it, "
         "and ruling i has this role ask CloudTrail whether the human's attempts were refused. It is the "
         "only cloudtrail action granted, so the instrument may read the record and may not change it. "

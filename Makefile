@@ -51,6 +51,15 @@ F2_1_CASES := test_s1_one_key_on_a_relaxation_is_refused,test_s1_two_files_from_
 SEED_PRS_OBS ?=
 BYPASS_OBS ?=
 DOORS_OBS ?=
+# M03 PR 2 (SPEC/03 §4, §5.1). F3_1, F3_2, F3_3 and F3_6: each seed refused
+# in a copy of the tree, read from the tests, with the guards beside the two
+# falsifiers they hold (a regressed golden RED; a never-passed one not). F3_5:
+# CI's lookup of seed S5's attempt (scripts/observe_ingest.py).
+F3_1_CASES := test_s1_a_table_change_is_not_measured_against_mains_table,test_f3_1_guard_a_regressed_golden_is_red
+F3_2_CASES := test_s2_a_silent_red_team_plant_is_red
+F3_3_CASES := test_s3_a_golden_that_overlaps_the_corpus_is_refused
+F3_6_CASES := test_s6_a_control_added_later_does_not_re_rule_an_old_envelope,test_s7_a_pass_recorded_later_does_not_re_rule_an_old_envelope,test_f3_6_guard_a_never_passed_golden_is_not_red
+INGEST_OBS ?=
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \
           $(if $(F0_3_OBS),--check-pr F0_3 "$(F0_3_OBS)") \
           $(if $(JUNIT),--check-cases F1_1 "$(F1_1_CASES)" "$(JUNIT)") \
@@ -61,6 +70,11 @@ CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)")
           $(if $(SEED_PRS_OBS),--check-seed-prs F2_1 "$(SEED_PRS_OBS)") \
           $(if $(BYPASS_OBS),--check-bypass F2_1 "$(BYPASS_OBS)") \
           $(if $(DOORS_OBS),--check-doors F2_2 "$(DOORS_OBS)") \
+          $(if $(JUNIT),--check-cases F3_1 "$(F3_1_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F3_2 "$(F3_2_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F3_3 "$(F3_3_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F3_6 "$(F3_6_CASES)" "$(JUNIT)") \
+          $(if $(INGEST_OBS),--check-ingest F3_5 "$(INGEST_OBS)") \
           $(if $(RUN_URL),--run-url "$(RUN_URL)")
 # CI passes a file path; the gate's exit code is written there, so a REJECTED
 # envelope (exit 2) is told from a RED one and is not recorded (M01 item 9).
@@ -74,7 +88,7 @@ ifneq ($(AGENT_RUNNER),)
 define chain
 	-uv run python -m src.baseline.run --out $(1)/$(2).baseline-raw.json
 	uv run python -m src.verdict.build card --raw $(1)/$(2).baseline-raw.json --out $(1)/$(2).baseline-card.json $(3)
-	-uv run python -m src.agent.run --out $(1)/$(2).agent-raw.json
+	-uv run python -m src.agent.run --out $(1)/$(2).agent-raw.json --recheck-runtime
 	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json
 	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS)
 	uv run python -m src.verdict.gate $(1)/$(2).json; code=$$?; $(if $(GATE_EXIT),echo $$code > "$(GATE_EXIT)";) exit $$code

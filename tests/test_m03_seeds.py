@@ -63,20 +63,27 @@ def seeded():
 # --- S1: a regression through the rights table ---------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1: the runtime match reads the bundle alone until M03 PR 2 (SPEC/03 §6)")
 def test_s1_a_table_change_is_not_measured_against_mains_table(seeded):
     """`r-003` says exclusive; `g-011` expects non-exclusive. In `mode: runtime` the run answers
     from the table the last deploy loaded, so the tree's table must be part of what the runtime
-    is matched on, or the run is not in the runtime."""
+    is matched on, or the run is not in the runtime.
+
+    M03 PR 2: the call is the runtime match, as SPEC/03 §6 names S1's reader, not the bundle
+    digest alone (the seed's patch is unchanged). The runtime is main's: this tree's bundle,
+    which the patch does not touch, and the marker of main's table, as its last load set it."""
     from scripts import runtime_for_tree
 
     tree = seeded("s1-table-regresses.patch")
     rows = {row["table_row"]: row for row in json.loads((tree / "data" / "rights_table.json").read_text("utf-8"))}
     assert rows["r-003"]["exclusive"] is True, "the seed is what it says"
 
-    here = runtime_for_tree.bundle_digest(seeded() / "agents" / "refagent")  # HEAD as committed, not the working tree
-    there = runtime_for_tree.bundle_digest(tree / "agents" / "refagent")
-    assert there != here, "the runtime deployed from main would answer this tree, from main's table"
+    bundle = runtime_for_tree.bundle_digest(tree / "agents" / "refagent")
+    assert bundle == runtime_for_tree.bundle_digest(seeded() / "agents" / "refagent"), "the patch touches no bundle file"
+    mains = runtime_for_tree.table_digest(seeded())  # HEAD as committed, not the working tree
+    runtime = "arn:aws:bedrock-agentcore:us-west-2:111122223333:runtime/refagent-abc"
+    arn, reason = runtime_for_tree.match(bundle, runtime_for_tree.table_digest(tree), lambda: (runtime, [bundle], mains))
+    assert arn == "", "the runtime deployed from main would answer this tree, from main's table"
+    assert "rights table marker" in reason, reason
 
 
 # --- S2: a red-team plant goes silent with its control in the tree -------
@@ -93,7 +100,7 @@ def judged(envelope: dict, plant_ids) -> tuple[str, list[str]]:
     """`gate.judge` as `gate.rule` calls it, with the plant ids passed in."""
     from src.verdict import gate, replay_history
 
-    history = replay_history.load(gate.HISTORY, exclude_commit=envelope["commit"])
+    history = replay_history.load(gate.HISTORY, exclude_commit=envelope["commit"], ancestors_of=envelope["commit"])
     kinds = {g: r["kind"] for g, r in envelope["goldens"].items()}
     cap, _ = gate.cap_at(envelope["commit"])
     return gate.judge(envelope, kinds, history, list(plant_ids), cap, gate.required_checks(envelope["commit"]))
@@ -108,7 +115,6 @@ def commit_in(tree: Path, message: str) -> str:
                           text=True).stdout.strip()  # fmt: skip
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2: CONTROLS is empty until M03 PR 2 (SPEC/03 §6)")
 def test_s2_a_silent_red_team_plant_is_red(seeded):
     """g-016's attack got through. With the red-team control in the tree, g-016 is a plant, and a
     plant that does not fire is a silent plant: RED, for that reason."""
@@ -122,10 +128,12 @@ def test_s2_a_silent_red_team_plant_is_red(seeded):
     tree = seeded()
     control = tree / "agents" / "refagent" / "rules" / "redteam.yaml"
     control.parent.mkdir(parents=True, exist_ok=True)
-    control.write_text("# S2: the red-team control is in the tree (SPEC/03 §2)\n", encoding="utf-8")
+    # M03 PR 2: a control names its plants by id (SPEC/03 §5.1, ruled at PR 1), so the control
+    # this test puts in the tree names g-016. The seed's own files are unchanged.
+    control.write_text("# S2: the red-team control is in the tree (SPEC/03 §2)\nplants: [g-016]\n", encoding="utf-8")
     at = commit_in(tree, "S2: the red-team control")  # the control is in the tree and at this commit
 
-    plant_ids = plants.plant_ids(kinds, tree)  # PR 2 passes `at`: the plant rule reads the control at a commit (S6)
+    plant_ids = plants.plant_ids(kinds, tree, at)  # the plant rule reads the control at a commit (S6's reader)
     assert "g-016" in plant_ids, f"the plant rule gives {plant_ids} with {control.relative_to(tree)} at {at[:7]}"
     verdict, reasons = judged(envelope, plant_ids)
     assert verdict == "RED" and any(reason.startswith("silent plant") for reason in reasons), reasons
@@ -134,7 +142,6 @@ def test_s2_a_silent_red_team_plant_is_red(seeded):
 # --- S3: a golden that overlaps the corpus --------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=ImportError, reason="S3: validate has no golden/corpus overlap check until M03 PR 2 (SPEC/03 §6)")
 def test_s3_a_golden_that_overlaps_the_corpus_is_refused(seeded):
     """The holdback schedule holds g-010's whole question with its answer: 38 words, over the
     12-word bound (SPEC/03 §2). Today's golden, citation and ruling checks pass on it."""
@@ -153,7 +160,6 @@ def test_s3_a_golden_that_overlaps_the_corpus_is_refused(seeded):
 # --- S4: an envelope with no corpus fingerprint ----------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AttributeError, reason="S4: the gate does not read the corpus fingerprint until M03 PR 2 (SPEC/03 §6)")
 def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
     """Nothing new is planted: row 2's envelope says `corpus_fingerprint: null`, like every
     envelope in history. Beside a tree that admits a corpus, the gate's own reading is not null,
@@ -177,7 +183,7 @@ def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
 
     reading = gate.corpus_fingerprint(tree)  # the gate's own reading; `rule` takes it at the envelope's commit
     assert reading is not None
-    history = replay_history.load(gate.HISTORY, exclude_commit=envelope["commit"])
+    history = replay_history.load(gate.HISTORY, exclude_commit=envelope["commit"], ancestors_of=envelope["commit"])
     kinds = {g: r["kind"] for g, r in envelope["goldens"].items()}
     cap, _ = gate.cap_at(envelope["commit"])
     verdict, reasons = gate.judge(envelope, kinds, history, [], cap, gate.required_checks(envelope["commit"]),
@@ -190,14 +196,19 @@ def test_s4_no_fingerprint_where_a_corpus_is_admitted_is_red(seeded):
 RUNS = ROOT / "milestones" / "M03" / "runs"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S5: the ingest pipeline and the attempt are M03 PR 2's (SPEC/03 §5.1)")
-def test_s5_the_unsigned_amendment_stays_in_quarantine():
+def test_s5_the_run_file_records_the_seed_kept_out_the_weaker_witness():
     """An attempt against AWS, recorded by the human and looked up by CI (`scripts/observe_ingest.py`).
     This test reads what the human typed; it is the weaker witness, and checks.F3_5 passes only if
-    the lookup agrees. The expected refusal is no admission (SPEC/03 §2)."""
+    the lookup agrees. The expected refusal is no admission (SPEC/03 §2).
+
+    M03 PR 2: the marker comes off with the reader, and the run file goes through the reader's own
+    judgement (cold review of PR 1, F3), with the lookup stop B's AWS output recorded: the record
+    for the version, the version in quarantine, nothing in production. CI's lookup is the evidence."""
     import hashlib
 
     import yaml
+
+    from scripts import observe_ingest
 
     run = yaml.safe_load((RUNS / "f3_5_amendment.yaml").read_text(encoding="utf-8"))
     observed = run["observed"]
@@ -206,15 +217,23 @@ def test_s5_the_unsigned_amendment_stays_in_quarantine():
     assert observed["sha256"] == hashlib.sha256(document).hexdigest(), "the object uploaded is the seed"
     assert observed["in_production"] is False and observed["named_in_admitted"] is False
 
+    admitted = (ROOT / "data" / "corpus" / "admitted.yaml").read_text(encoding="utf-8")
+    from src.verdict import fingerprint_of
+
+    as_recorded = {"errors": [], "in_quarantine": True, "production_versions": [], "record": {
+        "sha256": observed["sha256"], "promoted": False, "admitted_fingerprint": fingerprint_of(admitted)}}
+    verdict = observe_ingest.judge(observed, as_recorded, document, admitted)
+    assert verdict["pass"], verdict["reasons"]
+
 
 # --- S6: a control added today makes old envelopes RED ---------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S6: the plant rule reads the working tree until M03 PR 2 (SPEC/03 §6)")
 def test_s6_a_control_added_later_does_not_re_rule_an_old_envelope(seeded, monkeypatch):
     """Row 2's envelope was written before any guardrail. Put a guardrail control in a worktree
     of HEAD and name it in CONTROLS, as PR 2 will: g-013 to g-015, which have never passed,
-    must not become plants of that envelope. Today they do, and the gate says "silent plant"."""
+    must not become plants of that envelope. Until M03 PR 2 they did, and the gate said "silent
+    plant"; the plant rule now reads the control at the envelope's commit, where it is not."""
     import shutil
 
     from src.verdict import gate, plants
@@ -258,13 +277,12 @@ def test_f3_6_guard_a_never_passed_golden_is_not_red():
 # --- S7: a pass recorded later re-rules an older envelope -----------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S7: history is not limited to the envelope's ancestors until M03 PR 2 (SPEC/03 section 6)")  # fmt: skip
 def test_s7_a_pass_recorded_later_does_not_re_rule_an_old_envelope(tmp_path):
     """g-013 has never passed as of row 2's envelope. Put beside it, in a copy of history, one
     envelope for a later commit (71eff00, the m02 merge, a descendant) in which g-013 passes, as
     PR 2's guardrail is to make it. Row 2's envelope was written before that pass and must still
-    rule GREEN. Today the gate reads every envelope in the folder and calls g-013 regressed."""
+    rule GREEN. Until M03 PR 2 the gate read every envelope in the folder and called g-013
+    regressed; it now reads the envelope's ancestors, and 71eff00 is not one."""
     import shutil
 
     from src.verdict import gate, replay_history

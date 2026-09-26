@@ -3,3 +3,4 @@ docs/video/milestones/M00.mp4 -filter -diff -merge
 tests/fixtures/m02/*.patch -text
 tests/fixtures/m03/*.patch -text
 tests/fixtures/m03/s5-unsigned-amendment.md -text
+data/corpus/** text eol=lf

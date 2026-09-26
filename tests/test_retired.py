@@ -24,7 +24,7 @@ GOLDENS_AT_M00 = "9407615dcde09308490f6699c21a18100bfedcd2"  # row 0's envelope 
 
 def test_the_retired_golden_is_not_among_the_live_ones():
     live = load_golden_kinds(GOLDENS_DIR)
-    assert "g-012" not in live and "g-021" in live and len(live) == 15
+    assert "g-012" not in live and "g-021" in live and len(live) == 20  # g-016 to g-020 added at M03 PR 2
     assert build.retired_ids(GOLDENS_DIR) == {"g-012"}
     assert yaml.safe_load((GOLDENS_DIR / "g-012.yaml").read_text(encoding="utf-8"))["retired"] == "M02"
 

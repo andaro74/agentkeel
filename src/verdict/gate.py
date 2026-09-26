@@ -29,7 +29,13 @@ read from `thresholds.yaml` **as it stood at the envelope's commit**
 envelope does not record the cap — ADR-0004 has no amendment left — and a
 gate that read today's cap would re-rule an old envelope every time the
 Threshold Owner moved the number. A commit git cannot resolve falls back
-to the tree, and the gate says so.
+to the tree, and the gate says so. A file absent at a commit git knows is
+absent, not read from the tree (M03 PR 2; `open.md` row 11, items e, j).
+
+**Which plants** (SPEC/03 §6, seed S6). The plant rule reads each control
+the same way, at the envelope's commit, and counts only the goldens the
+control names by id. A control added later does not re-rule an envelope
+written before it.
 
 The pinned base card hash is read from the tree on purpose, and not this
 way. The base is frozen (ADR-0004 amendment 2): if it ever changes, every
@@ -60,14 +66,18 @@ import yaml
 from src.verdict import (
     ROOT,
     canonical_sha256,
+    fingerprint_at,
+    fingerprint_of,
     golden_kinds_at,
     load_golden_kinds,
     plants,
     replay_history,
     schema_errors,
+    text_at,
+    where_at,
 )
 
-__all__ = ["Rejected", "cap_at", "control_drift", "judge", "measured", "measured_at", "read", "required_checks",
+__all__ = ["Rejected", "cap_at", "control_drift", "corpus_fingerprint", "judge", "measured", "measured_at", "read", "required_checks",
            "rule", "schema_errors", "thresholds_at"]
 
 # What an agent envelope must carry from M01 (SPEC/01 §4). A check that is
@@ -82,6 +92,19 @@ CLAIM_1_CHECKS = ("F1_1", "F1_2", "F1_3", "F1_4")
 # merge commit is held to it; a commit git cannot place is held to it too.
 CLAIM_2_CHECKS = ("F2_1", "F2_2")
 M02_PR2_MERGE = "97d3c761bc561b9a33949a6d3d5a193aeb88debf"
+# What an agent envelope must carry from M03 PR 2 (SPEC/03 §4 and §5.1): the
+# seeds' tests, read in a copy of the tree (F3_1, F3_2, F3_3, F3_6), and CI's
+# lookup of seed S5's attempt (F3_5). F3.4 is the gate's own: the fingerprint,
+# read at the commit, which `judge` holds every envelope to. Held from the
+# commit that landed the last reader, f82a02a, and every descendant: known
+# now, unlike PR 2's merge, so no later PR has to set it (as M02 PR 3 set
+# CLAIM_2_CHECKS). Every CI run of PR 2 from here carries them.
+CLAIM_3_CHECKS = ("F3_1", "F3_2", "F3_3", "F3_5", "F3_6")
+# A commit on PR 2's branch. It stays in main's history only because PRs land
+# as merge commits, never squashed or rebased (ADR-0004 amendment 1); a squash
+# would orphan it and claim 3 would stop being required. `rule` refuses a
+# shallow clone, where git cannot place it at all (the cold review of PR 2, F3).
+M03_READERS = "f82a02a"
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -118,13 +141,9 @@ def thresholds_at(commit: str, root: Path = ROOT) -> tuple[dict[str, Any], str]:
     the old one. When git cannot resolve the commit — a test, a shallow
     clone — the tree is used and the caller says so in the output.
     """
-    done = subprocess.run(
-        ["git", "show", f"{commit}:thresholds.yaml"], cwd=root, capture_output=True, text=True
-    )
-    if done.returncode != 0:
-        return thresholds(root / "thresholds.yaml"), "the working tree"
-    loaded = yaml.safe_load(done.stdout)
-    return (loaded if isinstance(loaded, dict) else {}), f"{commit[:12]}, the envelope's own commit"
+    text, where = text_at(commit, "thresholds.yaml", root)
+    loaded = yaml.safe_load(text) if text is not None else None
+    return (loaded if isinstance(loaded, dict) else {}), where
 
 
 def cap_at(commit: str, root: Path = ROOT) -> tuple[int, str]:
@@ -140,12 +159,11 @@ def cap_at(commit: str, root: Path = ROOT) -> tuple[int, str]:
 
 def manifest_at(commit: str, bundle: str, root: Path = ROOT) -> tuple[dict[str, Any], str]:
     """The agent's manifest as it stood at `commit`, and where it was read. The same fallback as ruling m."""
-    done = subprocess.run(
-        ["git", "show", f"{commit}:{bundle}/manifest.yaml"], cwd=root, capture_output=True, text=True
-    )
-    if done.returncode != 0:
-        return yaml.safe_load((root / bundle / "manifest.yaml").read_text(encoding="utf-8")), "the working tree"
-    return yaml.safe_load(done.stdout), f"{commit[:12]}, the envelope's own commit"
+    text, where = text_at(commit, f"{bundle}/manifest.yaml", root)
+    manifest = yaml.safe_load(text) if text is not None else None
+    if not isinstance(manifest, dict):
+        raise Rejected(f"{bundle}/manifest.yaml is not there at {where}: an agent envelope for a commit with no agent")
+    return manifest, where
 
 
 def before_adr_0007(commit: str, root: Path = ROOT) -> bool:
@@ -160,9 +178,22 @@ def before_m02_pr2(commit: str, root: Path = ROOT) -> bool:
     return done.returncode == 0
 
 
+def from_m03_readers(commit: str, root: Path = ROOT) -> bool:
+    """True when `commit` is M03's last reader commit or a descendant of it. False when git cannot say."""
+    done = subprocess.run(["git", "merge-base", "--is-ancestor", M03_READERS, commit], cwd=root, capture_output=True,
+                          check=False)  # fmt: skip
+    return done.returncode == 0
+
+
 def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
-    """What an agent envelope for `commit` must carry: claim 1's checks, and claim 2's from PR 2's merge on."""
-    return CLAIM_1_CHECKS if before_m02_pr2(commit, root) else CLAIM_1_CHECKS + CLAIM_2_CHECKS
+    """What an agent envelope for `commit` must carry: claim 1's; claim 2's from M02 PR 2's merge; claim 3's from M03's readers.
+
+    A commit git cannot place is held to claims 1 and 2, as before; claim 3's
+    are required only where git shows the readers in its history.
+    """
+    if before_m02_pr2(commit, root):
+        return CLAIM_1_CHECKS
+    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + (CLAIM_3_CHECKS if from_m03_readers(commit, root) else ())
 
 
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:
@@ -277,15 +308,27 @@ def judge(
     history: replay_history.History,
     plant_ids: list[str],
     cap: int | None = None,
-    required: tuple[str, ...] = CLAIM_1_CHECKS,  # a direct caller gets claim 1 only; `rule` passes `required_checks`
+    required: tuple[str, ...] | None = None,  # None: what the envelope's own commit requires (required_checks)
+    corpus: str | None = None,
 ) -> tuple[str, list[str]]:
     """The gate's own verdict and its reasons. `envelope` has passed `read`.
 
+    `corpus` is the gate's own reading of the corpus fingerprint (SPEC/03 §2),
+    which `rule` takes from `admitted.yaml` at the envelope's commit: None where
+    no corpus was admitted. An envelope that says otherwise is RED (seed S4).
+
     `required` is what an agent envelope must carry (`required_checks`):
-    claim 1's four, and from M02 PR 2's merge claim 2's two as well.
+    claim 1's four, from M02 PR 2's merge claim 2's two, from M03's readers
+    claim 3's five. Left out, it is the envelope's own commit's: a direct
+    caller no longer skips claim 2 and 3 by default (M03 open.md row 3).
     """
     results = envelope["goldens"]
     reasons: list[str] = []
+    if required is None:
+        required = required_checks(envelope["commit"])
+    if envelope["corpus_fingerprint"] != corpus:
+        reasons.append(f"corpus_fingerprint: the envelope says {envelope['corpus_fingerprint']!r}, "
+                       f"the gate reads {corpus!r} from admitted.yaml")  # fmt: skip
 
     if {g: r["kind"] for g, r in results.items()} != kinds:
         reasons.append("the envelope's goldens are not the goldens in the tree")
@@ -359,7 +402,11 @@ def control_drift(envelope: dict[str, Any], history: replay_history.History) -> 
 
 
 def tallies(label: str, results: dict[str, dict[str, Any]]) -> str:
-    """`label: traps a/3 (ids); ordinary b/9; guardrail c/3`, from results keyed by golden id."""
+    """`label: traps a/3 (ids); ordinary b/9; guardrail c/3; redteam d/5`, from results keyed by golden id.
+
+    The red-team tally is printed only where the results hold one (M03 PR 2): no envelope before
+    g-016 has any, and a cell `make ledger` already holds for rows 0 to 2 must not change.
+    """
 
     def tally(kind: str) -> str:
         of_kind = [r for r in results.values() if r["kind"] == kind]
@@ -369,6 +416,7 @@ def tallies(label: str, results: dict[str, dict[str, Any]]) -> str:
     return (
         f"{label}: traps {tally('trap')}" + (f" ({', '.join(traps)})" if traps else "")
         + f"; ordinary {tally('ordinary')}; guardrail {tally('guardrail')}"
+        + (f"; redteam {tally('redteam')}" if any(r["kind"] == "redteam" for r in results.values()) else "")
     )
 
 
@@ -425,17 +473,44 @@ def latest(history_dir: Path = HISTORY) -> Path | None:
     return next((have[c] for c in commits if c in have), None)
 
 
+def shallow(root: Path = ROOT) -> bool:
+    """True in a shallow clone: git cannot place old commits, so the readers would fall back to the tree."""
+    done = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=root, capture_output=True, text=True,
+                          check=False)  # fmt: skip
+    return done.returncode != 0 or done.stdout.strip() != "false"  # git failing is not a full history
+
+
 def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
+    # The readers at a commit (the cap, the goldens, the controls, the fingerprint, the history's
+    # ancestors, claim 3's anchor) each fall back to the working tree when git cannot place a
+    # commit. In a shallow clone that would read today's tree as the past and shrink the history
+    # without a word, so the gate refuses to rule there (the cold review of PR 2, F3).
+    if shallow():
+        raise Rejected("a shallow clone: git cannot place the commits the gate reads at; fetch the full history")
     envelope = read(path)
     try:
-        history = replay_history.load(history_dir, exclude_commit=envelope["commit"])
+        # Only envelopes for the commit's ancestors (SPEC/03 §6, seed S7).
+        history = replay_history.load(history_dir, exclude_commit=envelope["commit"], ancestors_of=envelope["commit"],
+                                      root=ROOT)  # fmt: skip
     except ValueError as exc:  # a bad file in history: the gate cannot rule, which is not RED
         raise Rejected(f"history cannot be replayed: {exc}") from exc
     # The goldens as they stood at the envelope's commit, retired ones left
     # out (M02 PR 2): a golden added or retired since must not re-rule it.
     kinds, _ = golden_kinds_at(envelope["commit"], GOLDENS, ROOT)
     cap, _ = cap_at(envelope["commit"])
-    return judge(envelope, kinds, history, plants.plant_ids(kinds, ROOT), cap, required_checks(envelope["commit"]))
+    try:
+        # Each control as it stood at the envelope's commit (SPEC/03 §6, seed S6).
+        plant_ids = plants.plant_ids(kinds, ROOT, envelope["commit"])
+    except ValueError as exc:  # a control that lists no plants: the gate cannot count them, which is not GREEN
+        raise Rejected(str(exc)) from exc
+    corpus, _ = fingerprint_at(envelope["commit"], ROOT)  # admitted.yaml at the envelope's commit (S4)
+    return judge(envelope, kinds, history, plant_ids, cap, required_checks(envelope["commit"]), corpus=corpus)
+
+
+def corpus_fingerprint(root: Path = ROOT) -> str | None:
+    """The fingerprint of the corpus `root`'s tree admits, as it is now (a test's copy of the tree)."""
+    admitted = root / "data" / "corpus" / "admitted.yaml"
+    return fingerprint_of(admitted.read_text(encoding="utf-8") if admitted.is_file() else None)
 
 
 def control_card_of(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> dict[str, Any] | None:
@@ -466,16 +541,22 @@ def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT
 
 def print_plants() -> int:
     kinds = load_golden_kinds(GOLDENS)
-    plant_ids = plants.plant_ids(kinds, ROOT)
     path = latest()
     try:
-        results = read(path)["goldens"] if path else {}
+        envelope = read(path) if path else None
     except Rejected as rejection:
         print(f"REJECTED {rejection}")
         return 2
-    print(f"plants_expected = {len(plant_ids)}")
+    results = envelope["goldens"] if envelope else {}
+    # The last run's plants are the controls at its own commit, as the gate rules it; the
+    # next run's are the controls at HEAD. Reading HEAD's against the last run's results
+    # called plants SILENT that the gate ruled GREEN (the cold review of PR 2, F6).
+    ruled = plants.plant_ids(kinds, ROOT, envelope["commit"]) if envelope else []
+    plant_ids = plants.plant_ids(kinds, ROOT, "HEAD")
+    print(f"plants_expected = {len(ruled)} in the last run, {len(plant_ids)} in the next (the controls at HEAD)")
     for g in plant_ids:
-        fired = {True: "fired", False: "SILENT", None: "not run"}[results.get(g, {}).get("pass")]
+        fired = {True: "fired", False: "SILENT", None: "not run"}[results.get(g, {}).get("pass")] if g in ruled \
+            else "a plant from the next run"  # fmt: skip
         print(f"  {g} {kinds[g]:<9} {fired}")
     waiting = sorted(g for g, k in kinds.items() if k in ("guardrail", "redteam") and g not in plant_ids)
     if waiting:
@@ -513,7 +594,11 @@ def main(argv: list[str] | None = None) -> int:
     # Which cap ruled this envelope, and where it was read (ruling m).
     cap, where = cap_at(envelope["commit"])
     print(f"  note: cost_cap {cap} read at {where}")
-    history = replay_history.load(args.history_dir, exclude_commit=envelope["commit"])
+    print(f"  note: the goldens read at {golden_kinds_at(envelope['commit'], GOLDENS, ROOT)[1]}")
+    print(f"  note: the plant rule's controls read at {where_at(envelope['commit'])}")
+    history = replay_history.load(args.history_dir, exclude_commit=envelope["commit"], ancestors_of=envelope["commit"])
+    ancestors = "the envelope's ancestors" if replay_history.ancestry(envelope["commit"]) is not None else "every envelope"
+    print(f"  note: history read from {ancestors}")
     for golden_id in control_drift(envelope, history):
         print(f"  note: control {golden_id} has passed before and fails now; not gated (Finding F0.4)")
     if against := control_against_base(envelope, args.envelope):

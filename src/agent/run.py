@@ -58,14 +58,17 @@ def git(*args: str) -> str:
 def dirty() -> bool:
     """Is the tree other than what this commit names?
 
-    `evals/` is excluded, and it has to be: the control runs first and its
-    card is written into `evals/history/` before this runner starts, so
-    without the exclusion every CI run would see a dirty tree and `build`
-    would refuse the envelope. What this run writes is not what it ran.
-    `src/baseline/run.py` has no such line because nothing writes there
-    before it, and it is frozen at tag m00 either way.
+    `evals/history/` and `evals/local/` are excluded, and they have to be:
+    the control runs first and its card is written into one of them before
+    this runner starts, so without the exclusion every run would see a
+    dirty tree and `build` would refuse the envelope. What this run writes
+    is not what it ran. The goldens are not excluded: an edited golden is
+    what the run asked, and the commit must name it (M03 PR 2, `open.md`
+    row 11 item g; it was all of `evals/` before). `src/baseline/run.py`
+    has no such line because nothing writes there before it, and it is
+    frozen at tag m00 either way.
     """
-    return bool(git("status", "--porcelain", "--", ".", ":(exclude)evals"))
+    return bool(git("status", "--porcelain", "--", ".", ":(exclude)evals/history", ":(exclude)evals/local"))
 
 
 def invoke_deployed(client: Any, runtime_arn: str, question: str) -> dict[str, Any]:
@@ -78,14 +81,30 @@ def invoke_deployed(client: Any, runtime_arn: str, question: str) -> dict[str, A
     return json.loads(body)
 
 
+def runtime_moved(runtime_arn: str) -> str | None:
+    """None if the runtime still runs this tree's bundle and table, else why not (the match, read again)."""
+    from scripts import runtime_for_tree
+
+    try:
+        arn, reason = runtime_for_tree.match(runtime_for_tree.bundle_digest(), runtime_for_tree.table_digest())
+    except Exception as exc:  # noqa: BLE001 - a match that cannot be read again is not a match
+        return f"the match could not be read again ({type(exc).__name__}: {exc})"
+    return None if arn == runtime_arn else reason
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--goldens", type=Path, default=ROOT / "evals" / "goldens" / "v1")
+    # make evals passes it: its match was read before the run, as the eval role, which may
+    # read it again. deploy.yml's check at load does not: the deploy role may not read the
+    # runtime's image or the table marker, and it has just set both.
+    parser.add_argument("--recheck-runtime", action="store_true")
     args = parser.parse_args(argv)
 
     manifest = manifest_module.load(ROOT / BUNDLE / "manifest.yaml")
     model_id, region = manifest["model"]["profile"], manifest["model"]["region"]
+    guardrail = manifest["guardrail"]  # the pin both calls carry (M03 PR 2); None before M03
     runtime_arn = os.environ.get("AGENTKEEL_RUNTIME_ARN")
     table = os.environ.get("AGENTKEEL_RIGHTS_TABLE")
 
@@ -114,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
             if runtime_arn:
                 entry.update(invoke_deployed(client, runtime_arn, golden["question"]))
             else:
-                entry.update(agent.answer(client, golden["question"], model_id, rows, source))
+                entry.update(agent.answer(client, golden["question"], model_id, rows, source, guardrail))
         except (BotoCoreError, ClientError, ValueError, KeyError) as exc:  # a failed call is an observation too
             entry["error"] = f"{type(exc).__name__}: {exc}"
         observations.append(entry)
@@ -128,6 +147,16 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"{entry['id']} {entry['kind']:<9} {entry.get('stop_reason', ''):<12} {entry.get('parsed')}")
 
+    if args.recheck_runtime and runtime_arn and (moved := runtime_moved(runtime_arn)):
+        # The match was read once, before the calls; a load or a deploy on main
+        # during the run would change what answered (security-reviewer on
+        # 606bece, FINDING 1). Every answer is then a failed call, and build
+        # writes UNMEASURED rather than a runtime envelope about other bytes.
+        print(f"the runtime moved during the run: {moved}")
+        for entry in observations:
+            entry["error"] = f"the runtime moved during the run: {moved}"
+        errors = len(observations)
+
     result = {
         "what": "raw observations from refagent; not an envelope; scores nothing",
         "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -138,7 +167,8 @@ def main(argv: list[str] | None = None) -> int:
         "inference_config": agent.INFERENCE_CONFIG,
         "prompt_sha256": hashlib.sha256(agent.PROMPT.encode("utf-8")).hexdigest(),
         "tools": [agent.CONTRACT["name"] + "@" + agent.CONTRACT["version"]],
-        "guardrail": None,  # M03
+        # The pin, as the envelope's guardrail_version: "<id>:<version>" (M03 PR 2).
+        "guardrail": f"{guardrail['id']}:{guardrail['version']}" if guardrail else None,
         "retrieval": None,  # the knowledge base is cut to M03 (SPEC/01 §10, cut 3)
         "where": "the deployed runtime" if runtime_arn else "refagent's code, in the runner",
         # ADR-0007: what verdict.build copies into the envelope, which the gate

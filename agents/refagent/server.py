@@ -29,6 +29,12 @@ PORT = 8080
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 MODEL_ID = os.environ.get("AGENTKEEL_MODEL_PROFILE", "us.anthropic.claude-sonnet-4-6")
 TABLE = os.environ.get("AGENTKEEL_RIGHTS_TABLE")
+# The manifest's guardrail pin, which GovernedAgent sets from the same manifest
+# (M03 PR 2), as the guardrail's ARN: converse takes an id or an ARN, and the
+# agent role's invoke is conditioned on the ARN at the pinned version. Both or
+# neither; the image has no YAML reader to read it itself.
+GUARDRAIL = ({"id": os.environ["AGENTKEEL_GUARDRAIL_ARN"], "version": os.environ["AGENTKEEL_GUARDRAIL_VERSION"]}
+             if os.environ.get("AGENTKEEL_GUARDRAIL_ARN") else None)  # fmt: skip
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -45,7 +51,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": f"a JSON object with a question: {exc}"})
         try:
             rows, source = agent.rights_rows(TABLE, boto3.client("dynamodb", region_name=REGION))
-            self._send(200, agent.answer(self.bedrock, question, MODEL_ID, rows, source))
+            self._send(200, agent.answer(self.bedrock, question, MODEL_ID, rows, source, GUARDRAIL))
         except Exception as exc:  # noqa: BLE001 - a failed call is an observation too
             self._send(200, {"error": f"{type(exc).__name__}: {exc}"})
 

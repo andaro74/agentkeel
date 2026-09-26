@@ -7,7 +7,7 @@ import subprocess
 
 import pytest
 
-from src.verdict import ROOT, gate, load_golden_kinds, plants
+from src.verdict import ROOT, gate, load_golden_kinds, plants, text_at
 
 from .conftest import GOLDENS_DIR, URL
 
@@ -20,10 +20,10 @@ def judged(envelope_path, history=None, plant_ids=()):
 
 
 def test_empty_history_nothing_gates(chain):
-    """15 of 15 failing, none has ever passed: reported, not RED. passed == total is not a gate."""
+    """20 of 20 failing, none has ever passed: reported, not RED. passed == total is not a gate."""
     envelope_path, _, _ = chain(agent=True)
     envelope = gate.read(envelope_path)
-    assert len(envelope["never_passed"]) == 15 and envelope["regressed"] == []
+    assert len(envelope["never_passed"]) == 20 and envelope["regressed"] == []
     assert judged(envelope_path) == ("GREEN", [])
     assert gate.main([str(envelope_path), "--history-dir", str(envelope_path.parent / "none")]) == 0
 
@@ -48,7 +48,7 @@ def test_at_m00_every_result_is_the_controls(chain):
     envelope_path, _, _ = chain(right={"g-010"})
     envelope = gate.read(envelope_path)
     assert {r["scope"] for r in envelope["goldens"].values()} == {"control"}
-    assert len(envelope["goldens"]) == 15
+    assert len(envelope["goldens"]) == 20
 
 
 def test_the_control_is_never_gated(chain, past, capsys):
@@ -178,8 +178,8 @@ def test_an_agent_envelope_after_pr_2s_merge_must_carry_claim_2s_checks(chain):
     before = "e97125e970ccfc6d044612eb006cdbdbcdb99337"  # M01's Measured envelope, an ancestor of the merge
     assert gate.required_checks(before) == gate.CLAIM_1_CHECKS
     assert gate.required_checks(gate.M02_PR2_MERGE) == gate.CLAIM_1_CHECKS
-    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
-    assert gate.required_checks(head) == gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS
+    m03_open = "d2d1e6de29d85d2e566afb913c46c7780ec3467c"  # after the merge, before M03's readers
+    assert gate.required_checks(m03_open) == gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS
     assert gate.required_checks("a" * 40) == gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS
 
     envelope_path, _, _ = chain(agent=True)
@@ -189,9 +189,27 @@ def test_an_agent_envelope_after_pr_2s_merge_must_carry_claim_2s_checks(chain):
     for name in gate.CLAIM_2_CHECKS:
         forgot = json.loads(json.dumps(envelope))
         del forgot["checks"][name]
-        assert f"checks.{name} is missing from an agent envelope" not in gate.judge(forgot, KINDS, {}, [])[1]  # claim 1 alone
+        # The default is the envelope's own commit's checks (M03 open.md row 3): a direct caller no longer skips claim 2.
+        assert f"checks.{name} is missing from an agent envelope" in gate.judge(forgot, KINDS, {}, [])[1]
+        assert f"checks.{name} is missing from an agent envelope" not in gate.judge(
+            forgot, KINDS, {}, [], required=gate.CLAIM_1_CHECKS)[1]  # fmt: skip
         verdict, reasons = gate.judge(forgot, KINDS, {}, [], required=gate.required_checks("a" * 40))
         assert verdict == "RED" and f"checks.{name} is missing from an agent envelope" in reasons
+
+
+def test_an_agent_envelope_from_m03s_readers_must_carry_claim_3s_checks():
+    """SPEC/03 section 4: F3_1, F3_2, F3_3, F3_5, F3_6, from f82a02a (the last reader) and every descendant."""
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    everything = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_3_CHECKS
+    assert gate.required_checks(head) == everything
+    assert gate.required_checks(gate.M03_READERS) == everything
+    assert gate.CLAIM_3_CHECKS == ("F3_1", "F3_2", "F3_3", "F3_5", "F3_6")
+    envelope = json.loads((ROOT / "evals" / "history" / "8033c2a7a0588e557df577464c190e64a435e88a.json")
+                          .read_text(encoding="utf-8"))  # fmt: skip
+    kinds = {g: r["kind"] for g, r in envelope["goldens"].items()}
+    verdict, reasons = gate.judge(envelope, kinds, {}, [], required=everything)
+    assert verdict == "RED" and all(f"checks.{n} is missing from an agent envelope" in reasons
+                                    for n in gate.CLAIM_3_CHECKS)  # fmt: skip
 
 
 def test_the_three_branch_envelopes_before_the_constant_are_red_under_it():
@@ -219,10 +237,10 @@ def test_a_control_envelope_carries_no_claim_2_check(chain):
 def test_over_the_cap_is_red_in_the_gate_too(chain):
     envelope_path, _, _ = chain(agent=True)
     envelope = gate.read(envelope_path)
-    assert gate.judge(envelope, KINDS, {}, [], cap=9000) == ("GREEN", [])
-    verdict, reasons = gate.judge(envelope, KINDS, {}, [], cap=8999)
+    assert gate.judge(envelope, KINDS, {}, [], cap=12000) == ("GREEN", [])
+    verdict, reasons = gate.judge(envelope, KINDS, {}, [], cap=11999)
     assert verdict == "RED"
-    assert "cost-cap: 9000 over 8999" in reasons
+    assert "cost-cap: 12000 over 11999" in reasons
     assert "build said GREEN, the gate says RED" in reasons
 
 
@@ -247,16 +265,45 @@ def test_scope_is_required_and_has_two_values(chain):
 # --- plants -----------------------------------------------------------------------
 
 
-def test_plants_expected_is_zero_at_m00():
-    assert plants.CONTROLS == {}
-    assert plants.plant_ids(KINDS, ROOT) == []
+def test_plants_expected_is_zero_at_m00_and_seven_from_m03_pr2():
+    """The controls are read at the commit: none existed at M00's last envelope (55dadb2)."""
+    assert plants.plant_ids(KINDS, ROOT, "55dadb2f221e60036bdba0b01fdb6eff025d74bc") == []
+    assert plants.plant_ids(KINDS, ROOT, "HEAD") == ["g-013", "g-015", "g-016", "g-017", "g-018", "g-019", "g-020"]
 
 
-def test_the_plant_rule_counts_a_plant_once_its_control_exists(monkeypatch):
-    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "no/such/control"})
-    assert plants.plant_ids(KINDS, ROOT) == []
-    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "Makefile"})  # any path that exists
-    assert plants.plant_ids(KINDS, ROOT) == ["g-013", "g-014", "g-015"]
+def test_the_plant_rule_counts_the_plants_its_control_names(monkeypatch, tmp_path):
+    """SPEC/03 §5.1: a golden is a plant when its kind's control is there and names it by id.
+
+    `tmp_path` is not a repository, so the made-up commit is read from that tree, as a test's is.
+    """
+    commit = "a" * 40
+    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "rules/guardrail.yaml"})
+    assert plants.plant_ids(KINDS, tmp_path, commit) == []  # not there: no plants
+    (tmp_path / "rules").mkdir()
+    # g-014 is left out as it is at M03; g-001 is not the control's kind and is not counted.
+    (tmp_path / "rules" / "guardrail.yaml").write_text("plants: [g-013, g-015, g-001]\n", encoding="utf-8")
+    assert plants.plant_ids(KINDS, tmp_path, commit) == ["g-013", "g-015"]
+
+
+def test_a_control_that_lists_no_plants_is_refused(monkeypatch, tmp_path):
+    """Read as naming none, it would be a control whose plants nobody could see go silent."""
+    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "guardrail.yaml"})
+    (tmp_path / "guardrail.yaml").write_text("guardrail:\n  denied_topics: []\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="must list its plants by id"):
+        plants.plant_ids(KINDS, tmp_path, "a" * 40)
+
+
+def test_the_plant_rule_reads_the_control_at_the_commit_not_the_tree(monkeypatch):
+    """Seed S6's rule on a real commit: a file in today's tree that was not there at the commit is absent.
+
+    `Makefile` is in the tree; at M00's first commit it was not, and no golden could be a plant there.
+    """
+    first = subprocess.run(["git", "rev-list", "--max-parents=0", "HEAD"], cwd=ROOT, capture_output=True,
+                           text=True, check=True).stdout.split()[0]  # fmt: skip
+    monkeypatch.setattr(plants, "CONTROLS", {"guardrail": "Makefile"})
+    assert (ROOT / "Makefile").exists()
+    assert text_at(first, "Makefile", ROOT) == (None, f"{first[:12]}, the envelope's own commit")
+    assert plants.plant_ids(KINDS, ROOT, first) == []
 
 
 def test_a_silent_plant_is_red_for_the_agent_and_not_for_the_control(chain):
@@ -296,20 +343,20 @@ def test_a_flipped_control_pass_is_rejected_against_the_card(chain):
 
 def test_a_dropped_golden_is_red(chain):
     envelope_path, _, _ = chain()
-    verdict, reasons = gate.judge(gate.read(envelope_path), {**KINDS, "g-016": "redteam"}, {}, [])
+    verdict, reasons = gate.judge(gate.read(envelope_path), {**KINDS, "g-022": "redteam"}, {}, [])
     assert verdict == "RED" and "the envelope's goldens are not the goldens in the tree" in reasons
 
 
 def test_measured_is_what_the_ledger_cell_must_say(chain):
     envelope_path, _, _ = chain(right={"g-001", "g-010"})
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
-        "control: traps 1/3 (g-010); ordinary 1/9; guardrail 0/3; mode control; never_passed 13; regressed 0; "
+        "control: traps 1/3 (g-010); ordinary 1/9; guardrail 0/3; redteam 0/5; mode control; never_passed 18; regressed 0; "
         f"plants 0/0; GREEN; envelope `{'a' * 40}`"
     )
     envelope_path, _, _ = chain(right={"g-001"}, agent=True)
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
-        "agent: traps 0/3; ordinary 1/9; guardrail 0/3; control: traps 0/3; ordinary 0/9; guardrail 0/3; mode runner; "
-        f"never_passed 14; regressed 0; plants 0/0; F1_1 pass {URL}; F1_2 pass {URL}; F1_3 pass {URL}; "
+        "agent: traps 0/3; ordinary 1/9; guardrail 0/3; redteam 0/5; control: traps 0/3; ordinary 0/9; guardrail 0/3; "
+        f"redteam 0/5; mode runner; never_passed 19; regressed 0; plants 0/0; F1_1 pass {URL}; F1_2 pass {URL}; F1_3 pass {URL}; "
         f"F1_4 pass {URL}; F2_1 pass {URL}; F2_2 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
     )
 
@@ -332,3 +379,12 @@ def test_the_cap_is_the_one_that_stood_at_the_envelopes_commit():
     assert gate.thresholds(gate.THRESHOLDS)["cost_cap"]["tokens_per_run"] == 150000
     # A commit git cannot resolve falls back to the tree, and says so.
     assert gate.cap_at("a" * 40) == (150000, "the working tree")
+
+
+def test_bars_reads_every_level():
+    """M03 open.md row 4: a bar nested deeper than one level moved with no key."""
+    from src.gates import two_key
+
+    assert two_key.bars({"a": {"b": 1, "c": {"d": 2.5, "e": True}}, "relaxes": {"a.b": "up"}}) == {"a.b": 1, "a.c.d": 2.5}
+    before, after = {"a": {"c": {"d": 5}}, "relaxes": {"a.c.d": "up"}}, {"a": {"c": {"d": 6}}}
+    assert two_key.threshold_moves(before, after) == ["a.c.d 5 -> 6 relaxes it (relaxes: up)"]

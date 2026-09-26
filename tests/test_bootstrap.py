@@ -22,6 +22,7 @@ import fnmatch
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -559,7 +560,7 @@ DEPLOY_STEPS = {
     # created the stack and never called either; the second updated it and
     # was refused on GetTemplateSummary.
     "cloudformation deploy, update path": {"cloudformation:GetTemplateSummary", "cloudformation:DeleteChangeSet"},
-    "load_rights_table.py": {"dynamodb:PutItem", "dynamodb:DescribeTable"},
+    "load_rights_table.py": {"dynamodb:PutItem", "dynamodb:Scan", "dynamodb:DeleteItem", "ssm:PutParameter"},  # M03 PR 2
     "the load check": {"bedrock-agentcore:InvokeAgentRuntime", "cloudformation:DescribeStacks"},
 }  # fmt: skip
 
@@ -577,10 +578,79 @@ def test_the_deploy_role_may_do_what_each_step_of_deploy_yml_calls(template, ste
 
 
 def test_the_deploy_role_may_not_delete_or_batch_write(template):
+    """No image delete, no table delete, no batch write. DeleteItem only on the rights tables (M03 PR 2)."""
     granted = deploy_granted(template)
     assert not any(a.startswith("ecr:Delete") or a == "ecr:BatchDeleteImage" for a in granted)
-    assert not {"dynamodb:DeleteItem", "dynamodb:BatchWriteItem", "dynamodb:DeleteTable"} & granted
+    assert not {"dynamodb:BatchWriteItem", "dynamodb:DeleteTable"} & granted
     assert not any(a == "*" or a.endswith(":*") for a in granted)
+    deleting = [s for s in role_statements(template, "DeployRole") if "dynamodb:DeleteItem" in actions(s)]
+    assert len(deleting) == 1 and json.dumps(deleting[0]["Resource"]).endswith(':table/agentkeel-*-rights"]]}')
+
+
+def test_the_deploy_role_makes_the_table_the_file(template):
+    """S1's reader (SPEC/03 §6): load_rights_table.py scans and deletes rows the file lacks, and sets the marker."""
+    granted = deploy_granted(template)
+    assert {"dynamodb:Scan", "dynamodb:DeleteItem", "dynamodb:PutItem", "ssm:PutParameter"} <= granted
+    marker = [s for s in role_statements(template, "DeployRole") if "ssm:PutParameter" in actions(s)]
+    assert len(marker) == 1 and actions(marker[0]) == {"ssm:PutParameter"}
+    assert json.dumps(marker[0]["Resource"]).endswith(':parameter/agentkeel/marker/refagent/rights-table-digest"]]}')
+
+
+# --- the guardrail deny, narrowed (M03 PR 2, SPEC/03 §6) ------------------------
+
+# Every guardrail action the wildcard denied but Apply, by the names Bedrock has today.
+GUARDRAIL_ADMIN = {"bedrock:CreateGuardrail", "bedrock:UpdateGuardrail", "bedrock:DeleteGuardrail",
+                   "bedrock:CreateGuardrailVersion", "bedrock:GetGuardrail", "bedrock:ListGuardrails"}
+
+
+def denies_by_pattern(denied_actions: set[str], action: str) -> bool:
+    """IAM's own matching: `*` in an action name matches any run of characters."""
+    import fnmatch
+
+    return any(fnmatch.fnmatchcase(action, pattern) for pattern in denied_actions)
+
+
+@pytest.mark.parametrize("where", ["agentkeel-boundary", "agentkeel-deploy-boundary", "the eval role"])
+def test_apply_guardrail_is_no_longer_denied_and_the_admin_actions_still_are(template, where):
+    """security-reviewer F1 at M03 PR 1: the guardrail cannot be on the call under `bedrock:*Guardrail*`."""
+    if where == "the eval role":
+        denied_here = {a for s in eval_role_policy(template) if s["Effect"] == "Deny" for a in actions(s)}
+    else:
+        denied_here = denied(named(template, where))
+    assert not denies_by_pattern(denied_here, "bedrock:ApplyGuardrail"), where
+    assert all(denies_by_pattern(denied_here, a) for a in GUARDRAIL_ADMIN), where
+    assert "bedrock:*Guardrail*" not in denied_here, where
+
+
+def test_the_developer_role_may_not_list_guardrails(template):
+    """security-reviewer on e2839f2, FINDING 2: its `bedrock:List*` reached ListGuardrails once the wildcard went."""
+    developer = {a for s in role_statements(template, "DeveloperRole") if s["Effect"] == "Allow" for a in actions(s)}
+    assert "bedrock:List*" in developer, "the grant the boundary has to cap"
+    assert denies_by_pattern(denied(named(template, "agentkeel-deploy-boundary")), "bedrock:ListGuardrails")
+
+
+def test_a_later_admin_verb_on_a_guardrail_is_denied_without_being_listed(template):
+    """FINDING 3: the verbs are patterns, so a Put or a new Create on a guardrail is denied as it lands."""
+    for where in ("agentkeel-boundary", "agentkeel-deploy-boundary"):
+        denied_here = denied(named(template, where))
+        for action in ("bedrock:PutGuardrailPolicy", "bedrock:CreateGuardrailAlias", "bedrock:DeleteGuardrailVersion"):
+            assert denies_by_pattern(denied_here, action), (where, action)
+
+
+def test_the_agent_ceiling_allows_apply_guardrail_and_no_admin_action(template):
+    ceiling = allowed(named(template, "agentkeel-boundary"))
+    assert "bedrock:ApplyGuardrail" in ceiling
+    assert not any(denies_by_pattern(ceiling, a) for a in GUARDRAIL_ADMIN)
+
+
+def test_the_eval_role_reads_the_table_marker_and_writes_nothing_in_ssm(template):
+    allowed_here = {a for s in eval_role_policy(template) if s["Effect"] == "Allow" for a in actions(s)}
+    assert {a for a in allowed_here if a.startswith("ssm:")} == {"ssm:GetParameter"}
+
+
+def test_no_agent_role_can_read_the_table_marker(template):
+    """The agent must not answer from, or see, the marker that says which table it answers from."""
+    assert not any(a.startswith("ssm:") for a in allowed(named(template, "agentkeel-boundary")))
 
 
 def test_the_deploy_role_calls_refagents_runtime_and_no_other(template):
@@ -624,3 +694,109 @@ def test_every_action_the_construct_grants_the_agent_role_is_under_the_agent_bou
     # the ceiling allows bedrock-agentcore:* and the wildcard test above would pass any action under it
     # (platform-architect on M02 PR 3, N2); the construct grants the agent role none, and this holds it
     assert not [a for a in granted if a.startswith("bedrock-agentcore:")], granted
+
+
+# --- refagent's guardrail (M03 PR 2, SPEC/03 §6) ---------------------------------
+
+RULES = ROOT / "agents" / "refagent" / "rules"
+
+
+@pytest.fixture(scope="module")
+def bootstrap_module(tmp_path_factory):
+    """app.py as a module, for guardrail_spec. Importing it synthesises once, into a temporary folder."""
+    import importlib.util
+
+    os.environ.setdefault("CDK_OUTDIR", str(tmp_path_factory.mktemp("bootstrap-module")))
+    spec = importlib.util.spec_from_file_location("bootstrap_app", APP)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def the_one(template: dict[str, Any], kind: str) -> dict[str, Any]:
+    found = list(of_type(template, kind).values())
+    assert len(found) == 1, (kind, len(found))
+    return found[0]["Properties"]
+
+
+def test_the_guardrail_is_built_from_the_rule_files_and_nothing_else(template):
+    """One guardrail from guardrail.yaml (rule-owner F6); the prompt-attack filter off, so no content policy."""
+    import yaml
+
+    rules = yaml.safe_load((RULES / "guardrail.yaml").read_text(encoding="utf-8"))
+    built = the_one(template, "AWS::Bedrock::Guardrail")
+    topics = built["TopicPolicyConfig"]["TopicsConfig"]
+    assert [(t["Name"], t["Definition"], t["Examples"], t["Type"]) for t in topics] == [
+        (t["name"], t["definition"], t["examples"], "DENY") for t in rules["denied_topics"]]
+    assert built["SensitiveInformationPolicyConfig"]["PiiEntitiesConfig"] == [
+        {"Type": e["entity"], "Action": e["action"]} for e in rules["pii"]]
+    assert "ContentPolicyConfig" not in built and "WordPolicyConfig" not in built
+    assert "AutomatedReasoningPolicyConfig" not in built  # security-reviewer NOTE 1 on e2839f2
+
+
+def test_every_attack_names_a_rule_the_guardrail_builds(template):
+    import yaml
+
+    blocks = yaml.safe_load((RULES / "redteam.yaml").read_text(encoding="utf-8"))["blocks"]
+    built = {t["Name"] for t in the_one(template, "AWS::Bedrock::Guardrail")["TopicPolicyConfig"]["TopicsConfig"]}
+    assert set(blocks.values()) <= built
+
+
+def test_the_version_is_a_number_that_moves_with_the_rules(template, bootstrap_module):
+    """rule-owner F4: the manifest pins a version, never DRAFT; a rules change makes a new one."""
+    version = the_one(template, "AWS::Bedrock::GuardrailVersion")
+    assert version["Description"] == f"rules sha256 {bootstrap_module.guardrail_spec()['digest']}"
+    outputs = template["Outputs"]
+    assert {"GuardrailIdForTheManifest", "GuardrailVersionForTheManifest"} <= set(outputs)
+
+
+def test_the_eval_role_applies_this_guardrail_and_no_other(template):
+    applying = [s for s in eval_role_policy(template) if s["Effect"] == "Allow" and "bedrock:ApplyGuardrail" in actions(s)]
+    assert len(applying) == 1 and actions(applying[0]) == {"bedrock:ApplyGuardrail"}
+    arn = {"Fn::GetAtt": [next(iter(of_type(template, "AWS::Bedrock::Guardrail"))), "GuardrailArn"]}
+    assert applying[0]["Resource"] == [arn, {"Fn::Join": ["", [arn, ":*"]]}]
+
+
+def test_an_old_guardrail_version_is_kept_when_the_rules_change(template):
+    """security-reviewer on 0bb1d4a, F1: the version the manifest pins must outlive its replacement."""
+    (version,) = of_type(template, "AWS::Bedrock::GuardrailVersion").values()
+    assert version.get("DeletionPolicy") == "Retain" and version.get("UpdateReplacePolicy") == "Retain"
+
+
+@pytest.mark.parametrize(("change", "refused"), [
+    (lambda g, r: r["blocks"].update({"g-016": "no-such-rule"}), "does not build"),
+    (lambda g, r: g["denied_topics"][0].update({"definition": "x" * 201}), "outside Bedrock's limits"),
+    (lambda g, r: g["denied_topics"][0].update({"examples": ["x" * 101]}), "outside Bedrock's limits"),
+    (lambda g, r: g["denied_topics"].append(dict(g["denied_topics"][0])), "each once"),
+    (lambda g, r: g.update({"content_filters": {"prompt_attack": "HIGH"}}), "prompt-attack filter is off"),
+])  # fmt: skip
+def test_rule_files_the_guardrail_cannot_be_built_from_are_refused_at_synth(tmp_path, bootstrap_module, change, refused):
+    import yaml
+
+    guardrail = yaml.safe_load((RULES / "guardrail.yaml").read_text(encoding="utf-8"))
+    redteam = yaml.safe_load((RULES / "redteam.yaml").read_text(encoding="utf-8"))
+    change(guardrail, redteam)
+    (tmp_path / "guardrail.yaml").write_text(yaml.safe_dump(guardrail), encoding="utf-8")
+    (tmp_path / "redteam.yaml").write_text(yaml.safe_dump(redteam), encoding="utf-8")
+    with pytest.raises(ValueError, match=refused):
+        bootstrap_module.guardrail_spec(tmp_path)
+
+
+def test_the_topics_are_assessed_on_the_question_only_and_the_pii_on_both(template):
+    """guardrail.yaml topics_apply_to: input (M03 PR 2, after make evals-local at 6d49b79 blocked every answer)."""
+    for topic in the_one(template, "AWS::Bedrock::Guardrail")["TopicPolicyConfig"]["TopicsConfig"]:
+        assert (topic["InputEnabled"], topic["InputAction"]) == (True, "BLOCK"), topic["Name"]
+        assert (topic["OutputEnabled"], topic["OutputAction"]) == (False, "NONE"), topic["Name"]
+    for entity in the_one(template, "AWS::Bedrock::Guardrail")["SensitiveInformationPolicyConfig"]["PiiEntitiesConfig"]:
+        assert not {"InputEnabled", "OutputEnabled"} & set(entity), "the PII rule keeps Bedrock's default: both sides"
+
+
+def test_where_the_topics_apply_must_be_said(tmp_path, bootstrap_module):
+    import yaml
+
+    guardrail = yaml.safe_load((RULES / "guardrail.yaml").read_text(encoding="utf-8"))
+    del guardrail["topics_apply_to"]
+    (tmp_path / "guardrail.yaml").write_text(yaml.safe_dump(guardrail), encoding="utf-8")
+    shutil.copy(RULES / "redteam.yaml", tmp_path / "redteam.yaml")
+    with pytest.raises(ValueError, match="topics_apply_to"):
+        bootstrap_module.guardrail_spec(tmp_path)

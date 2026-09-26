@@ -275,6 +275,25 @@ def test_the_three_observations_are_made_and_handed_to_make_evals(workflow):
     assert steps.index(observe[0]) < steps.index(measuring_steps(workflow)[0])
 
 
+class _NoRepeatedKeys(yaml.SafeLoader):
+    """safe_load keeps the last of two equal keys; this loader refuses the file instead."""
+
+    def construct_mapping(self, node: yaml.MappingNode, deep: bool = False) -> dict[Any, Any]:
+        keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
+        repeated = {key for key in keys if keys.count(key) > 1}
+        assert not repeated, f"repeated keys {sorted(map(str, repeated))} at line {node.start_mark.line + 1}"
+        return super().construct_mapping(node, deep=deep)
+
+
+@pytest.mark.parametrize("name", ["f2_1_seed_prs.yaml", "f2_1_bypass.yaml", "f2_2_three_doors.yaml"])
+def test_the_observed_run_files_repeat_no_key(name):
+    """M03 open.md row 10 (Unsure C): the doors file had two `doors:` blocks and the observer read the second.
+
+    The human collapsed it to the filled block in M03 PR 2; the first is kept at tag m02.
+    """
+    yaml.load((ROOT / "milestones" / "M02" / "runs" / name).read_text(encoding="utf-8"), Loader=_NoRepeatedKeys)
+
+
 def test_ruleset_token_reaches_no_step_that_runs_code_from_the_pr(workflow):
     """pr2-security.md item 2: the fine-grained token is used by curl in one step and by nothing under src/ or scripts/."""
     for job in workflow["jobs"].values():
@@ -290,3 +309,27 @@ def test_ruleset_token_reaches_no_step_that_runs_code_from_the_pr(workflow):
     # the observer gets the files that step fetched, both of them
     assert observe["env"]["AGENTKEEL_LIVE_RULESET"].endswith("live-ruleset.json")
     assert observe["env"]["AGENTKEEL_RULE_SUITES"].endswith("rule-suites")
+
+
+def test_the_runner_counts_an_edited_golden_as_dirty(monkeypatch):
+    """M03 open.md row 11 item g: only what the chain writes is excluded, not the goldens the run asks."""
+    from src.agent import run
+
+    asked: list[tuple[str, ...]] = []
+    monkeypatch.setattr(run, "git", lambda *args: asked.append(args) or "")
+    assert run.dirty() is False
+    spec = asked[0]
+    assert ":(exclude)evals/history" in spec and ":(exclude)evals/local" in spec
+    assert ":(exclude)evals" not in spec and not any("goldens" in part for part in spec)
+
+
+def test_every_claim_3_case_the_makefile_names_is_a_seed_test():
+    """A name with no case fails the check (build.check_from_cases); a typo would fail F3 for no reason."""
+    import re
+
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    seeds = (ROOT / "tests" / "test_m03_seeds.py").read_text(encoding="utf-8")
+    for falsifier in ("F3_1", "F3_2", "F3_3", "F3_6"):
+        names = re.search(rf"^{falsifier}_CASES := (.+)$", makefile, re.M).group(1).split(",")
+        assert names and all(f"def {name}(" in seeds for name in names), (falsifier, names)
+    assert "--check-ingest F3_5" in makefile
