@@ -58,8 +58,8 @@ example's is (a list entry): Product, pr2.md Unsure B.
 `1088aw3ujhyd`, version **4**, built by the bootstrap stack from the two
 rule files; a numbered version, never DRAFT (F4 at PR 1). The files at the
 PR head hash to `rules sha256 9cbefa08…`, the digest version 4 was built
-from (`ade6dcb`; unchanged since). Its `get-guardrail` description:
-**to be pasted before this is ruled.** Probe of version 4: 0 mismatches,
+from (`ade6dcb`; unchanged since). Its `get-guardrail` description,
+pasted by the human on 2026-09-26: `rules sha256 9cbefa08…`, the same. Probe of version 4: 0 mismatches,
 transcribed whole in `guardrail_probes.md`.
 
 ## Plants
@@ -77,7 +77,7 @@ it working.
 | BLOCK | nothing read ADR-0009 entries 4 and 5 | **repaired** `1c33876` |
 | F1 | `g-013`, `g-015` have no named rule; dropping the blocked intent silences no plant | **deferred to M03 PR 3** (the human, 2026-09-26): any byte of `guardrail.yaml` makes version 5 |
 | F2 | the rule covers less than SPEC/00 §9 named | **repaired**: SPEC/00 §9 amended (pr2.md ruling 4) |
-| F3 | version 4 not read back against the files | the files: 9cbefa08, checked by the session; the description: before the merge |
+| F3 | version 4 not read back against the files | **done** `a9c8ff6`: the description and the files both 9cbefa08 |
 | F4 | `topics_apply_to` and a narrowed definition outside entry 5 | the switch **read** by `1c33876`; definitions: Product, pr2.md Unsure B |
 | F5 | no Rule Owner ruling | this file |
 | NOTEs | wording in `guardrail.yaml` comments (first of two local runs; the stated reason looser than the data); g-015 matching two more topics than its words; the synth refusing prompt-attack on | recorded; the comment wording changes with F1 at PR 3, the same new version |

@@ -71,7 +71,7 @@ cold review, not this file, decides whether the PR shape holds.
 | C | The guardrail's own plants (`g-013`, `g-015`) have no named rule, so dropping `sending-terms-to-a-competitor` silences no plant (`rule-owner` F1) | Rule Owner | M03 PR 3 (the human deferred it: any byte of `guardrail.yaml` is a new version) |
 | D | The runtime half of the guardrail on the call: first read by the merge deploy's load check (security F1, repaired as far as the tree can) | Security | the merge |
 | E | `g-010`'s answer is mostly in the corpus at M04 (`data-owner` F1) | Data Owner | M04 PR 1 |
-| F | Version 4's `get-guardrail` description | Rule Owner, Security | before the merge |
+| F | Version 4's `get-guardrail` description | Rule Owner, Security | **done** `a9c8ff6` |
 
 ## What a reader can run to falsify this PR
 

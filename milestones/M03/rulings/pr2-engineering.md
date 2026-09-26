@@ -45,7 +45,7 @@ their own commits; the diff the reviewer read is unchanged beneath them.
 | F2 | S5's test passes on the human's record alone | **named** `dadf78e` as the weaker witness it is; F3_5, CI's lookup, is the witness `CLAIM_3_CHECKS` requires |
 | F3 | the readers' git fallbacks fail open in a shallow clone | **repaired** `dadf78e`: `gate.rule` refuses a shallow clone; the constant says it holds only with merge commits |
 | F4 | F3_5 fails on every run once `admitted.yaml` changes | **repaired** `9ac4e2a`: compared at the run file's `admitted_at` |
-| F5 | nothing ties the pinned version to the rule files | the files hash to version 4's digest (checked); the description before the merge (pr2-rule-owner.md) |
+| F5 | nothing ties the pinned version to the rule files | **read back** `a9c8ff6`: the description and the files both 9cbefa08; no check reads it in CI (no platform role may read a guardrail) |
 | F6 | `make plants` said SILENT for an envelope ruled GREEN | **repaired** `dadf78e` |
 | F7 | PR 2's measurement not on the branch | PR 2's CI run; cited here before the merge |
 | N1 | S1's and S2's test bodies changed with their readers | recorded: the seeds' files are unchanged; S1's PR 1 assertion could never pass, the new one depends on the reader |

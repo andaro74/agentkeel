@@ -52,8 +52,8 @@ six times (e2839f2; before stop A; 606bece; ad4ab14 and 2e93d27, with
 | # | Finding | Status |
 |---|---|---|
 | F1 | the runtime sent the bare id; the condition names the ARN | **repaired** `72d52d1`; the merge deploy's load check is still the condition's first read in AWS. If it refuses, main's runtime answers nothing and runs go to the runner or UNMEASURED; the repair is M03 PR 3 |
-| F2 | version 4's `get-guardrail` description not pasted | **before the merge** (the human) |
-| F3 | nothing shows the deployed stacks equal the tree | **before the merge**: `cdk diff` of AgentkeelBootstrap and AgentkeelIngest at the PR head, "no differences", pasted into `milestones/M03/runs/` |
+| F2 | version 4's `get-guardrail` description not pasted | **done** `a9c8ff6`: 9cbefa08, the rule files' digest |
+| F3 | nothing shows the deployed stacks equal the tree | **confirmed by the human** (`a9c8ff6`): `cdk diff` of both stacks at the head, no differences; the output not pasted, a weaker witness |
 | F4 | the promoter's open egress outside the platform VPC | **deferred to M05, by name** (SPEC/03 §8): it is not an agent and M05's per-agent egress does not cover it |
 | N6 | a rights-table-only merge redeploys all; the marker is set before the load check | recorded |
 | N7 | the gate and the Makefile that read F3_5 are Engineering paths | SPEC/03 §8's known gap; M05 takes the reader from `main` |
