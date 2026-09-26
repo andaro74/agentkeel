@@ -79,9 +79,12 @@ retired: null
 PASSED_G010 = ROOT / "evals" / "history" / "e97125e970ccfc6d044612eb006cdbdbcdb99337.json"
 
 
-def ruling(seat: str, authorises: list[str], pr: int | str = 12, body: str = "") -> str:
+def ruling(seat: str, authorises: list[str], pr: int | str = 12, body: str = "", keys: list[str] = (),
+           deletes: list[str] = ()) -> str:  # fmt: skip
     lines = "\n".join(f"  - {a}" for a in authorises)
-    return f"---\nruling: r\nseat: {seat}\nauthorises:\n{lines}\nevidence:\n  - x\npr: {pr}\n---\n\n{body}\n"
+    extra = "".join(f"{field}:\n" + "".join(f"  - {v}\n" for v in values)
+                    for field, values in (("keys", keys), ("deletes", deletes)) if values)  # fmt: skip
+    return f"---\nruling: r\nseat: {seat}\nauthorises:\n{lines}\n{extra}evidence:\n  - x\npr: {pr}\n---\n\n{body}\n"
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -281,11 +284,20 @@ def test_one_key_is_refused_and_two_files_from_one_seat_are_one_key(repo):
     assert "one seat holds a key" in refused and "Two files from the same seat are one key" in refused
 
 
-def test_two_distinct_seats_pass_when_the_second_names_the_path_in_its_body(repo):
+def test_two_distinct_seats_pass_when_the_second_names_the_path_in_its_keys(repo):
+    """ADR-0009: the second key names the path, exactly, in `keys:`."""
     relax(repo)
     repo.write("milestones/M02/rulings/a.md", ruling("Threshold Owner", ["thresholds.yaml"]))
-    repo.write("milestones/M02/rulings/b.md", ruling("Engineering", ["src/**"], body="My key on thresholds.yaml is given here."))
+    repo.write("milestones/M02/rulings/b.md", ruling("Engineering", ["src/**"], keys=["thresholds.yaml"]))
     assert repo.keys() is None
+
+
+def test_a_body_mention_or_a_broad_glob_is_no_longer_a_second_key(repo):
+    """ADR-0009 (M02 PR 2 security F4): a ruling that argued against the change counted as a key for it."""
+    relax(repo)
+    repo.write("milestones/M02/rulings/a.md", ruling("Threshold Owner", ["thresholds.yaml"]))
+    repo.write("milestones/M02/rulings/b.md", ruling("Engineering", ["**"], body="I refuse thresholds.yaml."))
+    assert "one seat holds a key" in (repo.keys() or "")
 
 
 def test_two_seats_without_the_owners_key_are_refused(repo):
@@ -314,7 +326,7 @@ def test_retiring_a_golden_needs_two_keys(repo):
     refused = repo.keys() or ""
     assert "g-010 retired (retired: M02)" in refused
     repo.write("milestones/M02/rulings/a.md", ruling("Data Owner", ["evals/goldens/v1/g-010.yaml"]))
-    repo.write("milestones/M02/rulings/b.md", ruling("Threshold Owner", ["thresholds.yaml"], body="key on evals/goldens/v1/g-010.yaml"))
+    repo.write("milestones/M02/rulings/b.md", ruling("Threshold Owner", ["thresholds.yaml"], keys=["evals/goldens/v1/g-010.yaml"]))
     assert repo.keys() is None
 
 
@@ -359,7 +371,7 @@ def test_the_command_exits_1_on_a_refusal_and_0_otherwise_two_key(repo, capsys):
     assert two_key.main(["--base", str(repo.base), "--tree", str(repo.root), "--pr", "12"]) == 1
     assert "unkeyed thresholds.yaml" in capsys.readouterr().out
     repo.write("milestones/M02/rulings/a.md", ruling("Threshold Owner", ["thresholds.yaml"]))
-    repo.write("milestones/M02/rulings/b.md", ruling("Engineering", ["src/**"], body="thresholds.yaml"))
+    repo.write("milestones/M02/rulings/b.md", ruling("Engineering", ["src/**"], keys=["thresholds.yaml"]))
     assert two_key.main(["--base", str(repo.base), "--tree", str(repo.root), "--pr", "12"]) == 0
     assert "two keys with pr: 12 found" in capsys.readouterr().out
 
@@ -407,3 +419,114 @@ def test_an_existing_prompt_keeps_the_seat_the_base_gives_it(repo):
     repo.write("milestones/M03/rulings/pr1.md", ruling("Product", [".claude/agents/red-teamer.md"]))
     refused = repo.cited() or ""
     assert "owned by Rule Owner" in refused
+
+
+
+# --- ADR-0009 entries 1 to 5, and deletes: (read from M03 PR 2) --------------------
+
+RULES_YAML = """\
+plants: [g-013, g-015]
+topics_apply_to: input and output
+denied_topics:
+  - name: embargoed-synopsis
+    definition: plot
+  - name: third-party
+    definition: terms
+pii:
+  - entity: PHONE
+    action: ANONYMIZE
+blocks:
+  g-016: embargoed-synopsis
+"""
+
+
+@pytest.fixture
+def rules_repo(tmp_path: Path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    git(root, "init", "-q")
+    git(root, "config", "core.autocrlf", "false")
+    r = Repo(root)
+    r.write(".github/CODEOWNERS", CODEOWNERS)
+    r.write("thresholds.yaml", THRESHOLDS)
+    r.write("agents/refagent/manifest.yaml", MANIFEST)
+    r.write("agents/refagent/rules/guardrail.yaml", RULES_YAML)
+    r.write("rules/one.md", "a rule\n")
+    (root / "evals" / "history").mkdir(parents=True)
+    r.commit_base()
+    yield r
+    git(root, "worktree", "remove", "--force", str(r.base))
+
+
+@pytest.mark.parametrize(("change", "said"), [
+    (("  - name: third-party\n    definition: terms\n", ""), "denied_topics[third-party] removed"),
+    (("plants: [g-013, g-015]", "plants: [g-013]"), "plants[g-015] removed"),
+    (("    action: ANONYMIZE", "    action: NONE"), "pii[PHONE].action ANONYMIZE -> NONE weakened"),
+    (("topics_apply_to: input and output", "topics_apply_to: input"), "topics_apply_to 'input and output' -> 'input' narrowed"),
+    (("  g-016: embargoed-synopsis", "  g-016: third-party"), "blocks.g-016 embargoed-synopsis -> third-party pointed at another rule"),
+    (("name: third-party", "name: sending-terms"), "denied_topics[third-party] removed"),
+])  # fmt: skip
+def test_entry_5_a_rule_removed_weakened_or_repointed_needs_two_keys(rules_repo, change, said):
+    rules_repo.write("agents/refagent/rules/guardrail.yaml", RULES_YAML.replace(*change))
+    assert said in (rules_repo.keys() or ""), rules_repo.keys()
+
+
+def test_entry_5_a_rule_added_or_tightened_needs_one(rules_repo):
+    tighter = RULES_YAML.replace("plants: [g-013, g-015]", "plants: [g-013, g-015, g-014]").replace(
+        "    action: ANONYMIZE", "    action: BLOCK")  # fmt: skip
+    rules_repo.write("agents/refagent/rules/guardrail.yaml", tighter)
+    assert rules_repo.keys() is None
+
+
+def test_entry_4_a_guardrail_set_to_null_or_its_id_changed(rules_repo):
+    guard = 'guardrail: {id: g, version: "3"}'
+    assert guard in MANIFEST
+    rules_repo.write("agents/refagent/manifest.yaml", MANIFEST.replace(guard, "guardrail: null"))
+    assert "guardrail set to null or removed" in (rules_repo.keys() or "")
+    rules_repo.write("agents/refagent/manifest.yaml", MANIFEST.replace(guard, 'guardrail: {id: h, version: "3"}'))
+    assert "guardrail id g -> h" in (rules_repo.keys() or "")
+
+
+def test_entry_3_a_budget_raised_set_to_null_or_removed(tmp_path):
+    """The Threshold Owner's key on a manifest's max_tokens_per_session and daily_usd."""
+    from src.gates import Tree
+
+    root = tmp_path / "repo"
+    root.mkdir()
+    git(root, "init", "-q")
+    git(root, "config", "core.autocrlf", "false")
+    r = Repo(root)
+    r.write(".github/CODEOWNERS", CODEOWNERS)
+    r.write("agents/refagent/manifest.yaml", MANIFEST + "max_tokens_per_session: 20000\ndaily_usd: 10\n")
+    r.commit_base()
+    try:
+        r.write("agents/refagent/manifest.yaml", MANIFEST + "max_tokens_per_session: 30000\n")
+        found = [x.what for x in two_key.relaxations(Tree(r.root), Tree(r.base))]
+        assert "max_tokens_per_session 20000 -> 30000 raised (ADR-0009 entry 3)" in found
+        assert "daily_usd 10 set to null or removed (ADR-0009 entry 3)" in found
+        assert all(x.seat == "Threshold Owner" for x in two_key.relaxations(Tree(r.root), Tree(r.base)))
+    finally:
+        git(root, "worktree", "remove", "--force", str(r.base))
+
+
+def test_entries_1_and_2_a_relaxes_direction_flipped_or_a_bar_deleted(rules_repo):
+    import yaml as _yaml
+
+    doc = _yaml.safe_load(THRESHOLDS)
+    bar = next(iter(doc["relaxes"]))
+    flipped = THRESHOLDS.replace(f"{bar}: {doc['relaxes'][bar]}", f"{bar}: {'down' if doc['relaxes'][bar] == 'up' else 'up'}")
+    rules_repo.write("thresholds.yaml", flipped)
+    assert f"relaxes.{bar}" in (rules_repo.keys() or "")
+    section, name = bar.split(".", 1)
+    deleted = "\n".join(line for line in THRESHOLDS.splitlines() if not line.strip().startswith(f"{name}:")) + "\n"
+    rules_repo.write("thresholds.yaml", deleted)
+    assert f"{bar} deleted" in (rules_repo.keys() or "")
+
+
+def test_a_deletion_is_covered_only_when_its_seat_names_it_in_deletes(rules_repo):
+    """ADR-0009: an authorises: glob that matches a deleted path no longer rules the deletion."""
+    rules_repo.delete("rules/one.md")
+    rules_repo.write("milestones/M02/rulings/a.md", ruling("Rule Owner", ["rules/**"]))
+    assert "rules/one.md: deleted, and no ruling file" in (rules_repo.cited() or "")
+    rules_repo.write("milestones/M02/rulings/a.md", ruling("Rule Owner", ["rules/**"], deletes=["rules/one.md"]))
+    assert rules_repo.cited() is None

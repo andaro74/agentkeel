@@ -389,6 +389,10 @@ class Ruling:
     seat: str | None
     authorises: list[str] = field(default_factory=list)
     body: str = ""
+    # ADR-0009 (M03 PR 1; read from M03 PR 2): the exact paths this file gives
+    # a second key on, and the exact paths it rules deleted.
+    keys: list[str] = field(default_factory=list)
+    deletes: list[str] = field(default_factory=list)
     _globs: list[re.Pattern[str]] = field(default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
@@ -402,8 +406,14 @@ class Ruling:
         return seat is not None and self.seat == seat and self.authorises_path(path)
 
     def names(self, path: str) -> bool:
-        """The second key of a two-key change names the path in its body or its globs (M01 PR 1, ruling B)."""
-        return self.authorises_path(path) or path in self.body
+        """The second key of a two-key change names the path in `keys:`, exactly (ADR-0009).
+
+        Until M03 PR 2 it was the body or a glob (M01 PR 1, ruling B), so a
+        ruling that argued against a change counted as a key for it
+        (M02 PR 2 security F4). A body mention no longer counts, and neither
+        does a broad `authorises:` glob in the second key's file.
+        """
+        return path in self.keys
 
 
 def rulings(tree: Tree, pr: int) -> list[Ruling]:
@@ -417,5 +427,8 @@ def rulings(tree: Tree, pr: int) -> list[Ruling]:
         if fm is None or pr_number(fm.get("pr")) != pr:
             continue
         authorises = fm.get("authorises") if isinstance(fm.get("authorises"), list) else []
-        found.append(Ruling(path, canonical_seat(fm.get("seat")), [str(a) for a in authorises], text))
+        keys = fm.get("keys") if isinstance(fm.get("keys"), list) else []
+        deletes = fm.get("deletes") if isinstance(fm.get("deletes"), list) else []
+        found.append(Ruling(path, canonical_seat(fm.get("seat")), [str(a) for a in authorises], text,
+                            [str(k) for k in keys], [str(d) for d in deletes]))  # fmt: skip
     return found

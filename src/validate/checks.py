@@ -27,7 +27,17 @@ from typing import Any
 import yaml
 
 from src.gates import pattern_regex, two_key
-from src.validate import codeowners, controls, corpus, edges, golden_ids, overlap, ruleset, semver
+from src.gates import pr_number as two_key_pr
+from src.validate import (
+    codeowners,
+    controls,
+    corpus,
+    edges,
+    golden_ids,
+    overlap,
+    ruleset,
+    semver,
+)
 
 GOLDEN_FIELDS = {"id", "kind", "question", "expected", "seat", "added", "retired"}
 GOLDEN_ID = re.compile(r"^g-\d{3}$")
@@ -153,18 +163,28 @@ def front_matter(text: str) -> dict[str, Any] | None:
     return doc if isinstance(doc, dict) else None
 
 
-def deleted_paths(root: Path) -> set[str]:
-    """Every path deleted from the tree somewhere in HEAD's history. Empty when git cannot say.
+def merged_trees(root: Path, pr: int) -> list[set[str]]:
+    """The file sets of PR `pr`'s merge commit and its first parent; [] when it has not merged (ADR-0009).
 
-    A ruling is a record of the PR it merged with, and the paths it named can
-    be deleted later (`infra/eval-role/` at M02 PR 3, authorised by four M00
-    and M01 rulings). The front-matter check exists to catch a glob that
-    names nothing; a glob that names something the tree once had is not
-    that, and a past ruling is not edited to keep a check green.
+    Found from "Merge pull request #N": PRs land as merge commits only
+    (ADR-0004 amendment 1). Paths are read with --no-renames, so a rename is
+    a deletion and an addition.
     """
-    done = subprocess.run(["git", "log", "--diff-filter=D", "--name-only", "--format="], cwd=root,
-                          capture_output=True, text=True)  # fmt: skip
-    return set(done.stdout.split()) if done.returncode == 0 else set()
+    done = subprocess.run(["git", "log", "--merges", "--format=%H", "--fixed-strings",
+                           f"--grep=Merge pull request #{pr} ", "HEAD"], cwd=root, capture_output=True, text=True,
+                          check=False)  # fmt: skip
+    commits = done.stdout.split() if done.returncode == 0 else []
+    if not commits:
+        return []
+    trees = []
+    for rev in (commits[-1], f"{commits[-1]}^1"):
+        listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", "--no-renames", rev], cwd=root,
+                                capture_output=True, text=True, check=False)  # fmt: skip
+        if listed.returncode != 0:  # --no-renames is a diff option; ls-tree may refuse it
+            listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", rev], cwd=root, capture_output=True,
+                                    text=True, check=False)  # fmt: skip
+        trees.append(set(listed.stdout.split()))
+    return trees
 
 
 def check_rulings(root: Path) -> list[str]:
@@ -172,7 +192,6 @@ def check_rulings(root: Path) -> list[str]:
     if not paths:
         return ["milestones/*/rulings/: no ruling files found"]
     errors = []
-    gone: set[str] | None = None  # read once, only if a glob matches nothing in the tree
     for path in paths:
         rel = path.relative_to(root).as_posix()
         fm = front_matter(path.read_text(encoding="utf-8"))
@@ -185,18 +204,22 @@ def check_rulings(root: Path) -> list[str]:
         for field in ("authorises", "evidence"):
             if fm.get(field) and not isinstance(fm[field], list):
                 errors.append(f"{rel}: {field} must be a list")
+        for field in ("keys", "deletes"):  # ADR-0009: exact paths, a list
+            if field in fm and not isinstance(fm[field], list):
+                errors.append(f"{rel}: {field} must be a list of exact paths")
         if isinstance(fm.get("authorises"), list):
+            # ADR-0009 (read from M03 PR 2): a glob must match the tree at its own PR's merge
+            # commit or that commit's first parent, where its paths existed; until then, the
+            # tree. It no longer matches anything deleted anywhere in history (M02 PR 3 finding 3).
+            merged = merged_trees(root, pr) if (pr := two_key_pr(fm.get("pr"))) is not None else []
             for pattern in fm["authorises"]:
-                if glob.glob(str(pattern), root_dir=root, recursive=True):
-                    continue
-                if gone is None:
-                    gone = deleted_paths(root)
                 regex = pattern_regex(str(pattern), anchored=True)
-                if any(regex.match(path) for path in gone):
-                    continue  # named something the tree once had (M02 PR 3)
-                errors.append(
-                    f"{rel}: authorises path {pattern!r} matches nothing in the tree, nor anything deleted from it"
-                )
+                if merged and any(any(regex.match(f) for f in files) for files in merged):
+                    continue
+                if not merged and glob.glob(str(pattern), root_dir=root, recursive=True):
+                    continue
+                where = f"PR {pr}'s merge commit or its first parent" if merged else "the tree"
+                errors.append(f"{rel}: authorises path {pattern!r} matches nothing in {where}")
     return errors
 
 
