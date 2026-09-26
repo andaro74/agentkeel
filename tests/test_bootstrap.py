@@ -734,12 +734,15 @@ def test_the_guardrail_is_built_from_the_rule_files_and_nothing_else(template):
     assert "AutomatedReasoningPolicyConfig" not in built  # security-reviewer NOTE 1 on e2839f2
 
 
-def test_every_attack_names_a_rule_the_guardrail_builds(template):
+def test_every_plant_names_a_rule_the_guardrail_builds(template):
+    """Both controls' `blocks` (M03 PR 3: guardrail.yaml names its own plants' rules)."""
     import yaml
 
-    blocks = yaml.safe_load((RULES / "redteam.yaml").read_text(encoding="utf-8"))["blocks"]
+    named = set()
+    for name in ("guardrail.yaml", "redteam.yaml"):
+        named |= set((yaml.safe_load((RULES / name).read_text(encoding="utf-8")).get("blocks") or {}).values())
     built = {t["Name"] for t in the_one(template, "AWS::Bedrock::Guardrail")["TopicPolicyConfig"]["TopicsConfig"]}
-    assert set(blocks.values()) <= built
+    assert named and named <= built
 
 
 def test_the_version_is_a_number_that_moves_with_the_rules(template, bootstrap_module):
@@ -764,7 +767,8 @@ def test_an_old_guardrail_version_is_kept_when_the_rules_change(template):
 
 
 @pytest.mark.parametrize(("change", "refused"), [
-    (lambda g, r: r["blocks"].update({"g-016": "no-such-rule"}), "does not build"),
+    (lambda g, r: r["blocks"].update({"g-016": "no-such-rule"}), "redteam.yaml names blocks .* does not build"),
+    (lambda g, r: g.update({"blocks": {"g-015": "no-such-rule"}}), "guardrail.yaml names blocks .* does not build"),
     (lambda g, r: g["denied_topics"][0].update({"definition": "x" * 201}), "outside Bedrock's limits"),
     (lambda g, r: g["denied_topics"][0].update({"examples": ["x" * 101]}), "outside Bedrock's limits"),
     (lambda g, r: g["denied_topics"].append(dict(g["denied_topics"][0])), "each once"),
@@ -800,3 +804,11 @@ def test_where_the_topics_apply_must_be_said(tmp_path, bootstrap_module):
     shutil.copy(RULES / "redteam.yaml", tmp_path / "redteam.yaml")
     with pytest.raises(ValueError, match="topics_apply_to"):
         bootstrap_module.guardrail_spec(tmp_path)
+
+
+def test_the_guardrail_parameter_says_who_reads_it(template):
+    """security-reviewer N9 on M03 PR 2: the construct reads the manifest, not this parameter."""
+    (param,) = [p["Properties"] for p in of_type(template, "AWS::SSM::Parameter").values()
+                if p["Properties"].get("Name") == "/agentkeel/security/guardrail/refagent"]
+    assert "GovernedAgent's ApplyGuardrail" not in param["Description"]
+    assert "from the manifest" in param["Description"]
