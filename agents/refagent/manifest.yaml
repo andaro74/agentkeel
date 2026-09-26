@@ -44,13 +44,18 @@ judge_model_id: null
 # Rule Owner: the guardrail id and version. M03 PR 2: the guardrail the
 # bootstrap stack builds from rules/ (1088aw3ujhyd), version 4: version 3's
 # probe showed no mismatch on the questions, and version 3 then blocked every
-# ordinary answer in the runner; version 4 assesses the topics on the question
-# only (milestones/M03/runs/guardrail_probes.md).
+# ordinary answer on the first of two local runs (make evals-local, not
+# evidence); version 4 assesses the topics on the question only. M03 PR 3:
+# version 5, the same guardrail built from rule files that name the rule for
+# each of guardrail.yaml's plants (rule-owner F1 on PR 2); its description is
+# the digest of the rule files at 0a90d52, and its probe showed 0 mismatches
+# (milestones/M03/runs/guardrail_probes.md). Version 4 is retained.
 # A numbered version, never DRAFT. The runner's and the runtime's converse
-# both carry it; the construct conditions the agent role's invoke on it.
+# both carry it; the construct conditions the agent role's invoke on it, and
+# the ingest stack's promoter scans with it (both read it here, at synth).
 guardrail:
   id: 1088aw3ujhyd
-  version: "4"
+  version: "5"
 
 # Security (ruling d): AWS service names only at M01, one VPC endpoint each.
 # The agent's security group egress allows these and nothing else; anything
