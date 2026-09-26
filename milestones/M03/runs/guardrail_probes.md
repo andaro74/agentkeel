@@ -169,6 +169,25 @@ the answer side, which the probe cannot.
 
 On 2026-09-26, at the PR head, the human ran `npx aws-cdk@2 diff` for
 `AgentkeelBootstrap` (`infra/bootstrap`) and `AgentkeelIngest`
-(`infra/ingest`) from a clean tree and reported both matching the tree
-(`security-reviewer` on the whole diff, F3). **The output was not pasted:
-this is the human's confirmation, a weaker witness than the diff itself.**
+(`infra/ingest`) from a clean tree (`security-reviewer` on the whole diff,
+F3).
+
+**AgentkeelBootstrap**, pasted:
+
+```
+Could not create a change set, will base the diff on template differences (run again with -v to see the reason)
+
+Stack AgentkeelBootstrap
+There were no differences
+Omitted 10 changes because they are likely mangled non-ASCII characters. Use --strict to print them.
+
+✨  Number of stacks with differences: 0
+```
+
+Two things it does not show: the diff is of templates, not a change set;
+and 10 changes were omitted as likely mangled non-ASCII characters (the
+templates' `§` signs, most likely, in descriptions and suppression
+reasons). `--strict` would print them; it was not run.
+
+**AgentkeelIngest**: the human reported no differences; the output was not
+pasted, a weaker witness than the diff itself.
