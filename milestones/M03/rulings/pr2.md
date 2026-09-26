@@ -9,12 +9,14 @@ seat: Product
 authorises:
   - CLAUDE.md
   - SPEC/00-overview.md
+  - SPEC/02-seats-and-change-gates.md
   - SPEC/03-evals-regression-redteam-corpus.md
   - milestones/README.md
   - milestones/M02/runs/f2_2_three_doors.yaml
   - milestones/M03/runs/**
 evidence:
   - SPEC/00-overview.md#8-M03
+  - SPEC/02-seats-and-change-gates.md
   - SPEC/03-evals-regression-redteam-corpus.md
   - milestones/M03/rulings/pr1.md
   - milestones/M03/feasibility.md

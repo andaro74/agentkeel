@@ -134,8 +134,12 @@ def main(argv: list[str] | None = None) -> int:
         result = {"falsifier": "F3.5", "pass": False, "reasons": ["the attempt has not been made (observed: null)"]}
     else:
         then = observed.get("admitted_at")
-        admitted_then = text_at(then, "data/corpus/admitted.yaml", ROOT)[0] if then else admitted
-        result = judge(observed, lookup(observed), document, admitted, admitted_then or "")
+        admitted_then, where = text_at(then, "data/corpus/admitted.yaml", ROOT) if then else (admitted, "")
+        if then and where == "the working tree":  # git cannot resolve it: never read today's file instead
+            result = {"falsifier": "F3.5", "pass": False,
+                      "reasons": [f"admitted_at {then} is not a commit git can resolve here"]}  # fmt: skip
+        else:
+            result = judge(observed, lookup(observed), document, admitted, admitted_then or "")
     args.out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(("ok  " if result["pass"] else "FAIL ") + "F3.5: " + ("; ".join(result["reasons"]) or "the seed stayed out"))
     return 0

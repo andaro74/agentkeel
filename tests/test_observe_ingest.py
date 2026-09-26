@@ -121,3 +121,16 @@ def test_the_run_file_names_the_commit_the_stack_was_deployed_from():
 
     run = yaml.safe_load((ROOT / "milestones" / "M03" / "runs" / "f3_5_amendment.yaml").read_text(encoding="utf-8"))
     assert fingerprint_at(run["observed"]["admitted_at"])[0] == "e12988c54befa69c2f67437ab3f0c2a225a1845a5a43e553132003faa2e6431c"
+
+
+def test_an_admitted_at_git_cannot_resolve_fails_and_never_reads_todays_file(tmp_path, monkeypatch):
+    """The second cold read of PR 2, N2."""
+    run = yaml.safe_load((ROOT / "milestones" / "M03" / "runs" / "f3_5_amendment.yaml").read_text(encoding="utf-8"))
+    run["observed"]["admitted_at"] = "f" * 40
+    path = tmp_path / "run.yaml"
+    path.write_text(yaml.safe_dump(run), encoding="utf-8")
+    monkeypatch.setattr(oi, "lookup", lambda observed: found())
+    out = tmp_path / "f3_5.json"
+    oi.main([str(path), "--out", str(out)])
+    result = json.loads(out.read_text(encoding="utf-8"))
+    assert result["pass"] is False and "not a commit git can resolve" in result["reasons"][0]

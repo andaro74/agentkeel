@@ -167,8 +167,9 @@ def merged_trees(root: Path, pr: int) -> list[set[str]]:
     """The file sets of PR `pr`'s merge commit and its first parent; [] when it has not merged (ADR-0009).
 
     Found from "Merge pull request #N": PRs land as merge commits only
-    (ADR-0004 amendment 1). Paths are read with --no-renames, so a rename is
-    a deletion and an addition.
+    (ADR-0004 amendment 1). `ls-tree` lists a snapshot, so there are no
+    renames to follow: a renamed path is simply absent from one tree and
+    present in the other (ADR-0009's `--no-renames` holds by construction).
     """
     done = subprocess.run(["git", "log", "--merges", "--format=%H", "--fixed-strings",
                            f"--grep=Merge pull request #{pr} ", "HEAD"], cwd=root, capture_output=True, text=True,
@@ -178,12 +179,9 @@ def merged_trees(root: Path, pr: int) -> list[set[str]]:
         return []
     trees = []
     for rev in (commits[-1], f"{commits[-1]}^1"):
-        listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", "--no-renames", rev], cwd=root,
-                                capture_output=True, text=True, check=False)  # fmt: skip
-        if listed.returncode != 0:  # --no-renames is a diff option; ls-tree may refuse it
-            listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", rev], cwd=root, capture_output=True,
-                                    text=True, check=False)  # fmt: skip
-        trees.append(set(listed.stdout.split()))
+        listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", "-z", rev], cwd=root, capture_output=True,
+                                text=True, check=False)  # fmt: skip
+        trees.append({path for path in listed.stdout.split("\0") if path})
     return trees
 
 

@@ -133,6 +133,8 @@ def _ever_passed(history: replay_history.History, golden_id: str) -> list[str]:
 # ADR-0009 entry 5: how strong an action is. ANONYMIZE is Bedrock's word for MASK.
 ACTION_STRENGTH = {"BLOCK": 3, "BLOCKED": 3, "MASK": 2, "MASKED": 2, "ANONYMIZE": 2, "NONE": 1}
 APPLIES_TO_STRENGTH = {"input and output": 2, "input": 1}
+# A content filter's strength, as Bedrock names it (the second cold read of PR 2, F2).
+FILTER_STRENGTH = {"HIGH": 3, "MEDIUM": 2, "LOW": 1, "NONE": 0}
 IDENTITY_KEYS = ("name", "entity", "id", "type")
 
 
@@ -165,11 +167,17 @@ def _entries(node: Any, at: str = "") -> dict[str, Any]:
 def rule_relaxations(before_text: str | None, after_text: str | None) -> list[str]:
     """ADR-0009 entry 5, for one file under rules/**: what was removed, weakened or re-pointed."""
     try:
-        before, after = yaml.safe_load(before_text or ""), yaml.safe_load(after_text or "")
+        before = yaml.safe_load(before_text or "")
     except yaml.YAMLError:
-        return []  # not YAML (a markdown rule): only its deletion is read, as before
-    if not isinstance(before, (dict, list)) or not isinstance(after, (dict, list)):
+        return []  # not YAML on the base (a markdown rule): only its deletion is read, as before
+    if not isinstance(before, (dict, list)):
         return []
+    try:
+        after = yaml.safe_load(after_text or "")
+    except yaml.YAMLError:
+        return ["the file no longer parses: every entry removed"]  # the second cold read of PR 2, F1
+    if not isinstance(after, (dict, list)):
+        after = {}  # emptied, or comments only: every entry removed
     old, new = _entries(before), _entries(after)
     found = []
     for path in sorted(old):
@@ -177,7 +185,13 @@ def rule_relaxations(before_text: str | None, after_text: str | None) -> list[st
             found.append(f"{path} removed")
             continue
         was, now = old[path], new[path]
-        if isinstance(was, str) and isinstance(now, str):
+        if was is True and now is False:  # a rule's switch turned off (prompt_attack: on -> off)
+            found.append(f"{path} on -> off weakened")
+        elif isinstance(was, str) and isinstance(now, str) and was.upper() in FILTER_STRENGTH \
+                and now.upper() in FILTER_STRENGTH and was.upper() not in ACTION_STRENGTH:
+            if FILTER_STRENGTH[now.upper()] < FILTER_STRENGTH[was.upper()]:
+                found.append(f"{path} {was} -> {now} weakened")
+        elif isinstance(was, str) and isinstance(now, str):
             key = path.rsplit(".", 1)[-1]
             if was.upper() in ACTION_STRENGTH and now.upper() in ACTION_STRENGTH:
                 if ACTION_STRENGTH[now.upper()] < ACTION_STRENGTH[was.upper()]:

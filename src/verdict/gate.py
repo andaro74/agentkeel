@@ -477,7 +477,7 @@ def shallow(root: Path = ROOT) -> bool:
     """True in a shallow clone: git cannot place old commits, so the readers would fall back to the tree."""
     done = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=root, capture_output=True, text=True,
                           check=False)  # fmt: skip
-    return done.stdout.strip() == "true"
+    return done.returncode != 0 or done.stdout.strip() != "false"  # git failing is not a full history
 
 
 def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:

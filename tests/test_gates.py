@@ -530,3 +530,24 @@ def test_a_deletion_is_covered_only_when_its_seat_names_it_in_deletes(rules_repo
     assert "rules/one.md: deleted, and no ruling file" in (rules_repo.cited() or "")
     rules_repo.write("milestones/M02/rulings/a.md", ruling("Rule Owner", ["rules/**"], deletes=["rules/one.md"]))
     assert rules_repo.cited() is None
+
+
+@pytest.mark.parametrize(("after", "said"), [
+    ("", "denied_topics[third-party] removed"),
+    ("# nothing left\n", "plants[g-015] removed"),
+    ("plants: [g-013\n  : : broken", "the file no longer parses: every entry removed"),
+])  # fmt: skip
+def test_entry_5_an_emptied_or_unparseable_rules_file_is_every_entry_removed(rules_repo, after, said):
+    """The second cold read of PR 2, F1: the file stays in the tree, so "a rule deleted" does not fire."""
+    rules_repo.write("agents/refagent/rules/guardrail.yaml", after)
+    assert said in (rules_repo.keys() or ""), rules_repo.keys()
+
+
+def test_entry_5_a_switch_off_or_a_filter_level_lowered_is_weakened():
+    """The second cold read of PR 2, F2: the prompt-attack filter on -> off, HIGH -> NONE."""
+    before = "content_filters:\n  prompt_attack: on\n  hate: HIGH\n"
+    assert two_key.rule_relaxations(before, "content_filters:\n  prompt_attack: off\n  hate: HIGH\n") == [
+        "content_filters.prompt_attack on -> off weakened"]
+    assert two_key.rule_relaxations(before, "content_filters:\n  prompt_attack: on\n  hate: NONE\n") == [
+        "content_filters.hate HIGH -> NONE weakened"]
+    assert two_key.rule_relaxations(before, "content_filters:\n  prompt_attack: on\n  hate: HIGH\n  sexual: LOW\n") == []

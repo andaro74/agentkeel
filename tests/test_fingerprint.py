@@ -68,3 +68,8 @@ def test_the_gate_refuses_a_shallow_clone(monkeypatch):
     monkeypatch.setattr(gate, "shallow", lambda root=ROOT: True)
     with pytest.raises(gate.Rejected, match="a shallow clone"):
         gate.rule(ROOT / "evals" / "history" / "8033c2a7a0588e557df577464c190e64a435e88a.json")
+
+
+def test_shallow_fails_closed_where_git_cannot_answer(tmp_path):
+    """The second cold read of PR 2, N3: not a repository is not a full history."""
+    assert gate.shallow(tmp_path) is True

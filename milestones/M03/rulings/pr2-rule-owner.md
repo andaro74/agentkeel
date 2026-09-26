@@ -48,8 +48,10 @@ a list on `main`. Three narrowings happened inside the PR, none ever on
 each is a relaxation, two keys, because `two_key.py` now reads ADR-0009
 entry 5 (`1c33876`): a rule, a PII type, a plant id or a `blocks` entry
 removed (a rename is a removal), an action weakened, a `blocks` entry
-re-pointed, `topics_apply_to` narrowed. A definition's wording is not read
-(Product, pr2.md Unsure B).
+re-pointed, `topics_apply_to` narrowed, a switch turned off (the
+prompt-attack filter `on -> off`) or a filter level lowered (the second
+cold read of PR 2, F2). A definition's wording is not read, while an
+example's is (a list entry): Product, pr2.md Unsure B.
 
 ## The pin
 

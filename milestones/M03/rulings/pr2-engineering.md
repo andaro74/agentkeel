@@ -42,7 +42,7 @@ their own commits; the diff the reviewer read is unchanged beneath them.
 |---|---|---|
 | B1 | no ruling for the Rule Owner, Security and Product paths | `pr2.md`, `pr2-rule-owner.md`, `pr2-security.md`, this file |
 | F1 | S4's reader untested through `gate.rule` with a corpus admitted | **repaired** `dadf78e` |
-| F2 | S5's test passes on the human's record alone | **repaired** `dadf78e`: named as the weaker witness; F3_5 is CI's lookup |
+| F2 | S5's test passes on the human's record alone | **named** `dadf78e` as the weaker witness it is; F3_5, CI's lookup, is the witness `CLAIM_3_CHECKS` requires |
 | F3 | the readers' git fallbacks fail open in a shallow clone | **repaired** `dadf78e`: `gate.rule` refuses a shallow clone; the constant says it holds only with merge commits |
 | F4 | F3_5 fails on every run once `admitted.yaml` changes | **repaired** `9ac4e2a`: compared at the run file's `admitted_at` |
 | F5 | nothing ties the pinned version to the rule files | the files hash to version 4's digest (checked); the description before the merge (pr2-rule-owner.md) |
@@ -50,7 +50,7 @@ their own commits; the diff the reviewer read is unchanged beneath them.
 | F7 | PR 2's measurement not on the branch | PR 2's CI run; cited here before the merge |
 | N1 | S1's and S2's test bodies changed with their readers | recorded: the seeds' files are unchanged; S1's PR 1 assertion could never pass, the new one depends on the reader |
 | N2 | claim 3 required from `f82a02a`, before PR 2's merge | recorded: stricter than row 3's words, with no envelope between |
-| N3 | the runtime half of the guardrail not fired | recorded: PR 2's run is `mode: runner`; no prose says the runtime carries it before a runtime envelope shows it |
+| N3 | the runtime half of the guardrail not fired | recorded: PR 2's run is expected in `mode: runner` (the bundle changed); no prose says the runtime carries it before a runtime envelope shows it |
 | N4 | `validate` loosened for ingest rows, `bars` tightened | recorded |
 | N5 | schema.json's "M03 makes null a failure" | recorded: the gate fails a mismatch at the commit; null before `55c5b07` is right |
 | N6 | the doors file needs Product's ruling | `pr2.md` ruling 1 |
