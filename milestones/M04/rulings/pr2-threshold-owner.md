@@ -69,6 +69,12 @@ doubled came to 105,304. The cap is re-ruled against this PR's A-vs-A
 envelope once it is on the branch: kept if that envelope is under it,
 and a raise, two keys, only if it is not.
 
+**Read, 2026-09-27.** PR 2's A-vs-A envelope
+(`evals/history/9e4b559bf7ff8241482ed89bb350a2f6249e8c5c.json`, run
+36345661354) spent 87,344 in + 10,291 out = 97,635 tokens, both
+subjects twice. That is under 150,000, so by the rule above the cap is
+kept: 52,365 of headroom, 65% used. `thresholds.yaml` is not changed.
+
 ## 3. `pinned_roles` carry the whole pin (row 14; F5, F8 on PR 1)
 
 Every swap role has `version`, the suffix its id carries (null only

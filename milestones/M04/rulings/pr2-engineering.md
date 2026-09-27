@@ -43,6 +43,8 @@ evidence:
   - SPEC/04-model-swap.md#51-when-each-is-measured
   - milestones/README.md
   - milestones/M04/README.md
+  - https://github.com/andaro74/agentkeel/actions/runs/36345661354
+  - evals/history/9e4b559bf7ff8241482ed89bb350a2f6249e8c5c.json
 pr: 24
 ---
 
@@ -102,12 +104,34 @@ renders the chain with `make -n`; it fails on `4f7757d`'s Makefile and
 passes on the repair. The cold review read neither; the refusal is
 `build`'s own check in `a_vs_a_pair`.
 
+## This PR's measuring run
+
+Run 36345661354 on `9e4b559`, labelled (`LABELLED: true`); the envelope
+is `evals/history/9e4b559bf7ff8241482ed89bb350a2f6249e8c5c.json`, committed by `github-actions[bot]` as `e6f01b9`. Read from
+the envelope and `gate` (exit 0):
+
+| Field | Value |
+|---|---|
+| verdict | GREEN |
+| mode | `runner` (N6) |
+| refagent, grounded | ordinary 9/9, traps 2/2; guardrail 2/3 and redteam 5/5, as at `e518927` |
+| plants | 7 of 7 |
+| `a_vs_a` | `agent: []`, `control: [g-001]` |
+| `p95_ms` | 6,349: 1.09x the incumbent's median of 5,851.5 over 8 envelopes (bar 2.0) |
+| `agent_tokens` | 41,020: 0.85x the median of 48,212.5 (bar 1.5) |
+| tokens, the whole job | 87,344 in + 10,291 out = 97,635 of 150,000 |
+| `F4_1` to `F4_4` | pass, each |
+| `make evals` | 134 s (19:50:12 to 19:52:26 UTC), inside the 900-second session |
+
+So on this run refagent's A-vs-A is zero diff: the same ids passed and
+failed twice on one tree and one pin. The control answered `g-001`
+differently between its two runs; that is recorded and gates nothing, as
+ruled. `F4_1` and `F4_2` pass on their seed tests only, test-only
+witnesses until PR 3 reads the swap PRs.
+
 ## What this does not rule
 
-The swap PRs (read at PR 3). This PR's own measuring run, which does not
-exist yet: before the merge, this file gains that run's URL, the
-envelope commit, and its `a_vs_a`, `p95_ms`, `agent_tokens`, `F4_1` to
-`F4_4` and verdict, as `gate.measured_at` prints them.
+The swap PRs (read at PR 3).
 
 ## Falsify it
 
@@ -120,4 +144,4 @@ envelope commit, and its `a_vs_a`, `p95_ms`, `agent_tokens`, `F4_1` to
     grep -rn "evals/history" scripts/ --include=*.py           # observe_pr reads no envelope (B1)
     grep -n "cacheReadInputTokens" src/verdict/build.py        # usage + more (F2)
     uv run python -c "from src.verdict import gate; print(gate.required_checks('HEAD'))"
-    uv run python -m src.verdict.gate evals/history/<PR 2's envelope>.json   # once CI writes it
+    uv run python -m src.verdict.gate evals/history/9e4b559bf7ff8241482ed89bb350a2f6249e8c5c.json   # GREEN, exit 0
