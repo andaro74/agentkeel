@@ -84,6 +84,10 @@ files, and nothing here pretends otherwise.
   shortened, or `memory` removed". A second key names a path in a
   `keys:` front-matter field, by exact path; a ruling names a deleted path
   in `deletes:`; a rename is a deletion and an addition.
+  **Amended at M04 PR 1 by ADR-0009 amendment 1** (Threshold Owner
+  proposed; Product rules in `milestones/M04/rulings/pr1.md`; read by
+  `two-key` from M04 PR 2). Added: a manifest's `deprecated_after` moved
+  later, set from a date to null, or removed, with `model.id` unchanged.
 - **Two keys.** Two ruling files, each with one `seat:`, the two seats
   distinct, both with this PR's `pr:`. The file of the seat that owns the
   path covers it; the other names the path, exactly, in its `keys:`
