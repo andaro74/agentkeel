@@ -88,6 +88,8 @@ SEEDS_M03: dict[str, tuple[str, str, str]] = {
 # scoring, A-vs-A in build, the gate reading the bars), so `make plants`
 # says "in the tree" beside them: the strict markers, not this list, say
 # whether a seed is read. Listing them reads nothing and gates nothing.
+# Read at M04 PR 2: every reader landed and every strict marker came off
+# (cold review N1 on PR 1: "in the tree" is now also "reads its seed").
 SEEDS_M04: dict[str, tuple[str, str, str]] = {
     "S1": ("F4.1", "tests/fixtures/m04/s1-breaking-pin.patch, s1-breaking-raw.json", "src/verdict/build.py"),
     "S2": ("F4.2", "tests/fixtures/m04/s2-equivalent-pin.patch", "infra/bootstrap/app.py"),

@@ -82,6 +82,7 @@ from src.verdict import (
     fingerprint_of,
     golden_kinds_at,
     incumbent_at,
+    pin_moved,
     load_golden_kinds,
     plants,
     replay_history,
@@ -118,6 +119,16 @@ CLAIM_3_CHECKS = ("F3_1", "F3_2", "F3_3", "F3_5", "F3_6")
 # would orphan it and claim 3 would stop being required. `rule` refuses a
 # shallow clone, where git cannot place it at all (the cold review of PR 2, F3).
 M03_READERS = "f82a02a"
+# What an agent envelope must carry from M04 PR 2 (SPEC/04 §4): F4_1, F4_2 and
+# F4_4 on every one, and F4_3 where the pin is not the incumbent's (a swap,
+# `pin_moved`), where A-vs-A must run. F4_1 and F4_2 from the seed tests alone
+# are test-only witnesses until PR 3 adds the swap PRs as their second source.
+# Held from the commit that wired the flags into the Makefile and evals.yml,
+# 15047b4, and every descendant, as claim 3's are held from f82a02a: known
+# now, and on PR 2's branch, which lands as a merge commit (ADR-0004
+# amendment 1).
+CLAIM_4_CHECKS = ("F4_1", "F4_2", "F4_4")
+M04_READERS = "15047b4"
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -262,15 +273,27 @@ def from_m03_readers(commit: str, root: Path = ROOT) -> bool:
     return done.returncode == 0
 
 
-def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
-    """What an agent envelope for `commit` must carry: claim 1's; claim 2's from M02 PR 2's merge; claim 3's from M03's readers.
+def from_m04_readers(commit: str, root: Path = ROOT) -> bool:
+    """True when `commit` is the commit that wired claim 4's checks or a descendant of it. False when git cannot say."""
+    done = subprocess.run(["git", "merge-base", "--is-ancestor", M04_READERS, commit], cwd=root, capture_output=True,
+                          check=False)  # fmt: skip
+    return done.returncode == 0
 
-    A commit git cannot place is held to claims 1 and 2, as before; claim 3's
-    are required only where git shows the readers in its history.
+
+def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
+    """What an agent envelope for `commit` must carry: claim 1's; claim 2's from M02 PR 2's merge; claim 3's from
+    M03's readers; claim 4's from M04's, with F4_3 where the pin moved.
+
+    A commit git cannot place is held to claims 1 and 2, as before; claims 3
+    and 4 are required only where git shows their readers in its history.
     """
     if before_m02_pr2(commit, root):
         return CLAIM_1_CHECKS
-    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + (CLAIM_3_CHECKS if from_m03_readers(commit, root) else ())
+    claim_3 = CLAIM_3_CHECKS if from_m03_readers(commit, root) else ()
+    claim_4 = ()
+    if from_m04_readers(commit, root):
+        claim_4 = CLAIM_4_CHECKS + (("F4_3",) if pin_moved(commit, AGENT_BUNDLE, root) else ())
+    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4
 
 
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:
@@ -398,8 +421,9 @@ def judge(
 
     `required` is what an agent envelope must carry (`required_checks`):
     claim 1's four, from M02 PR 2's merge claim 2's two, from M03's readers
-    claim 3's five. Left out, it is the envelope's own commit's: a direct
-    caller no longer skips claim 2 and 3 by default (M03 open.md row 3).
+    claim 3's five, from M04's claim 4's three, and F4_3 on a swap. Left out,
+    it is the envelope's own commit's: a direct caller no longer skips
+    claims 2 to 4 by default (M03 open.md row 3).
 
     `bars` is the gate's own reading of the `delta_max` bars (`over_bar`),
     which `rule` works out at the envelope's commit: None where the commit

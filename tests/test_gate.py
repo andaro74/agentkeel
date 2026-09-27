@@ -201,7 +201,7 @@ def test_an_agent_envelope_from_m03s_readers_must_carry_claim_3s_checks():
     """SPEC/03 section 4: F3_1, F3_2, F3_3, F3_5, F3_6, from f82a02a (the last reader) and every descendant."""
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     everything = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_3_CHECKS
-    assert gate.required_checks(head) == everything
+    assert gate.required_checks(head)[:len(everything)] == everything  # and claim 4's from M04 PR 2
     assert gate.required_checks(gate.M03_READERS) == everything
     assert gate.CLAIM_3_CHECKS == ("F3_1", "F3_2", "F3_3", "F3_5", "F3_6")
     envelope = json.loads((ROOT / "evals" / "history" / "8033c2a7a0588e557df577464c190e64a435e88a.json")
@@ -405,3 +405,15 @@ def test_token_sums_are_held_to_the_control_card(chain):
     assert verdict == "RED" and any(r.startswith("tokens:") for r in reasons)
     # with A-vs-A the second runs add to the sum, so more is not a disagreement; fewer still is
     assert gate.spend({**envelope, "a_vs_a": {"agent": [], "control": None}, "tokens_in": envelope["tokens_in"] + 500}, card) == []
+
+
+def test_an_agent_envelope_from_m04s_readers_must_carry_claim_4s_checks(monkeypatch):
+    """SPEC/04 section 4: F4_1, F4_2 and F4_4 from 15047b4 (the flags wired) and every descendant; F4_3 on a swap."""
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    before = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_3_CHECKS
+    assert gate.CLAIM_4_CHECKS == ("F4_1", "F4_2", "F4_4")
+    assert gate.required_checks(head) == before + gate.CLAIM_4_CHECKS
+    assert gate.required_checks(gate.M04_READERS) == before + gate.CLAIM_4_CHECKS
+    assert gate.required_checks("e51892775b6b36236755f0f9a94e6d98d7628206") == before  # M04 PR 1's run
+    monkeypatch.setattr(gate, "pin_moved", lambda commit, bundle, root: True)  # a swap
+    assert gate.required_checks(head) == before + gate.CLAIM_4_CHECKS + ("F4_3",)

@@ -65,3 +65,62 @@ def test_a_hand_edited_verdict_does_not_carry(chain, past, goldens):
     verdict, reasons = gate.rule(envelope_path, history_dir)
     assert verdict == "RED"
     assert any(reason.startswith("envelope says regressed=[]") for reason in reasons)
+
+
+# --- M04 PR 2 (SPEC/04 §4, P5): a case for each new check ---------------------
+
+
+def test_the_runner_says_grounded_and_build_says_not(goldens):
+    """S1's reading: a right answer that says it used the tool, with no successful call, is not correct for the agent."""
+    raw = make_raw(goldens, right={"g-001"})
+    g001 = next(o for o in raw["observations"] if o["id"] == "g-001")
+    g001["tool_calls"] = [{**g001["tool_calls"][0], "status": "error"}]  # the schema refused it
+    g001["grounded"] = True  # the runner's own claim
+    results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
+    assert results["g-001"]["grounded"] is False
+    assert build.as_the_agent_is_scored(results)["g-001"]["pass"] is False
+
+
+def test_build_says_f4_4_pass_and_the_gate_reads_the_bar(chain):
+    """S4's reading: build wrote F4_4 pass; the gate's own reading of the bars says the run is over."""
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    envelope["checks"]["F4_4"] = {"status": "pass", "url": envelope["checks"]["F1_4"]["url"]}
+    over = ["F4_4: p95_ms 1500 is 3.00x the incumbent's median 500 over 3 envelopes (fixture), over relative.p95_ratio_max 2.0"]
+    verdict, reasons = gate.judge(envelope, load_golden_kinds(GOLDENS_DIR), {}, [], bars=over)
+    assert verdict == "RED"
+    assert over[0] in reasons
+    assert "envelope says F4_4 is pass, the gate reads fail" in reasons
+    assert "build said GREEN, the gate says RED" in reasons
+    # and at a commit with bars, an envelope with no F4_4 is not one that passed it
+    del envelope["checks"]["F4_4"]
+    verdict, reasons = gate.judge(envelope, load_golden_kinds(GOLDENS_DIR), {}, [], bars=[])
+    assert verdict == "RED" and any("checks.F4_4 is missing" in reason for reason in reasons)
+
+
+def test_build_says_f4_3_pass_and_the_gate_reads_a_vs_a(chain):
+    """S3's reading: an a_vs_a that names a golden cannot stand beside F4_3 pass, and neither stands alone."""
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    url = envelope["checks"]["F1_4"]["url"]
+    kinds = load_golden_kinds(GOLDENS_DIR)
+    flaky = {**envelope, "a_vs_a": {"agent": ["g-006"], "control": None},
+             "checks": {**envelope["checks"], "F4_3": {"status": "pass", "url": url}}}  # fmt: skip
+    verdict, reasons = gate.judge(flaky, kinds, {}, [])
+    assert verdict == "RED" and any("a_vs_a names ['g-006']" in reason for reason in reasons)
+    alone = {**envelope, "a_vs_a": {"agent": [], "control": None}}
+    assert "a_vs_a without checks.F4_3" in gate.judge(alone, kinds, {}, [])[1]
+    unread = {**envelope, "checks": {**envelope["checks"], "F4_3": {"status": "pass", "url": url}}}
+    assert any("without a_vs_a" in reason for reason in gate.judge(unread, kinds, {}, [])[1])
+
+
+def test_build_writes_no_claim_4_checks_and_the_gate_requires_them(chain):
+    """F4_1, F4_2 and F4_4 from M04's readers, and F4_3 on a swap: build says GREEN without them, the gate does not."""
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    assert envelope["verdict"] == "GREEN"
+    required = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_4_CHECKS + ("F4_3",)
+    verdict, reasons = gate.judge(envelope, load_golden_kinds(GOLDENS_DIR), {}, [], required=required)
+    assert verdict == "RED"
+    for name in ("F4_1", "F4_2", "F4_3", "F4_4"):
+        assert f"checks.{name} is missing from an agent envelope" in reasons
