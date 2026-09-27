@@ -175,3 +175,112 @@ seat.
 | N15 | A new eval-role-only list; `MODELS` unchanged; Haiku stays on the list | Security | SPEC/04 §5.1 |
 | N16 | The cap raise is two keys; `tokens_*` count every run the job made | Threshold Owner | SPEC/04 §6 |
 | N17 | The six rulings above go in `rulings/pr1.md` | Product | `rulings/pr1.md` |
+
+### 2.4 The seat reports on this PR (in the PR body verbatim)
+
+Filled when the reports are in: `threshold-owner` (SPEC/04's bars and
+candidates, ADR-0010), `data-owner` (`g-015`, tool grounding as part of
+CORRECT), `rule-owner` (the `red-teamer` prompt), and
+`engineering-cold-reviewer` through `/cold-review` (`src/verdict/plants.py`,
+`tests/**`, `.gitattributes`). No specialist is added at M04 (R8), and
+none is exercised: `red-teamer` has no M04 seed.
+
+## 3. The false state
+
+SPEC/04 §3, in full. Live today: `score_one` never reads `tool_calls`, so
+a breaking swap can pass every citing golden (S1); the eval role may
+invoke two models, so the equivalent swap cannot be measured (S2);
+nothing compares two runs of one pin (S3); nothing reads `p95_ms` or the
+agent's tokens against the incumbent (S4); `validate` never reads
+`deprecated_after` (S5). Held today: a run on another model counts (the
+gate REJECTs it, ADR-0007 T3); a breaking swap that fails a golden
+outright merges (claim 3's guard 1).
+
+The commits: `a16e2c7` S1, `c6b6cb8` S2, `6f18507` S3, `63033b7` S4,
+`8994dcb` S5. `git show <seed> --stat` shows fixtures, a test, the
+fixtures README and one line of `SEEDS_M04` (S1 also `.gitattributes`),
+and no reader. Each strict marker was checked with `--runxfail`:
+
+| Seed | Raises | The message read |
+|---|---|---|
+| S1 | `AssertionError` | "answers the tool did not ground passed: ['g-001', … 'g-011', 'g-021']", all twelve, after the seed's own checks (the pin is Llama's, no successful call) passed |
+| S2 | `AssertionError` | "the eval role may not invoke the equivalent swap's profile us.anthropic.claude-sonnet-4-5-20250929-v1:0", after the incumbent's profile was read in the same statements |
+| S3 | `SystemExit` | argparse: "unrecognized arguments: --a-vs-a …", after each run alone ruled GREEN |
+| S4 | `AssertionError` | "p95 3x the incumbent's ruled GREEN: []" and "tokens 2x the incumbent's ruled GREEN: []" |
+| S5 | `ImportError` | "cannot import name 'lifecycle' from 'src.validate'", after `check_manifests` accepted the pin |
+
+Two readings changed a marker or a fixture before its commit, which is
+what the rule is for. S1 first failed with `AssertionError` because its
+own raw run was malformed: its `guardrail` field was an object, and
+`build` refused the file. The raw runs now carry `guardrail` and `tools`
+as the runner writes them (`src/agent/run.py:169-171`). S5's marker first
+named `ModuleNotFoundError`; `from src.validate import lifecycle` raises
+its parent, `ImportError`.
+
+## 4. The code that reads the answer
+
+SPEC/04 §6, all PR 2, in order: tool grounding in `score_one` (S1), with
+`g-021` ruled first; `validate`'s `deprecated_after` (S5); the two
+`delta_max` bars and the gate reading them (S4); A-vs-A in `build` and
+`evals.yml`, and the optional `a_vs_a` field (S3); the cap re-ruled; the
+eval role's candidate list in the bootstrap stack, deployed by the human
+after `cdk diff --strict` (S2); `pinned_roles`; `observe_pr` given
+`runs/f4_swaps.yaml`; `CLAIM_4_CHECKS`. The swap PRs are opened during
+PR 2 and read at PR 3. None of it is in this PR.
+
+## 5. Falsifiers, and what each would look like in the repo
+
+SPEC/04 §4. `F4_1` and `F4_2` from PR 2's merge are test-only witnesses
+of the seed tests, and gain their second source, the swap PRs, at PR 3.
+`F4_3` is read on the run's own two runs, where A-vs-A runs. `F4_4` is
+read on the run's own `p95_ms` and tokens, and on S4.
+
+## 6. What M03 carried in (`milestones/M04/open.md`), row by row
+
+Every row is answered here or moved on with a seat and a date. None is
+dropped. Rows 25 to 37 were already dated to a later milestone and are
+carried to M05's `open.md` at the close as dated.
+
+| # | Seat | Now |
+|---|---|---|
+| 1 | Product | **Done here**: SPEC/00 §9 amended, seven documents, six admitted, five under a page (`78b042e`). |
+| 2 | Product (Rule Owner proposes) | **Ruled here: stays one key.** Nothing reads a rule's definition, only its examples and its presence in the list; an amendment to ADR-0009 needs a reader to hold it to. The Rule Owner proposes one with the next change to `rules/**`; **M05 open**. |
+| 3 | Data Owner | **M06**, with the knowledge base (SPEC/04 §9 cut f). Until refagent reads the corpus, the answer-side overlap reads nothing. |
+| 4 | Data Owner | **Done here** (`6dc922f`): the comment names `sending-terms-to-a-competitor`. |
+| 5 | Data Owner, Tool Owner | **PR 2**, before tool grounding lands: an answer no row governs (`row: null`) cannot be grounded in a row (SPEC/04 §2). Keep, or retire with two keys and re-add. |
+| 6 | Security | **PR 2**: read from the first bootstrap `cdk diff --strict`, which is the candidate list's redeploy. Locally, the minified template is 47,535 bytes with non-ASCII escaped and 47,491 as UTF-8 at `0100b64`, whose `infra/` is `main`'s; M03 recorded 47,601 at `0a90d52`. |
+| 7 | Security | **Measured here**, by local synth, nothing deployed: the three candidates on the eval role's two invoke statements only, `MODELS` unchanged, add 1,572 bytes: **49,107 of 51,200** (2,093 left). A scratch worktree, removed; no infra file changed in this PR. Anything else added to that stack at M04 is measured against 2,093. |
+| 8 | Security, Engineering | **M06**, when refagent first reads the corpus, as dated. |
+| 9 | Engineering, Security | **M06**, with row 8, in the same ingest redeploy. |
+| 10 | Product, Security | **This PR's run.** PR 1 leaves `agents/refagent/**` and `data/rights_table.json` alone, so its run may be the first `mode: runtime` envelope at `1088aw3ujhyd:5`. Read from the envelope when CI writes it; if it says `runner`, carried to PR 2 with the job summary's reason. |
+| 11 | Engineering, Security | **PR 2** if A-vs-A runs in `mode: runtime`; otherwise SPEC/04 §9 cut 2, **M05**. |
+| 12 | Threshold Owner | **Here**: `check_model_access` run on every candidate (`runs/model_access_2026-09-26.md`); the control's fairness ruled: the control stays Nova Micro at `m00`, a swap moves the agent only (SPEC/04 §10). **PR 2**: the cap re-ruled against A-vs-A's measured spend (two keys if raised), and the stale `thresholds.yaml` comment corrected with the new bars. |
+| 13 | Threshold Owner | **Ruled here**: `delta_max` on p95 (2.0×) and agent tokens (1.5×), not goldens (SPEC/04 §2). The bars land in `thresholds.yaml` at **PR 2**. |
+| 14 | Threshold Owner | **PR 2**: a manifest edit changes the bundle, and would cost row 10. |
+| 15 | Engineering; Product | **M06**, with the knowledge base (cut f). |
+| 16 | Product; Security | **M06** (cut f; SPEC/00 §9 amended). |
+| 17 | Rule Owner | **M06**, with retrieval. |
+| 18 | Data Owner | **M06**, with retrieval: an answer cites a corpus clause only once refagent reads the corpus. |
+| 19 | Product; Threshold Owner; Data Owner | **Done here**: SPEC/04 §9 cuts b, c, d (SPEC/03 cuts 1 to 4) to M07 and M06; SPEC/00 §8 M06 and M07 name them. |
+| 20 | Rule Owner | **Done here** (`70c2322`). |
+| 21 | Rule Owner | **M05**, with Promptfoo (row 25). |
+| 22 | Engineering | **PR 2**: item f (`server.py`'s profile default, which is the model the runtime calls) and item h (build's token sums, which A-vs-A doubles). Item i: **M05**. Cut 2 if the cap is threatened. |
+| 23 | Product | **Done here**: SPEC/00 §3 and §10.3 row 03 amended, `docs/milestones/README.md` regenerated, M03's page takes the amended sentence. |
+| 24 | Product | **Done here** (`31a026c`): 3:36, 4,323,437 bytes, LFS. The row's Shows cell is confirmed by Product in `rulings/pr1.md`. |
+| 25–35 | as dated | **M05**, carried unchanged. |
+| 36 | Tool Owner | **M06; M07**, carried unchanged. |
+| 37 | Rule Owner | **M08**, carried unchanged. The judge lands at M07 (cut b), before it. |
+| 38 | Engineering | **Done here** (`22b9cd9`): each shipped test run with its reader switched off fails with its planted message. |
+| 39 (new) | Product, Security, Threshold Owner | **The gateway decision, M05 open.** The probe (`runs/llm_gateway_probe.md`) leaned M05: an inference target cannot reach Sonnet 4.6; a passthrough target signed as the gateway's role carries Converse and the guardrail trace, and refuses a call without the guardrail as the gateway's role. |
+| 40 (new) | Security | **A seeded refusal of a model call without the pinned guardrail, or around the agent's own profile: M05**, with row 26. Nothing has attempted it in AWS. M04 only if the gateway had landed here; it did not. |
+
+## 7. What PR 1 does not do
+
+- It builds no reader: `score_one`, `build`'s command line, the gate,
+  `thresholds.yaml`, `validate` and the bootstrap stack are unchanged.
+  The strict markers say so.
+- It changes no pin: `agents/refagent/**` is untouched, so the bundle
+  digest is `main`'s.
+- It moves no bar and touches no AWS. The redeploy and the swap PRs are
+  PR 2's, and the human makes them.
+- It adds no specialist (R8).
