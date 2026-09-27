@@ -412,6 +412,7 @@ def test_an_agent_envelope_from_m04s_readers_must_carry_claim_4s_checks(monkeypa
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     before = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_3_CHECKS
     assert gate.CLAIM_4_CHECKS == ("F4_1", "F4_2", "F4_4")
+    monkeypatch.setattr(gate, "pin_moved", lambda commit, bundle, root: False)  # HEAD, or a swap PR's head
     assert gate.required_checks(head) == before + gate.CLAIM_4_CHECKS
     assert gate.required_checks(gate.M04_READERS) == before + gate.CLAIM_4_CHECKS
     assert gate.required_checks("e51892775b6b36236755f0f9a94e6d98d7628206") == before  # M04 PR 1's run
@@ -426,3 +427,28 @@ def test_a_deleted_relative_bar_is_rejected_from_the_commit_that_wired_it(monkey
     with pytest.raises(gate.Rejected, match="no relative bars"):
         gate.bars_at(head)
     assert gate.bars_at("e51892775b6b36236755f0f9a94e6d98d7628206") == ({}, "a test")  # before it: no bar, as before
+
+
+def test_strict_cards_open_a_card_only_at_its_fixed_path(chain, monkeypatch, tmp_path):
+    """M04 PR 3, security-reviewer's second read: a swap's envelope could make the gate open any path.
+    With `--strict-cards` (what rule_swaps passes) a card anywhere else is REJECTED before it is opened;
+    a card that is not UTF-8, or not a mapping, is REJECTED rather than crashing the gate."""
+    envelope_path, _, _ = chain(right={"g-001"}, agent=True)
+    assert gate.rule(envelope_path, envelope_path.parent)[0] == "GREEN"  # its cards are at tmp paths
+    opened = []
+    real = gate.Path.read_text
+    monkeypatch.setattr(gate.Path, "read_text", lambda self, *a, **k: opened.append(self) or real(self, *a, **k))
+    monkeypatch.setattr(gate, "STRICT_CARDS", True)
+    with pytest.raises(gate.Rejected, match="not at evals/history/<sha>.baseline-card.json: not opened"):
+        gate.rule(envelope_path, envelope_path.parent)
+    assert not [p for p in opened if "card" in p.name and ROOT / "evals" / "history" not in p.parents]  # m00's base is
+    monkeypatch.setattr(gate, "STRICT_CARDS", False)
+    monkeypatch.setattr(gate.Path, "read_text", real)
+
+    for name, content in (("binary", b"\xff\xfe"), ("list", b"[]")):
+        card = tmp_path / f"{name}.json"
+        card.write_bytes(content)
+        with pytest.raises(gate.Rejected, match="does not resolve|is not a card"):
+            gate.card_at(envelope_path, {"path": str(card), "sha256": "x"}, ROOT, "control_card_ref")
+    assert gate.main([str(envelope_path), "--strict-cards"]) == 2 and gate.STRICT_CARDS
+    gate.STRICT_CARDS = False

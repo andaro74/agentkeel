@@ -425,16 +425,29 @@ def required_contexts(repo: str, base: str, token: str | None) -> list[str] | No
                    for check in rule.get("parameters", {}).get("required_status_checks", [])} - {None})  # fmt: skip
 
 
-def measured_commit(repo: str, number: int, token: str | None) -> str | None:
-    """The commit the last bot envelope commit on the PR names: the one its `evals` run measured."""
+def envelope_commit(repo: str, number: int, token: str | None) -> tuple[str, str] | None:
+    """The last bot envelope commit on the PR, and the commit it names: the one its `evals` run measured.
+
+    The envelope is read at the bot's commit, not at the head, so a later commit on the branch
+    cannot change what is read (security-reviewer F2 on M04 PR 3). The author is GitHub's
+    attribution of the commit's email, which a commit can claim; `evals_on_measured` is what
+    GitHub itself recorded on the named commit.
+    """
     status, commits = get(repo, f"/pulls/{number}/commits?per_page=100", token)
     if status != 200 or not isinstance(commits, list):
         return None
     for commit in reversed(commits):
         match = ENVELOPE_COMMIT.match((commit.get("commit") or {}).get("message") or "")
-        if match and (commit.get("author") or {}).get("login") == "github-actions[bot]":
-            return match.group(1)
+        by_bot = (commit.get("author") or {}).get("login") == "github-actions[bot]"
+        if match and by_bot and re.fullmatch(r"[0-9a-f]{40}", commit.get("sha") or ""):
+            return commit["sha"], match.group(1)
     return None
+
+
+def measured_commit(repo: str, number: int, token: str | None) -> str | None:
+    """The commit the last bot envelope commit on the PR names: the one its `evals` run measured."""
+    found = envelope_commit(repo, number, token)
+    return found[1] if found else None
 
 
 def own_pr() -> int | None:
@@ -467,7 +480,8 @@ def observe_swap(repo: str, swap: dict[str, Any], record: dict[str, Any], roles:
         name: (run or {}).get("conclusion") for name in contexts
         for run in [check_run(repo, entry["head_sha"], name, token)]
     }  # fmt: skip
-    sha = measured_commit(repo, number, token)
+    found = envelope_commit(repo, number, token)
+    entry["envelope_commit"], sha = found if found else (None, None)
     entry["measured_commit"] = sha
     entry["evals_on_measured"] = (check_run(repo, sha, "evals", token) or {}).get("conclusion") if sha else None
     return entry
