@@ -302,3 +302,47 @@ def test_s7_a_pass_recorded_later_does_not_re_rule_an_old_envelope(tmp_path):
     verdict, reasons = gate.rule(M02_ENVELOPE, history)
     assert not any("regressed" in reason for reason in reasons), reasons
     assert verdict == "GREEN", reasons
+
+
+# --- S1 and S2 with their readers switched off (M04 open.md row 38) ---------
+#
+# S1's and S2's test bodies changed with their readers at M03 PR 2
+# (pr2-engineering.md N1), so the strict markers at PR 1 tested other
+# bodies, and no commit shows the shipped tests failing without their
+# readers. These two run each shipped test with its reader switched off and
+# assert it fails with its planted message. No marker: what they hold is
+# true today, and a reader that stopped mattering would turn one red.
+
+
+def test_s1_as_shipped_fails_with_the_table_left_out_of_the_runtime_match(seeded, monkeypatch):
+    """S1's reader off: the runtime matched on the bundle alone, as before M03 PR 2 (SPEC/03 §3
+    item 1). The shipped S1 test then fails for its planted reason: main's runtime would answer
+    the seeded tree from main's table."""
+    from scripts import runtime_for_tree
+
+    def bundle_only(digest: str, table: str, lookup=runtime_for_tree.deployed) -> tuple[str, str]:
+        arn, tags, _held = lookup()
+        return (arn, "runtime: bundle only") if digest in tags else ("", "runner: other bytes")
+
+    monkeypatch.setattr(runtime_for_tree, "match", bundle_only)
+    with pytest.raises(AssertionError, match="the runtime deployed from main would answer this tree"):
+        test_s1_a_table_change_is_not_measured_against_mains_table(seeded)
+
+
+def test_s2_as_shipped_fails_with_the_plant_rule_counting_nothing(seeded, monkeypatch):
+    """S2's reader off: the plant rule counts no plant, as when `CONTROLS` was empty (SPEC/03 §3
+    item 2). The shipped S2 test fails on the plant rule's answer; and the envelope it builds,
+    judged with no plants, is GREEN with no silent-plant reason, which is the planted false
+    state itself."""
+    from src.verdict import plants
+
+    monkeypatch.setattr(plants, "plant_ids", lambda kinds, root, commit: [])
+    with pytest.raises(AssertionError, match=r"the plant rule gives \[\]"):
+        test_s2_a_silent_red_team_plant_is_red(seeded)
+
+    envelope = recorded()
+    envelope["goldens"]["g-016"] = json.loads((FIXTURES / "s2-g-016-result.json").read_text(encoding="utf-8"))
+    envelope["never_passed"] = sorted(envelope["never_passed"] + ["g-016"])
+    verdict, reasons = judged(envelope, [])
+    assert not any(reason.startswith("silent plant") for reason in reasons), reasons
+    assert verdict == "GREEN", reasons
