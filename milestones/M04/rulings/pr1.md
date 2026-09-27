@@ -83,10 +83,9 @@ reader. Six strict expected failures. Nothing that makes claim 4 pass.
    gate, with a second key filed by hand for a definition change until the
    Rule Owner's amendment (M05 open, or the first `rules/**` change).
 9. **The M03 video** (`31a026c`, row 24): committed at tag `m03`, 3:36,
-   4,323,437 bytes, LFS. **Not confirmed here:** the row's Shows cell is
-   the plan written at M03's close, and Product has not yet checked it
-   against the recording. Unsure A in the PR body, Product, before this
-   PR merges.
+   4,323,437 bytes, LFS. **Confirmed:** the row's Shows cell was the plan
+   written at M03's close; andaro74, as Product, watched the recording on
+   2026-09-27 and confirmed it shows what the cell lists.
 
 ## What a reader can run to falsify this PR
 
