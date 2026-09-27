@@ -91,6 +91,7 @@ SEEDS_M03: dict[str, tuple[str, str, str]] = {
 SEEDS_M04: dict[str, tuple[str, str, str]] = {
     "S1": ("F4.1", "tests/fixtures/m04/s1-breaking-pin.patch, s1-breaking-raw.json", "src/verdict/build.py"),
     "S2": ("F4.2", "tests/fixtures/m04/s2-equivalent-pin.patch", "infra/bootstrap/app.py"),
+    "S3": ("F4.3", "tests/fixtures/m04/s3-a.json, s3-b.json", "src/verdict/build.py"),
 }
 
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.

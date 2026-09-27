@@ -216,3 +216,32 @@ def test_s2_the_equivalent_swaps_pin_is_one_the_eval_role_may_invoke(seeded, tmp
         f"the eval role may not invoke the equivalent swap's profile {pin['profile']}"  # fmt: skip
     assert f"foundation-model/{pin['id']}" in invokes, \
         f"the eval role may not invoke the equivalent swap's model {pin['id']}"  # fmt: skip
+
+
+# --- S3: A-vs-A with a diff -------------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, raises=SystemExit,
+                   reason="S3: build takes one raw run; A-vs-A (--a-vs-a) is M04 PR 2's reader")
+def test_s3_two_runs_of_one_pin_that_differ_are_a_failed_a_vs_a(measured, tmp_path):
+    """Two runs of the incumbent pin on one tree, identical but for g-006, which passes in one and
+    fails in the other. Each alone builds GREEN: nothing compares them, so a flaky golden shows up
+    only later, as a regression blamed on some other diff. Given both, build writes F4_3 fail and
+    names g-006 in the envelope's `a_vs_a` (F4.3; SPEC/04 §4, §6). Today build's command line has no
+    second raw, and argparse refuses the flag."""
+    a, b = fixture("s3-a.json"), fixture("s3-b.json")
+    assert (a["model_id"], a["region"]) == (b["model_id"], b["region"]) == (INCUMBENT, "us-west-2"), "one pin"
+    differ = [x["id"] for x, y in zip(a["observations"], b["observations"], strict=True) if x != y]
+    assert differ == ["g-006"], "the seed is what it says"
+    for run in (a, b):
+        verdict, reasons = gate.rule(measured(run), tmp_path / "no-history")
+        assert verdict == "GREEN", reasons  # alone, each is a clean run
+
+    second = tmp_path / f"{COMMIT}.agent-raw-b.json"
+    second.write_text(json.dumps({**b, "commit": COMMIT}), encoding="utf-8")
+    out = measured(a, extra=("--a-vs-a", str(second)))
+    envelope = gate.read(out)
+    assert envelope["checks"]["F4_3"]["status"] == "fail", envelope["checks"]
+    assert envelope["a_vs_a"]["agent"] == ["g-006"], envelope.get("a_vs_a")
+    verdict, reasons = gate.rule(out, tmp_path / "no-history")
+    assert verdict == "RED" and any("F4_3" in reason for reason in reasons), reasons
