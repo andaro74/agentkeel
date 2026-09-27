@@ -52,7 +52,7 @@ seat that owns it, and that a model swap cannot relax it unnoticed.*
 | Negligent developer | forgets a seat, ships no goldens, loosens a bar to go green | M02, M06 |
 | Malicious developer | edits a workflow, bypasses a check, deploys from a laptop | M01, M02, M06 |
 | Compromised or leaky tool | returns a credential, calls an undeclared endpoint | M05, M08 |
-| Poisoned corpus | an unsigned "amendment" lands in the knowledge base; a golden mirrors its own source | M03 |
+| Poisoned corpus | an unsigned "amendment" reaches the documents the agent will read; a golden mirrors its own source | M03 (the bucket), M06 (the answer) |
 | Prompt injection | via user, via document, via another agent, aimed at the judge | M03, M05, M08 |
 | Model regression or deprecation | a new version breaks a tool format or slows past the bar | M04 |
 | Rogue agent / swarm | agents reach each other or the internet, delete their tracks | M05, M08 |
@@ -117,6 +117,9 @@ Ownership notes:
   PR 1. The M00 table stays as the record at tag `m00`.
 - A manifest has several owners, one per field (§6). A diff to it names
   the seat of every field it changes (ADR-0003 amendment 1).
+- "Agent model id + version + region" is the whole pin: `model.profile`
+  and `deprecated_after` are the Threshold Owner's too (ADR-0010, M04
+  PR 1).
 - Every file on `main` has a seat. A file no seat owns is deleted, not
   adopted; an unowned file is a path with no seat.
 - `seat:` is the front matter field that names the owning seat, in
@@ -417,6 +420,12 @@ RED. F4.3 A-vs-A shows a diff (suite is flaky; milestone stops). F4.4
 p95 regression beyond the bar is GREEN.
 Threshold policy: **relative** (within `delta_max` of the incumbent)
 unless a ruling changes it. One policy, not both.
+Amended at M04 PR 1 (`milestones/M04/rulings/pr1.md`; SPEC/04 §2, §9):
+`delta_max` applies to p95 and the agent's tokens, not to goldens (P7
+stands). Cut at open: `model-watch`, the judge and `model-watch` over it,
+and `deprecated_after` set from Bedrock by code, to M07; k6 to M05; the
+knowledge base (SPEC/03 cut 6) and FRAGILE, to M06. "An equivalent swap
+promotes" means its PR is mergeable, not merged.
 
 ### M05 — Containment and evidence
 Build: default-deny egress per agent; no shared surfaces (per-agent
@@ -454,6 +463,12 @@ exceeds one working day (measured value for claim 6). F6.4 Grafana panel
 1 shows an agent the registry does not.
 Cut list, in order, if the cap is threatened: Grafana panel 2 → M07;
 Act 3 → M07. Never cut a seeded case, Acts 1–2, or `docs/refagent/`.
+Received at M04 PR 1 (SPEC/04 §9, cuts d and f): the Bedrock Knowledge
+Base over the production bucket and refagent retrieving from it, with
+the cached-answer seed, F3.5's second half ("or changes an answer") and
+`g-014` counted as a plant; the FRAGILE state. The knowledge base has
+moved twice (M01, M03 open, M04 open); moving it again is an amendment
+here, not a cut.
 
 ### M07 — Upgrade, retire, surfaces
 Build: `make upgrade` / `agent upgrade`; `platform-upgrade` draft PRs on
@@ -473,6 +488,13 @@ F7.4 a Grafana panel shows GREEN where the envelope says RED (Playwright
 asserts). F7.5 `plants_expected ≠ plants_fired` for the surfaces.
 Cut list, in order: compliance page → doc-only; Grafana panels 3–4 →
 doc-only; Act 6 → M08 PR 4.
+Received at M04 PR 1 (SPEC/04 §9, cuts a, b, c, g, 1): `model-watch` as
+M04's build list describes it (scheduled, polls Bedrock, shadow run,
+draft PR, never merges), with `deprecated_after` set from Bedrock; the
+Bedrock Evaluations judge pinned in the manifest, its rubric, the
+graded-examples set it must reproduce and `model-watch` over it (R6);
+`admitted_false_fails.json`; the Braintrust mirror with its divergence
+check and redaction before upload; the cheaper swap's run if M04 cut it.
 
 ### M08 — Game-day drill
 Claim 8 above. **Zero new code paths** (ADR ruling at PR 1); any needed
@@ -548,6 +570,14 @@ for real IP at M01 by hand; `legal-compliance` re-checks at M07.
   admitted document by sha256. The Bedrock Knowledge Base, and refagent
   retrieving from it, are M04 (SPEC/03 cut 6, taken at open). The
   fingerprint is on the envelope from M03 PR 2, read from `admitted.yaml`.
+
+  Amended at M04 PR 1 (`milestones/M04/rulings/pr1.md`; SPEC/04 §9 cut
+  f; `milestones/M04/open.md` rows 1 and 16). The knowledge base and
+  refagent's retrieval are M06, not M04. The corpus is seven documents,
+  not 8–10: six admitted (a master license, one signed amendment, a
+  holdback schedule, a music-clearance sheet, an embargo memo, a ratings
+  letter), and the seventh is the unsigned amendment, seed S5 of M03,
+  never admitted. Five of the six are under a page, not 1–3 pages.
 - **Rights table** — DynamoDB from M01, loaded from
   `data/rights_table.json`, ~40 rows: `title_id, territory, platform,
   window_start, window_end, exclusive, holdback_until, clearance_expiry,
@@ -691,8 +721,8 @@ finding on camera is the point.
 | 00 | Start from nothing | Before any guardrail, a plain model gets the trick questions wrong; every later number is measured against that. |
 | 01 | Nothing runs unsigned | An agent can only be deployed from a build the pipeline signed; a changed byte, or a laptop, is refused. |
 | 02 | Rules have owners | A rule, a test, or a threshold changes only when the person who owns it says so, and loosening one needs two owners. |
-| 03 | It can't get worse quietly | A test that used to pass and now fails stops the change from merging; every attack we planted must be caught, or the change stops; a contract nobody signed never reaches the agent's documents. |
-| 04 | Changing the model is safe or it's blocked | A new model version is tried in the shadows first; if it breaks anything, the PR stays red. |
+| 03 | It can't get worse quietly | A test that used to pass and now fails stops the change from merging; every attack we planted must be caught, or the change stops; a contract nobody signed never reaches the documents the agent will be given to read. |
+| 04 | Changing the model is tested, or it's blocked | When a team switches the agent to a different model, the switch is tested on its own proposal before it can go in; if a test that used to pass now fails, or answers get much slower, it can't go in. |
 | 05 | The agent stays in its box | An agent can't reach the internet, other agents, secrets, or its own logs — and every attempt is recorded where it can't reach. |
 | 06 | A team can do this in a day | Marketing creates a governed agent from the template, without touching the safety pipeline. |
 | 07 | Upgrades come to you | A new platform version, a new model, or a retirement arrives as a PR; the team never edits the pipeline. |
