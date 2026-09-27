@@ -82,11 +82,22 @@ SEEDS_M03: dict[str, tuple[str, str, str]] = {
     "S7": ("F3.6", "tests/fixtures/m03/s7-later-pass.json", "src/verdict/replay_history.py"),
 }
 
+# Claim 4's seeded cases (SPEC/04 section 5), the same shape. Listed at M04
+# PR 1, one seed per commit; the readers land at M04 PR 2. S1's, S3's and
+# S4's readers are files already in the tree that change there (build's
+# scoring, A-vs-A in build, the gate reading the bars), so `make plants`
+# says "in the tree" beside them: the strict markers, not this list, say
+# whether a seed is read. Listing them reads nothing and gates nothing.
+SEEDS_M04: dict[str, tuple[str, str, str]] = {
+    "S1": ("F4.1", "tests/fixtures/m04/s1-breaking-pin.patch, s1-breaking-raw.json", "src/verdict/build.py"),
+}
+
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
 SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/01 section 5", SEEDS),
     ("SPEC/02 section 5", SEEDS_M02),
     ("SPEC/03 section 5", SEEDS_M03),
+    ("SPEC/04 section 5", SEEDS_M04),
 ]
 
 

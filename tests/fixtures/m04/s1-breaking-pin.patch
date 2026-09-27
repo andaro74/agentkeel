@@ -1,0 +1,16 @@
+diff --git a/agents/refagent/manifest.yaml b/agents/refagent/manifest.yaml
+index b997255..71920e9 100644
+--- a/agents/refagent/manifest.yaml
++++ b/agents/refagent/manifest.yaml
+@@ -32,9 +32,9 @@ name: refagent
+ # the profile ARN's (M01 open item 23). The profile routes to us-east-1,
+ # us-east-2 and us-west-2 (get-inference-profile, 2026-09-20).
+ model:
+-  id: anthropic.claude-sonnet-4-6
++  id: meta.llama3-1-8b-instruct-v1:0
+   version: null
+-  profile: us.anthropic.claude-sonnet-4-6
++  profile: us.meta.llama3-1-8b-instruct-v1:0
+   region: us-west-2
+ 
+ # Threshold Owner: the judge model id. Picked at M03 PR 1 from the

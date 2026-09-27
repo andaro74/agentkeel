@@ -1,0 +1,172 @@
+"""M04's seeded cases S1-S5 (SPEC/04 §5), committed before the code that reads them.
+
+Each test asks the reader to refuse its seed, and asserts the planted
+reason, not only the verdict. Until the reader is in the tree the test
+fails, and it is marked `xfail(strict=True, raises=...)` with the one
+exception class its planted reason raises, so an exception of any other
+class (a patch that no longer applies, a fixture that moved) is a failure,
+not an expected one. Each was run once with `--runxfail` and its message
+read (M03 PR 1's second cold read), and the marker comes off in the commit
+that lands the reader.
+
+The readers, none of which exist at M04 PR 1 (SPEC/04 §6): tool grounding
+in `verdict.build.score_one` (S1); the eval role's candidate list in the
+bootstrap stack (S2); A-vs-A in `build` (S3); the `delta_max` bars in
+`thresholds.yaml` and the gate reading them (S4); `validate` reading
+`deprecated_after` (S5). The API names below are what PR 2 must provide;
+if they land under other names, PR 2 changes the call and never what the
+seed adds.
+
+Every envelope here is built by `verdict.build` in a temporary folder and
+ruled by `verdict.gate`; none is written by hand and none reaches
+`evals/history/`. Nothing here calls a model.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import pytest
+import yaml
+
+from src.verdict import ROOT, build, gate, plants
+
+from .conftest import AGENT_TOP, COMMIT, URL, claim_1_checks, claim_2_checks, make_raw
+
+FIXTURES = Path(__file__).parent / "fixtures" / "m04"
+INCUMBENT = AGENT_TOP["model_id"]  # the pin on main at M04 open: us.anthropic.claude-sonnet-4-6
+LLAMA = "meta.llama3-1-8b-instruct-v1:0"
+
+
+def fixture(name: str) -> dict[str, Any]:
+    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def seeded():
+    """A detached worktree of HEAD with one seed's patch applied. Removed after the test."""
+    trees: list[Path] = []
+
+    def apply(patch: str) -> Path:
+        tree = Path(tempfile.mkdtemp()) / "tree"
+        subprocess.run(["git", "worktree", "add", "--detach", str(tree), "HEAD"],
+                       cwd=ROOT, check=True, capture_output=True)  # fmt: skip
+        trees.append(tree)  # before apply, so a patch that no longer applies is still cleaned up
+        subprocess.run(["git", "apply", str(FIXTURES / patch)], cwd=tree, check=True, capture_output=True)
+        return tree
+
+    yield apply
+    for tree in trees:
+        subprocess.run(["git", "worktree", "remove", "--force", str(tree)], cwd=ROOT, check=False,
+                       capture_output=True)  # fmt: skip
+
+
+def pin_of(tree: Path) -> dict[str, Any]:
+    return yaml.safe_load((tree / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))["model"]
+
+
+def grounded(golden: dict[str, Any], latency: int = 500, tokens: int = 300) -> dict[str, Any]:
+    """An answer as the incumbent gives it: right, cited, and grounded in one successful tool call."""
+    base = {"id": golden["id"], "kind": golden["kind"], "question": golden["question"],
+            "usage": {"inputTokens": tokens * 2 // 3, "outputTokens": tokens // 3, "totalTokens": tokens},
+            "latency_ms": latency, "source": "fixture"}  # fmt: skip
+    if golden["kind"] not in build.CITING_KINDS:
+        return {**base, "text": "", "parsed": None, "stop_reason": "guardrail_intervened",
+                "guardrail_topics": [], "tool_calls": []}  # fmt: skip
+    expected = golden["expected"]
+    parsed = {**expected["answer_fields"], "table_row": expected["table_row"], "clause_id": expected["clause_id"]}
+    call = {"name": "check_availability", "input": {"title_id": "fixture", "territory": "fixture",
+            "platform": "fixture", "date": "2026-12-25"}, "status": "success",
+            "output": {"found": True, "row": {"table_row": parsed["table_row"]},
+                       "clause_candidates": [parsed["clause_id"]], "source": "fixture"}}  # fmt: skip
+    return {**base, "text": json.dumps(parsed), "parsed": parsed, "stop_reason": "end_turn",
+            "guardrail_topics": [], "tool_calls": [call]}  # fmt: skip
+
+
+@pytest.fixture
+def measured(tmp_path: Path, goldens, monkeypatch):
+    """Build an agent envelope from a raw run through build's command line, as `chain` does.
+
+    With no controls and no corpus, as `chain` has them: these seeds are about
+    the model, not the plants or the fingerprint. `tree`, when given, is a
+    worktree with a seed's pin in it: build reads the pin's version there, and
+    the gate reads the pin there instead of at the made-up commit.
+    """
+    monkeypatch.setattr(plants, "CONTROLS", {})
+    monkeypatch.setattr(build, "fingerprint_at", lambda commit, root=ROOT: (None, "no corpus in the fixture"))
+    monkeypatch.setattr(gate, "fingerprint_at", lambda commit, root=ROOT: (None, "no corpus in the fixture"))
+    runs = iter(range(1000))
+
+    def envelope(raw: dict[str, Any], *, commit: str = COMMIT, history: Path | None = None,
+                 tree: Path | None = None, out: Path | None = None, extra: tuple[str, ...] = ()) -> Path:  # fmt: skip
+        work = tmp_path / f"run-{next(runs)}"
+        work.mkdir()
+        control_raw = work / f"{commit}.baseline-raw.json"
+        control_raw.write_text(json.dumps(make_raw(goldens, commit=commit)), encoding="utf-8")
+        card = work / f"{commit}.baseline-card.json"
+        assert build.main(["card", "--raw", str(control_raw), "--out", str(card)]) == 0
+        top = {**raw, "commit": commit}
+        if tree is not None:
+            top["bundle"] = str(tree / "agents" / "refagent")
+            pinned = yaml.safe_load((tree / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
+            monkeypatch.setattr(gate, "manifest_at", lambda c, bundle, root=ROOT: (pinned, "the seed's tree"))
+        agent_raw = work / f"{commit}.agent-raw.json"
+        agent_raw.write_text(json.dumps(top), encoding="utf-8")
+        out = out or work / f"{commit}.json"
+        history = history or tmp_path / "no-history"
+        assert build.main(["envelope", "--raw", str(agent_raw), "--control-card", str(card), "--out", str(out),
+                           "--history-dir", str(history), "--run-url", URL,
+                           *claim_1_checks(work), *claim_2_checks(work), *extra]) == 0  # fmt: skip
+        return out
+
+    return envelope
+
+
+@pytest.fixture
+def incumbent_history(tmp_path: Path, goldens, measured):
+    """Three envelopes of the incumbent on its pin, in the runner, every citing golden passed and grounded.
+
+    Built by build, into a temporary history folder the gate is then given.
+    Three, so a median has something to be the middle of (S4)."""
+    history = tmp_path / "history"
+    history.mkdir()
+    live = [g for g in goldens.values() if not g.get("retired")]
+    raw = {**make_raw(goldens), **AGENT_TOP, "observations": [grounded(g) for g in live]}
+    for commit in ("b" * 40, "c" * 40, "d" * 40):
+        measured(raw, commit=commit, history=history, out=history / f"{commit}.json")
+    return history
+
+
+# --- S1: a breaking swap -----------------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S1: score_one does not read tool_calls; tool grounding is M04 PR 2's reader")
+def test_s1_a_breaking_swap_whose_answers_the_tool_never_grounded_is_red(seeded, measured, incumbent_history):
+    """The pin moved to Llama 3.1 8B. Every ordinary and trap answer has the expected fields and a
+    real row and clause, and none came from a successful `check_availability` call: the call was
+    printed as text, or refused by the schema. The incumbent passed every one of them, grounded.
+    SPEC/00 §9: the rights table is the truth, never inferred. So each is a golden that passed and
+    now fails, and the swap is RED for that reason (F4.1; SPEC/04 §2, §7)."""
+    tree = seeded("s1-breaking-pin.patch")
+    pin = pin_of(tree)
+    assert pin["id"] == LLAMA and pin["profile"] == f"us.{LLAMA}", "the seed moves the pin"
+    seed = fixture("s1-breaking-raw.json")
+    assert seed["model_id"] == pin["profile"], "the raw run is the swap's"
+    citing = [o for o in seed["observations"] if o["kind"] in build.CITING_KINDS]
+    assert len(citing) == 12, "every ordinary and trap golden"
+    assert not any(call["status"] == "success" for o in citing for call in o["tool_calls"]), \
+        "no answer is grounded: the seed is what it says"  # fmt: skip
+
+    out = measured(seed, tree=tree, history=incumbent_history)
+    results = gate.read(out)["goldens"]
+    verdict, reasons = gate.rule(out, incumbent_history)
+
+    ungrounded = sorted(o["id"] for o in citing if results[o["id"]]["pass"])
+    assert ungrounded == [], f"answers the tool did not ground passed: {ungrounded}"
+    assert verdict == "RED", reasons
+    assert any("regressed" in reason for reason in reasons), reasons

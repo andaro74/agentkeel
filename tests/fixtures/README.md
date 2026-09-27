@@ -125,3 +125,23 @@ no seed PR is opened at M03 (SPEC/03 §4).
 | S5 | `m03/s5-unsigned-amendment.md` | "Amendment No. 2", its signature lines blank, granting `t-001` exclusive SVOD in DE against `r-003` and `ML-5.2`. Uploaded once to the quarantine bucket by the human during PR 2 (`milestones/M03/runs/f3_5_amendment.yaml`, `observed: null` until then); never under `data/corpus/`, never named in `admitted.yaml`. `-text` in `.gitattributes`, so the sha256 the run file records is the same on every checkout |
 | S6 | `m03/s6-guardrail.yaml` | a guardrail control as the Rule Owner would write it, placed at `agents/refagent/rules/guardrail.yaml` in a worktree of HEAD with `CONTROLS` naming it. The plant rule reads the working tree, so row 2's envelope, written before any guardrail, is re-ruled RED on `g-013` to `g-015`, which have never passed. Its content is not the seed; its existence is |
 | S7 | `m03/s7-later-pass.json` | not an envelope: the commit of a later run (`71eff00`, a descendant of row 2's `8033c2a`) and the golden that passes in it (`g-013`). The test builds that later envelope in memory from row 2's and writes it only into a temporary copy of history, never under `evals/history/`. Added after the cold review of PR 1 (F1): history is read whole, so a pass recorded later makes a golden that had never passed "regressed" in an older envelope |
+
+## M04 (SPEC/04 §5)
+
+Committed at M04 PR 1, one commit per seed, each with its test in
+`tests/test_m04_seeds.py`, before any code that reads them. Each test is
+`xfail(strict=True, raises=...)` until its reader lands at PR 2, asserts
+the planted reason, not only the verdict, and was run once with
+`--runxfail` and its message read. None is an envelope: the raw runs are
+what a runner writes, and each test builds its envelope with
+`verdict.build` in a temporary folder and rules it with `verdict.gate`.
+Nothing here reaches `evals/history/`.
+
+The patches move refagent's pin and nothing else; they are `-text` in
+`.gitattributes`, as M02's and M03's are. The raw runs were generated
+from the live goldens at M04 PR 1 and are committed as they were
+written; they name no real title and call no model.
+
+| Seed | File | What is wrong with it |
+|---|---|---|
+| S1 | `m04/s1-breaking-pin.patch`, `m04/s1-breaking-raw.json` | the pin moved to Llama 3.1 8B, and a raw run under it where every ordinary and trap answer has the expected fields and a real `table_row` and `clause_id`, and no successful `check_availability` call: on odd positions the call is printed as text in the reply and never made, on even ones it is made with arguments the schema refuses. `score_one` does not read `tool_calls`, so all twelve pass and the swap is GREEN against an incumbent that passed them grounded. The worst case, not a prediction of what Llama does |
