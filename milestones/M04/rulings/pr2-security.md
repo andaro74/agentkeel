@@ -79,7 +79,10 @@ envelope.
   edits `src/verdict/` can switch off its own A-vs-A (`security-reviewer`
   F3): the header's known gap, `open.md` row 30, M05. The swap PRs change
   `model` only, and their rulings say so.
-- `observe_pr` reads a swap's envelope from its branch, where a commit
-  can claim the bot's name. Fixed in part here: the equivalent swap's
-  read also requires the `evals` run GitHub recorded on the commit that
-  envelope names. The rest is PR 3's, when it wires the read.
+- `observe_pr` found a swap's measured commit by a commit that claims the
+  bot's name, and read its envelope from the branch. The envelope reading
+  is cut from this PR (cold review B1: only the gate rules on an
+  envelope). What stays is GitHub's own record: the pull, the checks on
+  its head, and the `evals` run on the named commit. At PR 3 the gate
+  rules the swap's envelope at its commit, and the named commit is held
+  to the `evals` run GitHub recorded on it.

@@ -62,7 +62,7 @@ F3_6_CASES := test_s6_a_control_added_later_does_not_re_rule_an_old_envelope,tes
 INGEST_OBS ?=
 # M04 PR 2 (SPEC/04 §4). F4_1, F4_2 and F4_4: each seed refused in a copy of
 # the tree, read from the tests; F4_1 and F4_2 from the tests alone are
-# test-only witnesses until PR 3 wires the swap PRs (--check-swaps). F4_4 is
+# test-only witnesses until PR 3 wires the swap PRs as their second source. F4_4 is
 # joined by build's own reading of the bars. F4_3: the S3 test and the run's
 # own two runs, only when A_VS_A is set: the job then runs each subject twice
 # and hands build the second runs.

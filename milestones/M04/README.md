@@ -88,9 +88,11 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
   list (S2, `2870467`, Security; 49,107 of 51,200 bytes). `pinned_roles`
   carry the whole pin, and the three pin patches were regenerated for
   context only (`02c51d6`; `0c277ab` put back two comment lines that
-  M02's S1 patches read). `observe_pr` reads the swap PRs and `build
-  --check-swaps` joins them to `F4_1` and `F4_2` (`b3c41d9`), not wired in
-  `evals.yml` until PR 3. The flags are wired at `15047b4`, from which the
+  M02's S1 patches read). `observe_pr` reads GitHub's record of the swap
+  PRs (`b3c41d9`), not wired in `evals.yml` until PR 3; the first draft
+  also read each swap's envelope and let `build` rule on it, which the
+  cold review blocked (P5), so that part was cut and PR 3 has the gate
+  rule the swap's envelope. The flags are wired at `15047b4`, from which the
   gate requires `F4_1`, `F4_2` and `F4_4`, and `F4_3` where the pin moved
   (`cea0a5d`). `tests/test_m04_seeds.py`: six passed, none expected to
   fail.

@@ -28,8 +28,10 @@ Drafted by the session; the human rules as Product before the merge.
 PR 2 of row 4, the measure: every reader SPEC/04 §6 lists, each landing
 with its seed's marker off, and the gate requiring `F4_1`, `F4_2` and
 `F4_4` on every agent envelope from `15047b4`, and `F4_3` where the pin
-moved. Nothing in it decides the swap PRs: PR 3 wires their read and is
-it (SPEC/04 §5.1, the named P3 exception).
+moved. Nothing in it decides the swap PRs: `observe_pr` records what
+GitHub holds for them, and PR 3 has the gate rule their envelopes, wires
+both into `F4_1` and `F4_2`, and is the read (SPEC/04 §5.1, the named P3
+exception).
 
 ## 2. The expected line, restated before the run
 
@@ -56,7 +58,8 @@ from its envelope, not from this file.
 | security-reviewer | F2 | The `a-vs-a` label is on the PR before the measuring push | `pr2-security.md` §2 |
 | security-reviewer | F4 | Answered from run 36331360122: 93 s, twice is about 190 s | `pr2-security.md` §2 |
 | security-reviewer | F5 | `F4_2` from the S2 test is a test-only witness until PR 3 | `pr2-security.md` §1; row 4 |
-| security-reviewer | note (PR 3) | The equivalent swap's read needs GitHub's evals run too | `pr2-security.md` §3 |
+| security-reviewer | note (PR 3) | The swap envelope is not read here; PR 3 has the gate rule it | `pr2-security.md` §3 |
+| engineering-cold-reviewer | B1, F1 to F6, N1 to N6 | Ruled in Engineering's file | `pr2-engineering.md` |
 
 ## 4. Carried
 
