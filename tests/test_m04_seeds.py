@@ -245,8 +245,6 @@ def eval_role_invokes(tmp_path: Path) -> list[dict[str, Any]]:
     raise SeedBroken("no policy on the eval role")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S2: the eval role may invoke only MODELS; the candidate list is M04 PR 2's reader")
 def test_s2_the_equivalent_swaps_pin_is_one_the_eval_role_may_invoke(seeded, tmp_path):
     """The pin moved to Sonnet 4.5, the Threshold Owner's equivalent, and nothing else changed. The
     swap PR's run calls it through the eval role; if the role may not invoke it, every call is
