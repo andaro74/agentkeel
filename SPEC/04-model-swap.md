@@ -291,7 +291,8 @@ None of it is in PR 1. In the order the commits land:
   `data/rights_table.json` alone, so its run can be the first
   `mode: runtime` envelope at guardrail version 5 (`open.md` row 10);
   whether it is, the envelope says. `make plants` lists S1 to S5.
-  `uv run pytest tests/test_m04_seeds.py` shows five expected failures.
+  `uv run pytest tests/test_m04_seeds.py` shows six expected failures
+  (S4 has two cases, p95 and tokens).
   `make validate` passes: a patch is not a manifest. `make ledger` exits
   0.
 - **PR 2's run on the PR, stated before it.** S1 to S5 refused, each for
