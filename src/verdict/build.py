@@ -633,7 +633,13 @@ def as_the_agent_is_scored(results: dict[str, dict[str, Any]]) -> dict[str, dict
 
 
 def differ(first: dict[str, dict[str, Any]], second: dict[str, dict[str, Any]]) -> list[str]:
-    """The goldens whose `pass` is not the same in both runs. Latency, tokens and text are not compared."""
+    """The goldens whose `pass` is not the same in both runs. Latency, tokens and text are not compared.
+
+    Two runs over different goldens are not an A-vs-A: refused, not compared on what they share.
+    """
+    if set(first) != set(second):
+        raise Refused(f"A-vs-A: the two runs cover different goldens: only the first {sorted(set(first) - set(second))}, "
+                      f"only the second {sorted(set(second) - set(first))}")  # fmt: skip
     return sorted(g for g in first if first[g]["pass"] != second[g]["pass"])
 
 

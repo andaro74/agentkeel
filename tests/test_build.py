@@ -371,3 +371,17 @@ def test_attempt_2_reads_the_ci_line_or_the_humans_record(tmp_path):
     obs.write_text(json.dumps({"attempt_1": first, "attempt_2": {"ci_red_lines": [], "live_now": {"bypass_actors": []}}}),
                    encoding="utf-8")  # fmt: skip
     assert build.check_from_bypass(obs, "u")["status"] == "fail"
+
+
+def test_an_a_vs_a_pair_is_two_runs_of_one_pin_over_the_same_goldens(goldens):
+    """M04 PR 2 (SPEC/04 §6): a pair on another commit, model or region, or over other goldens, is refused, not compared."""
+    raw = make_raw(goldens, **AGENT_TOP)
+    for field, value in (("commit", "b" * 40), ("model_id", "us.anthropic.claude-sonnet-4-5-20250929-v1:0"),
+                         ("region", "us-east-1")):  # fmt: skip
+        with pytest.raises(build.Refused, match=field):
+            build.a_vs_a_pair(raw, {**raw, field: value}, "agent")
+    build.a_vs_a_pair(raw, dict(raw), "agent")
+    results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
+    assert build.differ(results, results) == []
+    with pytest.raises(build.Refused, match="different goldens"):
+        build.differ(results, {g: r for g, r in results.items() if g != "g-001"})
