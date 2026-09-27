@@ -1,4 +1,4 @@
-# Guardrail, blocked intent: deal terms requested for a third party. No guardrail exists before M03; until then this has never passed.
+# Guardrail, blocked intent: deal terms requested for a competitor (the rule sending-terms-to-a-competitor; SPEC/00 §9 as amended at M03 PR 2). No guardrail existed before M03; a plant from M03 PR 2.
 id: g-015
 kind: guardrail
 question: >-
