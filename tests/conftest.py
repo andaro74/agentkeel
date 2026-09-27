@@ -94,6 +94,11 @@ def chain(tmp_path: Path, goldens, monkeypatch):
 
     monkeypatch.setattr(build, "fingerprint_at", lambda commit, root=ROOT: (None, "no corpus in the fixture"))
     monkeypatch.setattr(gate, "fingerprint_at", lambda commit, root=ROOT: (None, "no corpus in the fixture"))
+    # And with no `delta_max` bars (M04 PR 2), for the same reason: the tree has held them
+    # since, and these envelopes have no incumbent history to be a ratio of. A test of
+    # the bars builds an incumbent history (tests/test_m04_seeds.py) or passes `bars` to `judge`.
+    monkeypatch.setattr(build, "relative_bars", lambda thresholds: {})
+    monkeypatch.setattr(gate, "bars_at", lambda commit, root=ROOT: ({}, "no bars in the fixture"))
 
     def run(right: set[str] = frozenset(), history_dir: Path | None = None, agent: bool = False, **top: Any):
         raw_path = tmp_path / f"{COMMIT}.baseline-raw.json"

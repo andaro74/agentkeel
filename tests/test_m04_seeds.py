@@ -268,8 +268,6 @@ def test_s2_the_equivalent_swaps_pin_is_one_the_eval_role_may_invoke(seeded, tmp
 # --- S3: A-vs-A with a diff -------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=SystemExit,
-                   reason="S3: build takes one raw run; A-vs-A (--a-vs-a) is M04 PR 2's reader")
 def test_s3_two_runs_of_one_pin_that_differ_are_a_failed_a_vs_a(measured, incumbent_history, tmp_path):
     """Two runs of the incumbent pin on one tree, identical but for g-006, which passes in one and
     fails in the other. Ruled against the incumbent's history (cold review F4 on M04 PR 1: with no
@@ -301,8 +299,6 @@ def test_s3_two_runs_of_one_pin_that_differ_are_a_failed_a_vs_a(measured, incumb
 # --- S4: over the delta_max bars --------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S4: nothing reads p95_ms or the agent's tokens against the incumbent; the bars are M04 PR 2's")
 @pytest.mark.parametrize(("seed", "bar", "field", "times"), [
     ("s4-slow-raw.json", "p95", "latency_ms", 3),  # p95 at 3x; the bar is 2.0x (SPEC/04 section 2)
     ("s4-heavy-raw.json", "tokens", "usage", 2),  # the agent's tokens at 2x; the bar is 1.5x

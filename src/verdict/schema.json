@@ -167,6 +167,11 @@
       "type": "integer",
       "minimum": 0
     },
+    "agent_tokens": {
+      "description": "From M04 PR 2 (SPEC/04 §2). The agent's own tokens, in plus out, in the first agent run: the number the relative token bar reads. Optional, so no envelope before it becomes invalid; tokens_in and tokens_out count every run the job made, and with A-vs-A they hold two agent runs.",
+      "type": "integer",
+      "minimum": 0
+    },
     "tokens_out": {
       "type": "integer",
       "minimum": 0
@@ -249,6 +254,16 @@
     "model_version": {
       "description": "ADR-0007, T1. The manifest's pinned version; null where Bedrock gives none (ruling p).",
       "type": ["string", "null"]
+    },
+    "a_vs_a": {
+      "description": "From M04 PR 2 (SPEC/04 §6, F4.3). Written when a second run of the same pin ran in the same job: the golden ids whose pass differ between the two runs, for the agent (gated as checks.F4_3) and for the control (recorded, never gated; null when the control ran once). Optional, so no envelope before it becomes invalid.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent", "control"],
+      "properties": {
+        "agent": {"$ref": "#/$defs/golden_ids"},
+        "control": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/golden_ids"}]}
+      }
     }
   },
   "dependentRequired": {

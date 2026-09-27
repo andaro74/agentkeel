@@ -149,3 +149,32 @@ def golden_kinds_at(commit: str, goldens_dir: Path, root: Path = ROOT) -> tuple[
         if golden.get("retired") is None:
             kinds[golden["id"]] = golden["kind"]
     return kinds, f"{commit[:12]}, the envelope's own commit"
+
+
+def incumbent_at(commit: str, bundle: str = "agents/refagent", root: Path = ROOT) -> tuple[dict[str, Any] | None, str]:
+    """The incumbent pin for an envelope at `commit`, and where it was read (SPEC/04 §2, M04 PR 2).
+
+    The incumbent is the pin in the manifest at the merge-base of `commit`
+    with `main` (the Threshold Owner, ruling on finding 3). On a pull request
+    that does not move the pin it is the pin under test; on a swap it is the
+    pin the swap moves away from; on `main` it is the commit's own. A commit
+    git cannot place (a test's made-up sha) is read from the tree, as
+    `text_at` reads it. `origin/main` first: a CI checkout has no local
+    `main`. None when the manifest is not there.
+    """
+    import subprocess
+
+    import yaml
+
+    for ref in ("origin/main", "main"):
+        done = subprocess.run(["git", "merge-base", commit, ref], cwd=root, capture_output=True, text=True, check=False)
+        if done.returncode == 0 and done.stdout.strip():
+            base = done.stdout.strip()
+            text, _ = text_at(base, f"{bundle}/manifest.yaml", root)
+            where = f"{base[:12]}, the merge-base with {ref}"
+            break
+    else:
+        text, where = text_at(commit, f"{bundle}/manifest.yaml", root)
+    manifest = yaml.safe_load(text) if text is not None else None
+    model = manifest.get("model") if isinstance(manifest, dict) else None
+    return (model if isinstance(model, dict) else None), where
