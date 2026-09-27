@@ -438,7 +438,8 @@ def envelope_commit(repo: str, number: int, token: str | None) -> tuple[str, str
         return None
     for commit in reversed(commits):
         match = ENVELOPE_COMMIT.match((commit.get("commit") or {}).get("message") or "")
-        if match and (commit.get("author") or {}).get("login") == "github-actions[bot]"                 and re.fullmatch(r"[0-9a-f]{40}", commit.get("sha") or ""):  # fmt: skip
+        by_bot = (commit.get("author") or {}).get("login") == "github-actions[bot]"
+        if match and by_bot and re.fullmatch(r"[0-9a-f]{40}", commit.get("sha") or ""):
             return commit["sha"], match.group(1)
     return None
 

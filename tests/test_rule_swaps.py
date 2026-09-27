@@ -125,3 +125,58 @@ def test_the_command_line_writes_the_file_build_reads(tmp_path: Path, swaps):
         return
     [kept] = kept
     assert kept["verdict"] == "GREEN" and kept["pr"] == 26 and set(kept) == set(build.SWAP_FIELDS)
+
+
+def real_show(commit, path):
+    done = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=ROOT, capture_output=True, check=False)
+    return done.stdout if done.returncode == 0 else None
+
+
+def test_a_real_swaps_card_is_written_and_ruled(monkeypatch):
+    """The path the swap PRs take: their card is not in HEAD's tree, so it is written, then ruled."""
+    monkeypatch.setattr(rule_swaps, "show", lambda c, p: None if c == "HEAD" else real_show(c, p))
+    [ruled] = rule_swaps.rule_all({"swaps": [observed()]})
+    assert ruled["verdict"] == "GREEN" and ruled["gate_exit"] == 0, ruled
+
+
+def test_a_card_is_not_written_over_other_bytes_at_head(monkeypatch):
+    monkeypatch.setattr(rule_swaps, "show", lambda c, p: b"{}" if c == "HEAD" else real_show(c, p))
+    [ruled] = rule_swaps.rule_all({"swaps": [observed()]})
+    assert ruled["verdict"] is None and "with other bytes: not overwritten" in ruled["note"]
+
+
+def test_the_gate_runs_without_credentials_strictly_in_a_worktree_per_swap_and_in_time(monkeypatch):
+    """The call site, not only gate_env (cold review F2, second read): what the gate's process is given.
+    A gate that runs out the budget is that swap's unread note, and the run goes on."""
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "planted")
+    real_run, calls = subprocess.run, []
+
+    def run(args, **kwargs):
+        if args[0] == "git":
+            return real_run(args, **kwargs)
+        calls.append((args, kwargs))
+        raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+
+    monkeypatch.setattr(rule_swaps.subprocess, "run", run)
+    ruled = rule_swaps.rule_all({"swaps": [observed(), observed(pr=25)]})
+    assert [r["verdict"] for r in ruled] == [None, None] and "did not finish" in ruled[0]["note"]
+    assert len(calls) == 2 and calls[0][1]["cwd"] != calls[1][1]["cwd"]
+    for args, kwargs in calls:
+        assert "--strict-cards" in args and 0 < kwargs["timeout"] <= rule_swaps.BUDGET_SECONDS
+        assert not [k for k in kwargs["env"] if k.startswith(("AWS_", "GITHUB_"))]
+
+
+def test_a_spent_budget_leaves_the_rest_unread(monkeypatch):
+    monkeypatch.setattr(rule_swaps, "BUDGET_SECONDS", 0)
+    [ruled] = rule_swaps.rule_all({"swaps": [observed()]})
+    assert ruled["verdict"] is None and "budget was spent" in ruled["note"]
+
+
+def test_the_gates_reasons_are_cut_before_they_reach_the_envelope(tmp_path):
+    """security-reviewer, second read: a reason can repeat a swap envelope's text, of any size."""
+    out = tmp_path / "gate.json"
+    out.write_text(json.dumps({"verdict": "REJECTED", "reasons": ["x" * 1_000_000 + "\n::error::y"] * 60}))
+    verdict, reasons = rule_swaps.gated(out)
+    assert verdict == "REJECTED" and len(reasons) == rule_swaps.MAX_REASONS + 1
+    assert all(len(r) <= rule_swaps.MAX_REASON_CHARS for r in reasons) and "10 more" in reasons[-1]
+    assert rule_swaps.plain("a\n::error::b") == "a : :error: :b"

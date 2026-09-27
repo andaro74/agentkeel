@@ -17,10 +17,11 @@ own process, in a fresh scratch worktree of HEAD for each swap (the tree
 under measurement, so the gate is this commit's), with the card written at
 its fixed path under `evals/history/` and nowhere else: a path taken from
 the envelope let a swap branch put its own code where the gate imports from
-(security-reviewer and cold review B1 on PR 3). The process gets no AWS or
-GitHub credentials: its environment is `PATH`, the temp and home variables
-and `PYTHONPATH`. The gate reads the card where the envelope names it and
-checks its hash, so an envelope naming any other path is REJECTED.
+(security-reviewer and cold review B1 on PR 3). The gate is run with
+`--strict-cards`, so it opens a card only at that fixed path and REJECTs an
+envelope naming any other before opening anything. The process gets no AWS
+or GitHub credentials: its environment is `PASSED_ENV` below and
+`PYTHONPATH`.
 Everything else the gate reads it reads at the swap's commit through git,
 as for any envelope: the cap, the goldens, the controls, the bars, the pin
 and the incumbent, and history from the swap's ancestors in the worktree.
@@ -30,7 +31,11 @@ by nothing (Product, M04 PR 3; SPEC/04 §4). So nothing on a swap branch may
 stop the run: whatever goes wrong for one swap (no PR, no bot commit, a
 file that is not there, a gate that hangs or writes nothing usable, any
 exception) is written for that swap as `verdict: null` with a note, never
-skipped and never raised (cold review F1 on PR 3). Exit 0 when the output
+skipped and never raised (cold review F1 on PR 3). All swaps together have
+`BUDGET_SECONDS`, and each git call `GIT_SECONDS`, so the read cannot run
+the job out of its 15 minutes. A verdict's reasons are cut to
+`MAX_REASONS` of `MAX_REASON_CHARS` each, since their text can repeat what
+a swap's envelope says (security-reviewer, second read). Exit 0 when the output
 is written, whatever it says; 1 only when the observation file cannot be
 read or the output cannot be written.
 """
@@ -44,6 +49,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -51,7 +57,10 @@ ROOT = Path(__file__).resolve().parent.parent
 HISTORY = "evals/history"
 VERDICTS = ("GREEN", "RED", "UNMEASURED", "REJECTED")
 SHA = re.compile(r"[0-9a-f]{40}")
-GATE_SECONDS = 300
+BUDGET_SECONDS = 240  # every swap together; the job has 15 minutes and must also run the agent twice
+GIT_SECONDS = 60
+MAX_REASONS = 50
+MAX_REASON_CHARS = 300
 # The gate's process gets these and nothing else: no AWS_*, no GITHUB_TOKEN (security-reviewer B1, PR 3).
 PASSED_ENV = ("PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR", "LANG")
 # What the ledger and the explainer need from GitHub's record, beside the gate's reading.
@@ -60,7 +69,9 @@ KEPT = ("swap", "falsifier", "role", "expected", "pr", "found", "own_pr", "state
 
 
 def git(*args: str, cwd: Path = ROOT) -> subprocess.CompletedProcess[bytes]:
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, check=False)
+    # No LFS smudge: a worktree of HEAD needs no video (security-reviewer, second read).
+    env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, check=False, timeout=GIT_SECONDS, env=env)
 
 
 def show(commit: str, path: str) -> bytes | None:
@@ -73,8 +84,20 @@ def gate_env(tree: Path) -> dict[str, str]:
     return {**{k: v for k, v in os.environ.items() if k in PASSED_ENV}, "PYTHONPATH": str(tree)}
 
 
+def plain(text: str) -> str:
+    """One line, no workflow command, cut: what reaches the job log and the envelope from a note."""
+    return " ".join(text.split()).replace("::", ": :")[:MAX_REASON_CHARS]
+
+
 def unread(entry: dict[str, Any], note: str) -> dict[str, Any]:
-    return entry | {"verdict": None, "reasons": [], "note": note}
+    return entry | {"verdict": None, "reasons": [], "note": plain(note)}
+
+
+def run_gate(envelope: Path, ruled: Path, tree: Path, seconds: float) -> subprocess.CompletedProcess[bytes]:
+    """The gate, as its own process, in `tree`, with no credentials and a card only at its fixed path."""
+    return subprocess.run([sys.executable, "-m", "src.verdict.gate", str(envelope), "--json", str(ruled),
+                           "--strict-cards"], cwd=tree, capture_output=True, check=False, timeout=seconds,
+                          env=gate_env(tree))  # fmt: skip
 
 
 def gated(ruled: Path) -> tuple[str, list[str]] | None:
@@ -86,10 +109,13 @@ def gated(ruled: Path) -> tuple[str, list[str]] | None:
     if not isinstance(out, dict) or out.get("verdict") not in VERDICTS or not isinstance(out.get("reasons"), list) \
             or not all(isinstance(r, str) for r in out["reasons"]):  # fmt: skip
         return None
-    return out["verdict"], out["reasons"]
+    reasons = [plain(r) for r in out["reasons"][:MAX_REASONS]]
+    if len(out["reasons"]) > MAX_REASONS:
+        reasons.append(f"and {len(out['reasons']) - MAX_REASONS} more reasons, not kept")
+    return out["verdict"], reasons
 
 
-def rule_one(observed: dict[str, Any], scratch: Path) -> dict[str, Any]:
+def rule_one(observed: dict[str, Any], scratch: Path, seconds: float = BUDGET_SECONDS) -> dict[str, Any]:
     """One swap: GitHub's record, and the gate's verdict on the envelope its bot commit holds."""
     entry = {key: observed.get(key) for key in KEPT}
     if observed.get("own_pr"):
@@ -102,7 +128,7 @@ def rule_one(observed: dict[str, Any], scratch: Path) -> dict[str, Any]:
     envelope, card = show(bot, f"{HISTORY}/{sha}.json"), show(bot, f"{HISTORY}/{sha}.baseline-card.json")
     if envelope is None:
         return unread(entry, f"no {HISTORY}/{sha}.json at the bot's commit {bot}, or {bot} is not in this checkout")
-    tree = scratch / f"tree-{sha[:12]}"
+    tree = Path(tempfile.mkdtemp(prefix=f"tree-{sha[:12]}-", dir=scratch))  # its own, even for the same sha
     added = git("worktree", "add", "--detach", str(tree), "HEAD")
     if added.returncode != 0:
         return unread(entry, f"no scratch worktree: {added.stderr.decode(errors='replace').strip()[-300:]}")
@@ -120,10 +146,9 @@ def rule_one(observed: dict[str, Any], scratch: Path) -> dict[str, Any]:
                                      "not overwritten")  # fmt: skip
         ruled = scratch / f"{sha}.gate.json"
         try:
-            done = subprocess.run([sys.executable, "-m", "src.verdict.gate", str(path), "--json", str(ruled)], cwd=tree,
-                                  capture_output=True, check=False, timeout=GATE_SECONDS, env=gate_env(tree))  # fmt: skip
+            done = run_gate(path, ruled, tree, max(seconds, 1))
         except subprocess.TimeoutExpired:
-            return unread(entry, f"the gate did not finish in {GATE_SECONDS} s")
+            return unread(entry, f"the gate did not finish in the {max(seconds, 1):.0f} s left of the read's budget")
         if (verdict := gated(ruled)) is None:
             return unread(entry, f"the gate wrote no verdict (exit {done.returncode}): "
                                  f"{done.stderr.decode(errors='replace').strip()[-300:]}")  # fmt: skip
@@ -135,11 +160,16 @@ def rule_one(observed: dict[str, Any], scratch: Path) -> dict[str, Any]:
 def rule_all(observation: dict[str, Any]) -> list[dict[str, Any]]:
     swaps = observation.get("swaps") if isinstance(observation, dict) else None
     ruled = []
+    deadline = time.monotonic() + BUDGET_SECONDS
     with tempfile.TemporaryDirectory() as scratch:
         for swap in swaps if isinstance(swaps, list) else []:
             swap = swap if isinstance(swap, dict) else {}
+            left = deadline - time.monotonic()
             try:
-                ruled.append(rule_one(swap, Path(scratch)))
+                if left <= 0:
+                    ruled.append(unread({key: swap.get(key) for key in KEPT}, "the read's budget was spent"))
+                    continue
+                ruled.append(rule_one(swap, Path(scratch), left))
             except Exception as exc:  # noqa: BLE001 - nothing on a swap branch may stop the run (cold review F1, PR 3)
                 ruled.append(unread({key: swap.get(key) for key in KEPT}, f"{type(exc).__name__}: {exc}"[:300]))
     return ruled

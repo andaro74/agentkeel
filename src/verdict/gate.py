@@ -2,6 +2,7 @@
 
     python -m src.verdict.gate ENVELOPE      exit 0 GREEN, 1 RED or UNMEASURED, 2 REJECTED
     python -m src.verdict.gate ENVELOPE --json OUT   the same, and the verdict and reasons written to OUT
+    python -m src.verdict.gate ENVELOPE --strict-cards   a card only at evals/history/<sha>.baseline-card.json
     python -m src.verdict.gate --plants      make plants
 
 The gate does not trust the writer. It rejects an envelope that does not
@@ -69,6 +70,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -339,15 +341,27 @@ def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) 
                            "subject (ADR-0007, T3)")  # fmt: skip
 
 
+# M04 PR 3: set by `--strict-cards`, which scripts/rule_swaps.py passes for a swap PR's envelope, the one
+# envelope the gate is given from a branch outside the ruleset. A card is then opened only at this
+# path, never at one the envelope chooses (security-reviewer, second read of PR 3).
+STRICT_CARDS = False
+STRICT_CARD_PATH = re.compile(r"evals/history/[0-9a-f]{40}\.baseline-card\.json")
+
+
 def card_at(path: Path, ref: Any, root: Path, field: str) -> dict[str, Any]:
     """The card `ref` names, if it resolves, hashes to `ref`, and says scope control."""
     if not isinstance(ref, dict):
         raise Rejected(f"{path}: no {field}")
+    if STRICT_CARDS and not STRICT_CARD_PATH.fullmatch(str(ref["path"])):
+        raise Rejected(f"{path}: {field} is not at evals/history/<sha>.baseline-card.json: not opened")
     card_path = Path(ref["path"]) if Path(ref["path"]).is_absolute() else root / ref["path"]
     try:
         card = json.loads(card_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    # ValueError: not JSON, or not UTF-8 (the cold review's second read of M04 PR 3).
+    except (OSError, ValueError) as exc:
         raise Rejected(f"{path}: {field} {ref['path']} does not resolve: {exc}") from exc
+    if not isinstance(card, dict):
+        raise Rejected(f"{path}: {field} {ref['path']} is not a card")
     if canonical_sha256(card) != ref["sha256"]:
         raise Rejected(f"{path}: {field} {ref['path']} is not the one the envelope names")
     if card.get("scope") != "control":
@@ -740,7 +754,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--plants", action="store_true")
     # M04 PR 3: scripts/rule_swaps.py reads a swap PR's verdict from here, not from the text below.
     parser.add_argument("--json", type=Path, help="also write {verdict, reasons} here")
+    parser.add_argument("--strict-cards", action="store_true", help="open a card only at its fixed path")
     args = parser.parse_args(argv)
+    global STRICT_CARDS
+    STRICT_CARDS = args.strict_cards
     if args.plants:
         return print_plants()
     if args.envelope is None:
