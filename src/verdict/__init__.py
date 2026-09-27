@@ -178,3 +178,24 @@ def incumbent_at(commit: str, bundle: str = "agents/refagent", root: Path = ROOT
     manifest = yaml.safe_load(text) if text is not None else None
     model = manifest.get("model") if isinstance(manifest, dict) else None
     return (model if isinstance(model, dict) else None), where
+
+
+PIN_FIELDS = ("id", "version", "profile", "region")
+
+
+def pin_moved(commit: str, bundle: str = "agents/refagent", root: Path = ROOT) -> bool:
+    """True when the pin at `commit` is not the incumbent's (SPEC/04 §4): a swap, where A-vs-A runs and F4_3 is required.
+
+    Compared on the pin's id, version, profile and region. A pin that cannot
+    be read on either side counts as moved: A-vs-A is then run and required,
+    not skipped.
+    """
+    import yaml
+
+    incumbent, _ = incumbent_at(commit, bundle, root)
+    text, _ = text_at(commit, f"{bundle}/manifest.yaml", root)
+    manifest = yaml.safe_load(text) if text is not None else None
+    pin = manifest.get("model") if isinstance(manifest, dict) else None
+    if not isinstance(incumbent, dict) or not isinstance(pin, dict):
+        return True
+    return any(incumbent.get(field) != pin.get(field) for field in PIN_FIELDS)
