@@ -37,8 +37,19 @@ measuring the swap is its control, and this file is its key.
 `aws bedrock get-foundation-model --model-identifier anthropic.claude-sonnet-4-5-20250929-v1:0`, us-west-2,
 read by the session with the human's credentials at 2026-09-27T21:07Z:
 `status: ACTIVE`, `startOfLifeTime` 2025-09-29T00:00:00Z, no `endOfLifeTime`. So
-`deprecated_after: null` is a reading, not a gap.
+`deprecated_after: null` is a reading, not a gap. The same at
+2026-09-27T21:23Z in us-east-1 and us-east-2, the profile's other two
+regions (threshold-owner note on PR 3).
 
-## Stated before its run (F4.2)
+## Stated before its run (F4.2), in SPEC/04 §2 and §7 at PR 1
 
 GREEN, with every required check green and A-vs-A zero diff (SPEC/04 §7). Named equivalent before any run; if its run regresses a golden, F4.2 fires and that is the finding, and the label is not moved (SPEC/04 §2).
+
+## Its first run
+
+Envelope `9ff21d5` (bot commit `131dc22`, run 36347490922): RED. Ordinary
+8/9: `g-005` regressed the same way in both of its runs (available,
+clause `EM-1`, no embargo; 01:30 UTC on 14 May is still 13 May in São
+Paulo, before the embargo lifts). A-vs-A zero diff. **F4.2 fired on this
+run, and it stands** (`rulings/pr3.md` §3); the label is not moved.
+Its other red checks were the suite's, repaired at PR 3.

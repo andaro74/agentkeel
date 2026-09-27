@@ -202,8 +202,8 @@ reader can look at.
 
 | Id | Fires when | What it looks like in the repo |
 |---|---|---|
-| F4.1 | the breaking swap is GREEN | S1's raw run built and gated GREEN in a copy of the tree; or the breaking swap PR's `evals` check green, or its envelope GREEN, or RED for a reason other than §7's; `checks.F4_1: fail` |
-| F4.2 | the equivalent swap is RED | S2's pin not among the models the eval role may invoke; or the equivalent swap PR's envelope RED or REJECTED, or a required check on it red for a reason of its own; `checks.F4_2: fail` |
+| F4.1 | the breaking swap is GREEN | S1's raw run built and gated GREEN in a copy of the tree; or the breaking swap PR's `evals` check green, or its envelope GREEN, or RED for a reason other than §7's; `checks.F4_1: fail` from the seed test; from PR 3, the live swap in the envelope's `swaps`, recorded and not gated (§4) |
+| F4.2 | the equivalent swap is RED | S2's pin not among the models the eval role may invoke; or the equivalent swap PR's envelope RED or REJECTED, or a required check on it red for a reason of its own; `checks.F4_2: fail` from the seed test; from PR 3, the live swap in the envelope's `swaps`, recorded and not gated (§4) |
 | F4.3 | A-vs-A shows a diff | refagent's two runs in one `evals` job with any golden's `pass` different; `checks.F4_3: fail`, the differing ids in the envelope's `a_vs_a`. The milestone stops (§1) |
 | F4.4 | a p95 regression beyond the bar is GREEN | S4's raw run built and gated GREEN; or an agent envelope whose `p95_ms` or agent tokens are over the bar at its commit, ruled GREEN; `checks.F4_4: fail` |
 
@@ -303,7 +303,10 @@ met.
   branch, which leaves its diff the pin alone, and its checks run again
   on PR 3's repaired tests. PR 4's run looks both up: the named P3
   exception, as M02 read its seed PRs at PR 3. **PR 3 is the repair and
-  the read's machinery; PR 4's run is the read.** The machinery is not
+  the read's machinery; PR 4's run is the read.** PR 4 records the swaps'
+  new envelopes in `f4_swaps.yaml`, which is not prose, so its run
+  measures and reads them rather than reuse an earlier envelope
+  (security-reviewer F3 on PR 3). The machinery is not
   built in the last PR: it lands and runs at PR 3, where it reads the
   swaps as they stand then. If either misses at PR 4, row 4 closes RED
   with that as the finding. There is no fifth PR.
@@ -382,8 +385,13 @@ None of it is in PR 1. In the order the commits land:
   lands. **Recorded at PR 3, before the reading run:** the equivalent
   swap's first run (#26, `9ff21d5`) regressed `g-005`, the same way in
   both runs (available, clause `EM-1`, no embargo, where 01:30 UTC is
-  still 13 May in São Paulo). By this section the row goes RED on it;
-  the reading run records whether it still does on the repaired tree.
+  still 13 May in São Paulo). **That run decides F4.2** (Product, on
+  threshold-owner's finding and the cold review's F2 on PR 3): §2 named
+  the candidate before any run, and nothing since has touched the model,
+  `g-005` or the rights table, so a different answer at the reading run
+  would be a difference between jobs, not a fix. The reading run records
+  the swaps on the repaired tree; a GREEN there is recorded beside the
+  first run, and row 4 closes RED on F4.2 either way.
 
 ## 8. Controls with no seeded case at M04
 

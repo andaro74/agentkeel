@@ -37,7 +37,9 @@ measuring the swap is its control, and this file is its key.
 `aws bedrock get-foundation-model --model-identifier meta.llama3-1-8b-instruct-v1:0`, us-west-2,
 read by the session with the human's credentials at 2026-09-27T21:07Z:
 `status: ACTIVE`, `startOfLifeTime` 2024-07-23T08:00:00Z, no `endOfLifeTime`. So
-`deprecated_after: null` is a reading, not a gap.
+`deprecated_after: null` is a reading, not a gap. The same at
+2026-09-27T21:23Z in us-east-1 and us-east-2, the profile's other two
+regions (threshold-owner note on PR 3).
 
 ## Stated before its run (F4.1)
 

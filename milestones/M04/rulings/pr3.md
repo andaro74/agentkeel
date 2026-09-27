@@ -52,16 +52,27 @@ What this gives up: a later swap PR is not held to M04's two by any
 check. It is held by its own envelope, as every pull request is:
 a golden that passed and now fails is RED under any model (P7).
 
-## 3. `g-005`, stated before the reading run
+## 3. `g-005`: the first run decides F4.2
 
 SPEC/04 §2 named Sonnet 4.5 equivalent before any run, and said that if
 its run regressed a golden, F4.2 fires and is recorded as the finding,
-with the label not moved. Its first run regressed `g-005` in both of its
-runs. Nothing in this PR touches `g-005`, the rights table or the
-candidate list. PR 4's run records whether it still does on the repaired
-tree; by SPEC/04 §7, if it does, row 4 closes RED.
+with the label not moved. Its first run (#26, `9ff21d5`) regressed
+`g-005` in both of its runs. **F4.2 fired there, and that stands**
+(threshold-owner FINDING and cold review F2 on PR 3; drafted for the
+human's ruling as Product). Nothing since touches the model, `g-005`, the
+rights table or the candidate list, so a GREEN at PR 4's read would be a
+difference between jobs, not a fix: it is recorded beside the first run,
+and row 4 closes RED on F4.2 either way.
 
-## 4. What the cold review of PR 2 missed
+## 4. How PR 4's run is made to read
+
+A run reuses an earlier envelope when nothing but prose changed
+(`evals.yml`, "Is this tree already measured?"), and a close is mostly
+prose (security-reviewer F3). PR 4 records the swaps' re-run envelopes
+in `milestones/M04/runs/f4_swaps.yaml`, which is not prose, so its run
+measures, and that run is the read.
+
+## 5. What the cold review of PR 2 missed
 
 The suite failed on any tree whose pin moved (nine tests on #25, ten on
 #26), so both swap PRs' `checks` were red for a reason of their own:
