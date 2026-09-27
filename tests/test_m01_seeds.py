@@ -138,7 +138,7 @@ def test_s7_an_answer_that_cites_nothing_is_not_a_pass(tmp_path, goldens):
                        "--history-dir", str(no_history), "--run-url", URL]) == 0  # fmt: skip
 
     citing = {g: r for g, r in gate.read(out)["goldens"].items() if r["kind"] in build.CITING_KINDS}
-    assert len(citing) == 12
+    assert len(citing) == 11  # g-021 retired at M04 PR 2
     for result in citing.values():
         assert result == {"kind": result["kind"], "scope": "agent", "score": True, "cites": False, "pass": False}
     envelope = gate.read(out)

@@ -17,7 +17,7 @@ PRE_SCOPE = ROOT / "evals" / "history" / "pre-scope"
 def test_keyed_on_scope_and_golden_id_and_blind_to_cards_and_raw(chain, goldens):
     envelope_path, _, _ = chain(right={"g-001"})
     history = replay_history.load(envelope_path.parent)  # the folder also holds the card and the raw
-    assert set(history) == {("control", g) for g in goldens}  # the live goldens: g-012 is retired, g-021 added (M02 PR 2)
+    assert set(history) == {("control", g) for g in goldens}  # the live goldens: g-012 and g-021 are retired (M02 PR 2, M04 PR 2)
     assert history[("control", "g-001")] == [(COMMIT, True)]
     assert history[("control", "g-002")] == [(COMMIT, False)]
     assert replay_history.ever_passed(history, "control", "g-001")

@@ -96,7 +96,9 @@ def the_call(golden: dict[str, Any]) -> dict[str, Any]:
     arguments and its result against its contract, so every call here is one
     the tool can make. For `g-021`, the sequel with no US row, it answers
     `found: false` (data-owner F9 on M04 PR 1): the incumbent's answer to it
-    is not grounded, as it is not in any run on record."""
+    is not grounded, as it is not in any run on record. `g-021` is retired at
+    M04 PR 2 (open.md row 5); the raw runs still answer it, as the planted
+    runs did, and build drops that answer unscored."""
     import re
 
     from agents.refagent import agent
@@ -116,7 +118,8 @@ def grounded(golden: dict[str, Any], latency: int = 500, tokens: int = 300) -> d
     """An answer as the incumbent gives it: right and cited, after the call its question asks for.
 
     Grounded (SPEC/04 §2) wherever the tool's row is the golden's row, which
-    is every ordinary and trap golden but `g-021`."""
+    is every live ordinary and trap golden (`g-021`, which it is not, is retired
+    at M04 PR 2)."""
     base = {"id": golden["id"], "kind": golden["kind"], "question": golden["question"],
             "usage": {"inputTokens": tokens * 2 // 3, "outputTokens": tokens // 3, "totalTokens": tokens},
             "latency_ms": latency, "source": TABLE}  # fmt: skip
@@ -189,11 +192,12 @@ def incumbent_history(tmp_path: Path, goldens, measured):
 
 @pytest.mark.xfail(strict=True, raises=AssertionError,
                    reason="S1: score_one does not read tool_calls; tool grounding is M04 PR 2's reader")
-def test_s1_a_breaking_swap_whose_answers_the_tool_never_grounded_is_red(seeded, measured, incumbent_history):
+def test_s1_a_breaking_swap_whose_answers_the_tool_never_grounded_is_red(seeded, measured, incumbent_history, goldens):
     """The pin moved to Llama 3.1 8B. Every ordinary and trap answer has the expected fields and a
     real row and clause, and none came from a successful `check_availability` call: the call was
     printed as text, or refused by the schema. The incumbent passed eleven of them grounded; g-021,
-    the sequel with no US row, it never grounds (the_call).
+    the sequel with no US row, it never grounds (the_call), and g-021 is retired at M04 PR 2, so its
+    answer in the seed is dropped unscored and the eleven live ones are what is read.
     SPEC/00 §9: the rights table is the truth, never inferred. So each is a golden that passed and
     now fails, and the swap is RED for that reason (F4.1; SPEC/04 §2, §7)."""
     tree = seeded("s1-breaking-pin.patch")
@@ -201,8 +205,9 @@ def test_s1_a_breaking_swap_whose_answers_the_tool_never_grounded_is_red(seeded,
     holds(pin["id"] == LLAMA and pin["profile"] == f"us.{LLAMA}", "the seed moves the pin")
     seed = fixture("s1-breaking-raw.json")
     holds(seed["model_id"] == pin["profile"], "the raw run is the swap's")
-    citing = [o for o in seed["observations"] if o["kind"] in build.CITING_KINDS]
-    holds(len(citing) == 12, "every ordinary and trap golden")
+    live = {g for g, golden in goldens.items() if not golden.get("retired")}
+    citing = [o for o in seed["observations"] if o["kind"] in build.CITING_KINDS and o["id"] in live]
+    holds(len(citing) == 11, "every live ordinary and trap golden")
     holds(not any(call["status"] == "success" for o in citing for call in o["tool_calls"]),
           "no answer is grounded: the seed is what it says")
 
@@ -314,6 +319,8 @@ def test_s4_a_run_over_the_incumbents_bar_is_red(seed, bar, field, times, measur
     holds(run["model_id"] == INCUMBENT and run["mode"] == "runner", "the incumbent's pin, in the history's mode")
     live = {g["id"]: g for g in goldens.values() if not g.get("retired")}
     for observation in run["observations"]:
+        if observation["id"] not in live:  # g-021, retired at M04 PR 2: build drops its answer unscored
+            continue
         incumbent = grounded(live[observation["id"]])
         if field == "latency_ms":
             holds(observation["latency_ms"] == times * incumbent["latency_ms"], observation["id"])

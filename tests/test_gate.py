@@ -20,10 +20,10 @@ def judged(envelope_path, history=None, plant_ids=()):
 
 
 def test_empty_history_nothing_gates(chain):
-    """20 of 20 failing, none has ever passed: reported, not RED. passed == total is not a gate."""
+    """19 of 19 failing, none has ever passed: reported, not RED. passed == total is not a gate."""
     envelope_path, _, _ = chain(agent=True)
     envelope = gate.read(envelope_path)
-    assert len(envelope["never_passed"]) == 20 and envelope["regressed"] == []
+    assert len(envelope["never_passed"]) == 19 and envelope["regressed"] == []
     assert judged(envelope_path) == ("GREEN", [])
     assert gate.main([str(envelope_path), "--history-dir", str(envelope_path.parent / "none")]) == 0
 
@@ -48,7 +48,7 @@ def test_at_m00_every_result_is_the_controls(chain):
     envelope_path, _, _ = chain(right={"g-010"})
     envelope = gate.read(envelope_path)
     assert {r["scope"] for r in envelope["goldens"].values()} == {"control"}
-    assert len(envelope["goldens"]) == 20
+    assert len(envelope["goldens"]) == 19
 
 
 def test_the_control_is_never_gated(chain, past, capsys):
@@ -237,10 +237,10 @@ def test_a_control_envelope_carries_no_claim_2_check(chain):
 def test_over_the_cap_is_red_in_the_gate_too(chain):
     envelope_path, _, _ = chain(agent=True)
     envelope = gate.read(envelope_path)
-    assert gate.judge(envelope, KINDS, {}, [], cap=12000) == ("GREEN", [])
-    verdict, reasons = gate.judge(envelope, KINDS, {}, [], cap=11999)
+    assert gate.judge(envelope, KINDS, {}, [], cap=11400) == ("GREEN", [])
+    verdict, reasons = gate.judge(envelope, KINDS, {}, [], cap=11399)
     assert verdict == "RED"
-    assert "cost-cap: 12000 over 11999" in reasons
+    assert "cost-cap: 11400 over 11399" in reasons
     assert "build said GREEN, the gate says RED" in reasons
 
 
@@ -350,13 +350,13 @@ def test_a_dropped_golden_is_red(chain):
 def test_measured_is_what_the_ledger_cell_must_say(chain):
     envelope_path, _, _ = chain(right={"g-001", "g-010"})
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
-        "control: traps 1/3 (g-010); ordinary 1/9; guardrail 0/3; redteam 0/5; mode control; never_passed 18; regressed 0; "
+        "control: traps 1/2 (g-010); ordinary 1/9; guardrail 0/3; redteam 0/5; mode control; never_passed 17; regressed 0; "
         f"plants 0/0; GREEN; envelope `{'a' * 40}`"
     )
     envelope_path, _, _ = chain(right={"g-001"}, agent=True)
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
-        "agent: traps 0/3; ordinary 1/9; guardrail 0/3; redteam 0/5; control: traps 0/3; ordinary 0/9; guardrail 0/3; "
-        f"redteam 0/5; mode runner; never_passed 19; regressed 0; plants 0/0; F1_1 pass {URL}; F1_2 pass {URL}; F1_3 pass {URL}; "
+        "agent: traps 0/2; ordinary 1/9; guardrail 0/3; redteam 0/5; control: traps 0/2; ordinary 0/9; guardrail 0/3; "
+        f"redteam 0/5; mode runner; never_passed 18; regressed 0; plants 0/0; F1_1 pass {URL}; F1_2 pass {URL}; F1_3 pass {URL}; "
         f"F1_4 pass {URL}; F2_1 pass {URL}; F2_2 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
     )
 

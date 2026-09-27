@@ -1,6 +1,7 @@
 """A retired golden is out of the run, the card and the envelope, and the gate reads the goldens at the envelope's commit (M02 PR 2, Door 2).
 
-`g-012` is retired at M02 PR 2 with two keys and `g-021` added. The frozen
+`g-012` is retired at M02 PR 2 with two keys and `g-021` added; `g-021` is
+retired at M04 PR 2 with two keys and nothing added (M04 open.md row 5). The frozen
 control (ADR-0002) still answers `g-012`; build drops that answer. The gate
 holds an envelope to the goldens of its own commit, so the M00 and M01
 envelopes in history, written over fifteen goldens that included `g-012`,
@@ -24,9 +25,11 @@ GOLDENS_AT_M00 = "9407615dcde09308490f6699c21a18100bfedcd2"  # row 0's envelope 
 
 def test_the_retired_golden_is_not_among_the_live_ones():
     live = load_golden_kinds(GOLDENS_DIR)
-    assert "g-012" not in live and "g-021" in live and len(live) == 20  # g-016 to g-020 added at M03 PR 2
-    assert build.retired_ids(GOLDENS_DIR) == {"g-012"}
+    # g-016 to g-020 added at M03 PR 2; g-021 retired at M04 PR 2
+    assert "g-012" not in live and "g-021" not in live and len(live) == 19
+    assert build.retired_ids(GOLDENS_DIR) == {"g-012", "g-021"}
     assert yaml.safe_load((GOLDENS_DIR / "g-012.yaml").read_text(encoding="utf-8"))["retired"] == "M02"
+    assert yaml.safe_load((GOLDENS_DIR / "g-021.yaml").read_text(encoding="utf-8"))["retired"] == "M04"
 
 
 def test_the_controls_answer_to_a_retired_golden_is_dropped_not_refused(goldens, capsys):
@@ -69,9 +72,10 @@ def test_the_ledger_still_holds_every_measured_cell(tmp_path: Path):
     assert done.returncode == 0, done.stdout + done.stderr
 
 
-def test_g_021_is_a_trap_the_control_cannot_pass(goldens):
-    golden = goldens["g-021"]
-    assert golden["kind"] == "trap" and golden["added"] == "M02" and golden["retired"] is None
+def test_g_021_was_a_trap_the_control_cannot_pass_and_is_retired_as_it_was_written():
+    """Retired at M04 PR 2, never edited: what it expected stays as it was, so history keyed on it still reads (R11)."""
+    golden = yaml.safe_load((GOLDENS_DIR / "g-021.yaml").read_text(encoding="utf-8"))
+    assert golden["kind"] == "trap" and golden["added"] == "M02" and golden["retired"] == "M04"
     assert golden["expected"]["answer_fields"]["constraints"] == ["sequel_no_inherit"]
     for prompt in (ROOT / "src" / "baseline" / "prompt.txt", ROOT / "agents" / "refagent" / "prompt.txt"):
         assert "sequel_no_inherit" not in prompt.read_text(encoding="utf-8")

@@ -13,11 +13,11 @@ from src.verdict import gate
 from .conftest import make_raw
 
 
-@pytest.mark.parametrize(("cap", "code", "said"), [(6000, 0, "ok"), (5999, 0, "OVER"), (0, 1, "FAIL"), ("20000", 1, "FAIL")])
+@pytest.mark.parametrize(("cap", "code", "said"), [(5700, 0, "ok"), (5699, 0, "OVER"), (0, 1, "FAIL"), ("20000", 1, "FAIL")])
 def test_cost_cap(tmp_path, goldens, capsys, cap, code, said):
     """From M01 over the cap is a recorded RED, written by build (item 22): cost-cap prints it and exits 0."""
     raw = tmp_path / "raw.json"
-    raw.write_text(json.dumps(make_raw(goldens)), encoding="utf-8")  # 20 calls x 300 tokens (g-016 to g-020 from M03 PR 2)
+    raw.write_text(json.dumps(make_raw(goldens)), encoding="utf-8")  # 19 calls x 300 tokens (g-016 to g-020 from M03 PR 2; g-021 retired at M04 PR 2)
     thresholds = tmp_path / "thresholds.yaml"
     thresholds.write_text(f"cost_cap:\n  tokens_per_run: {cap!r}\n", encoding="utf-8")
     assert cost_cap.main(["--raw", str(raw), "--thresholds", str(thresholds)]) == code
@@ -32,7 +32,7 @@ def test_cost_cap_counts_as_build_does(tmp_path, goldens, capsys):
     raw = tmp_path / "raw.json"
     raw.write_text(json.dumps(raw_doc), encoding="utf-8")
     assert cost_cap.main(["--raw", str(raw)]) == 0
-    assert "6,000 tokens this run" in capsys.readouterr().out
+    assert "5,700 tokens this run" in capsys.readouterr().out
 
 
 def test_the_gate_does_not_read_a_deleted_cap_as_no_cap(chain, monkeypatch):
@@ -50,7 +50,7 @@ def test_cost_cap_counts_both_subjects(tmp_path, goldens, capsys):
     for raw in (control, agent):
         raw.write_text(json.dumps(make_raw(goldens)), encoding="utf-8")
     assert cost_cap.main(["--raw", str(control), "--raw", str(agent)]) == 0
-    assert "12,000 tokens this run" in capsys.readouterr().out
+    assert "11,400 tokens this run" in capsys.readouterr().out
 
 
 def test_a_reply_with_no_usage_fails_the_cap(tmp_path, goldens):
@@ -89,9 +89,9 @@ def test_ledger_fails_when_the_cell_differs_from_the_envelope(chain):
     assert ledger.check_measured(row(cell, "GREEN"), history_dir) is None
     assert ledger.check_measured(row(ledger.UNMEASURED), history_dir) is None
 
-    wrong = cell.replace("traps 1/3", "traps 0/3")
+    wrong = cell.replace("traps 1/2", "traps 0/2")
     assert "differs from the envelope" in ledger.check_measured(row(wrong), history_dir)
-    assert "names no envelope" in ledger.check_measured(row("traps 1/3"), history_dir)
+    assert "names no envelope" in ledger.check_measured(row("traps 1/2"), history_dir)
     gone = cell.replace("a" * 40, "d" * 40)
     assert "unreadable" in ledger.check_measured(row(gone), history_dir)
 
