@@ -340,14 +340,15 @@ None of it is in PR 1. In the order the commits land:
   0.
 - **PR 2's run on the PR, stated before it.** S1 to S5 refused, each for
   its planted reason. refagent under grounding: **ordinary 9/9, traps
-  2/3**, as at `cb06c0d`; fewer is a finding, not a count to lower.
-  Those two counts were never grounded: no committed raw run shows a tool
-  call, so PR 2's run is the first measurement of them (data-owner F7).
-  If `g-021` is retired at PR 2, the traps are 2 of 2 live and a new id
-  is in `never_passed`; the expected line is restated before the run
-  (data-owner F16). A-vs-A
-  zero diff for refagent; the control's diff recorded, not gated. p95 and
-  tokens within their bars.
+  2/2**; fewer is a finding, not a count to lower. Restated at PR 2,
+  before its run (data-owner F16): `g-021` was retired before grounding
+  landed, with two keys, and nothing was added (M04 `open.md` row 5; the
+  absence form is M06's), so the traps are `g-010` and `g-011` and no new
+  id is in `never_passed`. Those counts were never grounded in an
+  envelope: PR 2's run is the first measurement of them (data-owner F7).
+  A-vs-A zero diff for refagent, on PR 2's own run (the `a-vs-a` label);
+  the control's diff recorded, not gated. p95 and tokens within their
+  bars.
 - **PR 3's run, stated before it.** The breaking swap PR RED with at
   least one citing golden `regressed`, ungrounded or with wrong fields,
   and none of these: REJECTED, access errors, the cost cap. Any other
