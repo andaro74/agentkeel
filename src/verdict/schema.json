@@ -264,6 +264,30 @@
         "agent": {"$ref": "#/$defs/golden_ids"},
         "control": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/golden_ids"}]}
       }
+    },
+    "swaps": {
+      "description": "From M04 PR 3 (SPEC/04 §4). The M04 swap PRs as scripts/rule_swaps.py read them: GitHub's record of each pull and the gate's verdict on that pull's own envelope. Recorded, never gated (Product, M04 PR 3). Optional, so no envelope before it becomes invalid.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["swap", "falsifier", "role", "pr", "merged", "head_sha", "measured_commit", "evals_on_measured", "required_on_head", "verdict", "reasons", "note"],
+        "properties": {
+          "swap": {"type": "string"},
+          "falsifier": {"type": ["string", "null"]},
+          "role": {"type": ["string", "null"]},
+          "pr": {"type": ["integer", "null"]},
+          "merged": {"type": ["boolean", "null"]},
+          "head_sha": {"type": ["string", "null"]},
+          "measured_commit": {"type": ["string", "null"]},
+          "evals_on_measured": {"type": ["string", "null"]},
+          "required_on_head": {"type": ["object", "null"], "additionalProperties": {"type": ["string", "null"]}},
+          "verdict": {"enum": ["GREEN", "RED", "UNMEASURED", "REJECTED", null]},
+          "reasons": {"type": "array", "items": {"type": "string"}},
+          "note": {"type": ["string", "null"]}
+        }
+      }
     }
   },
   "dependentRequired": {

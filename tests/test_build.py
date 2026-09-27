@@ -8,7 +8,7 @@ import pytest
 
 from src.verdict import build
 
-from .conftest import AGENT_TOP, COMMIT, URL, make_raw
+from .conftest import AGENT_TOP, COMMIT, URL, claim_1_checks, claim_2_checks, make_raw
 
 ROWS, CLAUSES = {"r-019"}, {"ML-2.1"}
 GOLDEN = {
@@ -458,3 +458,40 @@ def test_a_vs_a_through_builds_command_line_with_the_controls_second_run(tmp_pat
     assert build.main(envelope_args(agent_a, card_path, tmp_path / "cached.json", "--a-vs-a", str(agent_b),
                                     "--a-vs-a-control", str(control_b_path))) == 3  # fmt: skip
     assert "prompt cache" in capsys.readouterr().err
+
+
+def test_the_swaps_are_recorded_and_gate_nothing(tmp_path, chain, goldens, capsys):
+    """M04 PR 3 (SPEC/04 §4; Product): the swap PRs' verdicts, as rule_swaps wrote them, are copied into
+    `swaps`. A RED swap leaves this run GREEN, the gate agrees, and the ledger's cell prints both swaps.
+    A file not in rule_swaps' shape is refused, and nothing is written."""
+    from src.verdict import gate
+
+    envelope_path, card_path, _ = chain(right={"g-001"}, agent=True)
+    raw = tmp_path / "agent.json"
+    raw.write_text(json.dumps(make_raw(goldens, right={"g-001"}, **AGENT_TOP)), encoding="utf-8")
+    breaking = {"swap": "breaking", "falsifier": "F4.1", "role": "m04_breaking_swap", "pr": 25, "found": True,
+                "merged": False, "head_sha": "b" * 40, "measured_commit": "c" * 40, "evals_on_measured": "failure",
+                "required_on_head": {"evals": "failure"}, "verdict": "RED", "gate_exit": 1,
+                "reasons": [f"regressed: g-00{i} has passed before and fails now" for i in range(1, 5)]
+                + ["check F4_1 failed: x"]}  # fmt: skip
+    equivalent = {**breaking, "swap": "equivalent", "falsifier": "F4.2", "role": "m04_equivalent_swap", "pr": 26,
+                  "reasons": ["regressed: g-005 has passed before and fails now"]}  # fmt: skip
+    unread = {"swap": "none yet", "pr": None, "verdict": None, "reasons": [], "note": "no PR number recorded"}
+    ruled = tmp_path / "swaps-ruled.json"
+    ruled.write_text(json.dumps({"swaps": [breaking, equivalent, unread]}), encoding="utf-8")
+    out = envelope_path.parent / f"{'a' * 40}.json"
+    checks = [*claim_1_checks(tmp_path), *claim_2_checks(tmp_path)]
+    assert build.main(envelope_args(raw, card_path, out, *checks, "--swaps", str(ruled))) == 0
+    envelope = json.loads(out.read_text(encoding="utf-8"))
+    assert [s["verdict"] for s in envelope["swaps"]] == ["RED", "RED", None]
+    assert "gate_exit" not in envelope["swaps"][0] and envelope["swaps"][2]["note"] == "no PR number recorded"
+    assert envelope["verdict"] == "GREEN"
+    assert gate.rule(out, out.parent) == ("GREEN", []), gate.rule(out, out.parent)
+    cell = gate.measured_at(out, out.parent)
+    assert ("swap #25 breaking RED (regressed 4; other reasons 1); swap #26 equivalent RED (regressed 1 g-005; "
+            "other reasons 0); swap #None none yet unread; GREEN") in cell  # fmt: skip
+
+    ruled.write_text(json.dumps({"swaps": [{**equivalent, "verdict": "PASSED"}]}), encoding="utf-8")
+    refused = tmp_path / "refused.json"
+    assert build.main(envelope_args(raw, card_path, refused, *checks, "--swaps", str(ruled))) == 3
+    assert "rule_swaps' shape" in capsys.readouterr().err and not refused.exists()

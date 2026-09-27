@@ -23,7 +23,7 @@ fails when any ordinary answer does not (SPEC/01 §4). From M04 PR 2 its
 
     python -m src.verdict.build card --raw RAW --out CARD
     python -m src.verdict.build envelope --raw RAW --control-card CARD --out ENVELOPE [--run-url URL]
-        [--a-vs-a RAW_B [--a-vs-a-control CONTROL_RAW_B]]
+        [--a-vs-a RAW_B [--a-vs-a-control CONTROL_RAW_B]] [--swaps RULED]
 
 `--raw` is the agent's replies when an agent ran, and the control's own
 otherwise; which one it is, is worked out from the card, not passed in.
@@ -38,6 +38,11 @@ From M04 PR 2 (SPEC/04 §2, §6) an agent envelope also carries:
   whose `pass` differ in `a_vs_a`, and `checks.F4_3` failing on any agent
   diff. The control's diff, given `--a-vs-a-control`, is recorded and not
   gated (ADR-0004; Finding F0.4).
+
+From M04 PR 3, with `--swaps`, `swaps`: what `scripts/rule_swaps.py` wrote,
+the gate's verdict on each swap PR's own envelope beside GitHub's record of
+the pull. Copied, not read: build rules on no envelope (P5), and nothing
+gates the field (Product, M04 PR 3). It refuses a file not in that shape.
 
 It refuses, and writes nothing, when:
 - no control card is given, or the card is for another commit (seed 2, F0.2);
@@ -612,6 +617,24 @@ def f1_4(results: dict[str, dict[str, Any]]) -> str:
     return "fail" if any(r["kind"] == "ordinary" and not r["cites"] for r in results.values()) else "pass"
 
 
+SWAP_FIELDS = ("swap", "falsifier", "role", "pr", "merged", "head_sha", "measured_commit", "evals_on_measured",
+               "required_on_head", "verdict", "reasons", "note")  # fmt: skip
+VERDICTS = ("GREEN", "RED", "UNMEASURED", "REJECTED")
+
+
+def swaps_record(path: Path) -> list[dict[str, Any]]:
+    """`scripts/rule_swaps.py`'s output, cut to the fields the envelope keeps; refused if not in its shape."""
+    swaps = load_json(path).get("swaps")
+    if not isinstance(swaps, list) or not swaps:
+        raise Refused(f"{path}: no swaps")
+    kept = []
+    for swap in swaps:
+        if not isinstance(swap, dict) or swap.get("verdict") not in (*VERDICTS, None)                 or not isinstance(swap.get("reasons"), list) or not isinstance(swap.get("swap"), str):  # fmt: skip
+            raise Refused(f"{path}: a swap not in rule_swaps' shape: {swap!r}"[:300])
+        kept.append({field: swap.get(field) for field in SWAP_FIELDS})
+    return kept
+
+
 def compose_envelope(
     raw: dict[str, Any],
     results: dict[str, dict[str, Any]],
@@ -631,6 +654,7 @@ def compose_envelope(
     incumbent: tuple[list[dict[str, Any]], str] | None = None,
     second: tuple[dict[str, Any], dict[str, dict[str, Any]]] | None = None,
     control_second: tuple[dict[str, Any], list[str]] | None = None,
+    swaps: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """`bars` and `incumbent` (its runs, and where the pin was read) give F4_4; `second`, the
     agent's second raw and its scores, gives A-vs-A and F4_3; `control_second`, the control's
@@ -706,6 +730,8 @@ def compose_envelope(
         one_subject["agent_tokens"] = agent_usage  # the first run's, the agent's side only (SPEC/04 §2)
     if gated and second is not None:
         one_subject["a_vs_a"] = a_vs_a
+    if gated and swaps is not None:
+        one_subject["swaps"] = swaps
     return {
         "commit": raw["commit"],
         "tag": tag,
@@ -797,6 +823,8 @@ def main(argv: list[str] | None = None) -> int:
     # M04 PR 2 (SPEC/04 §6): the second runs of one pin, for A-vs-A (S3's reader).
     parser.add_argument("--a-vs-a", type=Path, metavar="AGENT_RAW_B")
     parser.add_argument("--a-vs-a-control", type=Path, metavar="CONTROL_RAW_B")
+    # M04 PR 3 (SPEC/04 §4): the swap PRs, as the gate ruled their own envelopes. Recorded only.
+    parser.add_argument("--swaps", type=Path, metavar="RULED")
     parser.add_argument("--run-url")
     parser.add_argument("--allow-dirty", action="store_true")
     args = parser.parse_args(argv)
@@ -894,6 +922,7 @@ def main(argv: list[str] | None = None) -> int:
                     incumbent=incumbent,
                     second=second,
                     control_second=control_second,
+                    swaps=swaps_record(args.swaps) if args.swaps else None,
                 )
             emit(envelope, args.out, envelope=True)
     except Refused as refusal:

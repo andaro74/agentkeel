@@ -587,12 +587,26 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         f"regressed {len(envelope['regressed'])}",
         f"plants {envelope['plants_fired']}/{envelope['plants_expected']}",
         *(f"{name} {c['status']} {c['url']}" for name, c in sorted(envelope["checks"].items())),
+        *(swap_reading(swap) for swap in envelope.get("swaps") or []),
         verdict,
         f"envelope `{envelope['commit']}`",
     ]
     if agent:
         parts.append(f"base {envelope['baseline_card_ref']['sha256'][:8]}")
     return "; ".join(parts)
+
+
+def swap_reading(swap: dict[str, Any]) -> str:
+    """One M04 swap PR in the Measured cell, as the envelope recorded it (M04 PR 3): printed, never gated.
+
+    Only an envelope with `swaps` has these parts, so every cell written before it still matches.
+    """
+    head = f"swap #{swap['pr']} {swap['swap']}"
+    if swap["verdict"] is None:
+        return f"{head} unread"
+    regressed = [reason.split()[1] for reason in swap["reasons"] if reason.startswith("regressed: ")]
+    named = f" {' '.join(regressed)}" if 0 < len(regressed) <= 3 else ""
+    return f"{head} {swap['verdict']} (regressed {len(regressed)}{named}; other reasons {len(swap['reasons']) - len(regressed)})"
 
 
 def latest(history_dir: Path = HISTORY) -> Path | None:

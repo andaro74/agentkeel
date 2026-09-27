@@ -1,0 +1,32 @@
+# M04's two swap PRs (SPEC/04 §4, §5.1). Opened by the human on
+# 2026-09-27 from M04 PR 2's head (10926b2), each changing only `model` in
+# agents/refagent/manifest.yaml to its `pinned_roles` entry, and never to
+# be merged: "promotes" is mergeable, not merged. Their Threshold Owner
+# rulings are milestones/M04/rulings/swap-breaking.md (pr: 25) and
+# swap-equivalent.md (pr: 26).
+#
+# Read by scripts/observe_pr.py (GitHub's record: the pull, the checks
+# required on its head, the commit its last evals run measured) and then
+# scripts/rule_swaps.py (the gate's verdict on that run's own envelope).
+# Recorded by build in the envelope's `swaps`, gated by nothing (Product,
+# M04 PR 3). A swap PR's own run skips itself.
+swaps:
+  - swap: breaking
+    falsifier: F4.1
+    role: m04_breaking_swap
+    expected: RED, with at least one citing golden regressed, ungrounded or with wrong fields; no REJECTED, access error or cost cap
+  - swap: equivalent
+    falsifier: F4.2
+    role: m04_equivalent_swap
+    expected: GREEN, every required check green, A-vs-A zero diff
+observed:
+  - swap: breaking
+    pr: 25
+    opened_at: 2026-09-27T20:17:26Z
+    branch: m04-swap-breaking
+    first_envelope: 133959f (bot bc75a53), RED; ordinary 0/9, traps 0/2, 11 citing goldens regressed; a_vs_a agent []
+  - swap: equivalent
+    pr: 26
+    opened_at: 2026-09-27T20:17:35Z
+    branch: m04-swap-equivalent
+    first_envelope: 9ff21d5 (bot 131dc22), RED; ordinary 8/9, g-005 regressed in both runs (available true, EM-1, no embargo); a_vs_a agent []
