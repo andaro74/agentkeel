@@ -32,9 +32,9 @@ name: refagent
 # the profile ARN's (M01 open item 23). The profile routes to us-east-1,
 # us-east-2 and us-west-2 (get-inference-profile, 2026-09-20).
 model:
-  id: anthropic.claude-sonnet-4-6
-  version: null
-  profile: us.anthropic.claude-sonnet-4-6
+  id: anthropic.claude-sonnet-4-5-20250929-v1:0
+  version: 20250929-v1:0
+  profile: us.anthropic.claude-sonnet-4-5-20250929-v1:0
   region: us-west-2
 
 # Threshold Owner: the judge model id. Null: the judge, its rubric and the
