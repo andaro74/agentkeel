@@ -19,9 +19,9 @@
 # about 105,000; the cap is re-ruled against that run's envelope, and a
 # raise is two keys (ADR-0009). The envelope's tokens_in and tokens_out
 # count every run the job made: both subjects when an agent ran, and both
-# runs of each under A-vs-A; the control's when none did. An envelope over
-# the cap is written RED by verdict.build and read RED by verdict.gate
-# (item 22), whichever its subject.
+# runs of each under A-vs-A; the control's when none did. An
+# envelope over the cap is written RED by verdict.build and read RED by
+# verdict.gate (item 22), whichever its subject.
 cost_cap:
   tokens_per_run: 150000
 
