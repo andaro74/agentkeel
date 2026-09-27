@@ -103,14 +103,22 @@ GATE_EXIT ?=
 # A_VS_A (M04 PR 2, SPEC/04 §4): each subject runs a second time on the same
 # tree, into `-b` raws that build compares with the first. Neither is
 # committed; the ids that differ are in the envelope's `a_vs_a`.
+#
+# The control's second run goes first, and outside the tree. src/baseline/
+# is frozen, and its runner calls any untracked file dirty (the agent's
+# runner leaves evals/history/ out), so run after the first raw was written
+# it recorded a dirty tree and build refused the pair: PR 2's first labelled
+# run, 36345059724. Its raw is moved in once the first run has written.
+A_VS_A_TMP := $(or $(RUNNER_TEMP),$(TMPDIR),/tmp)
 A_VS_A_RUNS = $(if $(A_VS_A),--raw $(1)/$(2).baseline-raw-b.json --raw $(1)/$(2).agent-raw-b.json)
 A_VS_A_FLAGS = $(if $(A_VS_A),--a-vs-a $(1)/$(2).agent-raw-b.json --a-vs-a-control $(1)/$(2).baseline-raw-b.json)
 ifneq ($(AGENT_RUNNER),)
 define chain
+	$(if $(A_VS_A),-uv run python -m src.baseline.run --out $(A_VS_A_TMP)/$(2).baseline-raw-b.json)
 	-uv run python -m src.baseline.run --out $(1)/$(2).baseline-raw.json
+	$(if $(A_VS_A),mv $(A_VS_A_TMP)/$(2).baseline-raw-b.json $(1)/$(2).baseline-raw-b.json)
 	uv run python -m src.verdict.build card --raw $(1)/$(2).baseline-raw.json --out $(1)/$(2).baseline-card.json $(3)
 	-uv run python -m src.agent.run --out $(1)/$(2).agent-raw.json --recheck-runtime
-	$(if $(A_VS_A),-uv run python -m src.baseline.run --out $(1)/$(2).baseline-raw-b.json)
 	$(if $(A_VS_A),-uv run python -m src.agent.run --out $(1)/$(2).agent-raw-b.json --recheck-runtime)
 	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json $(A_VS_A_RUNS)
 	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS)

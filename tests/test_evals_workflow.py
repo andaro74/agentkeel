@@ -335,6 +335,29 @@ def test_every_claim_3_case_the_makefile_names_is_a_seed_test():
     assert "--check-ingest F3_5" in makefile
 
 
+def test_both_control_runs_start_on_a_tree_with_nothing_untracked():
+    """M04 PR 2's first labelled run (36345059724): the control's second run started after the
+    first had written into evals/history/, so the frozen runner recorded a dirty tree and build
+    refused the pair. Behaviour, not text: `make -n` renders the chain, and no control run may
+    come after a line that writes into the folder, until both have run.
+    """
+    import shutil
+    import subprocess
+
+    if shutil.which("make") is None:
+        pytest.skip("GNU make is not on this machine")
+    rendered = subprocess.run(
+        ["make", "-n", "evals-local", "AGENT_RUNNER=src/agent/run.py", "A_VS_A=1", "RUNNER_TEMP=../outside"],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    ).stdout.splitlines()  # fmt: skip
+    control = [i for i, line in enumerate(rendered) if "src.baseline.run" in line]
+    assert len(control) == 2, rendered
+    assert "--out ../outside/" in rendered[control[0]], "the control's second run writes inside the tree"
+    written = [i for i, line in enumerate(rendered) if "evals/local/" in line and i not in control]
+    assert all(i > control[1] for i in written), "a line writes into the folder before both control runs"
+    assert any(line.startswith("mv ../outside/") and line.endswith(".baseline-raw-b.json") for line in rendered)
+
+
 def test_a_vs_a_is_decided_by_the_gates_own_test_or_a_label_and_reaches_make(workflow):
     """M04 PR 2 (security-reviewer on PR 2): dropping `A_VS_A` from the make line would pass unseen on a labelled PR.
 
