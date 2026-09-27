@@ -278,3 +278,31 @@ def test_s4_a_run_over_the_incumbents_bar_is_red(seed, bar, field, times, measur
     verdict, reasons = gate.rule(out, incumbent_history)
     assert verdict == "RED", f"{bar} {times}x the incumbent's ruled {verdict}: {reasons}"
     assert any(bar in reason for reason in reasons), reasons
+
+
+# --- S5: a pin past, or within 30 days of, its end of life -------------------
+
+SONNET_4 = "anthropic.claude-sonnet-4-20250514-v1:0"
+
+
+@pytest.mark.xfail(strict=True, raises=ImportError,
+                   reason="S5: validate does not read deprecated_after; src/validate/lifecycle.py is M04 PR 2's reader")
+def test_s5_a_pin_within_30_days_of_its_end_of_life_fails_validate(seeded):
+    """The pin moved to Sonnet 4 with `deprecated_after: '2026-10-14'`, Bedrock's `endOfLifeTime`
+    for it (read 2026-09-26, milestones/M04/runs/model_access_2026-09-26.md). Today's manifest
+    check takes the date, and nothing else in validate reads it. From M04 PR 2 a pin whose date is
+    within 30 days of the run, or past, fails; null passes (SPEC/04 section 5). Read before
+    2026-10-14 the seed is "30 days before"; after, "already past". The same check refuses both."""
+    import datetime
+
+    from src.validate import checks
+
+    tree = seeded("s5-deprecated-pin.patch")
+    manifest = yaml.safe_load((tree / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
+    assert manifest["model"]["id"] == SONNET_4 and manifest["deprecated_after"] == "2026-10-14", "the seed"
+    assert checks.check_manifests(tree) == [], "the schema takes the date: only its reader can refuse it"
+
+    from src.validate import lifecycle
+
+    errors = lifecycle.check(tree, today=datetime.date.today())
+    assert any("deprecated_after" in e and "2026-10-14" in e for e in errors), errors

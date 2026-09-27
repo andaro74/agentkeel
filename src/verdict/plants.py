@@ -93,6 +93,7 @@ SEEDS_M04: dict[str, tuple[str, str, str]] = {
     "S2": ("F4.2", "tests/fixtures/m04/s2-equivalent-pin.patch", "infra/bootstrap/app.py"),
     "S3": ("F4.3", "tests/fixtures/m04/s3-a.json, s3-b.json", "src/verdict/build.py"),
     "S4": ("F4.4", "tests/fixtures/m04/s4-slow-raw.json, s4-heavy-raw.json", "src/verdict/gate.py"),
+    "S5": ("none (SPEC/00 section 8 M04)", "tests/fixtures/m04/s5-deprecated-pin.patch", "src/validate/lifecycle.py"),
 }
 
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
