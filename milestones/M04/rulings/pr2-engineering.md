@@ -85,6 +85,23 @@ off (S1 grounding, S2 the candidate list, S3 `differ`, S4 the bars, S5
 `lifecycle.check`): each failed on its planted assertion, with its
 planted message. With the reader on, each passes.
 
+## The first labelled run, refused
+
+The PR opened at `4f7757d`. The `opened` event fired before `gh` added
+the `a-vs-a` label, so that run (36344929457) was cancelled during
+pytest, before any model call, and the PR was closed and reopened. The
+reopened run, 36345059724, read `LABELLED: true` and made both second
+runs; `build` then refused: "A-vs-A: the control's second run was on a
+dirty tree". No envelope was written. The cause was the Makefile's
+chain, not the tree: `src/baseline/run.py`, frozen, calls any untracked
+file dirty, and the control's second run started after the first had
+written into `evals/history/`. Repaired in the Makefile: the control's
+second run goes first, outside the tree, and its raw is moved in after
+the first run. `test_both_control_runs_start_on_a_tree_with_nothing_untracked`
+renders the chain with `make -n`; it fails on `4f7757d`'s Makefile and
+passes on the repair. The cold review read neither; the refusal is
+`build`'s own check in `a_vs_a_pair`.
+
 ## What this does not rule
 
 The swap PRs (read at PR 3). This PR's own measuring run, which does not
