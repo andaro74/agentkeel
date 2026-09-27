@@ -245,3 +245,36 @@ def test_s3_two_runs_of_one_pin_that_differ_are_a_failed_a_vs_a(measured, tmp_pa
     assert envelope["a_vs_a"]["agent"] == ["g-006"], envelope.get("a_vs_a")
     verdict, reasons = gate.rule(out, tmp_path / "no-history")
     assert verdict == "RED" and any("F4_3" in reason for reason in reasons), reasons
+
+
+# --- S4: over the delta_max bars --------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S4: nothing reads p95_ms or the agent's tokens against the incumbent; the bars are M04 PR 2's")
+@pytest.mark.parametrize(("seed", "bar", "field", "times"), [
+    ("s4-slow-raw.json", "p95", "latency_ms", 3),  # p95 at 3x; the bar is 2.0x (SPEC/04 section 2)
+    ("s4-heavy-raw.json", "tokens", "usage", 2),  # the agent's tokens at 2x; the bar is 1.5x
+])  # fmt: skip
+def test_s4_a_run_over_the_incumbents_bar_is_red(seed, bar, field, times, measured, incumbent_history, goldens):
+    """The incumbent's answers, every one grounded and right, three times as slow (p95) or with
+    twice the tokens. The incumbent's history is three runs on the same pin, in the same mode. No
+    golden regresses, so today the gate rules GREEN; `delta_max` (SPEC/04 section 2: p95 at most
+    2.0x the incumbent's median, the agent's tokens at most 1.5x) makes it RED for that reason
+    (F4.4)."""
+    run = fixture(seed)
+    assert run["model_id"] == INCUMBENT and run["mode"] == "runner", "the incumbent's pin, in the history's mode"
+    live = {g["id"]: g for g in goldens.values() if not g.get("retired")}
+    for observation in run["observations"]:
+        incumbent = grounded(live[observation["id"]])
+        if field == "latency_ms":
+            assert observation["latency_ms"] == times * incumbent["latency_ms"], observation["id"]
+        else:
+            assert observation["usage"]["totalTokens"] == times * incumbent["usage"]["totalTokens"], observation["id"]
+        assert {k: v for k, v in observation.items() if k not in ("latency_ms", "usage")} == \
+            {k: v for k, v in incumbent.items() if k not in ("latency_ms", "usage")}, "the same answers"  # fmt: skip
+
+    out = measured(run, history=incumbent_history)
+    verdict, reasons = gate.rule(out, incumbent_history)
+    assert verdict == "RED", f"{bar} {times}x the incumbent's ruled {verdict}: {reasons}"
+    assert any(bar in reason for reason in reasons), reasons
