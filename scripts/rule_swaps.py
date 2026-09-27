@@ -111,9 +111,13 @@ def rule_one(observed: dict[str, Any], scratch: Path) -> dict[str, Any]:
         path.write_bytes(envelope)
         if card is not None:
             target = tree / HISTORY / f"{sha}.baseline-card.json"
-            if target.exists():
-                return unread(entry, f"{target.relative_to(tree).as_posix()} is already in HEAD's tree: not overwritten")
-            target.write_bytes(card)
+            # Compared as git holds it, not as checked out: a checkout may rewrite line endings.
+            at_head = show("HEAD", f"{HISTORY}/{sha}.baseline-card.json")
+            if at_head is None:
+                target.write_bytes(card)
+            elif at_head != card:
+                return unread(entry, f"{target.relative_to(tree).as_posix()} is in HEAD's tree with other bytes: "
+                                     "not overwritten")  # fmt: skip
         ruled = scratch / f"{sha}.gate.json"
         try:
             done = subprocess.run([sys.executable, "-m", "src.verdict.gate", str(path), "--json", str(ruled)], cwd=tree,

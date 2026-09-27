@@ -358,7 +358,8 @@ def card_at(path: Path, ref: Any, root: Path, field: str) -> dict[str, Any]:
 def read(path: Path, root: Path = ROOT) -> dict[str, Any]:
     try:
         envelope = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    # ValueError: not JSON, or not UTF-8 at all, which crashed the gate instead of REJECTing (M04 PR 3).
+    except (OSError, ValueError) as exc:
         raise Rejected(f"{path}: unreadable: {exc}") from exc
     if errors := schema_errors(envelope):
         raise Rejected(f"{path}: does not validate: " + "; ".join(errors))
