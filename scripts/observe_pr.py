@@ -1,8 +1,9 @@
-"""Look up M02's seed PRs, the owner's bypass attempts and the three doors on GitHub, and write what it recorded (P5).
+"""Look up M02's seed PRs, the owner's bypass attempts, the three doors and M04's swap PRs on GitHub, and write what it recorded (P5).
 
     python scripts/observe_pr.py milestones/M02/runs/f2_1_seed_prs.yaml --out seed_prs.json
     python scripts/observe_pr.py milestones/M02/runs/f2_1_bypass.yaml --out bypass.json
     python scripts/observe_pr.py milestones/M02/runs/f2_2_three_doors.yaml --out doors.json
+    python scripts/observe_pr.py milestones/M04/runs/f4_swaps.yaml --out swaps.json
 
 An instrument, in the pattern of `scripts/observe_pr_check.py` (M00) and
 `scripts/observe_attempt.py` (M01). It reads the run file the human filled
@@ -40,6 +41,17 @@ What is read, per run file:
   (merged, `two-key` green on its head, and the merge commit carrying two
   ruling files with distinct seats and `pr:` equal to its number, read
   with git from the checkout's history).
+
+- **swaps** (`swaps:`, M04 PR 2; SPEC/04 §4, §5.1): for each swap PR the
+  human opened, the pull's state and `merged`; every check the ruleset
+  requires on the base, as it concluded on the PR's head; the commit the
+  bot's envelope commit names ("evals: CI-written envelope for <sha>"),
+  the `evals` check on it, and that envelope as the swap branch holds it
+  (verdict, model, regressed, the kinds, checks, `a_vs_a`, tokens). The
+  pin the swap moves to is read from `pinned_roles` in this tree. A swap
+  PR's run never reads itself: the pull request this run is on is skipped
+  and says so (`GITHUB_EVENT_PATH`). Wired in `evals.yml` at M04 PR 3, not
+  PR 2, whose own run would read swap PRs whose rulings are not on `main`.
 
 An entry the human has not filled (`observed: null`) writes an observation
 that says so, and the check fails; it does not error (ruling i, M01).
@@ -397,6 +409,91 @@ def observe_doors(repo: str, run: dict[str, Any], token: str | None, suites_toke
     return doors
 
 
+# --- the swap PRs (M04) ----------------------------------------------------------------
+
+ENVELOPE_COMMIT = re.compile(r"^evals: CI-written envelope for ([0-9a-f]{40})\b")
+
+
+def required_contexts(repo: str, base: str, token: str | None) -> list[str] | None:
+    """The status checks the rules on `base` require; None when they could not be read."""
+    status, rules = get(repo, f"/rules/branches/{base}", token)
+    if status != 200 or not isinstance(rules, list):
+        return None
+    return sorted({check.get("context") for rule in rules if rule.get("type") == "required_status_checks"
+                   for check in rule.get("parameters", {}).get("required_status_checks", [])} - {None})  # fmt: skip
+
+
+def measured_commit(repo: str, number: int, token: str | None) -> str | None:
+    """The commit the last bot envelope commit on the PR names: the one its `evals` run measured."""
+    status, commits = get(repo, f"/pulls/{number}/commits?per_page=100", token)
+    if status != 200 or not isinstance(commits, list):
+        return None
+    for commit in reversed(commits):
+        match = ENVELOPE_COMMIT.match((commit.get("commit") or {}).get("message") or "")
+        if match and (commit.get("author") or {}).get("login") == "github-actions[bot]":
+            return match.group(1)
+    return None
+
+
+def envelope_on(repo: str, sha: str, ref: str, token: str | None) -> dict[str, Any] | None:
+    """`evals/history/<sha>.json` as the branch holds it at `ref`, in brief. None when it is not there."""
+    import base64
+
+    status, body = get(repo, f"/contents/evals/history/{sha}.json?ref={ref}", token)
+    if status != 200 or not isinstance(body, dict) or "content" not in body:
+        return None
+    envelope = json.loads(base64.b64decode(body["content"]).decode("utf-8"))
+    goldens = envelope.get("goldens") or {}
+    return {
+        "commit": envelope.get("commit"), "verdict": envelope.get("verdict"), "mode": envelope.get("mode"),
+        "model_id": envelope.get("model_id"), "region": envelope.get("region"),
+        "model_version": envelope.get("model_version"),
+        "regressed": envelope.get("regressed") or [], "never_passed": envelope.get("never_passed") or [],
+        "kinds": {g: r.get("kind") for g, r in goldens.items()},
+        "checks": {name: c.get("status") for name, c in (envelope.get("checks") or {}).items()},
+        "a_vs_a": envelope.get("a_vs_a"), "p95_ms": envelope.get("p95_ms"),
+        "agent_tokens": envelope.get("agent_tokens"),
+        "tokens_total": (envelope.get("tokens_in") or 0) + (envelope.get("tokens_out") or 0),
+    }  # fmt: skip
+
+
+def own_pr() -> int | None:
+    """The pull request this run is on, from the event GitHub wrote; None off a pull request."""
+    path = os.environ.get("GITHUB_EVENT_PATH")
+    if not path or not Path(path).is_file():
+        return None
+    event = json.loads(Path(path).read_text(encoding="utf-8"))
+    return pr_number((event.get("pull_request") or {}).get("number"))
+
+
+def observe_swap(repo: str, swap: dict[str, Any], record: dict[str, Any], roles: dict[str, Any],
+                 token: str | None) -> dict[str, Any]:  # fmt: skip
+    role = roles.get(swap["role"]) or {}
+    entry = {"swap": swap["swap"], "falsifier": swap["falsifier"], "role": swap["role"],
+             "expected": swap["expected"], "expected_profile": role.get("profile"),
+             "human_said": {k: v for k, v in record.items() if k != "swap"}}  # fmt: skip
+    number = pr_number(record.get("pr"))
+    if number is None:
+        return entry | {"pr": None, "found": False, "note": "no PR number recorded for this swap"}
+    if number == own_pr():
+        return entry | {"pr": number, "found": False, "own_pr": True,
+                        "note": "the pull request this run is on: a swap PR never reads itself (SPEC/04 §4)"}  # fmt: skip
+    entry |= pull(repo, number, token)
+    if not entry["found"]:
+        return entry
+    contexts = required_contexts(repo, entry["base"], token)
+    entry["required_contexts"] = contexts
+    entry["required_on_head"] = None if contexts is None else {
+        name: (run or {}).get("conclusion") for name in contexts
+        for run in [check_run(repo, entry["head_sha"], name, token)]
+    }  # fmt: skip
+    sha = measured_commit(repo, number, token)
+    entry["measured_commit"] = sha
+    entry["evals_on_measured"] = (check_run(repo, sha, "evals", token) or {}).get("conclusion") if sha else None
+    entry["envelope"] = envelope_on(repo, sha, entry["head_sha"], token) if sha else None
+    return entry
+
+
 # --- command line ----------------------------------------------------------------------
 
 
@@ -431,8 +528,17 @@ def main(argv: list[str] | None = None) -> int:
         result["doors"] = observe_doors(repo, run, token, suites_token)
         if not observed:
             result["note"] = "the doors have not been filled in: `observed` is empty in the run file"
+    elif "swaps" in run:
+        result["kind"] = "swaps"
+        result["what"] = "GitHub's record of M04's swap PRs; not an envelope; rules nothing"
+        manifest = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
+        records = {str(r.get("swap")): r for r in (observed or []) if isinstance(r, dict)}
+        result["swaps"] = [observe_swap(repo, swap, records.get(str(swap["swap"]), {}), manifest.get("pinned_roles") or {},
+                                        token) for swap in run["swaps"]]  # fmt: skip
+        if not observed:
+            result["note"] = "the swap PRs have not been opened: `observed` is empty in the run file"
     else:
-        print(f"{args.run}: not a seed-PR, bypass or doors run file", file=sys.stderr)
+        print(f"{args.run}: not a seed-PR, bypass, doors or swaps run file", file=sys.stderr)
         return 1
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

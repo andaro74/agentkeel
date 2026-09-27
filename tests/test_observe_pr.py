@@ -234,3 +234,102 @@ def test_an_indented_validate_line_keeps_its_indent_with_or_without_a_timestamp(
     stamped = "2026-09-25T10:00:00.0000000Z " + detail
     for log in (detail, stamped):
         assert observe_pr.lines_naming(log, "evals/goldens/v1/g-099.yaml", "checks") == [detail]
+
+
+# --- M04: the swap PRs (SPEC/04 §4, §7; read at M04 PR 3) ------------------------
+
+BREAKING = "us.meta.llama3-1-8b-instruct-v1:0"
+EQUIVALENT = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+CAP = 150000
+
+
+def swap(expected: str, **over) -> dict:
+    """A swap PR as observe_pr writes it, read as stated before the run."""
+    red = expected == "RED"
+    envelope = {"model_id": BREAKING if red else EQUIVALENT, "verdict": expected,
+                "regressed": ["g-001"] if red else [], "kinds": {"g-001": "ordinary", "g-013": "guardrail"},
+                "a_vs_a": {"agent": [], "control": ["g-002"]}, "tokens_total": 100000}  # fmt: skip
+    base = {"swap": "breaking" if red else "equivalent", "falsifier": "F4_1" if red else "F4_2",
+            "expected": expected, "expected_profile": envelope["model_id"], "found": True, "merged": False,
+            "evals_on_measured": "failure" if red else "success",
+            "required_on_head": {c: "success" for c in ("checks", "cold-review-ruling", "evals", "ruling-cited", "two-key")},
+            "envelope": envelope}  # fmt: skip
+    for key, value in over.items():
+        if key in envelope and key not in base:
+            envelope[key] = value
+        else:
+            base[key] = value
+    return base
+
+
+def test_the_breaking_swap_passes_only_red_for_a_citing_regression(tmp_path):
+    ok = {"swaps": [swap("RED"), swap("GREEN")]}
+    assert build.check_from_swaps(write(tmp_path, ok), "F4_1", CAP, URL)["status"] == "pass"
+    for over in ({"verdict": "GREEN"}, {"regressed": []}, {"regressed": ["g-013"]},  # a plant is not a citing golden
+                 {"verdict": "UNMEASURED"},  # a call failed: an access error is not the model's reason
+                 {"tokens_total": CAP + 1},  # the cost cap is not the reason either
+                 {"envelope": None},  # REJECTED is never recorded
+                 {"model_id": EQUIVALENT}, {"merged": True}, {"found": False}, {"evals_on_measured": "success"}):  # fmt: skip
+        doc = {"swaps": [swap("RED", **over), swap("GREEN")]}
+        assert build.check_from_swaps(write(tmp_path, doc), "F4_1", CAP, URL)["status"] == "fail", over
+
+
+def test_the_equivalent_swap_passes_only_green_and_mergeable(tmp_path):
+    ok = {"swaps": [swap("RED"), swap("GREEN")]}
+    assert build.check_from_swaps(write(tmp_path, ok), "F4_2", CAP, URL)["status"] == "pass"
+    red_check = {c: "success" for c in ("checks", "evals", "ruling-cited", "two-key")} | {"cold-review-ruling": "failure"}
+    for over in ({"verdict": "RED"}, {"a_vs_a": {"agent": ["g-006"], "control": None}}, {"a_vs_a": None},
+                 {"required_on_head": red_check}, {"required_on_head": {}}, {"required_on_head": None},
+                 {"merged": True}, {"model_id": BREAKING}):  # fmt: skip
+        doc = {"swaps": [swap("RED"), swap("GREEN", **over)]}
+        assert build.check_from_swaps(write(tmp_path, doc), "F4_2", CAP, URL)["status"] == "fail", over
+    assert build.check_from_swaps(write(tmp_path, {"swaps": []}), "F4_2", CAP, URL)["status"] == "fail"
+    with pytest.raises(build.Refused):
+        build.check_from_swaps(write(tmp_path, ok), "F4_2", CAP, None)
+
+
+def test_a_swap_pr_never_reads_itself(tmp_path, monkeypatch):
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"pull_request": {"number": 31}}), encoding="utf-8")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    monkeypatch.setattr(observe_pr, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call on its own PR")))
+    roles = {"m04_equivalent_swap": {"profile": EQUIVALENT}}
+    entry = observe_pr.observe_swap("andaro74/agentkeel", {"swap": "equivalent", "falsifier": "F4_2", "role": "m04_equivalent_swap",
+                                    "expected": "GREEN"}, {"swap": "equivalent", "pr": 31}, roles, None)  # fmt: skip
+    assert entry["found"] is False and entry["own_pr"] is True
+    assert build.swap_held(entry, CAP) is False
+
+
+def test_observe_swap_reads_the_envelope_the_bot_committed(monkeypatch):
+    import base64
+
+    measured, head = "a" * 40, "b" * 40
+    envelope = {"commit": measured, "verdict": "GREEN", "model_id": EQUIVALENT, "region": "us-west-2", "mode": "runner",
+                "regressed": [], "never_passed": [], "goldens": {"g-001": {"kind": "ordinary"}},
+                "checks": {"F4_3": {"status": "pass", "url": URL}}, "a_vs_a": {"agent": [], "control": []},
+                "tokens_in": 90000, "tokens_out": 10000}  # fmt: skip
+    answers = {
+        "/pulls/32": {"html_url": "u", "state": "open", "merged": False, "base": {"ref": "main"}, "head": {"sha": head}},
+        "/rules/branches/main": [{"type": "required_status_checks",
+                                  "parameters": {"required_status_checks": [{"context": "evals"}, {"context": "checks"}]}}],
+        "/pulls/32/commits?per_page=100": [
+            {"sha": measured, "commit": {"message": "M04 swap"}, "author": {"login": "andaro74"}},
+            {"sha": head, "commit": {"message": f"evals: CI-written envelope for {measured}\n\nRun: x"},
+             "author": {"login": "github-actions[bot]"}}],
+        f"/contents/evals/history/{measured}.json?ref={head}": {"content": base64.b64encode(json.dumps(envelope).encode()).decode()},
+    }  # fmt: skip
+
+    def get(repo, path, token):
+        if path.startswith("/commits/"):
+            name = path.split("check_name=")[1].split("&")[0]
+            return 200, {"check_runs": [{"id": 1, "status": "completed", "conclusion": "success", "html_url": name}]}
+        return (200, answers[path]) if path in answers else (404, None)
+
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+    monkeypatch.setattr(observe_pr, "get", get)
+    roles = {"m04_equivalent_swap": {"profile": EQUIVALENT}}
+    entry = observe_pr.observe_swap("andaro74/agentkeel", {"swap": "equivalent", "falsifier": "F4_2", "role": "m04_equivalent_swap",
+                                    "expected": "GREEN"}, {"swap": "equivalent", "pr": 32}, roles, None)  # fmt: skip
+    assert entry["measured_commit"] == measured and entry["required_on_head"] == {"checks": "success", "evals": "success"}
+    assert entry["envelope"]["verdict"] == "GREEN" and entry["envelope"]["tokens_total"] == 100000
+    assert build.swap_held(entry, CAP) is True
