@@ -90,6 +90,7 @@ SEEDS_M03: dict[str, tuple[str, str, str]] = {
 # whether a seed is read. Listing them reads nothing and gates nothing.
 SEEDS_M04: dict[str, tuple[str, str, str]] = {
     "S1": ("F4.1", "tests/fixtures/m04/s1-breaking-pin.patch, s1-breaking-raw.json", "src/verdict/build.py"),
+    "S2": ("F4.2", "tests/fixtures/m04/s2-equivalent-pin.patch", "infra/bootstrap/app.py"),
 }
 
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.

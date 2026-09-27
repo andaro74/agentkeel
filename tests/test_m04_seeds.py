@@ -170,3 +170,49 @@ def test_s1_a_breaking_swap_whose_answers_the_tool_never_grounded_is_red(seeded,
     assert ungrounded == [], f"answers the tool did not ground passed: {ungrounded}"
     assert verdict == "RED", reasons
     assert any("regressed" in reason for reason in reasons), reasons
+
+
+# --- S2: an equivalent swap the eval role cannot call ------------------------
+
+SONNET_45 = "anthropic.claude-sonnet-4-5-20250929-v1:0"
+
+
+def eval_role_invokes(tmp_path: Path) -> list[dict[str, Any]]:
+    """The eval role's Allow statements that grant bedrock:InvokeModel, from the synthesised bootstrap template.
+
+    Synthesised as tests/test_bootstrap.py does: the rendered template is what
+    the human deploys, so it is what IAM will say."""
+    import os
+    import sys
+
+    done = subprocess.run([sys.executable, str(ROOT / "infra" / "bootstrap" / "app.py")], cwd=ROOT,
+                          capture_output=True, text=True, check=False,
+                          env={**os.environ, "PYTHONPATH": str(ROOT), "CDK_OUTDIR": str(tmp_path)})  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    template = json.loads((tmp_path / "AgentkeelBootstrap.template.json").read_text(encoding="utf-8"))
+    for logical, resource in template["Resources"].items():
+        if resource["Type"] == "AWS::IAM::Policy" and "EvalRole" in logical:
+            statements = resource["Properties"]["PolicyDocument"]["Statement"]
+            return [s for s in statements if s["Effect"] == "Allow"
+                    and "bedrock:InvokeModel" in ([s["Action"]] if isinstance(s["Action"], str) else s["Action"])]
+    raise AssertionError("no policy on the eval role")
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S2: the eval role may invoke only MODELS; the candidate list is M04 PR 2's reader")
+def test_s2_the_equivalent_swaps_pin_is_one_the_eval_role_may_invoke(seeded, tmp_path):
+    """The pin moved to Sonnet 4.5, the Threshold Owner's equivalent, and nothing else changed. The
+    swap PR's run calls it through the eval role; if the role may not invoke it, every call is
+    AccessDeniedException, every golden fails and the swap is RED for a reason that is IAM's, not the
+    model's (F4.2; SPEC/04 §3 item 2). Read from the template the human deploys."""
+    tree = seeded("s2-equivalent-pin.patch")
+    pin = pin_of(tree)
+    assert pin["id"] == SONNET_45 and pin["profile"] == f"us.{SONNET_45}", "the seed moves the pin"
+    assert pin["region"] == "us-west-2", "and nothing else"
+
+    invokes = json.dumps(eval_role_invokes(tmp_path))
+    assert f"inference-profile/{INCUMBENT}" in invokes, "the incumbent's profile is there: the read is the right one"
+    assert f"inference-profile/{pin['profile']}" in invokes, \
+        f"the eval role may not invoke the equivalent swap's profile {pin['profile']}"  # fmt: skip
+    assert f"foundation-model/{pin['id']}" in invokes, \
+        f"the eval role may not invoke the equivalent swap's model {pin['id']}"  # fmt: skip
