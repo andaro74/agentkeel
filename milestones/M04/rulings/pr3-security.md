@@ -95,9 +95,34 @@ the eval role's session. What reaches it, and the gate, from a swap PR:
 
 ## 3. The bootstrap redeploy (PR 2's `pr2-security.md` §1)
 
-Carried here because PR 2 merged before it was recorded. Sonnet 4.5
-answered every call on #26, so the eval role's candidate list is deployed.
-**Still to record, from the human:** the `cdk diff --strict` read against
-the checklist (only the EvalRole's policy changed), whether the deployed
-side read `§` or `?` (`open.md` row 6), the template size at that head,
-and `aws iam get-role-policy` on `agentkeel-evals` read back.
+Carried here because PR 2 merged before it was recorded. The human ran
+`cdk diff --strict` on `AgentkeelBootstrap` and deployed on 2026-09-27
+(output kept at 13:12 local, read here by the session). Against the
+checklist in `pr2-security.md` §1:
+
+1. **Only the EvalRole's `AWS::IAM::Policy` changed in its statements.**
+   `InvokePinnedProfiles` gained the three candidate profiles;
+   `InvokePinnedModelsThroughProfilesOnly` gained nine `foundation-model`
+   ARNs (three models in three regions) and the same three profiles in
+   its `bedrock:InferenceProfileArn` condition.
+2. **Nothing else changed in a statement:** no change to the boundary,
+   the deploy role or its boundary, `CopyFromThePinnedProfilesOnly`, the
+   trust policy or any key policy.
+3. **Every other difference is cdk-nag suppression text,** on the
+   boundary, five endpoint security groups and the execution, deploy,
+   developer and eval roles' policies: `§` in the tree against **`?` on
+   the deployed side**. That answers `open.md` row 6: the deployed
+   template read `?`; after this deploy it reads `§`. The diff was a
+   template diff (CDK could not create a change set), not a change set.
+4. **The template at this PR's head:** 49,173 of 51,200 bytes, compact
+   JSON, from a local synth (PR 1 measured 49,107 by the same method in a
+   scratch worktree; the 66 bytes between are not accounted for here).
+5. **Read back after the deploy:** `aws iam get-role-policy` on
+   `agentkeel-evals`, `EvalRoleDefaultPolicy39B7B632`: five profiles in
+   `InvokePinnedProfiles`; fifteen `foundation-model` ARNs and the same
+   five profiles in `InvokePinnedModelsThroughProfilesOnly`'s condition;
+   the Deny (`DenyEscalationAndEvidenceDeletion`) and every other
+   statement as before. It matches the diff.
+
+Sonnet 4.5 then answered every call on #26: the candidate list is
+deployed, and S2's reader has fired on a real run.
