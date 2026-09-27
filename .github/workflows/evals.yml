@@ -67,8 +67,9 @@
 # M04 PR 3 (SPEC/04 §4): the swap PRs. The observer step below also reads
 # milestones/M04/runs/f4_swaps.yaml (GitHub's record of each swap PR), and
 # `make evals` hands it to scripts/rule_swaps.py, which has the gate rule each
-# swap's own envelope from its head in this checkout (fetch-depth: 0 fetches
-# every branch). build records the verdicts in the envelope's `swaps`, gated
+# swap's own envelope, read at the bot's envelope commit in this checkout
+# (fetch-depth: 0 fetches every branch), in a worktree of HEAD, with no
+# credentials in its environment. build records the verdicts in `swaps`, gated
 # by nothing (Product, M04 PR 3): the equivalent swap regressed g-005 and F4.2
 # fired, and a check failing on every envelope from then on would block every
 # later pull request for a result that is already the finding.

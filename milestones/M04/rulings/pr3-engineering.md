@@ -55,6 +55,26 @@ diff. The human rules as Engineering before the merge.
 | N7 | A badly joined condition in `build.py` | **Repaired** in the F1 rewrite |
 | N8 | The Security ruling's readback | **Open**, with the human |
 
+## The second read (`fe31b6c..e8ab126`)
+
+`engineering-cold-reviewer` read the repair: 0 BLOCK, 4 FINDING, 7 NOTE,
+verbatim in the PR body. It found B1, B2, the credentials item and F1 held
+against every attack it tried.
+
+| # | Item | Status |
+|---|---|---|
+| F1 | `card_at` crashed on a card that was not UTF-8 or not a mapping | **Repaired**: REJECTED; and with `--strict-cards` no card is opened off its fixed path |
+| F2 | The credentials test would pass with the repair reverted | **Repaired**: the test captures the gate's process at the call site: its environment, `--strict-cards`, its timeout, and a different worktree for each swap |
+| F3 | Three hostile cases had no test; "a worktree per swap" was not tested | **Repaired**: the timeout, the card over other bytes, the card-write path real swaps take, and a worktree per swap are each a test; the README says only what is tested |
+| F4 | Row 4's Falsifiers cell said PR 4's run decides F4.2 | **Repaired** (Product): the cell says the first run decides, read again at PR 4 |
+| N1 | The `evals.yml` comment | **Repaired** (Security) |
+| N2 | The joined line in `observe_pr.py` | **Repaired** |
+| N3 | No swaps observed means no field, silently | **Recorded**: PR 4's read rests on `f4_swaps.yaml` listing both, and on the row's "RED if PR 4's run cannot read the swap PRs" |
+| N4 | The spoofable bot author | **Recorded**, in `pr3-security.md` §1 |
+| N5 | `show()` reads a whole blob | **Recorded**: bounded by 60 s per call |
+| N6 | The P5 guard is a string match | **Recorded** |
+| N7 | No CI envelope carries `swaps` yet | **Recorded**: this PR's own run is its first |
+
 ## Falsify it
 
     git diff --stat da6feae...HEAD -- src/baseline/            # empty

@@ -8,7 +8,7 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
 | Field | Row 4 |
 |---|---|
 | Claim | A breaking model swap goes RED; an equivalent swap promotes; A-vs-A is zero diff |
-| Falsifiers | F4.1 the breaking swap is GREEN, or RED for a reason other than a citing golden regressed, ungrounded or with wrong fields (a REJECTED, an access error or the cost cap is not the reason) (live: the breaking swap PR, read at PR 4's run). F4.2 the equivalent swap is RED or REJECTED, or a required check on its PR is red for a reason of its own ("promotes" is mergeable, not merged; live: the equivalent swap PR, read at PR 4's run). F4.3 A-vs-A shows a diff: two runs of one pin in one `evals` job with any golden's `pass` different (the milestone stops). F4.4 a run over a `delta_max` bar is GREEN: `p95_ms` over 2.0x, or the agent's tokens over 1.5x, the incumbent's median in the same mode. |
+| Falsifiers | F4.1 the breaking swap is GREEN, or RED for a reason other than a citing golden regressed, ungrounded or with wrong fields (a REJECTED, an access error or the cost cap is not the reason) (live: the breaking swap PR, read at PR 4's run). F4.2 the equivalent swap is RED or REJECTED, or a required check on its PR is red for a reason of its own ("promotes" is mergeable, not merged; live: the equivalent swap PR, whose first run decides (#26, `9ff21d5`), read again at PR 4's run and recorded, not gated). F4.3 A-vs-A shows a diff: two runs of one pin in one `evals` job with any golden's `pass` different (the milestone stops). F4.4 a run over a `delta_max` bar is GREEN: `p95_ms` over 2.0x, or the agent's tokens over 1.5x, the incumbent's median in the same mode. |
 | Seeded commit | `a16e2c7` (S1); `c6b6cb8` (S2); `6f18507` (S3); `63033b7` (S4, two cases), S3's and S4's raw runs remade at `2dc81ae` and `e0ce2ce` before any reader; `8994dcb` (S5, no falsifier: SPEC/00 §8 M04's `deprecated_after`), each its own commit before any reader (SPEC/04 §5) |
 | Expected gate output | PR 1: refagent's envelope as at M03; it says nothing about claim 4. PR 1 leaves `agents/refagent/**` and `data/rights_table.json` alone, so its run may be the first `mode: runtime` envelope at guardrail `1088aw3ujhyd:5` (`open.md` row 10); the envelope says whether it is. `make plants` lists S1 to S5; `tests/test_m04_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 to S5 refused by their readers, each for its planted reason; refagent under tool grounding ordinary 9/9, traps 2/2 (`g-021` retired at PR 2 before grounding landed, nothing added; restated before PR 2's run), fewer being the finding; refagent's A-vs-A zero diff, the control's reported and not gated, on PR 2's own run (the `a-vs-a` label); p95 and tokens within their bars. From PR 2's merge the gate requires `F4_1`, `F4_2` and `F4_4` on every agent envelope and `F4_3` where A-vs-A runs; **`F4_1` and `F4_2` from the seed tests alone are test-only witnesses**. During PR 2 the human redeploys the bootstrap stack with the eval role's candidate list after reading `cdk diff --strict`, and opens the two swap PRs from PR 2's head. **A named P3 exception (SPEC/04 §5.1): PR 4's run reads the swap PRs, after their rulings are on `main`;** amended at PR 3, since PR 2 merged before the rulings joined it: PR 3 is the repair and the read's machinery, and the read is recorded in the envelope's `swaps` and gated by nothing (`F4_1` and `F4_2` stay test-only witnesses). The equivalent swap's first run regressed `g-005` in both of its runs, recorded at PR 3 before the reading run: that run decides F4.2 (SPEC/04 §7), and PR 4 records the swaps' re-runs in `f4_swaps.yaml` so its own run measures and reads them. Stated before: the breaking swap RED with at least one citing golden regressed, ungrounded or wrong, and no REJECTED, access error or cost cap; the equivalent swap GREEN with every required check green. RED if a seed's test passes but by its reader, if either swap reads otherwise, if refagent's A-vs-A shows a diff, if a run over a bar rules GREEN, if PR 4's run cannot read the swap PRs, or if `make ledger` stops matching rows 0 to 3. |
 | Measured | — |
@@ -150,9 +150,16 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
   with the eval role's session in its environment (B1 in both reports).
   Now two fixed paths are read at the bot's envelope commit, each swap
   gets a fresh worktree, and the gate runs with no credentials; one bad
-  file marks that swap unread instead of failing the run. Each hostile
-  case is a test. One test found a gate bug: a file that is not UTF-8
-  crashed the gate instead of being REJECTED.
+  file marks that swap unread instead of failing the run. A second read
+  by both reviewers found the first repair short: the gate still opened
+  any card path an envelope named, reasons reached the envelope uncut,
+  there was no total time budget, and three hostile cases had no test.
+  Now the gate, given `--strict-cards`, opens a card only at its fixed
+  path; reasons are cut; the read has 240 s in all; and each of those
+  cases, the timeout, the credentials at the call site and the worktree
+  per swap included, is a test. Two tests found gate bugs: an envelope or
+  a card that is not UTF-8, or a card that is not a mapping, crashed the
+  gate instead of being REJECTED.
 - **Which run decides F4.2** (Product, drafted): #26's first run. A
   GREEN at PR 4's read is recorded beside it, not in its place.
 - **After this PR merges:** `main` is merged into both swap branches,
