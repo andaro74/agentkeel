@@ -7,6 +7,7 @@
 ruling: pr1-threshold-owner
 seat: Threshold Owner
 authorises:
+  - .claude/agents/threshold-owner.md
   - docs/adr/ADR-0009-the-closed-list-of-relaxations-amended.md
   - docs/adr/ADR-0010-the-pins-lifecycle-fields-are-the-threshold-owners.md
   - tests/fixtures/m04/s1-breaking-pin.patch
@@ -45,6 +46,17 @@ diff at `688634c`) are in the PR body verbatim.
 | 11 | `version` records a versioned id's suffix; null only when the id has none | SPEC/04 §2 |
 | 12 | `pinned_roles` completed at PR 2 before either swap PR opens | SPEC/04 §5.1 |
 | 13 | The control stays Nova Micro at `m00`; a swap moves the agent only (`open.md` row 12) | SPEC/04 §10 |
+
+**`.claude/agents/threshold-owner.md`** (`seat: threshold-owner`), on the
+second cold read's note 4: its description and check 1 said "two keys on
+any downward move", though every bar relaxes upward and entry 6 is new
+here. Check 1 now names the closed list of SPEC/02 §2 as ADR-0009 and its
+amendments leave it, entries 1, 2, 3 and 6 for this seat, and the `keys:`
+line the second key must carry; it reads ADR-0009. The `threshold-owner`
+report on the edit (0 BLOCK, 2 FINDING, 6 NOTE) is in the PR body; its two
+findings and notes 3, 5, 6 and 8 are applied, with SPEC/00 §5 (Product).
+Its note 4, R10's N not on the list and read by no gate, is `open.md` row
+28, M05. The prompt still never rules and never edits.
 
 **Held for PR 2 by this seat:** the two bars into `thresholds.yaml`; the
 cap re-ruled against A-vs-A's measured spend (two keys if raised); the

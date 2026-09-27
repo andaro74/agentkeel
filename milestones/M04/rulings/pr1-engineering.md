@@ -80,7 +80,7 @@ with `--runxfail`, each seed fails on its planted line; `make validate`,
 | 2N1 | S3's `SystemExit` and S5's `ImportError` are also the classes a precondition could raise | Recorded: S1 and S4 pass the same flags and would FAIL on the same refusal; `src.validate.checks` is imported by every `validate` run |
 | 2N2 | Once the gate requires claim 4's checks, `measured` must pass their flags or S3's preconditions raise `SeedBroken` | PR 2, Engineering: a `claim_4_checks` beside `claim_2_checks` in the harness; the seed stays as planted |
 | 2N3 | `pr1-threshold-owner.md` authorises paths other seats own as well | Recorded: that file is the Threshold Owner's key on its rulings, and each path is also covered by its own seat |
-| 2N4 | `.claude/agents/threshold-owner.md` and SPEC/00 §5's table still name no entry 6 | Threshold Owner and Product: before PR 2 (Unsure B in the PR body) |
+| 2N4 | `.claude/agents/threshold-owner.md` and SPEC/00 §5's table still name no entry 6 | **Done in this PR**: the prompt and SPEC/00 §5 name entry 6 and the whole list (`pr1-threshold-owner.md`) |
 | 2N5 | The checks the reviewer could not run | Run by the session, above |
 
 Also in this seat's paths: the data-owner's F1 and F3 (`e0ce2ce`: the date

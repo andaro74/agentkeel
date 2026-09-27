@@ -101,7 +101,7 @@ P11. **Only CI-written envelopes are evidence.** A local run
 | Rule Owner | what the agent may say and do | `rules/**` and `agents/*/rules/**`, guardrail id/version in manifest | edit goldens; write product code |
 | Data Owner | what CORRECT means | `evals/goldens/**`, `data/**` (slate, rights table, clause index, corpus), rulings on FRAGILE, corpus admission | weaken a golden to green a build |
 | Tool Owner | tool and edge contracts | `tools/**` and `agents/*/tools/**` schemas, `may_call`, `may_be_called_by` | change a schema without a major bump |
-| Threshold Owner | the bars, and which models are measured | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region (A-vs-A compares the pair) | move a bar without two keys |
+| Threshold Owner | the bars, and which models are measured | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region (A-vs-A compares the pair) | move a bar in its `relaxes:` direction, or a pin's `deprecated_after` later, to null or removed with the model unchanged (ADR-0009 amendment 1), without two keys |
 | Security | what tooling and infra MAY DO | platform repo: workflows, `.github/CODEOWNERS` (ADR-0003 amendment 2), construct (`infra/construct/**`), bootstrap stack (`infra/bootstrap/**`), the rest of `infra/**`, KMS key policy, cosign identity, security account; seats → groups in a manifest | define scope |
 | Engineering | that it works | `src/**`, `scripts/**`, `Makefile`, root config (`pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`, `.gitattributes`), `tests/**`, `agents/<name>/**` but for the fields and folders other seats own (ADR-0003 amendment 1), `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | self-approve any of the above |
 | (the seat named in its front matter) | its own routing | `.claude/agents/<name>.md` | rule; write to any seat-owned path |
@@ -146,7 +146,7 @@ approval. The mechanical gates are, exhaustively:
 - `two-key` — a diff that relaxes a threshold, retires a rule or golden,
   changes retention, or is a human commit touching `evals/history/**`
   cites rulings from two distinct seats (the closed list is SPEC/02 §2,
-  amended by ADR-0009 at M03 PR 1);
+  amended by ADR-0009 at M03 PR 1 and by its amendment 1 at M04 PR 1);
 - `regression` — the eval gate: RED on any regressed golden or any
   silent plant (`plants_expected ≠ plants_fired`), read on
   `scope: agent` results only. The baseline is the control
