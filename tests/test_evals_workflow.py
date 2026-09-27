@@ -265,12 +265,13 @@ def test_the_three_observations_are_made_and_handed_to_make_evals(workflow):
     observe = [s for s in steps if "scripts/observe_pr.py" in str(s.get("run", ""))]
     assert len(observe) == 1
     run = str(observe[0]["run"])
-    for name in ("f2_1_seed_prs.yaml", "f2_1_bypass.yaml", "f2_2_three_doors.yaml"):
-        assert f"milestones/M02/runs/{name}" in run
+    for name in ("M02/runs/f2_1_seed_prs.yaml", "M02/runs/f2_1_bypass.yaml", "M02/runs/f2_2_three_doors.yaml",
+                 "M04/runs/f4_swaps.yaml"):  # fmt: skip
+        assert f"milestones/{name}" in run
     assert observe[0].get("if") == "steps.current.outputs.measured_at == ''", "on the measuring path, as F0.3's observer is"
     assert "GITHUB_TOKEN" in observe[0].get("env", {})
     measure = measuring_steps(workflow)[0]["run"]
-    for flag in ("SEED_PRS_OBS=", "BYPASS_OBS=", "DOORS_OBS="):
+    for flag in ("SEED_PRS_OBS=", "BYPASS_OBS=", "DOORS_OBS=", "SWAPS_OBS="):
         assert flag in measure
     assert steps.index(observe[0]) < steps.index(measuring_steps(workflow)[0])
 

@@ -202,8 +202,8 @@ reader can look at.
 
 | Id | Fires when | What it looks like in the repo |
 |---|---|---|
-| F4.1 | the breaking swap is GREEN | S1's raw run built and gated GREEN in a copy of the tree; or the breaking swap PR's `evals` check green, or its envelope GREEN, or RED for a reason other than §7's; `checks.F4_1: fail` |
-| F4.2 | the equivalent swap is RED | S2's pin not among the models the eval role may invoke; or the equivalent swap PR's envelope RED or REJECTED, or a required check on it red for a reason of its own; `checks.F4_2: fail` |
+| F4.1 | the breaking swap is GREEN | S1's raw run built and gated GREEN in a copy of the tree; or the breaking swap PR's `evals` check green, or its envelope GREEN, or RED for a reason other than §7's; `checks.F4_1: fail` from the seed test; from PR 3, the live swap in the envelope's `swaps`, recorded and not gated (§4) |
+| F4.2 | the equivalent swap is RED | S2's pin not among the models the eval role may invoke; or the equivalent swap PR's envelope RED or REJECTED, or a required check on it red for a reason of its own; `checks.F4_2: fail` from the seed test; from PR 3, the live swap in the envelope's `swaps`, recorded and not gated (§4) |
 | F4.3 | A-vs-A shows a diff | refagent's two runs in one `evals` job with any golden's `pass` different; `checks.F4_3: fail`, the differing ids in the envelope's `a_vs_a`. The milestone stops (§1) |
 | F4.4 | a p95 regression beyond the bar is GREEN | S4's raw run built and gated GREEN; or an agent envelope whose `p95_ms` or agent tokens are over the bar at its commit, ruled GREEN; `checks.F4_4: fail` |
 
@@ -219,14 +219,23 @@ reader can look at.
   own two refagent raws, compared by `verdict.build`. Not on other PRs:
   it doubles the spend, and a flake after the close would block every
   M05 PR with no FRAGILE to hold it (finding 6).
-- **The second source of `F4_1` and `F4_2`, from PR 3's run:** the two
-  swap PRs looked up in GitHub's record by `scripts/observe_pr.py`
-  (M02's reader) from `milestones/M04/runs/f4_swaps.yaml`. A named P3
-  exception (§5.1). `build` then writes each as pass only when both
-  sources pass.
-- **A swap PR never reads itself.** Its tree does not carry
-  `f4_swaps.yaml`, and `observe_pr` skips the pull request its own run is
-  on. The equivalent swap can therefore be all-green on its own run.
+- **The swap PRs, from PR 3 (amended at PR 3, Product):** looked up in
+  GitHub's record by `scripts/observe_pr.py` (M02's reader) from
+  `milestones/M04/runs/f4_swaps.yaml`, and each one's own envelope ruled
+  by the gate at its commit (`scripts/rule_swaps.py`). `build` records
+  both in the envelope's optional `swaps`, and **nothing gates it**:
+  `F4_1` and `F4_2` stay the seed tests' witnesses. As first written,
+  `build` wrote each check as pass only when both sources passed. The
+  equivalent swap's first run regressed `g-005` in both of its runs, so
+  F4.2 fired; a check that failed on every envelope from then on would
+  have blocked every later pull request for a result that is already the
+  finding, and the one run that read it could not have merged. The
+  ledger's Measured cell prints `swaps`, so `make ledger` holds row 4 to
+  a CI-written envelope. A named P3 exception (§5.1).
+- **A swap PR never reads itself.** `observe_pr` skips the pull request
+  its own run is on, and `rule_swaps` writes it unread. Once `main` is
+  merged into a swap branch its tree carries `f4_swaps.yaml`, so its run
+  records the other swap; recorded only, as everywhere.
 
 `CLAIM_4_CHECKS` in the gate: `F4_1`, `F4_2` and `F4_4` on every agent
 envelope from PR 2's merge commit; `F4_3` on the envelopes above.
@@ -286,12 +295,21 @@ met.
   equivalent. Each runs refagent in `mode: runner` (its bundle differs
   from the deployed one), with A-vs-A. Their numbers go in
   `milestones/M04/runs/f4_swaps.yaml`, and their rulings (Threshold
-  Owner, `pr:` each swap PR) into PR 2.
-- **After PR 2 merges.** The swap PRs' checks re-run with their rulings
-  on `main`. PR 3's run looks both up: the named P3 exception, as M02
-  read its seed PRs at PR 3. **PR 3 is both this read and the repair**
-  (finding 13). If either misses, row 4 closes RED at PR 4 with that as
-  the finding. There is no fifth PR.
+  Owner, `pr:` each swap PR) into PR 2. **Amended at PR 3:** PR 2 (#24)
+  merged before either joined it, and the swap PRs (#25, #26) ran after,
+  so both are in PR 3.
+- **After PR 3 merges** (amended at PR 3; was "after PR 2 merges"). The
+  swap PRs' rulings are on `main`. `main` is merged into each swap
+  branch, which leaves its diff the pin alone, and its checks run again
+  on PR 3's repaired tests. PR 4's run looks both up: the named P3
+  exception, as M02 read its seed PRs at PR 3. **PR 3 is the repair and
+  the read's machinery; PR 4's run is the read.** PR 4 records the swaps'
+  new envelopes in `f4_swaps.yaml`, which is not prose, so its run
+  measures and reads them rather than reuse an earlier envelope
+  (security-reviewer F3 on PR 3). The machinery is not
+  built in the last PR: it lands and runs at PR 3, where it reads the
+  swaps as they stand then. If either misses at PR 4, row 4 closes RED
+  with that as the finding. There is no fifth PR.
 - **Never:** no swap PR merges. The equivalent swap is closed unmerged
   once read.
 
@@ -325,8 +343,9 @@ None of it is in PR 1. In the order the commits land:
 - **`pinned_roles`** (Threshold Owner): region and version on every
   swap role, and the stub's model fields (`open.md` row 14).
 - **`scripts/observe_pr.py`** (Engineering) given
-  `milestones/M04/runs/f4_swaps.yaml`; it skips its own PR. Wired at
-  PR 2, read at PR 3.
+  `milestones/M04/runs/f4_swaps.yaml`; it skips its own PR. Written at
+  PR 2; wired at PR 3 with `scripts/rule_swaps.py`; read at PR 4's run
+  (amended at PR 3).
 - **`CLAIM_4_CHECKS`** in the gate; the new `--check-*` in `build` and
   `evals.yml`.
 
@@ -352,7 +371,7 @@ None of it is in PR 1. In the order the commits land:
   A-vs-A zero diff for refagent, on PR 2's own run (the `a-vs-a` label);
   the control's diff recorded, not gated. p95 and tokens within their
   bars.
-- **PR 3's run, stated before it.** The breaking swap PR RED with at
+- **The reading run (PR 4's; PR 3's as first written), stated before it.** The breaking swap PR RED with at
   least one citing golden `regressed`, ungrounded or with wrong fields,
   and none of these: REJECTED, access errors, the cost cap. Any other
   RED is a finding, not a pass (finding 2). The equivalent swap PR GREEN
@@ -361,8 +380,18 @@ None of it is in PR 1. In the order the commits land:
   its reader; if the breaking swap is GREEN or RED for another reason;
   if the equivalent swap is RED or any of its required checks stays red
   for a reason of its own; if refagent's A-vs-A shows any diff; if a p95
-  or token count over its bar rules GREEN; if PR 3 cannot read the swap
-  PRs; or if `make ledger` stops matching rows 0 to 3 when a bar lands.
+  or token count over its bar rules GREEN; if PR 4's run cannot read the
+  swap PRs; or if `make ledger` stops matching rows 0 to 3 when a bar
+  lands. **Recorded at PR 3, before the reading run:** the equivalent
+  swap's first run (#26, `9ff21d5`) regressed `g-005`, the same way in
+  both runs (available, clause `EM-1`, no embargo, where 01:30 UTC is
+  still 13 May in São Paulo). **That run decides F4.2** (Product, on
+  threshold-owner's finding and the cold review's F2 on PR 3): §2 named
+  the candidate before any run, and nothing since has touched the model,
+  `g-005` or the rights table, so a different answer at the reading run
+  would be a difference between jobs, not a fix. The reading run records
+  the swaps on the repaired tree; a GREEN there is recorded beside the
+  first run, and row 4 closes RED on F4.2 either way.
 
 ## 8. Controls with no seeded case at M04
 

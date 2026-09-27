@@ -207,7 +207,9 @@ def test_the_model_is_reachable_only_through_the_agents_own_profile(template):
     assert len(direct) == 1
     assert direct[0]["Condition"] == {"StringEquals": {"bedrock:InferenceProfileArn": profile_arn(template),
                                                        "bedrock:GuardrailIdentifier": guardrail_identifier()}}
-    assert all(arn.endswith("::foundation-model/anthropic.claude-sonnet-4-6") for arn in direct[0]["Resource"])
+    # The manifest's own model, not a literal: a swap PR moves the pin, and the gate measures that (SPEC/04).
+    model = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))["model"]["id"]
+    assert all(arn.endswith(f"::foundation-model/{model}") for arn in direct[0]["Resource"])
 
 
 # --- B1 (M01 PR 3): the runtime can pull its own image -----------------------
