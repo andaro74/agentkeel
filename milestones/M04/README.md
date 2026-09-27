@@ -64,8 +64,9 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
   (findings 9, 10); the M03 video (row 24); the gateway probe record.
   Every `open.md` row and the two new items are answered or moved in
   `feasibility.md` §6.
-- **This PR's run** writes refagent's envelope as at M03. It does not
-  measure claim 4. PR 1 does not touch `agents/refagent/**` or
-  `data/rights_table.json`, so the run may be in `mode: runtime` at
-  guardrail version 5, the first (`open.md` row 10); what it says is read
-  from the envelope, not from this line.
+- **This PR's run** wrote refagent's envelope as at M03, and it does
+  not measure claim 4. It is the first envelope in `mode: runtime` at
+  guardrail version 5 (`open.md` row 10): `e518927`'s, CI run
+  36331360122, committed by `github-actions[bot]` as `82dfd42`, GREEN,
+  plants 7 of 7, agent 18 of 20 (`g-014`, `g-021` never passed), p95
+  5,948 ms, 52,652 tokens; the gate on it exits 0.
