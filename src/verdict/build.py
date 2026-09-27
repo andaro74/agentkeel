@@ -202,7 +202,9 @@ def grounded(parsed: dict[str, Any], observation: dict[str, Any]) -> bool:
     """
     row, clause = parsed.get("table_row"), parsed.get("clause_id")
     for call in observation.get("tool_calls") or []:
-        output = call.get("output") if isinstance(call, dict) else None
+        if not isinstance(call, dict):  # grounds nothing, and does not stop the envelope (cold review of PR 2, N1)
+            continue
+        output = call.get("output")
         if call.get("name") != "check_availability" or call.get("status") != "success" or not isinstance(output, dict):
             continue
         found = output.get("row") if output.get("found") is True else None
@@ -507,53 +509,6 @@ def check_from_doors(path: Path, run_url: str | None) -> dict[str, str]:
     return {"status": "pass" if door_1 and door_2 and door_3 else "fail", "url": run_url}
 
 
-def swap_held(swap: dict[str, Any], cap: int) -> bool:
-    """One swap PR as SPEC/04 §7 states it before the read (the Threshold Owner, ruling on finding 2).
-
-    Breaking (F4_1): the PR unmerged, its envelope on the breaking pin, RED,
-    the `evals` check red on the commit it measured, and at least one citing
-    golden regressed; and none of the reasons that are not the model's: an
-    UNMEASURED run (a call failed: an access error), a run over the cap, or
-    no envelope at all (REJECTED is never recorded). Other reasons beside a
-    citing regression are allowed; with none, the RED is a finding, not a pass.
-
-    Equivalent (F4_2): the PR unmerged ("promotes" is mergeable, not merged:
-    ruling 1), its envelope on the equivalent pin, GREEN, A-vs-A zero diff,
-    and every check the base requires green on its head.
-    """
-    envelope = swap.get("envelope") or {}
-    if swap.get("found") is not True or swap.get("merged") is not False or not envelope:
-        return False
-    if not swap.get("expected_profile") or envelope.get("model_id") != swap["expected_profile"]:
-        return False
-    if swap.get("expected") == "RED":
-        citing = [g for g in envelope.get("regressed") or [] if (envelope.get("kinds") or {}).get(g) in CITING_KINDS]
-        return (envelope.get("verdict") == "RED" and swap.get("evals_on_measured") == "failure" and bool(citing)
-                and envelope.get("tokens_total", cap + 1) <= cap)  # fmt: skip
-    if swap.get("expected") == "GREEN":
-        on_head = swap.get("required_on_head") or {}
-        a_vs_a = envelope.get("a_vs_a") or {}
-        # The envelope is read from the swap's branch, where a commit can claim the bot's name; the
-        # evals run on the commit it measured is GitHub's own record (security-reviewer on PR 2).
-        return (envelope.get("verdict") == "GREEN" and a_vs_a.get("agent") == [] and bool(on_head)
-                and swap.get("evals_on_measured") == "success"
-                and all(conclusion == "success" for conclusion in on_head.values()))  # fmt: skip
-    return False
-
-
-def check_from_swaps(path: Path, falsifier: str, cap: int, run_url: str | None) -> dict[str, str]:
-    """pass when every swap PR for `falsifier` read as stated before (SPEC/04 §4, the second source of F4_1 and F4_2).
-
-    Read from `scripts/observe_pr.py`'s observation of `f4_swaps.yaml`, from
-    M04 PR 3's run (a named P3 exception). No swap for the falsifier is a fail.
-    """
-    if not run_url:
-        raise Refused("a check needs the CI run URL (--run-url)")
-    swaps = [s for s in load_json(path).get("swaps") or [] if s.get("falsifier") == falsifier]
-    held = bool(swaps) and all(swap_held(s, cap) for s in swaps)
-    return {"status": "pass" if held else "fail", "url": run_url}
-
-
 def check_from_pr(path: Path) -> dict[str, str]:
     """pass when the check failed on the PR, the PR closed unmerged, and the check is required."""
     seen = load_json(path)
@@ -686,8 +641,12 @@ def compose_envelope(
     # Every run the job made counts against the cap (SPEC/04 §6; note 16 on M04 PR 1).
     extras = [extra[0]["observations"] for extra in (second, control_second) if extra]
     more = [o.get("usage", {}) for run in extras for o in run]
-    second_errors = any("error" in o for run in extras for o in run)
-    if sum(u.get("cacheReadInputTokens", 0) for u in usage):
+    # A failed call in the agent's second run leaves A-vs-A unread: UNMEASURED, as in the first.
+    # The control's is recorded in its diff and gates nothing (ADR-0004; cold review of PR 2, F3).
+    second_errors = second is not None and any("error" in o for o in second[0]["observations"])
+    # Every run, not the first only: a second run read from a cache would make a zero diff
+    # of nothing (cold review of PR 2, F2).
+    if sum(u.get("cacheReadInputTokens", 0) for u in usage + more):
         raise Refused("a reply was read from a prompt cache; cache_state would be a lie")
 
     # The regression bar and the plant count read the agent under test. The
@@ -835,10 +794,6 @@ def main(argv: list[str] | None = None) -> int:
                         metavar=("ID", "OBSERVATION"))  # fmt: skip
     parser.add_argument("--check-doors", nargs=2, action="append", default=[],
                         metavar=("ID", "OBSERVATION"))  # fmt: skip
-    # M04 (SPEC/04 §4): the second source of F4_1 and F4_2, the swap PRs, from
-    # scripts/observe_pr.py. Wired in evals.yml at M04 PR 3.
-    parser.add_argument("--check-swaps", nargs=2, action="append", default=[],
-                        metavar=("ID", "OBSERVATION"))  # fmt: skip
     # M04 PR 2 (SPEC/04 §6): the second runs of one pin, for A-vs-A (S3's reader).
     parser.add_argument("--a-vs-a", type=Path, metavar="AGENT_RAW_B")
     parser.add_argument("--a-vs-a-control", type=Path, metavar="CONTROL_RAW_B")
@@ -876,8 +831,6 @@ def main(argv: list[str] | None = None) -> int:
                 checks = both(checks, i, check_from_bypass(Path(p), args.run_url))
             for i, p in args.check_doors:
                 checks = both(checks, i, check_from_doors(Path(p), args.run_url))
-            for i, p in args.check_swaps:
-                checks = both(checks, i, check_from_swaps(Path(p), i, cap, args.run_url))
             kinds = {g: golden["kind"] for g, golden in goldens.items()}
             # The run's ancestors only, as the gate reads it (SPEC/03 §6, seed S7).
             history = replay_history.load(args.history_dir, exclude_commit=raw["commit"], ancestors_of=raw["commit"])

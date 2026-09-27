@@ -424,3 +424,36 @@ def test_a_deleted_relative_bar_is_refused_from_the_commit_that_wired_it(tmp_pat
     out = tmp_path / "out.json"
     assert build.main(envelope_args(agent_raw, card, out, "--thresholds", str(thresholds))) == 3
     assert "no relative bars" in capsys.readouterr().err and not out.exists()
+
+
+def test_a_vs_a_through_builds_command_line_with_the_controls_second_run(tmp_path, chain, goldens, capsys):
+    """Cold review of PR 2, F6, F2, F3: both second runs through `build envelope`, as the Makefile's A_VS_A hands them.
+
+    The agent's second run differs on g-001; the control's on g-010. The agent's diff fails F4_3;
+    the control's is recorded and gates nothing, and a failed call in it does not make the envelope
+    UNMEASURED. A second run read from a prompt cache is refused.
+    """
+    _, card_path, _ = chain(agent=True)
+    first = make_raw(goldens, right={"g-001"}, **AGENT_TOP)
+    agent_a, agent_b = tmp_path / "agent-a.json", tmp_path / "agent-b.json"
+    agent_a.write_text(json.dumps(first), encoding="utf-8")
+    agent_b.write_text(json.dumps(make_raw(goldens, **AGENT_TOP)), encoding="utf-8")  # g-001 wrong this time
+    control_b = make_raw(goldens, right={"g-010"})
+    control_b["observations"][0]["error"] = "ThrottlingException: once"
+    control_b_path = tmp_path / "control-b.json"
+    control_b_path.write_text(json.dumps(control_b), encoding="utf-8")
+    out = tmp_path / "out.json"
+    assert build.main(envelope_args(agent_a, card_path, out, "--a-vs-a", str(agent_b),
+                                    "--a-vs-a-control", str(control_b_path))) == 0  # fmt: skip
+    envelope = json.loads(out.read_text(encoding="utf-8"))
+    assert envelope["a_vs_a"] == {"agent": ["g-001"], "control": ["g-010"]}
+    assert envelope["checks"]["F4_3"]["status"] == "fail"
+    assert envelope["verdict"] == "RED"  # for F4_3, not UNMEASURED for the control's failed call
+    assert envelope["agent_tokens"] == 19 * 300 and envelope["tokens_in"] + envelope["tokens_out"] == 4 * 19 * 300
+
+    control_b["observations"][0].pop("error")
+    control_b["observations"][1]["usage"]["cacheReadInputTokens"] = 40
+    control_b_path.write_text(json.dumps(control_b), encoding="utf-8")
+    assert build.main(envelope_args(agent_a, card_path, tmp_path / "cached.json", "--a-vs-a", str(agent_b),
+                                    "--a-vs-a-control", str(control_b_path))) == 3  # fmt: skip
+    assert "prompt cache" in capsys.readouterr().err

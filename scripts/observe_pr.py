@@ -43,15 +43,17 @@ What is read, per run file:
   with git from the checkout's history).
 
 - **swaps** (`swaps:`, M04 PR 2; SPEC/04 §4, §5.1): for each swap PR the
-  human opened, the pull's state and `merged`; every check the ruleset
-  requires on the base, as it concluded on the PR's head; the commit the
-  bot's envelope commit names ("evals: CI-written envelope for <sha>"),
-  the `evals` check on it, and that envelope as the swap branch holds it
-  (verdict, model, regressed, the kinds, checks, `a_vs_a`, tokens). The
-  pin the swap moves to is read from `pinned_roles` in this tree. A swap
-  PR's run never reads itself: the pull request this run is on is skipped
-  and says so (`GITHUB_EVENT_PATH`). Wired in `evals.yml` at M04 PR 3, not
-  PR 2, whose own run would read swap PRs whose rulings are not on `main`.
+  human opened, GitHub's record only: the pull's state and `merged`;
+  every check the ruleset requires on the base, as it concluded on the
+  PR's head; the commit the bot's envelope commit names ("evals:
+  CI-written envelope for <sha>") and the `evals` check on it. It does
+  not read the swap's envelope: only the gate rules on an envelope (P5;
+  cold review of PR 2, B1), and at PR 3 the gate rules the swap's own
+  envelope at its commit. The pin the swap moves to is read from
+  `pinned_roles` in this tree. A swap PR's run never reads itself: the
+  pull request this run is on is skipped and says so
+  (`GITHUB_EVENT_PATH`). Wired in `evals.yml` at M04 PR 3, not PR 2,
+  whose own run would read swap PRs whose rulings are not on `main`.
 
 An entry the human has not filled (`observed: null`) writes an observation
 that says so, and the check fails; it does not error (ruling i, M01).
@@ -435,28 +437,6 @@ def measured_commit(repo: str, number: int, token: str | None) -> str | None:
     return None
 
 
-def envelope_on(repo: str, sha: str, ref: str, token: str | None) -> dict[str, Any] | None:
-    """`evals/history/<sha>.json` as the branch holds it at `ref`, in brief. None when it is not there."""
-    import base64
-
-    status, body = get(repo, f"/contents/evals/history/{sha}.json?ref={ref}", token)
-    if status != 200 or not isinstance(body, dict) or "content" not in body:
-        return None
-    envelope = json.loads(base64.b64decode(body["content"]).decode("utf-8"))
-    goldens = envelope.get("goldens") or {}
-    return {
-        "commit": envelope.get("commit"), "verdict": envelope.get("verdict"), "mode": envelope.get("mode"),
-        "model_id": envelope.get("model_id"), "region": envelope.get("region"),
-        "model_version": envelope.get("model_version"),
-        "regressed": envelope.get("regressed") or [], "never_passed": envelope.get("never_passed") or [],
-        "kinds": {g: r.get("kind") for g, r in goldens.items()},
-        "checks": {name: c.get("status") for name, c in (envelope.get("checks") or {}).items()},
-        "a_vs_a": envelope.get("a_vs_a"), "p95_ms": envelope.get("p95_ms"),
-        "agent_tokens": envelope.get("agent_tokens"),
-        "tokens_total": (envelope.get("tokens_in") or 0) + (envelope.get("tokens_out") or 0),
-    }  # fmt: skip
-
-
 def own_pr() -> int | None:
     """The pull request this run is on, from the event GitHub wrote; None off a pull request."""
     path = os.environ.get("GITHUB_EVENT_PATH")
@@ -490,7 +470,6 @@ def observe_swap(repo: str, swap: dict[str, Any], record: dict[str, Any], roles:
     sha = measured_commit(repo, number, token)
     entry["measured_commit"] = sha
     entry["evals_on_measured"] = (check_run(repo, sha, "evals", token) or {}).get("conclusion") if sha else None
-    entry["envelope"] = envelope_on(repo, sha, entry["head_sha"], token) if sha else None
     return entry
 
 

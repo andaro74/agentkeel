@@ -175,6 +175,10 @@ def incumbent_at(commit: str, bundle: str = "agents/refagent", root: Path = ROOT
             break
     else:
         text, where = text_at(commit, f"{bundle}/manifest.yaml", root)
+        if where != "the working tree":
+            # git knows the commit and finds no merge-base with main: no incumbent can be
+            # read, which `pin_moved` counts as moved (cold review of PR 2, N3).
+            return None, f"{commit[:12]}, which has no merge-base with main"
     manifest = yaml.safe_load(text) if text is not None else None
     model = manifest.get("model") if isinstance(manifest, dict) else None
     return (model if isinstance(model, dict) else None), where

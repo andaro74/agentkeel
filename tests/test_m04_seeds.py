@@ -301,6 +301,7 @@ def test_s3_two_runs_of_one_pin_that_differ_are_a_failed_a_vs_a(measured, incumb
     ("s4-slow-raw.json", "p95", "latency_ms", 3),  # p95 at 3x; the bar is 2.0x (SPEC/04 section 2)
     ("s4-heavy-raw.json", "tokens", "usage", 2),  # the agent's tokens at 2x; the bar is 1.5x
 ])  # fmt: skip
+# The ids stay as planted: the Makefile's F4_4 cases name them.
 def test_s4_a_run_over_the_incumbents_bar_is_red(seed, bar, field, times, measured, incumbent_history, goldens):
     """The incumbent's answers, every one grounded and right, three times as slow (p95) or with
     twice the tokens. The incumbent's history is three runs on the same pin, in the same mode. No
@@ -325,7 +326,9 @@ def test_s4_a_run_over_the_incumbents_bar_is_red(seed, bar, field, times, measur
     out = measured(run, history=incumbent_history)
     verdict, reasons = gate.rule(out, incumbent_history)
     assert verdict == "RED", f"{bar} {times}x the incumbent's ruled {verdict}: {reasons}"
-    assert any(bar in reason for reason in reasons), reasons
+    # The bar's own reason, by name: `gate.spend`'s "tokens:" reason is not it (cold review of PR 2, F5).
+    named = {"p95": "p95_ms", "tokens": "agent_tokens"}[bar]
+    assert any(reason.startswith("F4_4: ") and named in reason for reason in reasons), reasons
 
 
 # --- S5: a pin past, or within 30 days of, its end of life -------------------
