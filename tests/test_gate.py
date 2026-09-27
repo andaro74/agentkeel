@@ -412,6 +412,7 @@ def test_an_agent_envelope_from_m04s_readers_must_carry_claim_4s_checks(monkeypa
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     before = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_3_CHECKS
     assert gate.CLAIM_4_CHECKS == ("F4_1", "F4_2", "F4_4")
+    monkeypatch.setattr(gate, "pin_moved", lambda commit, bundle, root: False)  # HEAD, or a swap PR's head
     assert gate.required_checks(head) == before + gate.CLAIM_4_CHECKS
     assert gate.required_checks(gate.M04_READERS) == before + gate.CLAIM_4_CHECKS
     assert gate.required_checks("e51892775b6b36236755f0f9a94e6d98d7628206") == before  # M04 PR 1's run

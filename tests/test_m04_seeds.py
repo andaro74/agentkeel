@@ -33,12 +33,28 @@ from typing import Any
 import pytest
 import yaml
 
-from src.verdict import ROOT, build, gate, plants
+from src.verdict import PIN_FIELDS, ROOT, build, gate, plants
 
-from .conftest import AGENT_TOP, COMMIT, URL, claim_1_checks, claim_2_checks, make_raw
+from .conftest import (
+    AGENT_TOP,
+    COMMIT,
+    REFAGENT_PIN,
+    URL,
+    claim_1_checks,
+    claim_2_checks,
+    make_raw,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "m04"
-INCUMBENT = AGENT_TOP["model_id"]  # the pin on main at M04 open: us.anthropic.claude-sonnet-4-6
+# The pin on main at M04 open, which every seed's fixture and patch was planted against. Not the
+# working tree's pin: a swap PR, branched from M04 PR 2's head, moves that, and its own checks ran
+# these seeds and failed them for it (#25, #26). The seeds are read against the tree they were
+# planted in: the working tree with this pin (`planted_tree`).
+PLANTED = {"id": "anthropic.claude-sonnet-4-6", "version": None, "profile": "us.anthropic.claude-sonnet-4-6",
+           "region": "us-west-2"}  # fmt: skip
+INCUMBENT = PLANTED["profile"]
+PLANTED_TOP = {**AGENT_TOP, "model_id": PLANTED["profile"], "region": PLANTED["region"]}
+MOVED = any(REFAGENT_PIN.get(field) != PLANTED[field] for field in PIN_FIELDS)
 LLAMA = "meta.llama3-1-8b-instruct-v1:0"
 
 
@@ -60,6 +76,44 @@ def fixture(name: str) -> dict[str, Any]:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
+def with_planted_pin(tree: Path) -> None:
+    """Put the planted pin back in `tree`'s manifest: the four lines of `model:`, nothing else."""
+    path = tree / "agents" / "refagent" / "manifest.yaml"
+    text = path.read_bytes().decode("utf-8")  # as checked out: a Windows checkout has CRLF
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split(newline)
+    start = lines.index("model:")
+    for i in range(start + 1, start + 1 + len(PIN_FIELDS)):
+        key = lines[i].strip().partition(":")[0]
+        holds(key in PLANTED, f"the manifest's model block: {lines[i]!r}")
+        lines[i] = f"  {key}: {'null' if PLANTED[key] is None else PLANTED[key]}"
+    path.write_bytes(newline.join(lines).encode("utf-8"))
+    holds(yaml.safe_load(path.read_text(encoding="utf-8"))["model"] == PLANTED, "the planted pin is back")
+
+
+@pytest.fixture(scope="module")
+def planted_tree(tmp_path_factory) -> Path | None:
+    """None where the working tree pins the planted pin. Elsewhere, refagent's manifest with it put back."""
+    if not MOVED:
+        return None
+    tree = tmp_path_factory.mktemp("planted")
+    (tree / "agents" / "refagent").mkdir(parents=True)
+    source = (ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8")
+    (tree / "agents" / "refagent" / "manifest.yaml").write_text(source, encoding="utf-8")
+    with_planted_pin(tree)
+    return tree
+
+
+@pytest.fixture(autouse=True)
+def at_the_planted_pin(planted_tree, monkeypatch):
+    """Where the pin moved, a made-up commit's incumbent is the planted pin, not the working tree's."""
+    if planted_tree is None:
+        return
+    for module in (build, gate):
+        monkeypatch.setattr(module, "incumbent_at", lambda commit, bundle="agents/refagent", root=ROOT:
+                            (dict(PLANTED), "the pin the seeds were planted against"))  # fmt: skip
+
+
 @pytest.fixture
 def seeded():
     """A detached worktree of HEAD with one seed's patch applied. Removed after the test."""
@@ -70,6 +124,8 @@ def seeded():
         subprocess.run(["git", "worktree", "add", "--detach", str(tree), "HEAD"],
                        cwd=ROOT, check=True, capture_output=True)  # fmt: skip
         trees.append(tree)  # before apply, so a patch that no longer applies is still cleaned up
+        if MOVED:  # a swap PR's head: the patch's context is the planted pin
+            with_planted_pin(tree)
         subprocess.run(["git", "apply", str(FIXTURES / patch)], cwd=tree, check=True, capture_output=True)
         return tree
 
@@ -133,7 +189,7 @@ def grounded(golden: dict[str, Any], latency: int = 500, tokens: int = 300) -> d
 
 
 @pytest.fixture
-def measured(tmp_path: Path, goldens, monkeypatch):
+def measured(tmp_path: Path, goldens, monkeypatch, planted_tree):
     """Build an agent envelope from a raw run through build's command line, as `chain` does.
 
     With no controls and no corpus, as `chain` has them: these seeds are about
@@ -155,6 +211,7 @@ def measured(tmp_path: Path, goldens, monkeypatch):
         card = work / f"{commit}.baseline-card.json"
         holds(build.main(["card", "--raw", str(control_raw), "--out", str(card)]) == 0, "build refused the control card")
         top = {**raw, "commit": commit}
+        tree = tree or planted_tree
         if tree is not None:
             top["bundle"] = str(tree / "agents" / "refagent")
             pinned = yaml.safe_load((tree / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
@@ -181,7 +238,7 @@ def incumbent_history(tmp_path: Path, goldens, measured):
     history = tmp_path / "history"
     history.mkdir()
     live = [g for g in goldens.values() if not g.get("retired")]
-    raw = {**make_raw(goldens), **AGENT_TOP, "observations": [grounded(g) for g in live]}
+    raw = {**make_raw(goldens), **PLANTED_TOP, "observations": [grounded(g) for g in live]}
     for commit in ("b" * 40, "c" * 40, "d" * 40):
         measured(raw, commit=commit, history=history, out=history / f"{commit}.json")
     return history

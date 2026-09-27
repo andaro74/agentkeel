@@ -376,8 +376,9 @@ def test_attempt_2_reads_the_ci_line_or_the_humans_record(tmp_path):
 def test_an_a_vs_a_pair_is_two_runs_of_one_pin_over_the_same_goldens(goldens):
     """M04 PR 2 (SPEC/04 §6): a pair on another commit, model or region, or over other goldens, is refused, not compared."""
     raw = make_raw(goldens, **AGENT_TOP)
-    for field, value in (("commit", "b" * 40), ("model_id", "us.anthropic.claude-sonnet-4-5-20250929-v1:0"),
-                         ("region", "us-east-1")):  # fmt: skip
+    # Each value is not the pin's, whatever the tree pins: a swap PR runs this too (M04 PR 2's swap PRs).
+    for field, value in (("commit", "b" * 40), ("model_id", f"{raw['model_id']}.another"),
+                         ("region", f"{raw['region']}-another")):  # fmt: skip
         with pytest.raises(build.Refused, match=field):
             build.a_vs_a_pair(raw, {**raw, field: value}, "agent")
     build.a_vs_a_pair(raw, dict(raw), "agent")

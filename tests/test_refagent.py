@@ -79,7 +79,9 @@ def test_the_prompt_names_every_title_and_the_model_the_manifest_pins():
     slate = json.loads((ROOT / "data" / "slate.json").read_text(encoding="utf-8"))["titles"]
     for title in slate:
         assert f"{title['title_id']} {title['title']}" in agent.PROMPT
-    assert MANIFEST["model"]["profile"] == "us.anthropic.claude-sonnet-4-6"
+    # The profile over the pinned id, not a literal model: a swap PR moves the pin, and the gate
+    # measures that (SPEC/04); a literal here made both M04 swap PRs red for a reason of its own.
+    assert MANIFEST["model"]["profile"] == f"us.{MANIFEST['model']['id']}"
     assert MANIFEST["memory"] is None and MANIFEST["may_call"] == []  # cuts 1, 3 and 4, taken at open
 
 
