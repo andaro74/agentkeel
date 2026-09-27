@@ -9,6 +9,15 @@ are transcribed here by M04 PR 1. No envelope reads this file, and no
 gate. The human's IAM user name, which the files print, is written here
 as "the human's admin user".
 
+**Which guardrail version the calls sent.** The probe script,
+`~/probe-llmgw/call.py`, sends `guardrailIdentifier: 1088aw3ujhyd` and
+`guardrailVersion: "5"` (in `guardrailConfig`, or as
+`X-Amzn-Bedrock-GuardrailVersion` on round 1's headers) when the guardrail
+is on. The file as saved was last written at 19:52 local. Round 2's calls
+(20:04 to 20:45) came after it and sent version 5. Round 1's calls (19:35
+to 19:37) came before it, and **the files do not record which version
+round 1 sent** (rule-owner F6 on M04 PR 1).
+
 The question was whether an AgentCore Gateway could stand between
 refagent and Bedrock as its model gateway, carrying Converse unchanged
 and holding the guardrail pin as a gateway policy. The decision is M04
@@ -36,9 +45,11 @@ M05 open. The probe leaned M05, not M04.
 - Teardown (`99-teardown.txt`): `GetGateway` ResourceNotFoundException;
   `GetRole probe-llmgw-role` NoSuchEntity.
 
-**Finding (a).** An inference target, in the formats the probe tried,
-cannot reach Sonnet 4.6. Sonnet 4.6 is served by `bedrock-runtime` through
-Converse and InvokeModel, which that connector does not speak.
+**Finding (a).** What the files show: through the `bedrock-mantle`
+inference target, Sonnet 4.6 answered 404 "does not exist" three times,
+and the target's model list does not name it. Why (that Sonnet 4.6 is
+served only through `bedrock-runtime`'s Converse and InvokeModel) is an
+inference, not tested here (rule-owner note 11).
 
 ## Round 2: an HTTP passthrough target to `bedrock-runtime` (`out2/`)
 
@@ -82,15 +93,18 @@ the admin alike.
   `assumed-role/probe-llmgw2-gw-role/gateway-session-…`, **the gateway's
   role, not the caller's**.
 
-**Finding (b).** A passthrough target to `bedrock-runtime`, signed as the
-gateway's role, carries Converse unchanged: the guardrail's trace and
-topics come back as they do directly, and a call without the guardrail
-is refused. The refusal is on the gateway's role, so the pin is held in
-one place for every caller, and CloudTrail names the gateway, not the
-agent. The policy the gateway's role held for target B is not among the
-probe's files: `gw2-role-policy.json` as saved grants only
-`InvokeGateway`. What the record shows is the refusal naming that role,
-not the statement that made it.
+**Finding (b).** What the files show: through a passthrough target to
+`bedrock-runtime` signed as the gateway's role, two calls with guardrail
+version 5 answered HTTP 200 with the same stop reasons and topics as
+direct Converse (B1, B2), and one call without the guardrail, by one
+caller, was refused with a message naming the gateway's role (B3). Not
+shown, and questions for M05 open (feasibility §6 row 39): that the pin
+holds for every caller, or for a version other than 5 (no call sent DRAFT
+or another version); what CloudTrail records, since no CloudTrail file was
+read; and the statement that refused B3, since the policy the gateway's
+role held for target B is not among the probe's files
+(`gw2-role-policy.json` as saved grants only `InvokeGateway`) (rule-owner
+F5 on M04 PR 1).
 
 ## The endpoint
 
@@ -98,15 +112,19 @@ not the statement that made it.
 `com.amazonaws.us-west-2.bedrock-agentcore.gateway` exists (Interface,
 `*.gateway.bedrock-agentcore.us-west-2.amazonaws.com`).
 
-**Finding (d).** A gateway could be reached from the platform VPC
-through an interface endpoint, as `bedrock-runtime` is today.
+**Finding (d).** The endpoint service exists. That a gateway could be
+reached through it from the platform VPC, as `bedrock-runtime` is today,
+is an inference: nothing was called through that endpoint (rule-owner
+note 11).
 
 ## Also in the folder, not read by any call above
 
 `deny-without-guardrail.json`: a deny on `bedrock-mantle:*`,
 `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` unless
 the guardrail identifier names `1088aw3ujhyd`. The files do not record
-which role it was attached to, or whether any call ran under it.
+which role it was attached to, or whether any call ran under it. It
+denies on the guardrail id alone, which by `milestones/M04/open.md` row
+27 would admit DRAFT and every numbered version.
 
 ## Teardown
 

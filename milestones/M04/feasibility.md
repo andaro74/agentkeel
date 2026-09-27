@@ -178,12 +178,33 @@ seat.
 
 ### 2.4 The seat reports on this PR (in the PR body verbatim)
 
-Filled when the reports are in: `threshold-owner` (SPEC/04's bars and
-candidates, ADR-0010), `data-owner` (`g-015`, tool grounding as part of
-CORRECT), `rule-owner` (the `red-teamer` prompt), and
-`engineering-cold-reviewer` through `/cold-review` (`src/verdict/plants.py`,
-`tests/**`, `.gitattributes`). No specialist is added at M04 (R8), and
-none is exercised: `red-teamer` has no M04 seed.
+`threshold-owner` (0 BLOCK, 8 FINDING, 11 NOTE), `data-owner` (0, 7, 10)
+and `rule-owner` (0, 5, 6), on the branch at `74fb9ed`. None had a shell;
+the two diffs they asked for are pasted under their reports in the PR
+body. Ruled by the human, 2026-09-27, "as proposed". No specialist is
+added at M04 (R8), and none is exercised: `red-teamer` has no M04 seed.
+
+| Finding | Ruling | Seat | Where |
+|---|---|---|---|
+| threshold F1 to F3 | The bars read the first refagent run: its p95 and its agent-side tokens. Envelopes with no `mode` are not counted. No incumbent envelope in the mode means `F4_4: fail`, RED | Threshold Owner | SPEC/04 §2 |
+| threshold F4 | The bars apply to every agent envelope; the mapping is `relative.*` | Threshold Owner | SPEC/04 §2, §6 |
+| threshold F5 | `cost_cap` is a budget; "one policy" is about quality bars | Product | SPEC/04 §2; SPEC/00 §8 M04 |
+| threshold F6 | ADR-0009 amendment 1, entry 6: `deprecated_after` moved later, nulled or removed is a relaxation; SPEC/02 §2 amended inline | Product (Threshold Owner proposes) | ADR-0009; SPEC/02 §2 |
+| threshold F7 | Separate ruling files, one seat each | Product | `rulings/pr1*.md` |
+| threshold F8 | `version` records a versioned id's suffix; null only when it has none. Swap PRs follow it; seed patches stay | Threshold Owner | SPEC/04 §2 |
+| threshold notes 10, 14, 17 | The p95 clause compares the worst run with the median; lifecycle read in us-west-2 only; CLAUDE.md "in its `relaxes:` direction" | Product | SPEC/04 §2; `runs/model_access_2026-09-26.md`; CLAUDE.md |
+| threshold notes 13, 18 | The manifest's judge comment; the incumbent matched on profile and region | Threshold Owner; Engineering | PR 2 |
+| data F3, F4, F16 | `g-021` cannot pass grounded as written; row 5 says so | Data Owner, Tool Owner | §6 row 5; PR 2 |
+| data F5 | Grounding does not check the call's input against the question; ruled with `g-021` at PR 2 | Data Owner, Tool Owner | SPEC/04 §2 |
+| data F7 | The 9/9 and 2/3 counts were never grounded; PR 2's run is their first measurement | Data Owner | SPEC/04 §7 |
+| data F9 | S3's and S4's tool calls made on the real tool; `g-021` gets `found: false` (`2dc81ae`, before any reader) | Engineering | `tests/fixtures/m04/` |
+| data F11 | SPEC/00 §9: CORRECT includes grounding from PR 2 | Product | SPEC/00 §9 |
+| data note 14 | Row 3 is M06 `open.md`'s first row | Data Owner | §6 row 3 |
+| rule F3 | Row 2's text as the Rule Owner proposed | Product | §6 row 2 |
+| rule F4; data note 2 | `guardrail.yaml`'s stale comments carried by the Rule Owner's next `rules/**` change | Rule Owner | §6 row 17 |
+| rule F5, F6; notes 11 | The probe record says what the files show, names the version each round sent or says the files do not record it, and marks inferences | Product | `runs/llm_gateway_probe.md` |
+| rule F7 | SPEC/04 §8: a swap's plants fire before the candidate is called | Product | SPEC/04 §8 |
+| rule note 2 | `red-teamer` reads the lowest-numbered OPEN row of `milestones/README.md` | Rule Owner | `.claude/agents/red-teamer.md` |
 
 ## 3. The false state
 
@@ -244,10 +265,10 @@ carried to M05's `open.md` at the close as dated.
 | # | Seat | Now |
 |---|---|---|
 | 1 | Product | **Done here**: SPEC/00 §9 amended, seven documents, six admitted, five under a page (`78b042e`). |
-| 2 | Product (Rule Owner proposes) | **Ruled here: stays one key.** Nothing reads a rule's definition, only its examples and its presence in the list; an amendment to ADR-0009 needs a reader to hold it to. The Rule Owner proposes one with the next change to `rules/**`; **M05 open**. |
-| 3 | Data Owner | **M06**, with the knowledge base (SPEC/04 §9 cut f). Until refagent reads the corpus, the answer-side overlap reads nothing. |
+| 2 | Product (Rule Owner proposes) | **Ruled here: stays one key through M04**, because no M04 PR changes `rules/**`. Until an ADR-0009 amendment lands, the Rule Owner treats any change to a definition's wording as a relaxation and files a second key by hand. The Rule Owner proposes the amendment (any definition change takes two keys, read by `two_key.py`, whose `rule_relaxations` already holds the old and new definition) at **M05 open, or with the first change to `rules/**`, whichever comes first** (`rule-owner` F3 on this PR). |
+| 3 | Data Owner | **M06**, with the knowledge base (SPEC/04 §9 cut f). Until refagent reads the corpus, the answer-side overlap reads nothing. It is the first row of M06's `open.md`, ruled before retrieval lands (`data-owner` note 14). |
 | 4 | Data Owner | **Done here** (`6dc922f`): the comment names `sending-terms-to-a-competitor`. |
-| 5 | Data Owner, Tool Owner | **PR 2**, before tool grounding lands: an answer no row governs (`row: null`) cannot be grounded in a row (SPEC/04 §2). Keep, or retire with two keys and re-add. |
+| 5 | Data Owner, Tool Owner | **PR 2**, before tool grounding lands. `g-021` as written cannot pass grounded: its question's call returns `found: false`, and it expects the original's row `r-011` with `exclusive: false` against that row's `true` (`data-owner` F3, F4). Keeping it as written is ruled out: retire with two keys and re-add under a new id (an absence form needs SPEC/00 §6 amended), or keep it with a changed reader. If it is retired, the expected trap line is restated before PR 2's run (`data-owner` F16). |
 | 6 | Security | **PR 2**: read from the first bootstrap `cdk diff --strict`, which is the candidate list's redeploy. Locally, the minified template is 47,535 bytes with non-ASCII escaped and 47,491 as UTF-8 at `0100b64`, whose `infra/` is `main`'s; M03 recorded 47,601 at `0a90d52`. |
 | 7 | Security | **Measured here**, by local synth, nothing deployed: the three candidates on the eval role's two invoke statements only, `MODELS` unchanged, add 1,572 bytes: **49,107 of 51,200** (2,093 left). A scratch worktree, removed; no infra file changed in this PR. Anything else added to that stack at M04 is measured against 2,093. |
 | 8 | Security, Engineering | **M06**, when refagent first reads the corpus, as dated. |
@@ -259,7 +280,7 @@ carried to M05's `open.md` at the close as dated.
 | 14 | Threshold Owner | **PR 2**: a manifest edit changes the bundle, and would cost row 10. |
 | 15 | Engineering; Product | **M06**, with the knowledge base (cut f). |
 | 16 | Product; Security | **M06** (cut f; SPEC/00 §9 amended). |
-| 17 | Rule Owner | **M06**, with retrieval. |
+| 17 | Rule Owner | **M06**, with retrieval. Meanwhile `agents/refagent/rules/guardrail.yaml`'s comments are stale: "(M04)" and "until M04" for the knowledge base, and "a third party" at line 65. Comments only, not read by `two_key`; the Rule Owner's next change to `rules/**` carries the fix (`rule-owner` F4, `data-owner` note 2). SPEC/04 §8 says a swap's plants fire before the candidate is called (`rule-owner` F7). |
 | 18 | Data Owner | **M06**, with retrieval: an answer cites a corpus clause only once refagent reads the corpus. |
 | 19 | Product; Threshold Owner; Data Owner | **Done here**: SPEC/04 §9 cuts b, c, d (SPEC/03 cuts 1 to 4) to M07 and M06; SPEC/00 §8 M06 and M07 name them. |
 | 20 | Rule Owner | **Done here** (`70c2322`). |
@@ -271,7 +292,7 @@ carried to M05's `open.md` at the close as dated.
 | 36 | Tool Owner | **M06; M07**, carried unchanged. |
 | 37 | Rule Owner | **M08**, carried unchanged. The judge lands at M07 (cut b), before it. |
 | 38 | Engineering | **Done here** (`22b9cd9`): each shipped test run with its reader switched off fails with its planted message. |
-| 39 (new) | Product, Security, Threshold Owner | **The gateway decision, M05 open.** The probe (`runs/llm_gateway_probe.md`) leaned M05: an inference target cannot reach Sonnet 4.6; a passthrough target signed as the gateway's role carries Converse and the guardrail trace, and refuses a call without the guardrail as the gateway's role. |
+| 39 (new) | Product, Security, Threshold Owner | **The gateway decision, M05 open.** The probe (`runs/llm_gateway_probe.md`) leaned M05: through an inference target Sonnet 4.6 answered 404; through a passthrough target signed as the gateway's role, two calls with version 5 answered as direct Converse does and one call without the guardrail was refused naming the gateway's role. Open for M05: the pin for every caller and every version, what CloudTrail records, and the refusing statement. |
 | 40 (new) | Security | **A seeded refusal of a model call without the pinned guardrail, or around the agent's own profile: M05**, with row 26. Nothing has attempted it in AWS. M04 only if the gateway had landed here; it did not. |
 
 ## 7. What PR 1 does not do

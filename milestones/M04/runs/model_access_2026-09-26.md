@@ -70,6 +70,10 @@ meta.llama3-1-8b-instruct-v1:0
 }
 ```
 
+Read in us-west-2 only; every profile above routes to three regions,
+and the lifecycle of the model in us-east-1 and us-east-2 was not read
+(threshold-owner note 14 on PR 1).
+
 Bedrock gives `endOfLifeTime` only for the `LEGACY` model. refagent's
 `deprecated_after` stays null: no date is announced for Sonnet 4.6
 (SPEC/04 §2).

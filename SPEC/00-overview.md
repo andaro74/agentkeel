@@ -425,7 +425,9 @@ Amended at M04 PR 1 (`milestones/M04/rulings/pr1.md`; SPEC/04 §2, §9):
 stands). Cut at open: `model-watch`, the judge and `model-watch` over it,
 and `deprecated_after` set from Bedrock by code, to M07; k6 to M05; the
 knowledge base (SPEC/03 cut 6) and FRAGILE, to M06. "An equivalent swap
-promotes" means its PR is mergeable, not merged.
+promotes" means its PR is mergeable, not merged. "One policy" is about
+quality bars: `cost_cap.tokens_per_run` is a budget and stays absolute
+beside the relative bars (SPEC/04 §2).
 
 ### M05 — Containment and evidence
 Build: default-deny egress per agent; no shared surfaces (per-agent
@@ -541,7 +543,13 @@ row and a contract clause cited on every answer.
 **Domain rule (stated in SPEC/01 and enforced by the deterministic
 check, F1.4):** the rights table is the truth; the corpus is the
 evidence. An answer returns `table_row` and `clause_id` as typed fields.
-An answer missing either is a bug, not a style issue. Dates, windows,
+An answer missing either is a bug, not a style issue. Amended at M04
+PR 1 (`milestones/M04/rulings/pr1-data-owner.md`; SPEC/04 §2): from M04
+PR 2 an ordinary or trap answer is correct only when it is also
+tool-grounded, its `table_row` the row a successful `check_availability`
+call returned in the same answer and its `clause_id` among that call's
+candidates. The table stays the truth; grounding is how the check sees
+that the answer came from it. Dates, windows,
 holdbacks and exclusivity are read from the table, never inferred from
 vector search.
 

@@ -89,6 +89,11 @@ never gated** (ADR-0004): its diff is F0.4 measured, not `F4_3`.
   from PR 2 (the Data Owner, ruling on finding 4). An answer where no row
   governs (`found: false`, `row: null`; `g-021`) is ruled with the
   reader, before it lands (`open.md` row 5; Data Owner, Tool Owner).
+  **Grounding does not check that the call's input names the question's
+  title, territory and platform** (data-owner F5 on PR 1): a call on the
+  original title grounds an answer that cites the original's row.
+  Whether it must is ruled with `g-021` at PR 2. SPEC/00 §9 is amended in
+  this PR to say CORRECT includes grounding from PR 2.
 - **`delta_max`.** The relative bar SPEC/00 §8 M04 names ("within
   `delta_max` of the incumbent"; "one policy, not both", changed here
   under its own "unless a ruling changes it" by ruling 2). **It applies
@@ -101,15 +106,31 @@ never gated** (ADR-0004): its diff is F0.4 measured, not `F4_3`.
   - the agent's tokens (in plus out, the agent's side only) no more than
     **1.5×** the incumbent's.
   "The incumbent's" is the median over the envelopes in `evals/history/`
-  on the incumbent pin **in the same `mode`** as the envelope ruled. A
-  bar with no such envelope reads nothing and says so; it does not pass
-  silently.
+  on the incumbent pin (its profile and region) **in the same `mode`** as
+  the envelope ruled. An envelope with no `mode` (version 1, before
+  ADR-0007) is not counted. The run's side of each comparison is **its
+  first refagent run**: p95 over that run's latencies, and that run's
+  tokens, the agent's side only (the envelope's total less its control
+  card's). A-vs-A's second run is compared with the first and never with
+  the bar. **A bar with no incumbent envelope in that mode writes
+  `F4_4: fail`, and the envelope is RED**, with the reason; a mode the
+  incumbent never ran in is not a way past the bar (threshold-owner F1 to
+  F3 on PR 1).
+  The bars apply to **every agent envelope**, not only to swaps: F4.4 is
+  "a p95 regression beyond the bar", whatever the diff (threshold-owner
+  F4). A prompt or tool change that makes the agent 1.5 times as costly
+  is held to the same bar, and relaxing it is two keys.
+  `cost_cap.tokens_per_run` stays beside them: it is a budget, absolute
+  and per run, not a quality bar. SPEC/00 §8 M04's "one policy, not
+  both" is about quality bars (threshold-owner F5).
 - **p95.** `p95_ms` on the envelope, from the per-answer `latency_ms` the
   runner or the runtime records (from M01 PR 2). Not k6 at M04 (§9). On
   the incumbent pin before the guardrail, six `runner` envelopes ranged
-  4,845 to 8,641 ms and five `runtime` envelopes 5,415 to 7,996 ms: a
-  spread of 1.78× with no change to the model, which is why the bar is
-  2.0×.
+  4,845 to 8,641 ms and five `runtime` envelopes 5,415 to 7,996 ms. The
+  bar compares with a median, so the comparison that matters is the worst
+  run against it: across all thirty Sonnet 4.6 envelopes the slowest is
+  1.63× their median, and 1.48× the runner median. 2.0× clears every run
+  on record with no change to the model (threshold-owner note 10).
 - **A-vs-A.** Two runs of refagent, and two of the control, on the same
   tree and pin in one `evals` job. Zero diff means every golden's `pass`
   is the same in both. Latency, tokens and text are not compared.
@@ -117,7 +138,13 @@ never gated** (ADR-0004): its diff is F0.4 measured, not `F4_3`.
   allows a date or null). Bedrock publishes `modelLifecycle.endOfLifeTime`
   only once a model is `LEGACY`: on 2026-09-26 the incumbent and all three
   candidates are `ACTIVE` with none, so refagent's null is a reading ("no
-  date announced"), not a gap. At M04 the date is set by hand from that
+  date announced"), not a gap. Moving the date later, setting it to null,
+  or removing it is a relaxation, the Threshold Owner's key (ADR-0009
+  amendment 1, entry 6; threshold-owner F6).
+- **`version`.** For an id that carries a version, `version` records that
+  suffix (Sonnet 4.5: `20250929-v1:0`); it is null only when the id has
+  none, as Sonnet 4.6's has not (ruling G). The swap PRs follow this; the
+  seed patches stay as planted (threshold-owner F8). At M04 the date is set by hand from that
   reading; setting it from Bedrock by code is cut to M07 (§9, cut g).
 
 ## 3. The false state
@@ -259,7 +286,7 @@ None of it is in PR 1. In the order the commits land:
 - **`deprecated_after`** (`src/validate/`, Engineering): S5's reader.
   refagent's own stays null, recorded against Bedrock's reading.
 - **`delta_max`** (`thresholds.yaml`, Threshold Owner): two bars,
-  `swap.p95_ratio_max: 2.0` and `swap.agent_tokens_ratio_max: 1.5`, each
+  `relative.p95_ratio_max: 2.0` and `relative.agent_tokens_ratio_max: 1.5`, each
   relaxing upward. Adding a bar is not a relaxation (ADR-0009). The gate
   reads them at the envelope's commit, finds the incumbent (§2), and
   writes the reason. S4's reader.
@@ -297,7 +324,12 @@ None of it is in PR 1. In the order the commits land:
   0.
 - **PR 2's run on the PR, stated before it.** S1 to S5 refused, each for
   its planted reason. refagent under grounding: **ordinary 9/9, traps
-  2/3**, as at `cb06c0d`; fewer is a finding, not a count to lower. A-vs-A
+  2/3**, as at `cb06c0d`; fewer is a finding, not a count to lower.
+  Those two counts were never grounded: no committed raw run shows a tool
+  call, so PR 2's run is the first measurement of them (data-owner F7).
+  If `g-021` is retired at PR 2, the traps are 2 of 2 live and a new id
+  is in `never_passed`; the expected line is restated before the run
+  (data-owner F16). A-vs-A
   zero diff for refagent; the control's diff recorded, not gated. p95 and
   tokens within their bars.
 - **PR 3's run, stated before it.** The breaking swap PR RED with at
@@ -327,7 +359,12 @@ SPEC/00 §10.5: no document describes these as working.
 - a model called without the pinned guardrail, or around the agent's
   own profile (M05; `open.md` row 26, and new item 40 in
   `milestones/M04/feasibility.md` §6);
-- the judge, and a judge model swap (R6): §9, M07.
+- the judge, and a judge model swap (R6): §9, M07;
+- the guardrail on a candidate's answers: every topic is assessed on the
+  question only (`topics_apply_to: input`, `open.md` row 17), so a swap's
+  plants fire before the candidate is called. "Plants 7 of 7" on a swap
+  PR says nothing about the new model. M06, with retrieval (rule-owner
+  F7 on PR 1).
 
 ## 9. Cut list
 

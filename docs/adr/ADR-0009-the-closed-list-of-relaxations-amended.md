@@ -7,7 +7,7 @@ seat: Product
 authorises:
   - Threshold Owner  # SPEC/00 §5 `two-key`: what counts as a relaxation (SPEC/02 §2, "Relaxation")
   - Rule Owner  # entries 4 and 5: a guardrail removed; a rule narrowed
-amendments: 0
+amendments: 1
 ---
 
 # ADR-0009 — The closed list of relaxations, amended
@@ -105,3 +105,25 @@ own merge commit, where its paths existed.
   `max_tokens_per_session`, entry 3 makes that two keys.
 - One person still holds every seat (R1). The amendment makes a second
   key say which path it keys; it does not make it a second person.
+
+## Amendment 1 (M04 PR 1, 2026-09-27): `deprecated_after` joins the list
+
+Threshold Owner proposes (`threshold-owner` F6 on M04 PR 1, in the PR
+body); Product rules (`milestones/M04/rulings/pr1.md`).
+
+From M04 PR 2, `validate` fails a pin whose `deprecated_after` is within
+30 days of the run, or past (SPEC/04 §5, seed S5). A one-key commit that
+moved the date later, or cleared it, would switch that check off. ADR-0010
+made the field the Threshold Owner's and left this open.
+
+**Entry 6:** a manifest's `deprecated_after` moved to a later date, set
+from a date to null, or removed. Null to a date is not one, nor is a date
+moved earlier. The key that covers it is the Threshold Owner's.
+
+**What reads it, and when.** Nothing at M04 PR 1: this is the ruling.
+`src/gates/two_key.py` reads it from M04 PR 2 (Engineering), in the same
+PR as `src/validate/lifecycle.py` and no later.
+
+Not changed here: a rule definition narrowed under the same name stays
+one key until the Rule Owner's amendment (`milestones/M04/feasibility.md`
+§6 row 2). This is ADR-0009's first amendment. One is left.
