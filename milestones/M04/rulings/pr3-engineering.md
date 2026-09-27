@@ -26,6 +26,8 @@ evidence:
   - milestones/M04/rulings/pr3.md
   - https://github.com/andaro74/agentkeel/pull/25
   - https://github.com/andaro74/agentkeel/pull/26
+  - https://github.com/andaro74/agentkeel/actions/runs/36353810782
+  - evals/history/12ebb54ca3fb3a13e8807f8f5bca37a83b0e4df1.json
 pr: 27
 ---
 
@@ -75,6 +77,30 @@ against every attack it tried.
 | N6 | The P5 guard is a string match | **Recorded** |
 | N7 | No CI envelope carries `swaps` yet | **Recorded**: this PR's own run is its first |
 
+## This PR's measuring run
+
+Run 36353810782 on `12ebb54`; the envelope is `evals/history/12ebb54ca3fb3a13e8807f8f5bca37a83b0e4df1.json`, committed by
+`github-actions[bot]` as `f161053`. Read from the envelope and `gate`
+(exit 0), not evidence of anything the run did not measure:
+
+| Field | Value |
+|---|---|
+| verdict | GREEN |
+| mode | `runtime` |
+| `F4_1`, `F4_2`, `F4_4` | pass (the seed tests; `F4_3` not required: the pin did not move) |
+| `p95_ms` | 5,829 |
+| `agent_tokens` | 41,001 |
+| tokens, the whole job | 48,815 of 150,000 |
+| `make evals` | 86 s (22:04:00 to 22:05:26 UTC), the swap read inside it |
+| `swaps` | #25 breaking RED (regressed 11; other reasons 5); #26 equivalent RED (regressed 1 `g-005`; other reasons 4); each read at its bot commit (`bc75a53`, `131dc22`) |
+
+The first CI envelope with `swaps`. The "other reasons" on both are the
+swaps' own red seed-test checks, the suite's reason this PR repairs; they
+go when the swaps re-run on `main` after this merge. This commit, which
+cites the envelope, is prose only, so its run reuses the envelope and
+gives the pull request a head the required checks run on: the bot's
+commit starts no workflow.
+
 ## Falsify it
 
     git diff --stat da6feae...HEAD -- src/baseline/            # empty
@@ -83,5 +109,6 @@ against every attack it tried.
     uv run python -m src.validate                              # exit 0
     uv run python -m src.gates.ruling_cited --base origin/main --pr 27
     grep -n "json.loads(envelope" scripts/rule_swaps.py        # nothing (B2)
+    uv run python -m src.verdict.gate evals/history/12ebb54ca3fb3a13e8807f8f5bca37a83b0e4df1.json   # GREEN, exit 0
     GITHUB_TOKEN=$(gh auth token) uv run python scripts/observe_pr.py milestones/M04/runs/f4_swaps.yaml --out swaps.json
     uv run python scripts/rule_swaps.py swaps.json --out swaps-ruled.json   # local, not evidence
