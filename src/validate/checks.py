@@ -34,6 +34,7 @@ from src.validate import (
     corpus,
     edges,
     golden_ids,
+    lifecycle,
     overlap,
     ruleset,
     semver,
@@ -408,4 +409,6 @@ CHECKS = {
     "plant controls name live goldens of their kind": controls.check,
     "golden/corpus overlap (12 words), no row id in the corpus": overlap.check,
     "admitted.yaml is the corpus, byte for byte, under a Data Owner ruling": corpus.check,
+    # M04 PR 2 (SPEC/04 section 5, seed S5)
+    "deprecated_after more than 30 days away, or null": lifecycle.check,
 }

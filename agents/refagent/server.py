@@ -8,8 +8,14 @@ to the deployed runtime (ruling l). `GET /ping` is the health check.
 The runtime reads the rights table from DynamoDB
 (`AGENTKEEL_RIGHTS_TABLE`, set by `GovernedAgent`), through the VPC's
 gateway endpoint. There is no way out of that VPC (ADR-0006), so if the
-table is missing the answer says so; it does not fall back to the file,
-which is not in the image.
+variable is not set the answer is an error that says so; it does not fall
+back to the file, which is not in the image (`agent.rights_rows` would try
+it, so the server does not call it without a table).
+
+The model is `AGENTKEEL_MODEL_PROFILE`, the profile `GovernedAgent` makes
+from the manifest's pin, and nothing else: with no default, a runtime
+started without it answers with an error rather than call a model the pin
+does not name (M04 PR 2; M04 open.md row 22, item f).
 
 This server judges nothing and writes no envelope (P5).
 """
@@ -27,7 +33,7 @@ from agents.refagent import agent
 
 PORT = 8080
 REGION = os.environ.get("AWS_REGION", "us-west-2")
-MODEL_ID = os.environ.get("AGENTKEEL_MODEL_PROFILE", "us.anthropic.claude-sonnet-4-6")
+MODEL_ID = os.environ.get("AGENTKEEL_MODEL_PROFILE")
 TABLE = os.environ.get("AGENTKEEL_RIGHTS_TABLE")
 # The manifest's guardrail pin, which GovernedAgent sets from the same manifest
 # (M03 PR 2), as the guardrail's ARN: converse takes an id or an ARN, and the
@@ -49,6 +55,10 @@ class Handler(BaseHTTPRequestHandler):
             question = json.loads(body or b"{}")["question"]
         except (ValueError, KeyError) as exc:
             return self._send(400, {"error": f"a JSON object with a question: {exc}"})
+        if not MODEL_ID or not TABLE:
+            missing = [name for name, value in (("AGENTKEEL_MODEL_PROFILE", MODEL_ID), ("AGENTKEEL_RIGHTS_TABLE", TABLE))
+                       if not value]  # fmt: skip
+            return self._send(200, {"error": f"not set in the runtime: {', '.join(missing)}"})
         try:
             rows, source = agent.rights_rows(TABLE, boto3.client("dynamodb", region_name=REGION))
             self._send(200, agent.answer(self.bedrock, question, MODEL_ID, rows, source, GUARDRAIL))

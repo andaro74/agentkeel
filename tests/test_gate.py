@@ -20,10 +20,10 @@ def judged(envelope_path, history=None, plant_ids=()):
 
 
 def test_empty_history_nothing_gates(chain):
-    """20 of 20 failing, none has ever passed: reported, not RED. passed == total is not a gate."""
+    """19 of 19 failing, none has ever passed: reported, not RED. passed == total is not a gate."""
     envelope_path, _, _ = chain(agent=True)
     envelope = gate.read(envelope_path)
-    assert len(envelope["never_passed"]) == 20 and envelope["regressed"] == []
+    assert len(envelope["never_passed"]) == 19 and envelope["regressed"] == []
     assert judged(envelope_path) == ("GREEN", [])
     assert gate.main([str(envelope_path), "--history-dir", str(envelope_path.parent / "none")]) == 0
 
@@ -48,7 +48,7 @@ def test_at_m00_every_result_is_the_controls(chain):
     envelope_path, _, _ = chain(right={"g-010"})
     envelope = gate.read(envelope_path)
     assert {r["scope"] for r in envelope["goldens"].values()} == {"control"}
-    assert len(envelope["goldens"]) == 20
+    assert len(envelope["goldens"]) == 19
 
 
 def test_the_control_is_never_gated(chain, past, capsys):
@@ -201,7 +201,7 @@ def test_an_agent_envelope_from_m03s_readers_must_carry_claim_3s_checks():
     """SPEC/03 section 4: F3_1, F3_2, F3_3, F3_5, F3_6, from f82a02a (the last reader) and every descendant."""
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
     everything = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_3_CHECKS
-    assert gate.required_checks(head) == everything
+    assert gate.required_checks(head)[:len(everything)] == everything  # and claim 4's from M04 PR 2
     assert gate.required_checks(gate.M03_READERS) == everything
     assert gate.CLAIM_3_CHECKS == ("F3_1", "F3_2", "F3_3", "F3_5", "F3_6")
     envelope = json.loads((ROOT / "evals" / "history" / "8033c2a7a0588e557df577464c190e64a435e88a.json")
@@ -237,10 +237,10 @@ def test_a_control_envelope_carries_no_claim_2_check(chain):
 def test_over_the_cap_is_red_in_the_gate_too(chain):
     envelope_path, _, _ = chain(agent=True)
     envelope = gate.read(envelope_path)
-    assert gate.judge(envelope, KINDS, {}, [], cap=12000) == ("GREEN", [])
-    verdict, reasons = gate.judge(envelope, KINDS, {}, [], cap=11999)
+    assert gate.judge(envelope, KINDS, {}, [], cap=11400) == ("GREEN", [])
+    verdict, reasons = gate.judge(envelope, KINDS, {}, [], cap=11399)
     assert verdict == "RED"
-    assert "cost-cap: 12000 over 11999" in reasons
+    assert "cost-cap: 11400 over 11399" in reasons
     assert "build said GREEN, the gate says RED" in reasons
 
 
@@ -350,13 +350,13 @@ def test_a_dropped_golden_is_red(chain):
 def test_measured_is_what_the_ledger_cell_must_say(chain):
     envelope_path, _, _ = chain(right={"g-001", "g-010"})
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
-        "control: traps 1/3 (g-010); ordinary 1/9; guardrail 0/3; redteam 0/5; mode control; never_passed 18; regressed 0; "
+        "control: traps 1/2 (g-010); ordinary 1/9; guardrail 0/3; redteam 0/5; mode control; never_passed 17; regressed 0; "
         f"plants 0/0; GREEN; envelope `{'a' * 40}`"
     )
     envelope_path, _, _ = chain(right={"g-001"}, agent=True)
     assert gate.measured_at(envelope_path, envelope_path.parent) == (
-        "agent: traps 0/3; ordinary 1/9; guardrail 0/3; redteam 0/5; control: traps 0/3; ordinary 0/9; guardrail 0/3; "
-        f"redteam 0/5; mode runner; never_passed 19; regressed 0; plants 0/0; F1_1 pass {URL}; F1_2 pass {URL}; F1_3 pass {URL}; "
+        "agent: traps 0/2; ordinary 1/9; guardrail 0/3; redteam 0/5; control: traps 0/2; ordinary 0/9; guardrail 0/3; "
+        f"redteam 0/5; mode runner; never_passed 18; regressed 0; plants 0/0; F1_1 pass {URL}; F1_2 pass {URL}; F1_3 pass {URL}; "
         f"F1_4 pass {URL}; F2_1 pass {URL}; F2_2 pass {URL}; GREEN; envelope `{'a' * 40}`; base b0219756"
     )
 
@@ -388,3 +388,41 @@ def test_bars_reads_every_level():
     assert two_key.bars({"a": {"b": 1, "c": {"d": 2.5, "e": True}}, "relaxes": {"a.b": "up"}}) == {"a.b": 1, "a.c.d": 2.5}
     before, after = {"a": {"c": {"d": 5}}, "relaxes": {"a.c.d": "up"}}, {"a": {"c": {"d": 6}}}
     assert two_key.threshold_moves(before, after) == ["a.c.d 5 -> 6 relaxes it (relaxes: up)"]
+
+
+def test_token_sums_are_held_to_the_control_card(chain):
+    """M04 open.md row 22, item h (M04 PR 2): the gate no longer takes build's token sums as given."""
+    envelope_path, card_path, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    assert gate.spend(envelope, card) == []
+    assert envelope["tokens_in"] + envelope["tokens_out"] == envelope["agent_tokens"] + card["tokens_in"] + card["tokens_out"]
+    under = {**envelope, "tokens_in": envelope["tokens_in"] - 1}
+    assert gate.spend(under, card) and "make" in gate.spend(under, card)[0]
+    below = {**envelope, "tokens_in": card["tokens_in"] - 1}
+    assert "fewer than this run's control card" in gate.spend(below, card)[0]
+    verdict, reasons = gate.judge(under, KINDS, {}, [], control_card=card)
+    assert verdict == "RED" and any(r.startswith("tokens:") for r in reasons)
+    # with A-vs-A the second runs add to the sum, so more is not a disagreement; fewer still is
+    assert gate.spend({**envelope, "a_vs_a": {"agent": [], "control": None}, "tokens_in": envelope["tokens_in"] + 500}, card) == []
+
+
+def test_an_agent_envelope_from_m04s_readers_must_carry_claim_4s_checks(monkeypatch):
+    """SPEC/04 section 4: F4_1, F4_2 and F4_4 from 15047b4 (the flags wired) and every descendant; F4_3 on a swap."""
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    before = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_3_CHECKS
+    assert gate.CLAIM_4_CHECKS == ("F4_1", "F4_2", "F4_4")
+    assert gate.required_checks(head) == before + gate.CLAIM_4_CHECKS
+    assert gate.required_checks(gate.M04_READERS) == before + gate.CLAIM_4_CHECKS
+    assert gate.required_checks("e51892775b6b36236755f0f9a94e6d98d7628206") == before  # M04 PR 1's run
+    monkeypatch.setattr(gate, "pin_moved", lambda commit, bundle, root: True)  # a swap
+    assert gate.required_checks(head) == before + gate.CLAIM_4_CHECKS + ("F4_3",)
+
+
+def test_a_deleted_relative_bar_is_rejected_from_the_commit_that_wired_it(monkeypatch):
+    """threshold-owner F2 on M04 PR 2: from 15047b4 the gate does not read a missing `relative` as no bar."""
+    monkeypatch.setattr(gate, "thresholds_at", lambda commit, root=ROOT: ({"cost_cap": {"tokens_per_run": 1}}, "a test"))
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    with pytest.raises(gate.Rejected, match="no relative bars"):
+        gate.bars_at(head)
+    assert gate.bars_at("e51892775b6b36236755f0f9a94e6d98d7628206") == ({}, "a test")  # before it: no bar, as before

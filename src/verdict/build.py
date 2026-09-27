@@ -16,15 +16,28 @@ and its card is written first. An agent envelope names two cards:
 form: `control` results, `control_card_ref: null`, and `baseline_card_ref`
 naming this run's own card. For the agent, an ordinary or trap answer
 passes only if it cites a row and a clause that exist, and `checks.F1_4`
-fails when any ordinary answer does not (SPEC/01 §4). A run over
+fails when any ordinary answer does not (SPEC/01 §4). From M04 PR 2 its
+`score` is also false unless the answer is tool-grounded (SPEC/04 §2). A run over
 `thresholds.yaml`'s token cap is written RED, whichever the subject
 (Threshold Owner, M01 item 22). A run always writes an envelope.
 
     python -m src.verdict.build card --raw RAW --out CARD
     python -m src.verdict.build envelope --raw RAW --control-card CARD --out ENVELOPE [--run-url URL]
+        [--a-vs-a RAW_B [--a-vs-a-control CONTROL_RAW_B]]
 
 `--raw` is the agent's replies when an agent ran, and the control's own
 otherwise; which one it is, is worked out from the card, not passed in.
+
+From M04 PR 2 (SPEC/04 §2, §6) an agent envelope also carries:
+- `agent_tokens`, the agent's own tokens in the first run, which the
+  `delta_max` bar reads; `tokens_in` and `tokens_out` count every run;
+- `checks.F4_4`, build's own reading of the `relative` bars in
+  `thresholds.yaml` against the incumbent's median (`incumbent_runs`),
+  joined with the S4 test through both();
+- with `--a-vs-a`, a second run of the same pin scored as the first, the ids
+  whose `pass` differ in `a_vs_a`, and `checks.F4_3` failing on any agent
+  diff. The control's diff, given `--a-vs-a-control`, is recorded and not
+  gated (ADR-0004; Finding F0.4).
 
 It refuses, and writes nothing, when:
 - no control card is given, or the card is for another commit (seed 2, F0.2);
@@ -34,6 +47,7 @@ It refuses, and writes nothing, when:
 - the tree was dirty when the runner ran (unless --allow-dirty, local only);
 - a reply was read from a prompt cache;
 - the composed envelope does not validate;
+- an A-vs-A pair names another commit, model or region;
 - the target is evals/history/ and GITHUB_ACTIONS is not "true" (ADR-0003).
   That is an environment variable. It stops an accident, not a person.
 Exit 3 is a refusal.
@@ -54,9 +68,12 @@ from typing import Any
 import yaml
 
 from src.verdict import (
+    M04_READERS,
     ROOT,
     canonical_sha256,
+    descends_from,
     fingerprint_at,
+    incumbent_at,
     plants,
     replay_history,
     schema_errors,
@@ -113,6 +130,23 @@ def token_cap(thresholds: dict[str, Any]) -> int:
     return cap
 
 
+def relative_bars(thresholds: dict[str, Any]) -> dict[str, float]:
+    """`relative` in thresholds.yaml (the Threshold Owner, M04 PR 2): {} where there is none.
+
+    A bar that is there and is not a positive number is a refusal, as a
+    missing cap is: a deleted bar is not read as no bar.
+    """
+    bars = thresholds.get("relative")
+    if bars is None:
+        return {}
+    wanted = ("p95_ratio_max", "agent_tokens_ratio_max")
+    if not isinstance(bars, dict) or any(
+        not isinstance(bars.get(name), (int, float)) or isinstance(bars.get(name), bool) or bars[name] <= 0 for name in wanted
+    ):  # fmt: skip
+        raise Refused(f"thresholds.yaml relative must give {' and '.join(wanted)} as positive numbers, got {bars!r}")
+    return {name: float(bars[name]) for name in wanted}
+
+
 def load_citables(root: Path) -> tuple[set[str], set[str]]:
     rows = {r["table_row"] for r in load_json(root / "data" / "rights_table.json")}
     clauses = set(load_json(root / "data" / "clause_index.json"))
@@ -154,6 +188,32 @@ def blocks_at(commit: str, root: Path = ROOT) -> dict[str, str]:
     return blocks
 
 
+def grounded(parsed: dict[str, Any], observation: dict[str, Any]) -> bool:
+    """SPEC/04 §2 (the Data Owner's ruling on finding 4, M04 PR 1): the answer came from the tool.
+
+    Some `check_availability` call of this answer succeeded, found a row
+    whose `table_row` is the answer's, and offered the answer's `clause_id`
+    among its `clause_candidates`. A call printed as text is not in
+    `tool_calls`; a call the schema refused has `status: error`. Neither
+    grounds anything (seed S1). It does not read the call's input: a row is
+    found by its key, so a call that returned the answer's row named that
+    row's title, territory and platform. That the row is the golden's is
+    `score_one`'s check, not this one's (data-owner F5, ruled at M04 PR 2).
+    """
+    row, clause = parsed.get("table_row"), parsed.get("clause_id")
+    for call in observation.get("tool_calls") or []:
+        if not isinstance(call, dict):  # grounds nothing, and does not stop the envelope (cold review of PR 2, N1)
+            continue
+        output = call.get("output")
+        if call.get("name") != "check_availability" or call.get("status") != "success" or not isinstance(output, dict):
+            continue
+        found = output.get("row") if output.get("found") is True else None
+        candidates = output.get("clause_candidates")
+        if isinstance(found, dict) and found.get("table_row") == row and isinstance(candidates, list) and clause in candidates:
+            return True
+    return False
+
+
 def score_one(
     golden: dict[str, Any],
     observation: dict[str, Any],
@@ -176,6 +236,12 @@ def score_one(
         cites: bool | None = (
             isinstance(row, str) and row in rows and isinstance(clause, str) and clause in clauses
         )
+        # Applied to the agent only, in compose_envelope: the control has no tool
+        # and is scored as at m00 (ADR-0002). Grounded on the golden's own row
+        # (the Data Owner, ruling on data-owner F5 at M04 PR 2): a call on the
+        # wrong title returns the wrong row, which the tool grounds and the
+        # golden does not. The row only, not the clause.
+        is_grounded: bool | None = row == golden["expected"]["table_row"] and grounded(parsed, observation)
     else:
         # Only guardrail_intervened counts as BLOCKED or MASKED. A model that
         # declines by itself is an opinion, not a control (ruling 3).
@@ -189,8 +255,10 @@ def score_one(
         if named is not None:
             score = score and named in (observation.get("guardrail_topics") or [])
         cites = None
-    # The gate reads `score` for pass. `cites` gates from M01 (F1.4).
-    return {"kind": kind, "score": score, "cites": cites, "pass": score}
+        is_grounded = None
+    # The gate reads `score` for pass. `cites` gates from M01 (F1.4). `grounded`
+    # is build's own and never reaches the envelope (SPEC/04 §2).
+    return {"kind": kind, "score": score, "cites": cites, "grounded": is_grounded, "pass": score}
 
 
 def score_all(
@@ -219,6 +287,9 @@ def score_all(
 
 
 def compose_card(raw: dict[str, Any], results: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    # The card's results in m00's shape: `grounded` is build's own (M04 PR 2), and
+    # the gate holds a control envelope's results to the card's, key for key.
+    results = {g: {k: r[k] for k in ("kind", "score", "cites", "pass")} for g, r in results.items()}
     counts: dict[str, dict[str, int]] = {}
     for result in results.values():
         bucket = counts.setdefault(result["kind"], {"passed": 0, "total": 0})
@@ -483,6 +554,59 @@ def subject(raw: dict[str, Any], scope: str, root: Path = ROOT) -> dict[str, Any
             "region": raw["region"], "model_version": manifest["model"]["version"]}  # fmt: skip
 
 
+def over_the_bars(
+    p95_ms: int | None, tokens: int, bars: dict[str, float], runs: list[dict[str, Any]], where: str,
+) -> list[str]:  # fmt: skip
+    """build's own reading of the `delta_max` bars (SPEC/04 §2). Empty is under both.
+
+    The median of the incumbent's envelopes in the same mode. None of them is
+    a fail, with the reason: a mode the incumbent never ran in is not a way
+    past the bar (threshold-owner F1 to F3 on M04 PR 1).
+    """
+    import statistics
+
+    over = []
+    for name, mine, field in (("p95_ratio_max", p95_ms, "p95_ms"), ("agent_tokens_ratio_max", tokens, "agent_tokens")):
+        theirs = [r[field] for r in runs if isinstance(r.get(field), int)]
+        if not theirs:
+            over.append(f"{field}: no incumbent envelope ({where}) to compare with")
+            continue
+        median = statistics.median(theirs)
+        if mine is None or median <= 0 or mine / median > bars[name]:
+            over.append(f"{field} {mine} over relative.{name} {bars[name]} x the incumbent's median {median} "
+                        f"over {len(theirs)} envelopes ({where})")  # fmt: skip
+    return over
+
+
+def a_vs_a_pair(first: dict[str, Any], second: dict[str, Any], what: str) -> None:
+    """Two runs of one pin on one tree, or a refusal (SPEC/04 §6)."""
+    for field in ("commit", "model_id", "region"):
+        if first.get(field) != second.get(field):
+            raise Refused(f"A-vs-A: the {what}'s second run has {field} {second.get(field)!r}, "
+                          f"the first {first.get(field)!r}: two runs of one pin on one tree, or none")  # fmt: skip
+    if second.get("dirty") and not first.get("dirty"):
+        raise Refused(f"A-vs-A: the {what}'s second run was on a dirty tree")
+
+
+def as_the_agent_is_scored(results: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """An agent's answer: correct only when grounded (SPEC/04 §2, M04 PR 2), a pass only when it also cites (F1.4)."""
+    results = {g: {**r, "score": r["score"] and r["grounded"] is True} if r["kind"] in CITING_KINDS else r
+               for g, r in results.items()}  # fmt: skip
+    return {g: {**r, "pass": r["score"] and bool(r["cites"])} if r["kind"] in CITING_KINDS else r
+            for g, r in results.items()}  # fmt: skip
+
+
+def differ(first: dict[str, dict[str, Any]], second: dict[str, dict[str, Any]]) -> list[str]:
+    """The goldens whose `pass` is not the same in both runs. Latency, tokens and text are not compared.
+
+    Two runs over different goldens are not an A-vs-A: refused, not compared on what they share.
+    """
+    if set(first) != set(second):
+        raise Refused(f"A-vs-A: the two runs cover different goldens: only the first {sorted(set(first) - set(second))}, "
+                      f"only the second {sorted(set(second) - set(first))}")  # fmt: skip
+    return sorted(g for g in first if first[g]["pass"] != second[g]["pass"])
+
+
 def f1_4(results: dict[str, dict[str, Any]]) -> str:
     """fail when any ordinary answer does not cite a row and a clause that exist (SPEC/01 §4)."""
     return "fail" if any(r["kind"] == "ordinary" and not r["cites"] for r in results.values()) else "pass"
@@ -503,10 +627,26 @@ def compose_envelope(
     cap: int | None = None,
     run_url: str | None = None,
     corpus_fingerprint: str | None = None,
+    bars: dict[str, float] | None = None,
+    incumbent: tuple[list[dict[str, Any]], str] | None = None,
+    second: tuple[dict[str, Any], dict[str, dict[str, Any]]] | None = None,
+    control_second: tuple[dict[str, Any], list[str]] | None = None,
 ) -> dict[str, Any]:
+    """`bars` and `incumbent` (its runs, and where the pin was read) give F4_4; `second`, the
+    agent's second raw and its scores, gives A-vs-A and F4_3; `control_second`, the control's
+    second raw and the ids whose pass differ from its card, is recorded only (M04 PR 2)."""
     observations = raw["observations"]
     usage = [o.get("usage", {}) for o in observations]
-    if sum(u.get("cacheReadInputTokens", 0) for u in usage):
+    agent_usage = sum(u.get("inputTokens", 0) + u.get("outputTokens", 0) for u in usage)
+    # Every run the job made counts against the cap (SPEC/04 §6; note 16 on M04 PR 1).
+    extras = [extra[0]["observations"] for extra in (second, control_second) if extra]
+    more = [o.get("usage", {}) for run in extras for o in run]
+    # A failed call in the agent's second run leaves A-vs-A unread: UNMEASURED, as in the first.
+    # The control's is recorded in its diff and gates nothing (ADR-0004; cold review of PR 2, F3).
+    second_errors = second is not None and any("error" in o for o in second[0]["observations"])
+    # Every run, not the first only: a second run read from a cache would make a zero diff
+    # of nothing (cold review of PR 2, F2).
+    if sum(u.get("cacheReadInputTokens", 0) for u in usage + more):
         raise Refused("a reply was read from a prompt cache; cache_state would be a lie")
 
     # The regression bar and the plant count read the agent under test. The
@@ -514,13 +654,24 @@ def compose_envelope(
     # result is the control's, `regressed` is empty by construction.
     gated = scope == "agent"
     if gated:
-        # F1.4 (SPEC/01 §4): an agent's answer is not a pass unless it cites.
+        # SPEC/04 §2 (M04 PR 2, seed S1): an agent's answer is not correct unless
+        # the tool grounded it. F1.4 (SPEC/01 §4): not a pass unless it cites.
         # The control is scored as at m00; its card is the base.
-        results = {g: {**r, "pass": r["pass"] and bool(r["cites"])} if r["kind"] in CITING_KINDS else r
-                   for g, r in results.items()}  # fmt: skip
+        results = as_the_agent_is_scored(results)
         if not run_url:
             raise Refused("checks.F1_4 needs the CI run URL (--run-url)")
         checks = {**checks, "F1_4": {"status": f1_4(results), "url": run_url}}
+        if bars:
+            runs, where = incumbent or ([], "no incumbent given")
+            first_p95 = p95([o["latency_ms"] for o in observations if "latency_ms" in o])
+            over = over_the_bars(first_p95, agent_usage, bars, runs, where)
+            for reason in over:
+                print(f"F4_4: {reason}", file=sys.stderr)
+            checks = both(checks, "F4_4", {"status": "fail" if over else "pass", "url": run_url})
+        if second is not None:
+            a_vs_a = {"agent": differ(results, as_the_agent_is_scored(second[1])),
+                      "control": control_second[1] if control_second else None}  # fmt: skip
+            checks = both(checks, "F4_3", {"status": "fail" if a_vs_a["agent"] else "pass", "url": run_url})
     plant_ids = plant_ids if gated else []
     failing = [g for g, r in results.items() if not r["pass"]]
     passed_before = {g for g in failing if replay_history.ever_passed(history, scope, g)}
@@ -534,11 +685,11 @@ def compose_envelope(
 
     # The run's spend, both subjects: the agent's replies and the control card's
     # (Threshold Owner, M01 item 22: the cap is for two subjects).
-    tokens_in = sum(u.get("inputTokens", 0) for u in usage) + control_tokens[0]
-    tokens_out = sum(u.get("outputTokens", 0) for u in usage) + control_tokens[1]
+    tokens_in = sum(u.get("inputTokens", 0) for u in usage + more) + control_tokens[0]
+    tokens_out = sum(u.get("outputTokens", 0) for u in usage + more) + control_tokens[1]
     if cap is not None and tokens_in + tokens_out > cap:
         verdict = "RED"  # an over-cap run is a recorded RED (Threshold Owner, M01 item 22)
-    elif any("error" in o for o in observations):
+    elif any("error" in o for o in observations) or second_errors:
         verdict = "UNMEASURED"
     elif (
         regressed
@@ -551,6 +702,10 @@ def compose_envelope(
         verdict = "GREEN"
 
     one_subject = {"control_card_ref": control_ref, "tokens_in": tokens_in}
+    if gated:
+        one_subject["agent_tokens"] = agent_usage  # the first run's, the agent's side only (SPEC/04 §2)
+    if gated and second is not None:
+        one_subject["a_vs_a"] = a_vs_a
     return {
         "commit": raw["commit"],
         "tag": tag,
@@ -639,6 +794,9 @@ def main(argv: list[str] | None = None) -> int:
                         metavar=("ID", "OBSERVATION"))  # fmt: skip
     parser.add_argument("--check-doors", nargs=2, action="append", default=[],
                         metavar=("ID", "OBSERVATION"))  # fmt: skip
+    # M04 PR 2 (SPEC/04 §6): the second runs of one pin, for A-vs-A (S3's reader).
+    parser.add_argument("--a-vs-a", type=Path, metavar="AGENT_RAW_B")
+    parser.add_argument("--a-vs-a-control", type=Path, metavar="CONTROL_RAW_B")
     parser.add_argument("--run-url")
     parser.add_argument("--allow-dirty", action="store_true")
     args = parser.parse_args(argv)
@@ -682,6 +840,34 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError as exc:
                 raise Refused(str(exc)) from exc
             corpus, _ = fingerprint_at(raw["commit"], ROOT)  # admitted.yaml at the run's commit
+            if args.a_vs_a_control and not args.a_vs_a:
+                raise Refused("--a-vs-a-control without --a-vs-a: the control's second run is read beside the agent's")
+            second = control_second = None
+            if args.a_vs_a:
+                raw_b = load_json(args.a_vs_a)
+                a_vs_a_pair(raw, raw_b, "agent")
+                second = (raw_b, score_all(raw_b, goldens, *load_citables(ROOT), retired=retired_ids(args.goldens),
+                                           blocks=blocks_at(raw["commit"])))  # fmt: skip
+            if args.a_vs_a_control:
+                control_b = load_json(args.a_vs_a_control)
+                control_raw = {"commit": control.get("commit"), "model_id": control.get("model_id"),
+                               "region": control.get("region")}  # fmt: skip
+                a_vs_a_pair(control_raw, control_b, "control")
+                scored = score_all(control_b, goldens, *load_citables(ROOT), retired=retired_ids(args.goldens),
+                                   blocks=blocks_at(raw["commit"]))  # fmt: skip
+                control_second = (control_b, differ(control["goldens"], scored))
+            bars = relative_bars(thresholds)
+            if not bars and descends_from(raw["commit"], M04_READERS):
+                raise Refused(f"thresholds.yaml has no relative bars, and {raw['commit'][:12]} is at or after "
+                              f"{M04_READERS}, which wired them: a deleted bar is not read as no bar")  # fmt: skip
+            incumbent = None
+            if bars:
+                pin, where = incumbent_at(raw["commit"])
+                runs = [] if pin is None else replay_history.incumbent_runs(
+                    args.history_dir, profile=pin["profile"], region=pin["region"], mode=raw.get("mode"),
+                    exclude_commit=raw["commit"], ancestors_of=raw["commit"],
+                )  # fmt: skip
+                incumbent = (runs, f"{pin and pin['profile']} {pin and pin['region']} {raw.get('mode')}, pin at {where}")
             if scope_of(raw, control) == "control":
                 # No agent ran: the control is the subject, in M00's form (ADR-0004
                 # amendment 2, ruling A). Its own card is the base; no control_card_ref.
@@ -704,6 +890,10 @@ def main(argv: list[str] | None = None) -> int:
                     cap=cap,
                     run_url=args.run_url,
                     corpus_fingerprint=corpus,
+                    bars=bars,
+                    incumbent=incumbent,
+                    second=second,
+                    control_second=control_second,
                 )
             emit(envelope, args.out, envelope=True)
     except Refused as refusal:

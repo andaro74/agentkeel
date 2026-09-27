@@ -101,6 +101,19 @@ DAILY_USD = 10  # Threshold Owner (ruling a). At M01 this is an alert, not a sto
 MONTHLY_USD = DAILY_USD * 30
 
 MODELS = ["amazon.nova-micro-v1:0", "anthropic.claude-sonnet-4-6"]  # ruling p
+# M04 PR 2 (SPEC/04 §5.1, seed S2's reader; note 15 on M04 PR 1): the swap
+# candidates the eval role alone may invoke, so a swap PR's run can call the
+# model it moves the pin to. The Threshold Owner's pinned_roles in
+# agents/refagent/manifest.yaml: the equivalent (Sonnet 4.5), the breaking
+# (Llama 3.1 8B) and the cheaper (Haiku 4.5), which stays on the list if its
+# run is cut. Not MODELS, which also feeds the agent boundary and the deploy
+# role: no candidate reaches the runtime or the deploy. Not the deprecation
+# plant (Sonnet 4): LEGACY, refused on every call, and nobody's swap.
+EVAL_CANDIDATES = [
+    "anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "meta.llama3-1-8b-instruct-v1:0",
+    "anthropic.claude-haiku-4-5-20251001-v1:0",
+]
 PROFILE_REGIONS = ["us-east-1", "us-east-2", "us-west-2"]
 INVOKE = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
 # M03 PR 2 (SPEC/03 §6, security-reviewer F1 at M03 PR 1): the guardrail
@@ -742,12 +755,14 @@ class BootstrapStack(cdk.Stack):
             description="agentkeel: GitHub Actions runs make evals. Replaces agentkeel-m00-evals.",
         )  # fmt: skip
 
-        profiles = [f"arn:aws:bedrock:{REGION}:{self.account}:inference-profile/us.{model}" for model in MODELS]
+        # The pins, and from M04 PR 2 the swap candidates (EVAL_CANDIDATES): this role's alone.
+        models = MODELS + EVAL_CANDIDATES
+        profiles = [f"arn:aws:bedrock:{REGION}:{self.account}:inference-profile/us.{model}" for model in models]
         role.add_to_policy(iam.PolicyStatement(sid="InvokePinnedProfiles", actions=INVOKE, resources=profiles))
         role.add_to_policy(iam.PolicyStatement(
             sid="InvokePinnedModelsThroughProfilesOnly", actions=INVOKE,
             resources=[f"arn:aws:bedrock:{region}::foundation-model/{model}"
-                       for model in MODELS for region in PROFILE_REGIONS],
+                       for model in models for region in PROFILE_REGIONS],
             conditions={"StringEquals": {"bedrock:InferenceProfileArn": profiles}},
         ))  # fmt: skip
         # Ruling f: refagent's runtime, and no other. The name is the agent's;

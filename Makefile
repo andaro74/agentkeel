@@ -60,6 +60,17 @@ F3_2_CASES := test_s2_a_silent_red_team_plant_is_red
 F3_3_CASES := test_s3_a_golden_that_overlaps_the_corpus_is_refused
 F3_6_CASES := test_s6_a_control_added_later_does_not_re_rule_an_old_envelope,test_s7_a_pass_recorded_later_does_not_re_rule_an_old_envelope,test_f3_6_guard_a_never_passed_golden_is_not_red
 INGEST_OBS ?=
+# M04 PR 2 (SPEC/04 §4). F4_1, F4_2 and F4_4: each seed refused in a copy of
+# the tree, read from the tests; F4_1 and F4_2 from the tests alone are
+# test-only witnesses until PR 3 wires the swap PRs as their second source. F4_4 is
+# joined by build's own reading of the bars. F4_3: the S3 test and the run's
+# own two runs, only when A_VS_A is set: the job then runs each subject twice
+# and hands build the second runs.
+F4_1_CASES := test_s1_a_breaking_swap_whose_answers_the_tool_never_grounded_is_red
+F4_2_CASES := test_s2_the_equivalent_swaps_pin_is_one_the_eval_role_may_invoke
+F4_3_CASES := test_s3_two_runs_of_one_pin_that_differ_are_a_failed_a_vs_a
+F4_4_CASES := test_s4_a_run_over_the_incumbents_bar_is_red[s4-slow-raw.json-p95-latency_ms-3],test_s4_a_run_over_the_incumbents_bar_is_red[s4-heavy-raw.json-tokens-usage-2]
+A_VS_A ?=
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \
           $(if $(F0_3_OBS),--check-pr F0_3 "$(F0_3_OBS)") \
           $(if $(JUNIT),--check-cases F1_1 "$(F1_1_CASES)" "$(JUNIT)") \
@@ -75,6 +86,10 @@ CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)")
           $(if $(JUNIT),--check-cases F3_3 "$(F3_3_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F3_6 "$(F3_6_CASES)" "$(JUNIT)") \
           $(if $(INGEST_OBS),--check-ingest F3_5 "$(INGEST_OBS)") \
+          $(if $(JUNIT),--check-cases F4_1 "$(F4_1_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F4_2 "$(F4_2_CASES)" "$(JUNIT)") \
+          $(if $(and $(JUNIT),$(A_VS_A)),--check-cases F4_3 "$(F4_3_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F4_4 "$(F4_4_CASES)" "$(JUNIT)") \
           $(if $(RUN_URL),--run-url "$(RUN_URL)")
 # CI passes a file path; the gate's exit code is written there, so a REJECTED
 # envelope (exit 2) is told from a RED one and is not recorded (M01 item 9).
@@ -84,13 +99,29 @@ GATE_EXIT ?=
 # A runner exits 1 when a call failed. It has still written what it saw,
 # so the chain goes on (the leading `-`) and build writes UNMEASURED. If it
 # wrote nothing, the next line fails on the missing file.
+#
+# A_VS_A (M04 PR 2, SPEC/04 §4): each subject runs a second time on the same
+# tree, into `-b` raws that build compares with the first. Neither is
+# committed; the ids that differ are in the envelope's `a_vs_a`.
+#
+# The control's second run goes first, and outside the tree. src/baseline/
+# is frozen, and its runner calls any untracked file dirty (the agent's
+# runner leaves evals/history/ out), so run after the first raw was written
+# it recorded a dirty tree and build refused the pair: PR 2's first labelled
+# run, 36345059724. Its raw is moved in once the first run has written.
+A_VS_A_TMP := $(or $(RUNNER_TEMP),$(TMPDIR),/tmp)
+A_VS_A_RUNS = $(if $(A_VS_A),--raw $(1)/$(2).baseline-raw-b.json --raw $(1)/$(2).agent-raw-b.json)
+A_VS_A_FLAGS = $(if $(A_VS_A),--a-vs-a $(1)/$(2).agent-raw-b.json --a-vs-a-control $(1)/$(2).baseline-raw-b.json)
 ifneq ($(AGENT_RUNNER),)
 define chain
+	$(if $(A_VS_A),-uv run python -m src.baseline.run --out $(A_VS_A_TMP)/$(2).baseline-raw-b.json)
 	-uv run python -m src.baseline.run --out $(1)/$(2).baseline-raw.json
+	$(if $(A_VS_A),mv $(A_VS_A_TMP)/$(2).baseline-raw-b.json $(1)/$(2).baseline-raw-b.json)
 	uv run python -m src.verdict.build card --raw $(1)/$(2).baseline-raw.json --out $(1)/$(2).baseline-card.json $(3)
 	-uv run python -m src.agent.run --out $(1)/$(2).agent-raw.json --recheck-runtime
-	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json
-	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS)
+	$(if $(A_VS_A),-uv run python -m src.agent.run --out $(1)/$(2).agent-raw-b.json --recheck-runtime)
+	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json $(A_VS_A_RUNS)
+	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS)
 	uv run python -m src.verdict.gate $(1)/$(2).json; code=$$?; $(if $(GATE_EXIT),echo $$code > "$(GATE_EXIT)";) exit $$code
 endef
 else

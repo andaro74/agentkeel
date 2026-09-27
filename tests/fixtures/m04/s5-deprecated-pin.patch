@@ -1,5 +1,5 @@
 diff --git a/agents/refagent/manifest.yaml b/agents/refagent/manifest.yaml
-index b997255..4b4b2c3 100644
+index 63cdec7..0ae9396 100644
 --- a/agents/refagent/manifest.yaml
 +++ b/agents/refagent/manifest.yaml
 @@ -32,9 +32,9 @@ name: refagent
@@ -13,8 +13,8 @@ index b997255..4b4b2c3 100644
 +  profile: us.anthropic.claude-sonnet-4-20250514-v1:0
    region: us-west-2
  
- # Threshold Owner: the judge model id. Picked at M03 PR 1 from the
-@@ -110,7 +110,7 @@ daily_usd: 10
+ # Threshold Owner: the judge model id. Null: the judge, its rubric and the
+@@ -113,7 +113,7 @@ daily_usd: 10
  # informational in the PoC (SPEC/00 §12).
  memory: null
  data_class: internal

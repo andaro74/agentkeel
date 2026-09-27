@@ -234,3 +234,48 @@ def test_an_indented_validate_line_keeps_its_indent_with_or_without_a_timestamp(
     stamped = "2026-09-25T10:00:00.0000000Z " + detail
     for log in (detail, stamped):
         assert observe_pr.lines_naming(log, "evals/goldens/v1/g-099.yaml", "checks") == [detail]
+
+
+# --- M04: the swap PRs (SPEC/04 §4, §7; read at M04 PR 3) ------------------------
+
+EQUIVALENT = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+
+
+def test_a_swap_pr_never_reads_itself(tmp_path, monkeypatch):
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"pull_request": {"number": 31}}), encoding="utf-8")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    monkeypatch.setattr(observe_pr, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no call on its own PR")))
+    roles = {"m04_equivalent_swap": {"profile": EQUIVALENT}}
+    entry = observe_pr.observe_swap("andaro74/agentkeel", {"swap": "equivalent", "falsifier": "F4_2", "role": "m04_equivalent_swap",
+                                    "expected": "GREEN"}, {"swap": "equivalent", "pr": 31}, roles, None)  # fmt: skip
+    assert entry["found"] is False and entry["own_pr"] is True
+
+
+def test_observe_swap_reads_githubs_record_and_no_envelope(monkeypatch):
+    """GitHub's record only (cold review of PR 2, B1): only the gate rules on an envelope."""
+    measured, head = "a" * 40, "b" * 40
+    answers = {
+        "/pulls/32": {"html_url": "u", "state": "open", "merged": False, "base": {"ref": "main"}, "head": {"sha": head}},
+        "/rules/branches/main": [{"type": "required_status_checks",
+                                  "parameters": {"required_status_checks": [{"context": "evals"}, {"context": "checks"}]}}],
+        "/pulls/32/commits?per_page=100": [
+            {"sha": measured, "commit": {"message": "M04 swap"}, "author": {"login": "andaro74"}},
+            {"sha": head, "commit": {"message": f"evals: CI-written envelope for {measured}\n\nRun: x"},
+             "author": {"login": "github-actions[bot]"}}],
+    }  # fmt: skip
+
+    def get(repo, path, token):
+        if path.startswith("/commits/"):
+            name = path.split("check_name=")[1].split("&")[0]
+            return 200, {"check_runs": [{"id": 1, "status": "completed", "conclusion": "success", "html_url": name}]}
+        assert not path.startswith("/contents/"), "no envelope is read"
+        return (200, answers[path]) if path in answers else (404, None)
+
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+    monkeypatch.setattr(observe_pr, "get", get)
+    roles = {"m04_equivalent_swap": {"profile": EQUIVALENT}}
+    entry = observe_pr.observe_swap("andaro74/agentkeel", {"swap": "equivalent", "falsifier": "F4_2", "role": "m04_equivalent_swap",
+                                    "expected": "GREEN"}, {"swap": "equivalent", "pr": 32}, roles, None)  # fmt: skip
+    assert entry["measured_commit"] == measured and entry["required_on_head"] == {"checks": "success", "evals": "success"}
+    assert entry["evals_on_measured"] == "success" and "envelope" not in entry

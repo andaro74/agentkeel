@@ -142,6 +142,14 @@ The patches move refagent's pin and nothing else; they are `-text` in
 from the live goldens at M04 PR 1 and are committed as they were
 written; they name no real title and call no model.
 
+**At M04 PR 2** every reader landed and every marker came off. The three
+pin patches were regenerated once, in the commit that completed
+`pinned_roles` (SPEC/04 §5.1): the manifest's comment under `model` had
+changed, which is S1's and S2's trailing context. The lines each patch
+changes are the planted ones, checked line for line. `g-021`, which
+every raw run here answers, was retired at PR 2; build drops that
+answer unscored, and the S1 and S4 tests skip it.
+
 | Seed | File | What is wrong with it |
 |---|---|---|
 | S1 | `m04/s1-breaking-pin.patch`, `m04/s1-breaking-raw.json` | the pin moved to Llama 3.1 8B, and a raw run under it where every ordinary and trap answer has the expected fields and a real `table_row` and `clause_id`, and no successful `check_availability` call: counting positions from 0 in the file, on odd positions the call is printed as text in the reply and never made, on even ones (g-001 first) it is made with arguments the schema refuses. `score_one` does not read `tool_calls`, so all twelve pass and the swap is GREEN against an incumbent that passed them grounded. The worst case, not a prediction of what Llama does |

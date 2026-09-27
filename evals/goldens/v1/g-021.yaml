@@ -1,4 +1,5 @@
 # Trap: a sequel does not inherit the original's rights. We hold the original on SVOD in the US; the table has no US SVOD row for the sequel at all, so there is nothing to publish under, and the code names why. The frozen control cannot emit `sequel_no_inherit`, so this never passes (P7); it replaces g-012, retired at M02 PR 2 (Door 2).
+# Retired at M04 PR 2, with two keys: Data Owner (milestones/M04/rulings/pr2-data-owner.md) and Threshold Owner (milestones/M04/rulings/pr2-threshold-owner.md). It never passed, and cannot pass grounded as written: the table has no US SVOD row for the sequel, so check_availability answers found: false with no row, while this file expects the original's row r-011, and exclusive: false against that row's true (M04 open.md row 5; data-owner F3, F4 on M04 PR 1). A trap where no row governs needs an absence form in SPEC/00 section 6; it goes to M06. Retired, never renamed, never reused (R11); the file stays so that history keyed on the id still reads.
 id: g-021
 kind: trap
 question: >-
@@ -12,4 +13,4 @@ expected:
     constraints: [sequel_no_inherit]
 seat: Data Owner
 added: M02
-retired: null
+retired: M04

@@ -86,14 +86,17 @@ never gated** (ADR-0004): its diff is F0.4 measured, not `F4_3`.
   whose output's `row.table_row` equals the answer's `table_row`, and
   whose `clause_candidates` include the answer's `clause_id`. SPEC/00 §9:
   "the rights table is the truth ... never inferred". Part of CORRECT
-  from PR 2 (the Data Owner, ruling on finding 4). An answer where no row
-  governs (`found: false`, `row: null`; `g-021`) is ruled with the
-  reader, before it lands (`open.md` row 5; Data Owner, Tool Owner).
-  **Grounding does not check that the call's input names the question's
-  title, territory and platform** (data-owner F5 on PR 1): a call on the
-  original title grounds an answer that cites the original's row.
-  Whether it must is ruled with `g-021` at PR 2. SPEC/00 §9 is amended in
-  this PR to say CORRECT includes grounding from PR 2.
+  from PR 2 (the Data Owner, ruling on finding 4). **Ruled at PR 2, before
+  the reader landed** (`rulings/pr2-data-owner.md`): `g-021`, the one
+  answer where no row governs (`found: false`, `row: null`), is retired
+  with two keys and nothing is added; the absence form it needs, with the
+  Tool Owner's question of which clauses a not-found result offers, is
+  M06's. And the answer is grounded **on the golden's own row**: its
+  `table_row` is also the golden's `expected.table_row` (data-owner F5).
+  A call on the wrong title returns the wrong row, which grounding alone
+  would accept; the call's input is not read. The row only, not the
+  clause. SPEC/00 §9 is amended at PR 1 to say CORRECT includes grounding
+  from PR 2.
 - **`delta_max`.** The relative bar SPEC/00 §8 M04 names ("within
   `delta_max` of the incumbent"; "one policy, not both", changed here
   under its own "unless a ruling changes it" by ruling 2). **It applies
@@ -340,14 +343,15 @@ None of it is in PR 1. In the order the commits land:
   0.
 - **PR 2's run on the PR, stated before it.** S1 to S5 refused, each for
   its planted reason. refagent under grounding: **ordinary 9/9, traps
-  2/3**, as at `cb06c0d`; fewer is a finding, not a count to lower.
-  Those two counts were never grounded: no committed raw run shows a tool
-  call, so PR 2's run is the first measurement of them (data-owner F7).
-  If `g-021` is retired at PR 2, the traps are 2 of 2 live and a new id
-  is in `never_passed`; the expected line is restated before the run
-  (data-owner F16). A-vs-A
-  zero diff for refagent; the control's diff recorded, not gated. p95 and
-  tokens within their bars.
+  2/2**; fewer is a finding, not a count to lower. Restated at PR 2,
+  before its run (data-owner F16): `g-021` was retired before grounding
+  landed, with two keys, and nothing was added (M04 `open.md` row 5; the
+  absence form is M06's), so the traps are `g-010` and `g-011` and no new
+  id is in `never_passed`. Those counts were never grounded in an
+  envelope: PR 2's run is the first measurement of them (data-owner F7).
+  A-vs-A zero diff for refagent, on PR 2's own run (the `a-vs-a` label);
+  the control's diff recorded, not gated. p95 and tokens within their
+  bars.
 - **PR 3's run, stated before it.** The breaking swap PR RED with at
   least one citing golden `regressed`, ungrounded or with wrong fields,
   and none of these: REJECTED, access errors, the cost cap. Any other

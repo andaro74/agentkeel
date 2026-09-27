@@ -108,3 +108,28 @@ def test_the_rights_table_has_one_row_per_title_territory_platform_today():
     """The tool refuses a repeat; this says the table does not have one now."""
     keys = [(r["title_id"], r["territory"], r["platform"]) for r in ROWS]
     assert len(keys) == len(set(keys))
+
+
+def test_the_runtime_calls_no_model_the_pin_does_not_name(monkeypatch):
+    """M04 open.md row 22, item f: no default profile and no file fallback in the runtime (M04 PR 2)."""
+    import http.client
+    import threading
+    from http.server import HTTPServer
+
+    from agents.refagent import server
+
+    monkeypatch.setattr(server, "MODEL_ID", None)
+    monkeypatch.setattr(server, "TABLE", None)
+    called = []
+    monkeypatch.setattr(server.agent, "answer", lambda *args, **kwargs: called.append(args) or {})
+    httpd = HTTPServer(("127.0.0.1", 0), server.Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", httpd.server_address[1], timeout=10)
+        conn.request("POST", "/invocations", body=json.dumps({"question": "q"}),
+                     headers={"Content-Type": "application/json"})  # fmt: skip
+        reply = json.loads(conn.getresponse().read())
+    finally:
+        httpd.shutdown()
+    assert reply == {"error": "not set in the runtime: AGENTKEEL_MODEL_PROFILE, AGENTKEEL_RIGHTS_TABLE"}
+    assert called == []

@@ -48,6 +48,18 @@ F1.4 (SPEC/01 §4), worked out here again, not taken from build: an agent's
 ordinary or trap answer passes only if it cites, and `checks.F1_4` fails
 when any ordinary answer does not.
 
+**The `delta_max` bars** (SPEC/04 §2, M04 PR 2, seed S4). Read from
+`thresholds.yaml` at the envelope's commit, as the cap is: `relative`,
+p95 and the agent's tokens as ratios of the incumbent's median. The
+incumbent is the pin at the merge-base with `main` (`incumbent_at`), its
+envelopes in history in the same mode (`incumbent_runs`), and the run's side
+is the first agent run (`p95_ms`, `agent_tokens`). Over either bar is a
+reason; so is no incumbent envelope in that mode. The gate works this out
+with its own code and holds `checks.F4_4` to it. A-vs-A (S3): an `a_vs_a`
+with an agent diff is held to `checks.F4_3` failing, and the one needs the
+other. Grounding (S1) is build's: it reads the raw run, which the gate is
+not given, as it is not given `expected`.
+
 What it cannot see: a hand-written envelope that validates, points at real
 cards and agrees with itself. Nothing signs an envelope yet.
 """
@@ -63,12 +75,16 @@ from typing import Any
 
 import yaml
 
+from src.verdict import M04_READERS as verdict_m04_readers
 from src.verdict import (
     ROOT,
     canonical_sha256,
+    descends_from,
     fingerprint_at,
     fingerprint_of,
     golden_kinds_at,
+    incumbent_at,
+    pin_moved,
     load_golden_kinds,
     plants,
     replay_history,
@@ -105,6 +121,16 @@ CLAIM_3_CHECKS = ("F3_1", "F3_2", "F3_3", "F3_5", "F3_6")
 # would orphan it and claim 3 would stop being required. `rule` refuses a
 # shallow clone, where git cannot place it at all (the cold review of PR 2, F3).
 M03_READERS = "f82a02a"
+# What an agent envelope must carry from M04 PR 2 (SPEC/04 §4): F4_1, F4_2 and
+# F4_4 on every one, and F4_3 where the pin is not the incumbent's (a swap,
+# `pin_moved`), where A-vs-A must run. F4_1 and F4_2 from the seed tests alone
+# are test-only witnesses until PR 3 adds the swap PRs as their second source.
+# Held from the commit that wired the flags into the Makefile and evals.yml,
+# 15047b4, and every descendant, as claim 3's are held from f82a02a: known
+# now, and on PR 2's branch, which lands as a merge commit (ADR-0004
+# amendment 1).
+CLAIM_4_CHECKS = ("F4_1", "F4_2", "F4_4")
+M04_READERS = verdict_m04_readers  # 15047b4, defined beside `descends_from` in src/verdict
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -157,6 +183,73 @@ def cap_at(commit: str, root: Path = ROOT) -> tuple[int, str]:
     return cap, where
 
 
+def bars_at(commit: str, root: Path = ROOT) -> tuple[dict[str, float], str]:
+    """The `relative` bars in `thresholds.yaml` at `commit`, and where read. {} before M04 PR 2 (ruling m).
+
+    A `relative` that is there and does not give both ratios as positive
+    numbers is REJECTED, as a deleted cap is: not read as no bar.
+    """
+    thresholds, where = thresholds_at(commit, root)
+    bars = thresholds.get("relative")
+    if bars is None:
+        if descends_from(commit, M04_READERS, root):
+            raise Rejected(f"thresholds.yaml at {where} has no relative bars, at or after {M04_READERS}, "
+                           "which wired them: a deleted bar is not read as no bar")  # fmt: skip
+        return {}, where
+    wanted = ("p95_ratio_max", "agent_tokens_ratio_max")
+    if not isinstance(bars, dict) or not all(
+        isinstance(bars.get(name), (int, float)) and not isinstance(bars.get(name), bool) and bars[name] > 0 for name in wanted
+    ):  # fmt: skip
+        raise Rejected(f"thresholds.yaml relative at {where} must give {' and '.join(wanted)} as positive numbers, got {bars!r}")
+    return {name: float(bars[name]) for name in wanted}, where
+
+
+def over_bar(envelope: dict[str, Any], bars: dict[str, float], runs: list[dict[str, Any]], where: str) -> list[str]:
+    """The gate's own reading of the `delta_max` bars (SPEC/04 §2). build has one too; they are not shared (P5)."""
+    reasons = []
+    mine = {"p95_ms": envelope.get("p95_ms"), "agent_tokens": envelope.get("agent_tokens")}
+    for field, name in (("p95_ms", "p95_ratio_max"), ("agent_tokens", "agent_tokens_ratio_max")):
+        theirs = sorted(r[field] for r in runs if isinstance(r.get(field), int))
+        if not theirs:
+            reasons.append(f"F4_4: no incumbent envelope to compare {field} with ({where})")
+            continue
+        middle = len(theirs) // 2
+        median = theirs[middle] if len(theirs) % 2 else (theirs[middle - 1] + theirs[middle]) / 2
+        if not isinstance(mine[field], int):
+            reasons.append(f"F4_4: the envelope carries no {field} to hold to relative.{name}")
+        elif mine[field] > bars[name] * median:
+            reasons.append(f"F4_4: {field} {mine[field]} is {mine[field] / median:.2f}x the incumbent's median "
+                           f"{median} over {len(theirs)} envelopes ({where}), over relative.{name} {bars[name]}")  # fmt: skip
+    return reasons
+
+
+def spend(envelope: dict[str, Any], control_card: dict[str, Any] | None) -> list[str]:
+    """build's token sums held to the cards the gate reads (M04 PR 2; M04 open.md row 22, item h).
+
+    The gate is not given the raw runs, so it cannot count the agent's
+    tokens itself. It can hold the sums to this run's control card: an agent
+    envelope's `tokens_in` and `tokens_out` are at least the card's, and from
+    M04 PR 2 exactly `agent_tokens` plus the card's, or more where A-vs-A
+    added a second run of each. A run that under-reports to pass the cap no
+    longer passes unread. What it cannot see: `agent_tokens` itself set low.
+    """
+    if control_card is None or "tokens_in" not in envelope:
+        return []
+    card_in, card_out = control_card.get("tokens_in", 0), control_card.get("tokens_out", 0)
+    total = envelope["tokens_in"] + envelope["tokens_out"]
+    if envelope["tokens_in"] < card_in or envelope["tokens_out"] < card_out:
+        return [f"tokens: the envelope says {envelope['tokens_in']} in and {envelope['tokens_out']} out, "
+                f"fewer than this run's control card alone ({card_in} and {card_out})"]  # fmt: skip
+    agent = envelope.get("agent_tokens")
+    if not isinstance(agent, int):
+        return []
+    least = agent + card_in + card_out
+    if total < least or ("a_vs_a" not in envelope and total != least):
+        return [f"tokens: the envelope says {total} in all; agent_tokens {agent} and the control card's "
+                f"{card_in + card_out} make {least}" + ("" if "a_vs_a" not in envelope else " at least")]  # fmt: skip
+    return []
+
+
 def manifest_at(commit: str, bundle: str, root: Path = ROOT) -> tuple[dict[str, Any], str]:
     """The agent's manifest as it stood at `commit`, and where it was read. The same fallback as ruling m."""
     text, where = text_at(commit, f"{bundle}/manifest.yaml", root)
@@ -185,15 +278,27 @@ def from_m03_readers(commit: str, root: Path = ROOT) -> bool:
     return done.returncode == 0
 
 
-def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
-    """What an agent envelope for `commit` must carry: claim 1's; claim 2's from M02 PR 2's merge; claim 3's from M03's readers.
+def from_m04_readers(commit: str, root: Path = ROOT) -> bool:
+    """True when `commit` is the commit that wired claim 4's checks or a descendant of it. False when git cannot say."""
+    done = subprocess.run(["git", "merge-base", "--is-ancestor", M04_READERS, commit], cwd=root, capture_output=True,
+                          check=False)  # fmt: skip
+    return done.returncode == 0
 
-    A commit git cannot place is held to claims 1 and 2, as before; claim 3's
-    are required only where git shows the readers in its history.
+
+def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
+    """What an agent envelope for `commit` must carry: claim 1's; claim 2's from M02 PR 2's merge; claim 3's from
+    M03's readers; claim 4's from M04's, with F4_3 where the pin moved.
+
+    A commit git cannot place is held to claims 1 and 2, as before; claims 3
+    and 4 are required only where git shows their readers in its history.
     """
     if before_m02_pr2(commit, root):
         return CLAIM_1_CHECKS
-    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + (CLAIM_3_CHECKS if from_m03_readers(commit, root) else ())
+    claim_3 = CLAIM_3_CHECKS if from_m03_readers(commit, root) else ()
+    claim_4 = ()
+    if from_m04_readers(commit, root):
+        claim_4 = CLAIM_4_CHECKS + (("F4_3",) if pin_moved(commit, AGENT_BUNDLE, root) else ())
+    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4
 
 
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:
@@ -310,6 +415,8 @@ def judge(
     cap: int | None = None,
     required: tuple[str, ...] | None = None,  # None: what the envelope's own commit requires (required_checks)
     corpus: str | None = None,
+    bars: list[str] | None = None,
+    control_card: dict[str, Any] | None = None,
 ) -> tuple[str, list[str]]:
     """The gate's own verdict and its reasons. `envelope` has passed `read`.
 
@@ -319,8 +426,14 @@ def judge(
 
     `required` is what an agent envelope must carry (`required_checks`):
     claim 1's four, from M02 PR 2's merge claim 2's two, from M03's readers
-    claim 3's five. Left out, it is the envelope's own commit's: a direct
-    caller no longer skips claim 2 and 3 by default (M03 open.md row 3).
+    claim 3's five, from M04's claim 4's three, and F4_3 on a swap. Left out,
+    it is the envelope's own commit's: a direct caller no longer skips
+    claims 2 to 4 by default (M03 open.md row 3).
+
+    `bars` is the gate's own reading of the `delta_max` bars (`over_bar`),
+    which `rule` works out at the envelope's commit: None where the commit
+    has no bars, else the reasons it is over them (empty: under both).
+    `control_card`, this run's, holds build's token sums (`spend`).
     """
     results = envelope["goldens"]
     reasons: list[str] = []
@@ -373,6 +486,23 @@ def judge(
         # it whole.
         reasons += [f"checks.{name} is missing from an agent envelope"
                     for name in required if name not in envelope["checks"]]  # fmt: skip
+        reasons += spend(envelope, control_card)
+        # SPEC/04 §2 (S4): the gate's own reading of the bars, and build's F4_4 held to it.
+        if bars is not None:
+            reasons += bars
+            said_f4_4 = envelope["checks"].get("F4_4")
+            if said_f4_4 is None:
+                reasons.append("checks.F4_4 is missing from an agent envelope at a commit with relative bars")
+            elif said_f4_4["status"] == "pass" and bars:
+                reasons.append("envelope says F4_4 is pass, the gate reads fail")
+        # SPEC/04 §6 (S3): an A-vs-A diff and F4_3 come together.
+        a_vs_a, said_f4_3 = envelope.get("a_vs_a"), envelope["checks"].get("F4_3")
+        if a_vs_a is not None and said_f4_3 is None:
+            reasons.append("a_vs_a without checks.F4_3")
+        elif a_vs_a is None and said_f4_3 is not None:
+            reasons.append("checks.F4_3 without a_vs_a: an A-vs-A that names no goldens")
+        elif a_vs_a is not None and a_vs_a["agent"] and said_f4_3["status"] == "pass":
+            reasons.append(f"envelope says F4_3 is pass, and a_vs_a names {a_vs_a['agent']} for the agent")
     reasons += [
         f"check {name} failed: {check['url']}"
         for name, check in sorted(envelope["checks"].items())
@@ -504,7 +634,22 @@ def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
     except ValueError as exc:  # a control that lists no plants: the gate cannot count them, which is not GREEN
         raise Rejected(str(exc)) from exc
     corpus, _ = fingerprint_at(envelope["commit"], ROOT)  # admitted.yaml at the envelope's commit (S4)
-    return judge(envelope, kinds, history, plant_ids, cap, required_checks(envelope["commit"]), corpus=corpus)
+    return judge(envelope, kinds, history, plant_ids, cap, required_checks(envelope["commit"]), corpus=corpus,
+                 bars=bars_reading(envelope, history_dir), control_card=control_card_of(envelope, path))  # fmt: skip
+
+
+def bars_reading(envelope: dict[str, Any], history_dir: Path = HISTORY) -> list[str] | None:
+    """The `delta_max` bars at the envelope's commit against its incumbent (SPEC/04 §2). None: no bars, or no agent."""
+    bars, _ = bars_at(envelope["commit"])
+    if not bars or not any(r["scope"] == "agent" for r in envelope["goldens"].values()):
+        return None
+    pin, where = incumbent_at(envelope["commit"], AGENT_BUNDLE)
+    if pin is None:
+        return [f"F4_4: no incumbent pin: {AGENT_BUNDLE}/manifest.yaml is not there at {where}"]
+    runs = replay_history.incumbent_runs(history_dir, profile=pin["profile"], region=pin["region"],
+                                         mode=envelope.get("mode"), exclude_commit=envelope["commit"],
+                                         ancestors_of=envelope["commit"])  # fmt: skip
+    return over_bar(envelope, bars, runs, f"{pin['profile']} {pin['region']} {envelope.get('mode')}, pin at {where}")
 
 
 def corpus_fingerprint(root: Path = ROOT) -> str | None:
@@ -596,6 +741,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  note: cost_cap {cap} read at {where}")
     print(f"  note: the goldens read at {golden_kinds_at(envelope['commit'], GOLDENS, ROOT)[1]}")
     print(f"  note: the plant rule's controls read at {where_at(envelope['commit'])}")
+    if bars_at(envelope["commit"])[0]:
+        print(f"  note: the relative bars read at {bars_at(envelope['commit'])[1]}; "
+              f"the incumbent pin at {incumbent_at(envelope['commit'], AGENT_BUNDLE)[1]}")  # fmt: skip
     history = replay_history.load(args.history_dir, exclude_commit=envelope["commit"], ancestors_of=envelope["commit"])
     ancestors = "the envelope's ancestors" if replay_history.ancestry(envelope["commit"]) is not None else "every envelope"
     print(f"  note: history read from {ancestors}")

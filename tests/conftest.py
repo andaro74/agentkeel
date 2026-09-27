@@ -26,8 +26,24 @@ def goldens() -> dict[str, dict[str, Any]]:
     return build.load_goldens(GOLDENS_DIR)
 
 
+def grounding_call(expected: dict[str, Any]) -> dict[str, Any]:
+    """The `check_availability` call that returns the expected row, made on the real tool and table.
+
+    From M04 PR 2 an agent's answer is correct only when the tool grounded it
+    (SPEC/04 §2), so a right answer here carries the call it came from."""
+    from agents.refagent import agent
+
+    table = "data/rights_table.json"
+    rows = json.loads((ROOT / table).read_text(encoding="utf-8"))
+    row = next(r for r in rows if r["table_row"] == expected["table_row"])
+    arguments = {"title_id": row["title_id"], "territory": row["territory"], "platform": row["platform"],
+                 "date": row["window_start"]}  # fmt: skip
+    return {"name": "check_availability", "input": arguments, "status": "success",
+            "output": agent.check_availability(arguments, rows, table)}
+
+
 def make_raw(goldens: dict[str, dict[str, Any]], right: set[str] = frozenset(), **top: Any) -> dict[str, Any]:
-    """Raw observations as a runner would write them. Goldens in `right` get the expected answer, cited."""
+    """Raw observations as a runner would write them. Goldens in `right` get the expected answer, cited and grounded."""
     observations = []
     for golden_id, golden in goldens.items():
         if golden["kind"] in build.CITING_KINDS:
@@ -36,13 +52,15 @@ def make_raw(goldens: dict[str, dict[str, Any]], right: set[str] = frozenset(), 
             # A wrong answer still cites: F1.4 is its own test, not a side effect of every other one.
             parsed = fields if golden_id in right else {"available": None, "table_row": fields["table_row"], "clause_id": fields["clause_id"]}
             stop = "end_turn"
+            calls = [grounding_call(expected)] if golden_id in right else []
         else:
             parsed, stop = None, "guardrail_intervened" if golden_id in right else "end_turn"
+            calls = []
         observations.append({
             "id": golden_id, "kind": golden["kind"], "question": golden["question"],
             "text": json.dumps(parsed), "parsed": parsed, "stop_reason": stop,
             "usage": {"inputTokens": 200, "outputTokens": 100, "totalTokens": 300},
-            "latency_ms": 500,
+            "latency_ms": 500, "tool_calls": calls,
         })  # fmt: skip
     return {
         "commit": COMMIT, "dirty": False, "model_id": "us.amazon.nova-micro-v1:0",
@@ -76,6 +94,11 @@ def chain(tmp_path: Path, goldens, monkeypatch):
 
     monkeypatch.setattr(build, "fingerprint_at", lambda commit, root=ROOT: (None, "no corpus in the fixture"))
     monkeypatch.setattr(gate, "fingerprint_at", lambda commit, root=ROOT: (None, "no corpus in the fixture"))
+    # And with no `delta_max` bars (M04 PR 2), for the same reason: the tree has held them
+    # since, and these envelopes have no incumbent history to be a ratio of. A test of
+    # the bars builds an incumbent history (tests/test_m04_seeds.py) or passes `bars` to `judge`.
+    monkeypatch.setattr(build, "relative_bars", lambda thresholds: {})
+    monkeypatch.setattr(gate, "bars_at", lambda commit, root=ROOT: ({}, "no bars in the fixture"))
 
     def run(right: set[str] = frozenset(), history_dir: Path | None = None, agent: bool = False, **top: Any):
         raw_path = tmp_path / f"{COMMIT}.baseline-raw.json"

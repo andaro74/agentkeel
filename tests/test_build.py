@@ -25,7 +25,8 @@ def score(parsed, golden=GOLDEN, **observation):
 
 def test_score_reads_the_answer_fields_and_nothing_else():
     right = {"available": True, "exclusive": False, "constraints": ["embargo", "holdback"]}
-    assert score(right) == {"kind": "ordinary", "score": True, "cites": False, "pass": True}
+    # `grounded` is read, and applied to the agent only, in compose_envelope (M04 PR 2)
+    assert score(right) == {"kind": "ordinary", "score": True, "cites": False, "grounded": False, "pass": True}
     assert score({**right, "table_row": "r-019", "clause_id": "ML-2.1"})["cites"] is True
     assert score({**right, "table_row": "12345", "clause_id": "ML-2.1"})["cites"] is False
 
@@ -76,7 +77,7 @@ def test_refuses_a_dirty_tree(tmp_path, goldens, capsys):
 
 def test_refuses_observations_that_do_not_cover_the_goldens(tmp_path, goldens, capsys):
     raw = make_raw(goldens)
-    dropped = raw["observations"].pop()["id"]  # the last live golden; g-021 from M02 PR 2
+    dropped = raw["observations"].pop()["id"]  # the last live golden; g-020 from M03 PR 2 (g-021 retired at M04 PR 2)
     assert run(tmp_path, raw) == 3
     assert f"missing ['{dropped}']" in capsys.readouterr().err
 
@@ -102,7 +103,7 @@ def test_when_no_agent_ran_the_envelope_is_the_controls_in_m00s_form(chain):
     assert {r["scope"] for r in envelope["goldens"].values()} == {"control"}
     assert envelope["control_card_ref"] is None
     assert envelope["baseline_card_ref"]["path"] == card_path.resolve().as_posix()
-    assert (envelope["tokens_in"], envelope["tokens_out"]) == (4000, 2000)  # the control's own, counted once: 20 replies, each 200 in, 100 out
+    assert (envelope["tokens_in"], envelope["tokens_out"]) == (3800, 1900)  # the control's own, counted once: 19 replies, each 200 in, 100 out (g-021 retired at M04 PR 2)
     assert "F1_4" not in envelope["checks"]
     assert envelope["verdict"] == "GREEN"
 
@@ -143,8 +144,8 @@ def test_an_over_cap_run_is_a_recorded_red(tmp_path, chain):
     """Threshold Owner, M01 item 22: the envelope is written, and it is RED."""
     envelope_path, card_path, raw_path = chain(agent=True, right={"g-001"})
     envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
-    # the run's spend, both subjects: 20 agent replies and 20 control replies, each 200 in, 100 out
-    assert (envelope["tokens_in"], envelope["tokens_out"]) == (8000, 4000)
+    # the run's spend, both subjects: 19 agent replies and 19 control replies, each 200 in, 100 out
+    assert (envelope["tokens_in"], envelope["tokens_out"]) == (7600, 3800)
     thresholds = tmp_path / "thresholds.yaml"
     pinned = build.load_thresholds(build.THRESHOLDS)["baseline_card"]
     thresholds.write_text(
@@ -161,12 +162,14 @@ def test_f1_4_an_agent_answer_passes_only_if_it_cites(goldens):
     raw = make_raw(goldens, right={"g-001", "g-002"}, **AGENT_TOP)
     raw["observations"][1]["parsed"].pop("clause_id")  # g-002: right, and cites no clause
     results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
-    assert results["g-002"] == {"kind": "ordinary", "score": True, "cites": False, "pass": True}  # the control's reading
+    assert results["g-002"] == {"kind": "ordinary", "score": True, "cites": False, "grounded": False,
+                                "pass": True}  # the control's reading  # fmt: skip
 
     envelope = build.compose_envelope(raw, results, "agent", {"path": "x", "sha256": "0" * 64}, {}, [], {}, None,
                                       control_ref={"path": "y", "sha256": "1" * 64}, run_url=URL)  # fmt: skip
     assert envelope["goldens"]["g-001"]["pass"] is True
-    assert envelope["goldens"]["g-002"] == {"kind": "ordinary", "scope": "agent", "score": True, "cites": False, "pass": False}
+    # no clause is also no grounding (M04 PR 2): score false; F1.4 still fails on the missing citation
+    assert envelope["goldens"]["g-002"] == {"kind": "ordinary", "scope": "agent", "score": False, "cites": False, "pass": False}
     assert envelope["checks"]["F1_4"] == {"status": "fail", "url": URL}
     assert envelope["verdict"] == "RED"
 
@@ -368,3 +371,89 @@ def test_attempt_2_reads_the_ci_line_or_the_humans_record(tmp_path):
     obs.write_text(json.dumps({"attempt_1": first, "attempt_2": {"ci_red_lines": [], "live_now": {"bypass_actors": []}}}),
                    encoding="utf-8")  # fmt: skip
     assert build.check_from_bypass(obs, "u")["status"] == "fail"
+
+
+def test_an_a_vs_a_pair_is_two_runs_of_one_pin_over_the_same_goldens(goldens):
+    """M04 PR 2 (SPEC/04 §6): a pair on another commit, model or region, or over other goldens, is refused, not compared."""
+    raw = make_raw(goldens, **AGENT_TOP)
+    for field, value in (("commit", "b" * 40), ("model_id", "us.anthropic.claude-sonnet-4-5-20250929-v1:0"),
+                         ("region", "us-east-1")):  # fmt: skip
+        with pytest.raises(build.Refused, match=field):
+            build.a_vs_a_pair(raw, {**raw, field: value}, "agent")
+    build.a_vs_a_pair(raw, dict(raw), "agent")
+    results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
+    assert build.differ(results, results) == []
+    with pytest.raises(build.Refused, match="different goldens"):
+        build.differ(results, {g: r for g, r in results.items() if g != "g-001"})
+
+
+def test_a_grounded_answer_on_another_row_is_not_correct_for_the_agent(goldens):
+    """data-owner F5, ruled at M04 PR 2: g-001 answered from a call on 'Quorum of Kites' (r-001), not the golden's r-019.
+
+    The tool returned the row, the answer cites it and a clause the tool offered, and the fields are
+    g-001's. Grounded on its own row, it is not grounded on the golden's, so it is not correct.
+    """
+    from .conftest import grounding_call
+
+    raw = make_raw(goldens, right={"g-001"}, **AGENT_TOP)
+    g001 = next(o for o in raw["observations"] if o["id"] == "g-001")
+    other = {**goldens["g-001"]["expected"], "table_row": "r-001"}
+    g001["tool_calls"] = [grounding_call(other)]
+    g001["parsed"] = {**g001["parsed"], "table_row": "r-001"}
+    assert g001["parsed"]["clause_id"] in g001["tool_calls"][0]["output"]["clause_candidates"]
+    results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
+    assert results["g-001"]["cites"] is True and results["g-001"]["grounded"] is False
+    assert build.as_the_agent_is_scored(results)["g-001"]["pass"] is False
+    assert results["g-001"]["pass"] is True  # the control's reading is m00's, untouched
+
+
+def test_a_deleted_relative_bar_is_refused_from_the_commit_that_wired_it(tmp_path, goldens, capsys):
+    """threshold-owner F2 on M04 PR 2: from 15047b4, no `relative` in thresholds.yaml is a refusal, as no cap is."""
+    import subprocess
+
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=build.ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    control_raw, card = tmp_path / "control.json", tmp_path / "card.json"
+    control_raw.write_text(json.dumps(make_raw(goldens, commit=head)), encoding="utf-8")
+    assert build.main(["card", "--raw", str(control_raw), "--out", str(card)]) == 0
+    agent_raw = tmp_path / "agent.json"
+    agent_raw.write_text(json.dumps(make_raw(goldens, commit=head, **AGENT_TOP)), encoding="utf-8")
+    pinned = build.load_thresholds(build.THRESHOLDS)["baseline_card"]
+    thresholds = tmp_path / "thresholds.yaml"
+    thresholds.write_text(f"cost_cap:\n  tokens_per_run: 150000\nbaseline_card:\n  path: {pinned['path']}\n"
+                          f"  sha256: {pinned['sha256']}\n", encoding="utf-8")  # fmt: skip
+    out = tmp_path / "out.json"
+    assert build.main(envelope_args(agent_raw, card, out, "--thresholds", str(thresholds))) == 3
+    assert "no relative bars" in capsys.readouterr().err and not out.exists()
+
+
+def test_a_vs_a_through_builds_command_line_with_the_controls_second_run(tmp_path, chain, goldens, capsys):
+    """Cold review of PR 2, F6, F2, F3: both second runs through `build envelope`, as the Makefile's A_VS_A hands them.
+
+    The agent's second run differs on g-001; the control's on g-010. The agent's diff fails F4_3;
+    the control's is recorded and gates nothing, and a failed call in it does not make the envelope
+    UNMEASURED. A second run read from a prompt cache is refused.
+    """
+    _, card_path, _ = chain(agent=True)
+    first = make_raw(goldens, right={"g-001"}, **AGENT_TOP)
+    agent_a, agent_b = tmp_path / "agent-a.json", tmp_path / "agent-b.json"
+    agent_a.write_text(json.dumps(first), encoding="utf-8")
+    agent_b.write_text(json.dumps(make_raw(goldens, **AGENT_TOP)), encoding="utf-8")  # g-001 wrong this time
+    control_b = make_raw(goldens, right={"g-010"})
+    control_b["observations"][0]["error"] = "ThrottlingException: once"
+    control_b_path = tmp_path / "control-b.json"
+    control_b_path.write_text(json.dumps(control_b), encoding="utf-8")
+    out = tmp_path / "out.json"
+    assert build.main(envelope_args(agent_a, card_path, out, "--a-vs-a", str(agent_b),
+                                    "--a-vs-a-control", str(control_b_path))) == 0  # fmt: skip
+    envelope = json.loads(out.read_text(encoding="utf-8"))
+    assert envelope["a_vs_a"] == {"agent": ["g-001"], "control": ["g-010"]}
+    assert envelope["checks"]["F4_3"]["status"] == "fail"
+    assert envelope["verdict"] == "RED"  # for F4_3, not UNMEASURED for the control's failed call
+    assert envelope["agent_tokens"] == 19 * 300 and envelope["tokens_in"] + envelope["tokens_out"] == 4 * 19 * 300
+
+    control_b["observations"][0].pop("error")
+    control_b["observations"][1]["usage"]["cacheReadInputTokens"] = 40
+    control_b_path.write_text(json.dumps(control_b), encoding="utf-8")
+    assert build.main(envelope_args(agent_a, card_path, tmp_path / "cached.json", "--a-vs-a", str(agent_b),
+                                    "--a-vs-a-control", str(control_b_path))) == 3  # fmt: skip
+    assert "prompt cache" in capsys.readouterr().err

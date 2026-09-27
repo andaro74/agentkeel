@@ -10,9 +10,9 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
 | Claim | A breaking model swap goes RED; an equivalent swap promotes; A-vs-A is zero diff |
 | Falsifiers | F4.1 the breaking swap is GREEN, or RED for a reason other than a citing golden regressed, ungrounded or with wrong fields (a REJECTED, an access error or the cost cap is not the reason) (live: the breaking swap PR, read at PR 3). F4.2 the equivalent swap is RED or REJECTED, or a required check on its PR is red for a reason of its own ("promotes" is mergeable, not merged; live: the equivalent swap PR, read at PR 3). F4.3 A-vs-A shows a diff: two runs of one pin in one `evals` job with any golden's `pass` different (the milestone stops). F4.4 a run over a `delta_max` bar is GREEN: `p95_ms` over 2.0x, or the agent's tokens over 1.5x, the incumbent's median in the same mode. |
 | Seeded commit | `a16e2c7` (S1); `c6b6cb8` (S2); `6f18507` (S3); `63033b7` (S4, two cases), S3's and S4's raw runs remade at `2dc81ae` and `e0ce2ce` before any reader; `8994dcb` (S5, no falsifier: SPEC/00 §8 M04's `deprecated_after`), each its own commit before any reader (SPEC/04 §5) |
-| Expected gate output | PR 1: refagent's envelope as at M03; it says nothing about claim 4. PR 1 leaves `agents/refagent/**` and `data/rights_table.json` alone, so its run may be the first `mode: runtime` envelope at guardrail `1088aw3ujhyd:5` (`open.md` row 10); the envelope says whether it is. `make plants` lists S1 to S5; `tests/test_m04_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 to S5 refused by their readers, each for its planted reason; refagent under tool grounding ordinary 9/9, traps 2/3, fewer being the finding; refagent's A-vs-A zero diff, the control's reported and not gated; p95 and tokens within their bars. From PR 2's merge the gate requires `F4_1`, `F4_2` and `F4_4` on every agent envelope and `F4_3` where A-vs-A runs; **`F4_1` and `F4_2` from the seed tests alone are test-only witnesses**. During PR 2 the human redeploys the bootstrap stack with the eval role's candidate list after reading `cdk diff --strict`, and opens the two swap PRs from PR 2's head. **A named P3 exception (SPEC/04 §5.1): PR 3's run reads the swap PRs, after their rulings are on `main`;** PR 3 is both that read and the repair. Stated before: the breaking swap RED with at least one citing golden regressed, ungrounded or wrong, and no REJECTED, access error or cost cap; the equivalent swap GREEN with every required check green. RED if a seed's test passes but by its reader, if either swap reads otherwise, if refagent's A-vs-A shows a diff, if a run over a bar rules GREEN, if PR 3 cannot read the swap PRs, or if `make ledger` stops matching rows 0 to 3. |
+| Expected gate output | PR 1: refagent's envelope as at M03; it says nothing about claim 4. PR 1 leaves `agents/refagent/**` and `data/rights_table.json` alone, so its run may be the first `mode: runtime` envelope at guardrail `1088aw3ujhyd:5` (`open.md` row 10); the envelope says whether it is. `make plants` lists S1 to S5; `tests/test_m04_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 to S5 refused by their readers, each for its planted reason; refagent under tool grounding ordinary 9/9, traps 2/2 (`g-021` retired at PR 2 before grounding landed, nothing added; restated before PR 2's run), fewer being the finding; refagent's A-vs-A zero diff, the control's reported and not gated, on PR 2's own run (the `a-vs-a` label); p95 and tokens within their bars. From PR 2's merge the gate requires `F4_1`, `F4_2` and `F4_4` on every agent envelope and `F4_3` where A-vs-A runs; **`F4_1` and `F4_2` from the seed tests alone are test-only witnesses**. During PR 2 the human redeploys the bootstrap stack with the eval role's candidate list after reading `cdk diff --strict`, and opens the two swap PRs from PR 2's head. **A named P3 exception (SPEC/04 §5.1): PR 3's run reads the swap PRs, after their rulings are on `main`;** PR 3 is both that read and the repair. Stated before: the breaking swap RED with at least one citing golden regressed, ungrounded or wrong, and no REJECTED, access error or cost cap; the equivalent swap GREEN with every required check green. RED if a seed's test passes but by its reader, if either swap reads otherwise, if refagent's A-vs-A shows a diff, if a run over a bar rules GREEN, if PR 3 cannot read the swap PRs, or if `make ledger` stops matching rows 0 to 3. |
 | Measured | — |
-| PRs used / cap | 1 / 4 |
+| PRs used / cap | 2 / 4 |
 | State | OPEN |
 
 ### Open detail (PR 1, 2026-09-26)
@@ -70,3 +70,43 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
   36331360122, committed by `github-actions[bot]` as `82dfd42`, GREEN,
   plants 7 of 7, agent 18 of 20 (`g-014`, `g-021` never passed), p95
   5,948 ms, 52,652 tokens; the gate on it exits 0.
+
+### PR 2 detail (the measure, 2026-09-27)
+
+- **`g-021` ruled first** (`open.md` row 5), before grounding: retired
+  with two keys, Data Owner and Threshold Owner, nothing added (`fe70686`).
+  The absence form it needs is SPEC/00 §6's and goes to M06. The expected
+  line was restated before the run: traps 2 of 2 live.
+- **The readers, in SPEC/04 §6's order**, each in its own commit, each
+  seed's marker off in the commit that lands its reader, and each test
+  run once with its reader switched off to see the planted message:
+  grounding in `build` (S1, `9b5e3f6`; all eleven live citing answers
+  named); `deprecated_after` in `validate` (S5, `7bf5d3c`; read on
+  2026-09-27, S5's date is 17 days away, so it met "within 30 days"); the
+  `delta_max` bars (`fb1e6e9`, Threshold Owner) and the bars and A-vs-A in
+  `build` and the gate (S4 and S3, `1436366`); the eval role's candidate
+  list (S2, `2870467`, Security; 49,107 of 51,200 bytes). `pinned_roles`
+  carry the whole pin, and the three pin patches were regenerated for
+  context only (`02c51d6`; `0c277ab` put back two comment lines that
+  M02's S1 patches read). `observe_pr` reads GitHub's record of the swap
+  PRs (`b3c41d9`), not wired in `evals.yml` until PR 3; the first draft
+  also read each swap's envelope and let `build` rule on it, which the
+  cold review blocked (P5), so that part was cut and PR 3 has the gate
+  rule the swap's envelope. The flags are wired at `15047b4`, from which the
+  gate requires `F4_1`, `F4_2` and `F4_4`, and `F4_3` where the pin moved
+  (`cea0a5d`). `tests/test_m04_seeds.py`: six passed, none expected to
+  fail.
+- **Also here:** `open.md` row 22 items f (the runtime names no model of
+  its own) and h (the gate holds the token sums to the control card), and
+  row 12 (the cap comment). Item i stays M05.
+- **A pre-read, not evidence.** M04 PR 1's run artifact (CI run
+  36331360122, raws kept 90 days) scored with the new `build`: ordinary
+  9/9 and traps 2/2 under grounding; with its raws doubled as a stand-in
+  for A-vs-A, GREEN, 105,304 tokens of 150,000. It found one bug, fixed
+  (`89e57ec`).
+- **Still to happen during this PR, by the human:** read `cdk diff
+  --strict` on the bootstrap stack and deploy it (S2's redeploy; also
+  `open.md` row 6); open the two swap PRs from this PR's head, each
+  changing only `model` to its `pinned_roles` entry; then this PR gains
+  `milestones/M04/runs/f4_swaps.yaml` and the swaps' Threshold Owner
+  rulings. PR 3 wires the swap read and is the read.
