@@ -51,7 +51,7 @@ diff. The human rules as Engineering before the merge.
 | N3 | `test_refagent` no longer names the model | **Recorded**: the gate and the Threshold Owner hold the pin |
 | N4 | The Measured cell cannot answer F4.1 or F4.2 by itself | **Recorded**: the close reads `swaps[].reasons`, `required_on_head` and `evals_on_measured` in the envelope, and says so in the row |
 | N5 | The recorded verdict is HEAD's gate over HEAD's history, for the last commit the bot measured | **Recorded**: `envelope_commit`, `measured_commit` and `evals_on_measured` are kept beside it |
-| N6 | "566 passed" | **Recorded**: that count is the full suite on each swap's pin, before the read's tests were added; on this head it is in the section below |
+| N6 | "566 passed" | **Recorded**: that count is the full suite on each swap's pin, before the read's tests were added; this head: 576 passed, 1 skipped |
 | N7 | A badly joined condition in `build.py` | **Repaired** in the F1 rewrite |
 | N8 | The Security ruling's readback | **Open**, with the human |
 
