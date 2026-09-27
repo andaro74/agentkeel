@@ -88,7 +88,7 @@ the diff; you do not merge.
 | `rules/**`, `agents/*/rules/**`, guardrail id/version | Rule Owner | `ruling-cited`, `two-key` on relaxation |
 | `evals/goldens/**`, `data/**` | Data Owner | `ruling-cited`, `two-key` on retire |
 | `tools/**`, `agents/*/tools/**`, `may_call`, `may_be_called_by` | Tool Owner | `ruling-cited`, computed semver |
-| `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region (the whole pin, with `profile` and `deprecated_after`, ADR-0010) | Threshold Owner | `two-key` on a move of a bar in its `relaxes:` direction; a model id change is measured by the gate, not two-keyed (SPEC/04 §10) |
+| `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region (the whole pin, with `profile` and `deprecated_after`, ADR-0010) | Threshold Owner | `two-key` on a move of a bar in its `relaxes:` direction, and on `deprecated_after` moved later, nulled or removed with the model id unchanged (ADR-0009 amendment 1); a model id change is measured by the gate, not two-keyed (SPEC/04 §10) |
 | `.github/workflows/**`, `.github/CODEOWNERS` (ADR-0003 amendment 2), `infra/**` (incl. `infra/bootstrap/**`, `infra/construct/**`), key policy, cosign identity, seats → groups in a manifest | Security | `ruling-cited`, `security-reviewer` |
 | `src/**`, `scripts/**`, `tests/**`, `Makefile`, `pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`, `.gitattributes`, `agents/<name>/**` (but for the rows above and the manifest fields their seats own), `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | Engineering | `cold-review-ruling`; `two-key` on a human commit to `evals/history/**` |
 | `.claude/agents/<name>.md` | the seat in its `seat:` front matter | `ruling-cited` |

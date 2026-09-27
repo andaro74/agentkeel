@@ -206,6 +206,39 @@ added at M04 (R8), and none is exercised: `red-teamer` has no M04 seed.
 | rule F7 | SPEC/04 §8: a swap's plants fire before the candidate is called | Product | SPEC/04 §8 |
 | rule note 2 | `red-teamer` reads the lowest-numbered OPEN row of `milestones/README.md` | Rule Owner | `.claude/agents/red-teamer.md` |
 
+### 2.5 The cold review and the second read, on the diff
+
+`engineering-cold-reviewer` (0 BLOCK, 5 FINDING, 4 NOTE) and the seat
+re-reads, each on the diff `2addb95...688634c` and each saying so in its
+first line: `threshold-owner` (0, 5, 12), `data-owner` (0, 3, 4),
+`rule-owner` (0, 3, 8). All in the PR body verbatim. Ruled by the human,
+2026-09-27, "as proposed".
+
+| Finding | Ruling | Seat | Where |
+|---|---|---|---|
+| cold F1; threshold F2; data F2; rule note 10 | The ruling files, one seat each, `pr: 23` | each seat | `rulings/pr1*.md` |
+| cold F3; data F3 | Seed preconditions raise `SeedBroken`; only the planted line is an `assert` (`e0ce2ce`) | Engineering | `tests/test_m04_seeds.py` |
+| cold F4 | S3 ruled against the incumbent history: its first run alone GREEN, its second alone RED for `g-006` regressed only (`e0ce2ce`) | Engineering | S3 |
+| data F1 | `the_call` takes the date the question asks about; S3 and S4 regenerated (`e0ce2ce`) | Engineering (Data Owner rules the call) | S3, S4 |
+| cold F2 | The seeded-commit cell names the fixture commits beside S3 and S4 | Product | ledger row 4; README; §3 |
+| threshold F1 | `build` writes the first agent run's tokens as their own optional field; the bar reads it | Threshold Owner | SPEC/04 §2 |
+| threshold F4 | Entry 6 compares dates only with `model.id` unchanged; a swap to a `LEGACY` model carries its `endOfLifeTime`, recorded in the swap's ruling | Threshold Owner proposes, Product rules | ADR-0009; SPEC/02 §2; SPEC/04 §2 |
+| cold F5; threshold note 15 | CLAUDE.md and SPEC/00 §5.1 name entry 6 beside the bar rule | Product | CLAUDE.md; SPEC/00 |
+| threshold F3; rule F1 | ADR-0010 points at ADR-0009 amendment 1; ADR-0009 says a second key is filed by hand for a definition change until the Rule Owner's amendment | Product | the two ADRs |
+| threshold F5; cold N4 | `pinned_roles` completed at PR 2 before either swap PR; PR 2 regenerates the pin patches' context in the commit that edits the manifest | Threshold Owner, Engineering | SPEC/04 §5.1 |
+| rule F2, F3; notes 5, 6, 9; data notes 4, 7; threshold notes 14, 17 | Row 17 adds line 51; the probe record marks round 2's version as inferred and round 1's as unrecorded; row 5 "under today's grounding"; row 20 cites both commits; S1's positions from 0; the `deprecated_after` sentence moved; the PII rule reads the answer; the ledger's F4.1 names the reasons | Product, Engineering | as named |
+
+**For PR 2, not fixed here:** `make plants` says "in the tree" for a
+reader that does not read its seed yet (cold N1); S1's test does not rule
+out the excluded reasons, and PR 3's live read must (cold N3); PR 2's
+reader tests keep `CONTROLS` off or give the raws their topics (rule N7);
+the p95 evidence restated on the counted set (threshold N12); the
+incumbent median's ratchet (threshold N13); `g-021`'s tool answer offers
+`ML-2.1` where the golden expects `ML-2.3` (data N5).
+
+**Recorded only:** cold N2; threshold notes 6 to 11 and 16; rule notes 4,
+8 and 11; data note 6.
+
 ## 3. The false state
 
 SPEC/04 §3, in full. Live today: `score_one` never reads `tool_calls`, so
@@ -218,7 +251,10 @@ gate REJECTs it, ADR-0007 T3); a breaking swap that fails a golden
 outright merges (claim 3's guard 1).
 
 The commits: `a16e2c7` S1, `c6b6cb8` S2, `6f18507` S3, `63033b7` S4,
-`8994dcb` S5. `git show <seed> --stat` shows fixtures, a test, the
+`8994dcb` S5; S3's and S4's raw runs remade at `2dc81ae` and `e0ce2ce`,
+before any reader. Every precondition in the seed tests raises
+`SeedBroken`, so a broken seed fails the run; only the planted line is
+an `assert`. `git show <seed> --stat` shows fixtures, a test, the
 fixtures README and one line of `SEEDS_M04` (S1 also `.gitattributes`),
 and no reader. Each strict marker was checked with `--runxfail`:
 
@@ -268,7 +304,7 @@ carried to M05's `open.md` at the close as dated.
 | 2 | Product (Rule Owner proposes) | **Ruled here: stays one key through M04**, because no M04 PR changes `rules/**`. Until an ADR-0009 amendment lands, the Rule Owner treats any change to a definition's wording as a relaxation and files a second key by hand. The Rule Owner proposes the amendment (any definition change takes two keys, read by `two_key.py`, whose `rule_relaxations` already holds the old and new definition) at **M05 open, or with the first change to `rules/**`, whichever comes first** (`rule-owner` F3 on this PR). |
 | 3 | Data Owner | **M06**, with the knowledge base (SPEC/04 §9 cut f). Until refagent reads the corpus, the answer-side overlap reads nothing. It is the first row of M06's `open.md`, ruled before retrieval lands (`data-owner` note 14). |
 | 4 | Data Owner | **Done here** (`6dc922f`): the comment names `sending-terms-to-a-competitor`. |
-| 5 | Data Owner, Tool Owner | **PR 2**, before tool grounding lands. `g-021` as written cannot pass grounded: its question's call returns `found: false`, and it expects the original's row `r-011` with `exclusive: false` against that row's `true` (`data-owner` F3, F4). Keeping it as written is ruled out: retire with two keys and re-add under a new id (an absence form needs SPEC/00 §6 amended), or keep it with a changed reader. If it is retired, the expected trap line is restated before PR 2's run (`data-owner` F16). |
+| 5 | Data Owner, Tool Owner | **PR 2**, before tool grounding lands. `g-021` as written cannot pass grounded: its question's call returns `found: false`, and it expects the original's row `r-011` with `exclusive: false` against that row's `true` (`data-owner` F3, F4). Keeping it as written under today's grounding is ruled out: retire with two keys and re-add under a new id (an absence form needs SPEC/00 §6 amended), or keep it with a changed reader. If it is retired, the expected trap line is restated before PR 2's run (`data-owner` F16). |
 | 6 | Security | **PR 2**: read from the first bootstrap `cdk diff --strict`, which is the candidate list's redeploy. Locally, the minified template is 47,535 bytes with non-ASCII escaped and 47,491 as UTF-8 at `0100b64`, whose `infra/` is `main`'s; M03 recorded 47,601 at `0a90d52`. |
 | 7 | Security | **Measured here**, by local synth, nothing deployed: the three candidates on the eval role's two invoke statements only, `MODELS` unchanged, add 1,572 bytes: **49,107 of 51,200** (2,093 left). A scratch worktree, removed; no infra file changed in this PR. Anything else added to that stack at M04 is measured against 2,093. |
 | 8 | Security, Engineering | **M06**, when refagent first reads the corpus, as dated. |
@@ -280,10 +316,10 @@ carried to M05's `open.md` at the close as dated.
 | 14 | Threshold Owner | **PR 2**: a manifest edit changes the bundle, and would cost row 10. |
 | 15 | Engineering; Product | **M06**, with the knowledge base (cut f). |
 | 16 | Product; Security | **M06** (cut f; SPEC/00 §9 amended). |
-| 17 | Rule Owner | **M06**, with retrieval. Meanwhile `agents/refagent/rules/guardrail.yaml`'s comments are stale: "(M04)" and "until M04" for the knowledge base, and "a third party" at line 65. Comments only, not read by `two_key`; the Rule Owner's next change to `rules/**` carries the fix (`rule-owner` F4, `data-owner` note 2). SPEC/04 §8 says a swap's plants fire before the candidate is called (`rule-owner` F7). |
+| 17 | Rule Owner | **M06**, with retrieval. Meanwhile `agents/refagent/rules/guardrail.yaml`'s comments are stale: "(M04)" and "until M04" for the knowledge base, "at M04, when it reads documents, the answer side is re-examined" at line 51, and "a third party" at line 65. Comments only, not read by `two_key`; the Rule Owner's next change to `rules/**` carries the fix (`rule-owner` F4, `data-owner` note 2). SPEC/04 §8 says a swap's plants fire before the candidate is called (`rule-owner` F7). |
 | 18 | Data Owner | **M06**, with retrieval: an answer cites a corpus clause only once refagent reads the corpus. |
 | 19 | Product; Threshold Owner; Data Owner | **Done here**: SPEC/04 §9 cuts b, c, d (SPEC/03 cuts 1 to 4) to M07 and M06; SPEC/00 §8 M06 and M07 name them. |
-| 20 | Rule Owner | **Done here** (`70c2322`). |
+| 20 | Rule Owner | **Done here** (`70c2322`, `688634c`). |
 | 21 | Rule Owner | **M05**, with Promptfoo (row 25). |
 | 22 | Engineering | **PR 2**: item f (`server.py`'s profile default, which is the model the runtime calls) and item h (build's token sums, which A-vs-A doubles). Item i: **M05**. Cut 2 if the cap is threatened. |
 | 23 | Product | **Done here**: SPEC/00 §3 and §10.3 row 03 amended, `docs/milestones/README.md` regenerated, M03's page takes the amended sentence. |

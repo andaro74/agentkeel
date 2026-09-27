@@ -117,13 +117,22 @@ moved the date later, or cleared it, would switch that check off. ADR-0010
 made the field the Threshold Owner's and left this open.
 
 **Entry 6:** a manifest's `deprecated_after` moved to a later date, set
-from a date to null, or removed. Null to a date is not one, nor is a date
-moved earlier. The key that covers it is the Threshold Owner's.
+from a date to null, or removed, **with `model.id` unchanged**. Null to a
+date is not one, nor is a date moved earlier. The key that covers it is
+the Threshold Owner's. A swap changes the id, and its date describes
+another model, so the two dates are not compared; a swap to a model
+Bedrock marks `LEGACY` carries that model's `endOfLifeTime`, recorded in
+the swap's Threshold Owner ruling (SPEC/04 §2; `threshold-owner` F4 on
+the second read of M04 PR 1).
 
 **What reads it, and when.** Nothing at M04 PR 1: this is the ruling.
 `src/gates/two_key.py` reads it from M04 PR 2 (Engineering), in the same
 PR as `src/validate/lifecycle.py` and no later.
 
 Not changed here: a rule definition narrowed under the same name stays
-one key until the Rule Owner's amendment (`milestones/M04/feasibility.md`
-§6 row 2). This is ADR-0009's first amendment. One is left.
+one key **at the gate**. Until the Rule Owner's amendment, the Rule Owner
+files a second key by hand for any change to a definition's wording
+(`milestones/M04/feasibility.md` §6 row 2; `rule-owner` F1 on the second
+read). This is ADR-0009's first amendment. One is left, and the Rule
+Owner's is planned to be it; a change to the list after that is a new
+ADR.

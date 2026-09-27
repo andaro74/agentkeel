@@ -110,9 +110,13 @@ never gated** (ADR-0004): its diff is F0.4 measured, not `F4_3`.
   the envelope ruled. An envelope with no `mode` (version 1, before
   ADR-0007) is not counted. The run's side of each comparison is **its
   first refagent run**: p95 over that run's latencies, and that run's
-  tokens, the agent's side only (the envelope's total less its control
-  card's). A-vs-A's second run is compared with the first and never with
-  the bar. **A bar with no incumbent envelope in that mode writes
+  tokens, the agent's side only. `build` writes that run's tokens as an
+  envelope field of its own, optional so no past envelope becomes invalid,
+  and the bar reads that field: the envelope's `tokens_in` and
+  `tokens_out` count every run the job made, and with A-vs-A they hold
+  two agent runs (threshold-owner F1, second read). A-vs-A's second run is
+  compared with the first and never with the bar, and never lifts the
+  incumbent's median. **A bar with no incumbent envelope in that mode writes
   `F4_4: fail`, and the envelope is RED**, with the reason; a mode the
   incumbent never ran in is not a way past the bar (threshold-owner F1 to
   F3 on PR 1).
@@ -138,14 +142,19 @@ never gated** (ADR-0004): its diff is F0.4 measured, not `F4_3`.
   allows a date or null). Bedrock publishes `modelLifecycle.endOfLifeTime`
   only once a model is `LEGACY`: on 2026-09-26 the incumbent and all three
   candidates are `ACTIVE` with none, so refagent's null is a reading ("no
-  date announced"), not a gap. Moving the date later, setting it to null,
-  or removing it is a relaxation, the Threshold Owner's key (ADR-0009
-  amendment 1, entry 6; threshold-owner F6).
+  date announced"), not a gap. At M04 the date is set by hand from that
+  reading; setting it from Bedrock by code is cut to M07 (§9, cut g).
+  Moving the date later, setting it to null, or removing it, **with
+  `model.id` unchanged**, is a relaxation, the Threshold Owner's key
+  (ADR-0009 amendment 1, entry 6; threshold-owner F6). A swap changes the
+  id, so its date is not compared with the old one; instead a swap to a
+  model Bedrock marks `LEGACY` carries that model's `endOfLifeTime` as
+  its `deprecated_after`, and the swap's Threshold Owner ruling records
+  the `modelLifecycle` it read (threshold-owner F4, second read).
 - **`version`.** For an id that carries a version, `version` records that
   suffix (Sonnet 4.5: `20250929-v1:0`); it is null only when the id has
   none, as Sonnet 4.6's has not (ruling G). The swap PRs follow this; the
-  seed patches stay as planted (threshold-owner F8). At M04 the date is set by hand from that
-  reading; setting it from Bedrock by code is cut to M07 (§9, cut g).
+  seed patches stay as planted (threshold-owner F8).
 
 ## 3. The false state
 
@@ -261,6 +270,13 @@ met.
   51,200 bytes at M03's close; `open.md` row 7). The human reads
   `cdk diff --strict`, which also answers whether the deployed template
   reads `§` (`open.md` row 6), and deploys. S2's test then passes.
+- **`pinned_roles` first, during PR 2.** The Threshold Owner completes
+  region and version on every swap role (`open.md` row 14) before either
+  swap PR is opened (threshold-owner F5, second read). The manifest edit
+  moves the context the seed patches carry: PR 2 regenerates the three pin
+  patches in the commit that edits the manifest, and re-runs each seed
+  with `--runxfail`. Rebasing a patch's context is not changing what the
+  seed adds; the lines a patch changes stay as planted (cold review N4).
 - **The swap PRs, during PR 2.** After the readers land, the human opens
   two draft PRs against `main`, each branched from PR 2's head and each
   changing only the pin: one to the breaking candidate, one to the
@@ -363,8 +379,9 @@ SPEC/00 §10.5: no document describes these as working.
 - the guardrail on a candidate's answers: every topic is assessed on the
   question only (`topics_apply_to: input`, `open.md` row 17), so a swap's
   plants fire before the candidate is called. "Plants 7 of 7" on a swap
-  PR says nothing about the new model. M06, with retrieval (rule-owner
-  F7 on PR 1).
+  PR says nothing about the new model. The PII rule reads the answer as
+  well, but its plant, `g-014`, is not counted until M06 (cut f). M06,
+  with retrieval (rule-owner F7 on PR 1; note 6 on the second read).
 
 ## 9. Cut list
 

@@ -14,7 +14,8 @@ as "the human's admin user".
 `guardrailVersion: "5"` (in `guardrailConfig`, or as
 `X-Amzn-Bedrock-GuardrailVersion` on round 1's headers) when the guardrail
 is on. The file as saved was last written at 19:52 local. Round 2's calls
-(20:04 to 20:45) came after it and sent version 5. Round 1's calls (19:35
+(20:04 to 20:45) came after it, so they sent version 5; that is inferred
+from the script's time, not read from the call files. Round 1's calls (19:35
 to 19:37) came before it, and **the files do not record which version
 round 1 sent** (rule-owner F6 on M04 PR 1).
 
@@ -99,8 +100,8 @@ version 5 answered HTTP 200 with the same stop reasons and topics as
 direct Converse (B1, B2), and one call without the guardrail, by one
 caller, was refused with a message naming the gateway's role (B3). Not
 shown, and questions for M05 open (feasibility §6 row 39): that the pin
-holds for every caller, or for a version other than 5 (no call sent DRAFT
-or another version); what CloudTrail records, since no CloudTrail file was
+holds for every caller, or for a version other than 5 (no round 2 call
+sent DRAFT or another version; round 1's version is not recorded); what CloudTrail records, since no CloudTrail file was
 read; and the statement that refused B3, since the policy the gateway's
 role held for target B is not among the probe's files
 (`gw2-role-policy.json` as saved grants only `InvokeGateway`) (rule-owner

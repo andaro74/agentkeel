@@ -8,8 +8,8 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
 | Field | Row 4 |
 |---|---|
 | Claim | A breaking model swap goes RED; an equivalent swap promotes; A-vs-A is zero diff |
-| Falsifiers | F4.1 the breaking swap is GREEN, or RED for a reason other than a citing golden regressed (live: the breaking swap PR, read at PR 3). F4.2 the equivalent swap is RED or REJECTED, or a required check on its PR is red for a reason of its own ("promotes" is mergeable, not merged; live: the equivalent swap PR, read at PR 3). F4.3 A-vs-A shows a diff: two runs of one pin in one `evals` job with any golden's `pass` different (the milestone stops). F4.4 a run over a `delta_max` bar is GREEN: `p95_ms` over 2.0x, or the agent's tokens over 1.5x, the incumbent's median in the same mode. |
-| Seeded commit | `a16e2c7` (S1); `c6b6cb8` (S2); `6f18507` (S3); `63033b7` (S4, two cases); `8994dcb` (S5, no falsifier: SPEC/00 §8 M04's `deprecated_after`), each its own commit before any reader (SPEC/04 §5) |
+| Falsifiers | F4.1 the breaking swap is GREEN, or RED for a reason other than a citing golden regressed, ungrounded or with wrong fields (a REJECTED, an access error or the cost cap is not the reason) (live: the breaking swap PR, read at PR 3). F4.2 the equivalent swap is RED or REJECTED, or a required check on its PR is red for a reason of its own ("promotes" is mergeable, not merged; live: the equivalent swap PR, read at PR 3). F4.3 A-vs-A shows a diff: two runs of one pin in one `evals` job with any golden's `pass` different (the milestone stops). F4.4 a run over a `delta_max` bar is GREEN: `p95_ms` over 2.0x, or the agent's tokens over 1.5x, the incumbent's median in the same mode. |
+| Seeded commit | `a16e2c7` (S1); `c6b6cb8` (S2); `6f18507` (S3); `63033b7` (S4, two cases), S3's and S4's raw runs remade at `2dc81ae` and `e0ce2ce` before any reader; `8994dcb` (S5, no falsifier: SPEC/00 §8 M04's `deprecated_after`), each its own commit before any reader (SPEC/04 §5) |
 | Expected gate output | PR 1: refagent's envelope as at M03; it says nothing about claim 4. PR 1 leaves `agents/refagent/**` and `data/rights_table.json` alone, so its run may be the first `mode: runtime` envelope at guardrail `1088aw3ujhyd:5` (`open.md` row 10); the envelope says whether it is. `make plants` lists S1 to S5; `tests/test_m04_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 to S5 refused by their readers, each for its planted reason; refagent under tool grounding ordinary 9/9, traps 2/3, fewer being the finding; refagent's A-vs-A zero diff, the control's reported and not gated; p95 and tokens within their bars. From PR 2's merge the gate requires `F4_1`, `F4_2` and `F4_4` on every agent envelope and `F4_3` where A-vs-A runs; **`F4_1` and `F4_2` from the seed tests alone are test-only witnesses**. During PR 2 the human redeploys the bootstrap stack with the eval role's candidate list after reading `cdk diff --strict`, and opens the two swap PRs from PR 2's head. **A named P3 exception (SPEC/04 §5.1): PR 3's run reads the swap PRs, after their rulings are on `main`;** PR 3 is both that read and the repair. Stated before: the breaking swap RED with at least one citing golden regressed, ungrounded or wrong, and no REJECTED, access error or cost cap; the equivalent swap GREEN with every required check green. RED if a seed's test passes but by its reader, if either swap reads otherwise, if refagent's A-vs-A shows a diff, if a run over a bar rules GREEN, if PR 3 cannot read the swap PRs, or if `make ledger` stops matching rows 0 to 3. |
 | Measured | — |
 | PRs used / cap | 1 / 4 |
@@ -29,7 +29,11 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
   tests alone, as test-only witnesses; the swap PRs are opened during
   PR 2 and read by PR 3's run, a named P3 exception; PR 3 is both that
   read and the repair. There is no fifth PR.
-- **Planted** in five commits, one per seed, `a16e2c7` to `8994dcb`, each
+- **Planted** in five commits, one per seed, `a16e2c7` to `8994dcb`; S3's
+  and S4's raw runs were remade before any reader, at `2dc81ae` (made on
+  the real tool, `data-owner` F9) and `e0ce2ce` (the date the question
+  asks about; S3 ruled against the incumbent; a broken seed fails the run
+  with `SeedBroken`, cold review F3 and F4). Each
   with its test in `tests/test_m04_seeds.py`, before any code that reads
   them: 6 expected failures (S4 has two cases), each run once with
   `--runxfail` and its message read. Two readings on the way were the

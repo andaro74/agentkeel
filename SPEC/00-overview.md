@@ -194,7 +194,7 @@ case; a specialist with no milestone to serve is a prompt nobody tests.
 | `rule-owner` | Rule Owner | reviews `rules/` and guardrail version changes; a relaxation must be named as one and its ADR must cite the case it enables |
 | `data-owner` | Data Owner | drafts traps from the corpus, flags goldens overlapping the retrieval source, proposes FRAGILE over rescoring, reviews corpus admissions |
 | `tool-owner` | Tool Owner | reviews tool and edge schemas: `additionalProperties: false`, semver preview, edge declared both sides |
-| `threshold-owner` | Threshold Owner | reviews bars and the judge rubric: relative policy stated, two keys on any downward move |
+| `threshold-owner` | Threshold Owner | reviews bars and the judge rubric: relative policy stated, two keys on a move of a bar in its `relaxes:` direction, and on `deprecated_after` moved later or cleared with the model unchanged (ADR-0009 amendment 1) |
 | `security-reviewer` | Security | reviews construct, bootstrap, workflows, IAM, SGs, key policy, anything touching the security account; reads cdk-nag output |
 | `engineering-cold-reviewer` | Engineering | the cold read per PR: diff and ledger row only, no PR description; outputs the ruling text with `ruling: DRAFT`; the Engineering seat commits it as the ruling file `cold-review-ruling` requires |
 

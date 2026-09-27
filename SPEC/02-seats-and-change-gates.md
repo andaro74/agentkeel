@@ -87,7 +87,7 @@ files, and nothing here pretends otherwise.
   **Amended at M04 PR 1 by ADR-0009 amendment 1** (Threshold Owner
   proposed; Product rules in `milestones/M04/rulings/pr1.md`; read by
   `two-key` from M04 PR 2). Added: a manifest's `deprecated_after` moved
-  later, set from a date to null, or removed.
+  later, set from a date to null, or removed, with `model.id` unchanged.
 - **Two keys.** Two ruling files, each with one `seat:`, the two seats
   distinct, both with this PR's `pr:`. The file of the seat that owns the
   path covers it; the other names the path, exactly, in its `keys:`

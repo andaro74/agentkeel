@@ -48,7 +48,8 @@ ADR-0003 has used both its amendments, so this is a new ADR.
 ## Consequences
 
 - A diff that clears or moves `deprecated_after` needs a Threshold Owner
-  ruling. Whether moving it later is a relaxation is not decided here;
-  ADR-0009's list does not name it.
+  ruling. Moving it later, nulling it or removing it with the model id
+  unchanged is a relaxation, decided in the same PR by ADR-0009 amendment
+  1, entry 6.
 - One person holds every seat (R1). This names whose ruling a diff cites;
   it does not add a reviewer.
