@@ -617,19 +617,20 @@ def f1_4(results: dict[str, dict[str, Any]]) -> str:
     return "fail" if any(r["kind"] == "ordinary" and not r["cites"] for r in results.values()) else "pass"
 
 
-SWAP_FIELDS = ("swap", "falsifier", "role", "pr", "merged", "head_sha", "measured_commit", "evals_on_measured",
-               "required_on_head", "verdict", "reasons", "note")  # fmt: skip
+SWAP_FIELDS = ("swap", "falsifier", "role", "pr", "merged", "head_sha", "envelope_commit", "measured_commit",
+               "evals_on_measured", "required_on_head", "verdict", "reasons", "note")  # fmt: skip
 VERDICTS = ("GREEN", "RED", "UNMEASURED", "REJECTED")
 
 
 def swaps_record(path: Path) -> list[dict[str, Any]]:
     """`scripts/rule_swaps.py`'s output, cut to the fields the envelope keeps; refused if not in its shape."""
     swaps = load_json(path).get("swaps")
-    if not isinstance(swaps, list) or not swaps:
-        raise Refused(f"{path}: no swaps")
+    if not isinstance(swaps, list):
+        raise Refused(f"{path}: no swaps list")
     kept = []
     for swap in swaps:
-        if not isinstance(swap, dict) or swap.get("verdict") not in (*VERDICTS, None)                 or not isinstance(swap.get("reasons"), list) or not isinstance(swap.get("swap"), str):  # fmt: skip
+        shaped = isinstance(swap, dict) and swap.get("verdict") in (*VERDICTS, None)
+        if not shaped or not isinstance(swap.get("reasons"), list) or not isinstance(swap.get("swap"), str):
             raise Refused(f"{path}: a swap not in rule_swaps' shape: {swap!r}"[:300])
         kept.append({field: swap.get(field) for field in SWAP_FIELDS})
     return kept
@@ -730,7 +731,7 @@ def compose_envelope(
         one_subject["agent_tokens"] = agent_usage  # the first run's, the agent's side only (SPEC/04 §2)
     if gated and second is not None:
         one_subject["a_vs_a"] = a_vs_a
-    if gated and swaps is not None:
+    if gated and swaps:  # none observed is no field, not an empty one
         one_subject["swaps"] = swaps
     return {
         "commit": raw["commit"],

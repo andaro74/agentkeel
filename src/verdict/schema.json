@@ -272,7 +272,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["swap", "falsifier", "role", "pr", "merged", "head_sha", "measured_commit", "evals_on_measured", "required_on_head", "verdict", "reasons", "note"],
+        "required": ["swap", "falsifier", "role", "pr", "merged", "head_sha", "envelope_commit", "measured_commit", "evals_on_measured", "required_on_head", "verdict", "reasons", "note"],
         "properties": {
           "swap": {"type": "string"},
           "falsifier": {"type": ["string", "null"]},
@@ -280,6 +280,7 @@
           "pr": {"type": ["integer", "null"]},
           "merged": {"type": ["boolean", "null"]},
           "head_sha": {"type": ["string", "null"]},
+          "envelope_commit": {"type": ["string", "null"]},
           "measured_commit": {"type": ["string", "null"]},
           "evals_on_measured": {"type": ["string", "null"]},
           "required_on_head": {"type": ["object", "null"], "additionalProperties": {"type": ["string", "null"]}},

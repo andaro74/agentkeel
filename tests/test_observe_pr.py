@@ -279,3 +279,4 @@ def test_observe_swap_reads_githubs_record_and_no_envelope(monkeypatch):
                                     "expected": "GREEN"}, {"swap": "equivalent", "pr": 32}, roles, None)  # fmt: skip
     assert entry["measured_commit"] == measured and entry["required_on_head"] == {"checks": "success", "evals": "success"}
     assert entry["evals_on_measured"] == "success" and "envelope" not in entry
+    assert entry["envelope_commit"] == head  # the bot's commit, where the envelope is read (security-reviewer F2, PR 3)
