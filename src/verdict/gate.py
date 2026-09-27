@@ -207,6 +207,33 @@ def over_bar(envelope: dict[str, Any], bars: dict[str, float], runs: list[dict[s
     return reasons
 
 
+def spend(envelope: dict[str, Any], control_card: dict[str, Any] | None) -> list[str]:
+    """build's token sums held to the cards the gate reads (M04 PR 2; M04 open.md row 22, item h).
+
+    The gate is not given the raw runs, so it cannot count the agent's
+    tokens itself. It can hold the sums to this run's control card: an agent
+    envelope's `tokens_in` and `tokens_out` are at least the card's, and from
+    M04 PR 2 exactly `agent_tokens` plus the card's, or more where A-vs-A
+    added a second run of each. A run that under-reports to pass the cap no
+    longer passes unread. What it cannot see: `agent_tokens` itself set low.
+    """
+    if control_card is None or "tokens_in" not in envelope:
+        return []
+    card_in, card_out = control_card.get("tokens_in", 0), control_card.get("tokens_out", 0)
+    total = envelope["tokens_in"] + envelope["tokens_out"]
+    if envelope["tokens_in"] < card_in or envelope["tokens_out"] < card_out:
+        return [f"tokens: the envelope says {envelope['tokens_in']} in and {envelope['tokens_out']} out, "
+                f"fewer than this run's control card alone ({card_in} and {card_out})"]  # fmt: skip
+    agent = envelope.get("agent_tokens")
+    if not isinstance(agent, int):
+        return []
+    least = agent + card_in + card_out
+    if total < least or ("a_vs_a" not in envelope and total != least):
+        return [f"tokens: the envelope says {total} in all; agent_tokens {agent} and the control card's "
+                f"{card_in + card_out} make {least}" + ("" if "a_vs_a" not in envelope else " at least")]  # fmt: skip
+    return []
+
+
 def manifest_at(commit: str, bundle: str, root: Path = ROOT) -> tuple[dict[str, Any], str]:
     """The agent's manifest as it stood at `commit`, and where it was read. The same fallback as ruling m."""
     text, where = text_at(commit, f"{bundle}/manifest.yaml", root)
@@ -361,6 +388,7 @@ def judge(
     required: tuple[str, ...] | None = None,  # None: what the envelope's own commit requires (required_checks)
     corpus: str | None = None,
     bars: list[str] | None = None,
+    control_card: dict[str, Any] | None = None,
 ) -> tuple[str, list[str]]:
     """The gate's own verdict and its reasons. `envelope` has passed `read`.
 
@@ -376,6 +404,7 @@ def judge(
     `bars` is the gate's own reading of the `delta_max` bars (`over_bar`),
     which `rule` works out at the envelope's commit: None where the commit
     has no bars, else the reasons it is over them (empty: under both).
+    `control_card`, this run's, holds build's token sums (`spend`).
     """
     results = envelope["goldens"]
     reasons: list[str] = []
@@ -428,6 +457,7 @@ def judge(
         # it whole.
         reasons += [f"checks.{name} is missing from an agent envelope"
                     for name in required if name not in envelope["checks"]]  # fmt: skip
+        reasons += spend(envelope, control_card)
         # SPEC/04 §2 (S4): the gate's own reading of the bars, and build's F4_4 held to it.
         if bars is not None:
             reasons += bars
@@ -576,7 +606,7 @@ def rule(path: Path, history_dir: Path = HISTORY) -> tuple[str, list[str]]:
         raise Rejected(str(exc)) from exc
     corpus, _ = fingerprint_at(envelope["commit"], ROOT)  # admitted.yaml at the envelope's commit (S4)
     return judge(envelope, kinds, history, plant_ids, cap, required_checks(envelope["commit"]), corpus=corpus,
-                 bars=bars_reading(envelope, history_dir))  # fmt: skip
+                 bars=bars_reading(envelope, history_dir), control_card=control_card_of(envelope, path))  # fmt: skip
 
 
 def bars_reading(envelope: dict[str, Any], history_dir: Path = HISTORY) -> list[str] | None:

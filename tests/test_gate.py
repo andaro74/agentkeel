@@ -388,3 +388,20 @@ def test_bars_reads_every_level():
     assert two_key.bars({"a": {"b": 1, "c": {"d": 2.5, "e": True}}, "relaxes": {"a.b": "up"}}) == {"a.b": 1, "a.c.d": 2.5}
     before, after = {"a": {"c": {"d": 5}}, "relaxes": {"a.c.d": "up"}}, {"a": {"c": {"d": 6}}}
     assert two_key.threshold_moves(before, after) == ["a.c.d 5 -> 6 relaxes it (relaxes: up)"]
+
+
+def test_token_sums_are_held_to_the_control_card(chain):
+    """M04 open.md row 22, item h (M04 PR 2): the gate no longer takes build's token sums as given."""
+    envelope_path, card_path, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    assert gate.spend(envelope, card) == []
+    assert envelope["tokens_in"] + envelope["tokens_out"] == envelope["agent_tokens"] + card["tokens_in"] + card["tokens_out"]
+    under = {**envelope, "tokens_in": envelope["tokens_in"] - 1}
+    assert gate.spend(under, card) and "make" in gate.spend(under, card)[0]
+    below = {**envelope, "tokens_in": card["tokens_in"] - 1}
+    assert "fewer than this run's control card" in gate.spend(below, card)[0]
+    verdict, reasons = gate.judge(under, KINDS, {}, [], control_card=card)
+    assert verdict == "RED" and any(r.startswith("tokens:") for r in reasons)
+    # with A-vs-A the second runs add to the sum, so more is not a disagreement; fewer still is
+    assert gate.spend({**envelope, "a_vs_a": {"agent": [], "control": None}, "tokens_in": envelope["tokens_in"] + 500}, card) == []
