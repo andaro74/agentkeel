@@ -41,6 +41,24 @@ run's side its first agent run, and no incumbent envelope in the mode is
 a fail. On the counted set today the slowest runner envelope is 1.48x
 the runner median, and the slowest runtime one 1.30x.
 
+Ruled on this PR's report, by the human on 2026-09-27:
+
+- **The ratchet (F1, your N13).** The median leaves out envelopes whose
+  `checks.F4_4` failed, so a run over the bar that merged does not lift
+  the next run's bar. Unless every counted envelope on the pin and mode
+  failed it: a pin's first runs fail for having no incumbent, the
+  envelope does not say which, and leaving them all out would leave the
+  pin no median, ever. Then all are counted. No envelope in history
+  carries `F4_4`, so today's medians are unchanged.
+- **A deleted bar (F2).** From `15047b4`, which wired the checks, a
+  `thresholds.yaml` with no `relative` is refused by `build` and
+  REJECTED by the gate, as a deleted cap is. Before it, no bar, as
+  before.
+- **After a swap merges (note 9)**, its first envelope in a mode the
+  swap never ran in fails `F4_4` for having no incumbent there, as ruled
+  ("a mode the incumbent never ran in is not a way past the bar"). No
+  swap merges at M04; recorded for M05's `open.md`.
+
 ## 2. The cap stays 150,000 until PR 2's own run is read (row 12)
 
 The comment now gives the measured spend by subject. A-vs-A runs both
