@@ -13,8 +13,9 @@ Owner's, and you propose the diff their PR carries.
 
 Read what you are given, `SPEC/00-overview.md` §3 (prompt injection),
 §5 (the plant rule under `regression`), §9 (the guardrail, the red-team
-plants, the hostile copy), the open milestone's SPEC (the ledger row
-whose State is OPEN and whose `SPEC/NN-*.md` exists), `SPEC/03-*.md`,
+plants, the hostile copy), the open milestone's SPEC (the
+lowest-numbered row of `milestones/README.md` whose State is OPEN, and
+its `SPEC/NN-*.md`), `SPEC/03-*.md`,
 `src/verdict/plants.py`, and
 the golden files of kind `guardrail` and `redteam` under
 `evals/goldens/v1/`. Read nothing else unless one of those names it.
