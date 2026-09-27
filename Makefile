@@ -71,6 +71,13 @@ F4_2_CASES := test_s2_the_equivalent_swaps_pin_is_one_the_eval_role_may_invoke
 F4_3_CASES := test_s3_two_runs_of_one_pin_that_differ_are_a_failed_a_vs_a
 F4_4_CASES := test_s4_a_run_over_the_incumbents_bar_is_red[s4-slow-raw.json-p95-latency_ms-3],test_s4_a_run_over_the_incumbents_bar_is_red[s4-heavy-raw.json-tokens-usage-2]
 A_VS_A ?=
+# M04 PR 3 (SPEC/04 §4): the swap PRs, as observe_pr.py recorded them from
+# milestones/M04/runs/f4_swaps.yaml. rule_swaps.py has the gate rule each
+# one's own envelope, in a scratch worktree of HEAD, and build copies the
+# verdicts into the envelope's `swaps`. Recorded, never gated (Product, M04
+# PR 3): F4_1 and F4_2 stay the seed tests' witnesses.
+SWAPS_OBS ?=
+SWAPS_RULED = $(SWAPS_OBS:.json=-ruled.json)
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \
           $(if $(F0_3_OBS),--check-pr F0_3 "$(F0_3_OBS)") \
           $(if $(JUNIT),--check-cases F1_1 "$(F1_1_CASES)" "$(JUNIT)") \
@@ -121,7 +128,8 @@ define chain
 	-uv run python -m src.agent.run --out $(1)/$(2).agent-raw.json --recheck-runtime
 	$(if $(A_VS_A),-uv run python -m src.agent.run --out $(1)/$(2).agent-raw-b.json --recheck-runtime)
 	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json $(A_VS_A_RUNS)
-	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS)
+	$(if $(SWAPS_OBS),uv run python scripts/rule_swaps.py "$(SWAPS_OBS)" --out "$(SWAPS_RULED)")
+	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)")
 	uv run python -m src.verdict.gate $(1)/$(2).json; code=$$?; $(if $(GATE_EXIT),echo $$code > "$(GATE_EXIT)";) exit $$code
 endef
 else
