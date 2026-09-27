@@ -190,8 +190,6 @@ def incumbent_history(tmp_path: Path, goldens, measured):
 # --- S1: a breaking swap -----------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S1: score_one does not read tool_calls; tool grounding is M04 PR 2's reader")
 def test_s1_a_breaking_swap_whose_answers_the_tool_never_grounded_is_red(seeded, measured, incumbent_history, goldens):
     """The pin moved to Llama 3.1 8B. Every ordinary and trap answer has the expected fields and a
     real row and clause, and none came from a successful `check_availability` call: the call was

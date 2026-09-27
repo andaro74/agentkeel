@@ -25,7 +25,8 @@ def score(parsed, golden=GOLDEN, **observation):
 
 def test_score_reads_the_answer_fields_and_nothing_else():
     right = {"available": True, "exclusive": False, "constraints": ["embargo", "holdback"]}
-    assert score(right) == {"kind": "ordinary", "score": True, "cites": False, "pass": True}
+    # `grounded` is read, and applied to the agent only, in compose_envelope (M04 PR 2)
+    assert score(right) == {"kind": "ordinary", "score": True, "cites": False, "grounded": False, "pass": True}
     assert score({**right, "table_row": "r-019", "clause_id": "ML-2.1"})["cites"] is True
     assert score({**right, "table_row": "12345", "clause_id": "ML-2.1"})["cites"] is False
 
@@ -161,12 +162,14 @@ def test_f1_4_an_agent_answer_passes_only_if_it_cites(goldens):
     raw = make_raw(goldens, right={"g-001", "g-002"}, **AGENT_TOP)
     raw["observations"][1]["parsed"].pop("clause_id")  # g-002: right, and cites no clause
     results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
-    assert results["g-002"] == {"kind": "ordinary", "score": True, "cites": False, "pass": True}  # the control's reading
+    assert results["g-002"] == {"kind": "ordinary", "score": True, "cites": False, "grounded": False,
+                                "pass": True}  # the control's reading  # fmt: skip
 
     envelope = build.compose_envelope(raw, results, "agent", {"path": "x", "sha256": "0" * 64}, {}, [], {}, None,
                                       control_ref={"path": "y", "sha256": "1" * 64}, run_url=URL)  # fmt: skip
     assert envelope["goldens"]["g-001"]["pass"] is True
-    assert envelope["goldens"]["g-002"] == {"kind": "ordinary", "scope": "agent", "score": True, "cites": False, "pass": False}
+    # no clause is also no grounding (M04 PR 2): score false; F1.4 still fails on the missing citation
+    assert envelope["goldens"]["g-002"] == {"kind": "ordinary", "scope": "agent", "score": False, "cites": False, "pass": False}
     assert envelope["checks"]["F1_4"] == {"status": "fail", "url": URL}
     assert envelope["verdict"] == "RED"
 

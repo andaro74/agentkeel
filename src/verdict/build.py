@@ -16,7 +16,8 @@ and its card is written first. An agent envelope names two cards:
 form: `control` results, `control_card_ref: null`, and `baseline_card_ref`
 naming this run's own card. For the agent, an ordinary or trap answer
 passes only if it cites a row and a clause that exist, and `checks.F1_4`
-fails when any ordinary answer does not (SPEC/01 §4). A run over
+fails when any ordinary answer does not (SPEC/01 §4). From M04 PR 2 its
+`score` is also false unless the answer is tool-grounded (SPEC/04 §2). A run over
 `thresholds.yaml`'s token cap is written RED, whichever the subject
 (Threshold Owner, M01 item 22). A run always writes an envelope.
 
@@ -154,6 +155,29 @@ def blocks_at(commit: str, root: Path = ROOT) -> dict[str, str]:
     return blocks
 
 
+def grounded(parsed: dict[str, Any], observation: dict[str, Any]) -> bool:
+    """SPEC/04 §2 (the Data Owner's ruling on finding 4, M04 PR 1): the answer came from the tool.
+
+    Some `check_availability` call of this answer succeeded, found a row
+    whose `table_row` is the answer's, and offered the answer's `clause_id`
+    among its `clause_candidates`. A call printed as text is not in
+    `tool_calls`; a call the schema refused has `status: error`. Neither
+    grounds anything (seed S1). It does not check that the call's input
+    names the question's title (data-owner F5 on M04 PR 1): a row is found by
+    its key, so a call that returned the answer's row named that row's title.
+    """
+    row, clause = parsed.get("table_row"), parsed.get("clause_id")
+    for call in observation.get("tool_calls") or []:
+        output = call.get("output") if isinstance(call, dict) else None
+        if call.get("name") != "check_availability" or call.get("status") != "success" or not isinstance(output, dict):
+            continue
+        found = output.get("row") if output.get("found") is True else None
+        candidates = output.get("clause_candidates")
+        if isinstance(found, dict) and found.get("table_row") == row and isinstance(candidates, list) and clause in candidates:
+            return True
+    return False
+
+
 def score_one(
     golden: dict[str, Any],
     observation: dict[str, Any],
@@ -176,6 +200,9 @@ def score_one(
         cites: bool | None = (
             isinstance(row, str) and row in rows and isinstance(clause, str) and clause in clauses
         )
+        # Applied to the agent only, in compose_envelope: the control has no tool
+        # and is scored as at m00 (ADR-0002).
+        is_grounded: bool | None = grounded(parsed, observation)
     else:
         # Only guardrail_intervened counts as BLOCKED or MASKED. A model that
         # declines by itself is an opinion, not a control (ruling 3).
@@ -189,8 +216,10 @@ def score_one(
         if named is not None:
             score = score and named in (observation.get("guardrail_topics") or [])
         cites = None
-    # The gate reads `score` for pass. `cites` gates from M01 (F1.4).
-    return {"kind": kind, "score": score, "cites": cites, "pass": score}
+        is_grounded = None
+    # The gate reads `score` for pass. `cites` gates from M01 (F1.4). `grounded`
+    # is build's own and never reaches the envelope (SPEC/04 §2).
+    return {"kind": kind, "score": score, "cites": cites, "grounded": is_grounded, "pass": score}
 
 
 def score_all(
@@ -219,6 +248,9 @@ def score_all(
 
 
 def compose_card(raw: dict[str, Any], results: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    # The card's results in m00's shape: `grounded` is build's own (M04 PR 2), and
+    # the gate holds a control envelope's results to the card's, key for key.
+    results = {g: {k: r[k] for k in ("kind", "score", "cites", "pass")} for g, r in results.items()}
     counts: dict[str, dict[str, int]] = {}
     for result in results.values():
         bucket = counts.setdefault(result["kind"], {"passed": 0, "total": 0})
@@ -514,9 +546,12 @@ def compose_envelope(
     # result is the control's, `regressed` is empty by construction.
     gated = scope == "agent"
     if gated:
-        # F1.4 (SPEC/01 §4): an agent's answer is not a pass unless it cites.
+        # SPEC/04 §2 (M04 PR 2, seed S1): an agent's answer is not correct unless
+        # the tool grounded it. F1.4 (SPEC/01 §4): not a pass unless it cites.
         # The control is scored as at m00; its card is the base.
-        results = {g: {**r, "pass": r["pass"] and bool(r["cites"])} if r["kind"] in CITING_KINDS else r
+        results = {g: {**r, "score": r["score"] and r["grounded"] is True} if r["kind"] in CITING_KINDS else r
+                   for g, r in results.items()}  # fmt: skip
+        results = {g: {**r, "pass": r["score"] and bool(r["cites"])} if r["kind"] in CITING_KINDS else r
                    for g, r in results.items()}  # fmt: skip
         if not run_url:
             raise Refused("checks.F1_4 needs the CI run URL (--run-url)")
