@@ -62,6 +62,27 @@ envelope outside `verdict.build` and `verdict.gate`, and nothing reaches
 | N3 | S1's test does not rule out §7's excluded reasons | PR 3's live read of the breaking swap must; recorded |
 | N4 | PR 2's manifest edits will break the pin patches' context | Ruled (`f5922c4`, SPEC/04 §5.1): PR 2 regenerates the patches' context in the commit that edits the manifest and re-runs each seed with `--runxfail`; the lines a patch changes stay as planted |
 
+## Second cold read, after the repairs
+
+`engineering-cold-reviewer` read `688634c..70cf8ee` (21 files) with the
+full diff `2addb95...70cf8ee` (36 files) and row 4: **0 BLOCK, 0 FINDING,
+5 NOTE**, in the PR body verbatim. All five findings above read as
+repaired; no repair touches `src/`, `thresholds.yaml`, `agents/`,
+`infra/`, `rules/`, `data/`, `evals/history/` or `.github/`; the
+`authorises` of the five ruling files cover all 36 paths. It could not run
+commands; the session ran them at `70cf8ee`: `uv run pytest
+tests/test_m04_seeds.py tests/test_m03_seeds.py`, 11 passed, 6 xfailed;
+with `--runxfail`, each seed fails on its planted line; `make validate`,
+15 of 15 ok, exit 0; `make ledger`, exit 0.
+
+| # | Note | Status |
+|---|---|---|
+| 2N1 | S3's `SystemExit` and S5's `ImportError` are also the classes a precondition could raise | Recorded: S1 and S4 pass the same flags and would FAIL on the same refusal; `src.validate.checks` is imported by every `validate` run |
+| 2N2 | Once the gate requires claim 4's checks, `measured` must pass their flags or S3's preconditions raise `SeedBroken` | PR 2, Engineering: a `claim_4_checks` beside `claim_2_checks` in the harness; the seed stays as planted |
+| 2N3 | `pr1-threshold-owner.md` authorises paths other seats own as well | Recorded: that file is the Threshold Owner's key on its rulings, and each path is also covered by its own seat |
+| 2N4 | `.claude/agents/threshold-owner.md` and SPEC/00 §5's table still name no entry 6 | Threshold Owner and Product: before PR 2 (Unsure B in the PR body) |
+| 2N5 | The checks the reviewer could not run | Run by the session, above |
+
 Also in this seat's paths: the data-owner's F1 and F3 (`e0ce2ce`: the date
 the question asks about; `SeedBroken`) and F9 (`2dc81ae`: the tool calls
 made on the real tool), and `open.md` row 38 (`22b9cd9`: M03's S1 and S2
