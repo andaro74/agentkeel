@@ -8,11 +8,11 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
 | Field | Row 4 |
 |---|---|
 | Claim | A breaking model swap goes RED; an equivalent swap promotes; A-vs-A is zero diff |
-| Falsifiers | F4.1 the breaking swap is GREEN, or RED for a reason other than a citing golden regressed, ungrounded or with wrong fields (a REJECTED, an access error or the cost cap is not the reason) (live: the breaking swap PR, read at PR 3). F4.2 the equivalent swap is RED or REJECTED, or a required check on its PR is red for a reason of its own ("promotes" is mergeable, not merged; live: the equivalent swap PR, read at PR 3). F4.3 A-vs-A shows a diff: two runs of one pin in one `evals` job with any golden's `pass` different (the milestone stops). F4.4 a run over a `delta_max` bar is GREEN: `p95_ms` over 2.0x, or the agent's tokens over 1.5x, the incumbent's median in the same mode. |
+| Falsifiers | F4.1 the breaking swap is GREEN, or RED for a reason other than a citing golden regressed, ungrounded or with wrong fields (a REJECTED, an access error or the cost cap is not the reason) (live: the breaking swap PR, read at PR 4's run). F4.2 the equivalent swap is RED or REJECTED, or a required check on its PR is red for a reason of its own ("promotes" is mergeable, not merged; live: the equivalent swap PR, read at PR 4's run). F4.3 A-vs-A shows a diff: two runs of one pin in one `evals` job with any golden's `pass` different (the milestone stops). F4.4 a run over a `delta_max` bar is GREEN: `p95_ms` over 2.0x, or the agent's tokens over 1.5x, the incumbent's median in the same mode. |
 | Seeded commit | `a16e2c7` (S1); `c6b6cb8` (S2); `6f18507` (S3); `63033b7` (S4, two cases), S3's and S4's raw runs remade at `2dc81ae` and `e0ce2ce` before any reader; `8994dcb` (S5, no falsifier: SPEC/00 §8 M04's `deprecated_after`), each its own commit before any reader (SPEC/04 §5) |
-| Expected gate output | PR 1: refagent's envelope as at M03; it says nothing about claim 4. PR 1 leaves `agents/refagent/**` and `data/rights_table.json` alone, so its run may be the first `mode: runtime` envelope at guardrail `1088aw3ujhyd:5` (`open.md` row 10); the envelope says whether it is. `make plants` lists S1 to S5; `tests/test_m04_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 to S5 refused by their readers, each for its planted reason; refagent under tool grounding ordinary 9/9, traps 2/2 (`g-021` retired at PR 2 before grounding landed, nothing added; restated before PR 2's run), fewer being the finding; refagent's A-vs-A zero diff, the control's reported and not gated, on PR 2's own run (the `a-vs-a` label); p95 and tokens within their bars. From PR 2's merge the gate requires `F4_1`, `F4_2` and `F4_4` on every agent envelope and `F4_3` where A-vs-A runs; **`F4_1` and `F4_2` from the seed tests alone are test-only witnesses**. During PR 2 the human redeploys the bootstrap stack with the eval role's candidate list after reading `cdk diff --strict`, and opens the two swap PRs from PR 2's head. **A named P3 exception (SPEC/04 §5.1): PR 3's run reads the swap PRs, after their rulings are on `main`;** PR 3 is both that read and the repair. Stated before: the breaking swap RED with at least one citing golden regressed, ungrounded or wrong, and no REJECTED, access error or cost cap; the equivalent swap GREEN with every required check green. RED if a seed's test passes but by its reader, if either swap reads otherwise, if refagent's A-vs-A shows a diff, if a run over a bar rules GREEN, if PR 3 cannot read the swap PRs, or if `make ledger` stops matching rows 0 to 3. |
+| Expected gate output | PR 1: refagent's envelope as at M03; it says nothing about claim 4. PR 1 leaves `agents/refagent/**` and `data/rights_table.json` alone, so its run may be the first `mode: runtime` envelope at guardrail `1088aw3ujhyd:5` (`open.md` row 10); the envelope says whether it is. `make plants` lists S1 to S5; `tests/test_m04_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 to S5 refused by their readers, each for its planted reason; refagent under tool grounding ordinary 9/9, traps 2/2 (`g-021` retired at PR 2 before grounding landed, nothing added; restated before PR 2's run), fewer being the finding; refagent's A-vs-A zero diff, the control's reported and not gated, on PR 2's own run (the `a-vs-a` label); p95 and tokens within their bars. From PR 2's merge the gate requires `F4_1`, `F4_2` and `F4_4` on every agent envelope and `F4_3` where A-vs-A runs; **`F4_1` and `F4_2` from the seed tests alone are test-only witnesses**. During PR 2 the human redeploys the bootstrap stack with the eval role's candidate list after reading `cdk diff --strict`, and opens the two swap PRs from PR 2's head. **A named P3 exception (SPEC/04 §5.1): PR 4's run reads the swap PRs, after their rulings are on `main`;** amended at PR 3, since PR 2 merged before the rulings joined it: PR 3 is the repair and the read's machinery, and the read is recorded in the envelope's `swaps` and gated by nothing (`F4_1` and `F4_2` stay test-only witnesses). The equivalent swap's first run regressed `g-005`, recorded at PR 3 before the reading run. Stated before: the breaking swap RED with at least one citing golden regressed, ungrounded or wrong, and no REJECTED, access error or cost cap; the equivalent swap GREEN with every required check green. RED if a seed's test passes but by its reader, if either swap reads otherwise, if refagent's A-vs-A shows a diff, if a run over a bar rules GREEN, if PR 4's run cannot read the swap PRs, or if `make ledger` stops matching rows 0 to 3. |
 | Measured | — |
-| PRs used / cap | 2 / 4 |
+| PRs used / cap | 3 / 4 |
 | State | OPEN |
 
 ### Open detail (PR 1, 2026-09-26)
@@ -110,3 +110,38 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
   changing only `model` to its `pinned_roles` entry; then this PR gains
   `milestones/M04/runs/f4_swaps.yaml` and the swaps' Threshold Owner
   rulings. PR 3 wires the swap read and is the read.
+
+### PR 3 detail (the repair and the read's machinery, 2026-09-27)
+
+- **PR 2 (#24) merged before its last three items joined it:** the swap
+  PRs' numbers (`milestones/M04/runs/f4_swaps.yaml`), their Threshold
+  Owner rulings, and the bootstrap redeploy's readback. All three are in
+  this PR. The human opened the swap PRs from PR 2's head (`10926b2`):
+  #25 breaking (Llama 3.1 8B) and #26 equivalent (Sonnet 4.5), each
+  changing only the three lines of `model`.
+- **What their first runs found.** Both RED. #25: ordinary 0/9, traps
+  0/2, eleven citing goldens regressed, A-vs-A zero diff. #26: ordinary
+  8/9, `g-005` regressed the same way in both runs (available, `EM-1`,
+  no embargo; 01:30 UTC on 14 May is still 13 May in São Paulo), A-vs-A
+  zero diff. Sonnet 4.5 answered every call, so the eval role's
+  candidate list is deployed.
+- **What the cold review of PR 2 did not find, and the swap PRs did.**
+  On both, `checks` was red for the suite's own reason: nine tests (ten
+  on #26) treated Sonnet 4.6 as the tree's pin. The seed patches carried
+  the planted pin as context, the seeds read their incumbent from the
+  working tree, and three tests named the model literally. That also
+  failed each swap's `F4_1` to `F4_4`, whose seed tests are their first
+  source. Repaired first (`feaa036`): the seeds run against the planted
+  pin wherever the tree's pin moved, the others read the manifest. On
+  each swap's pin the suite went from 9 and 10 failed to 566 passed.
+- **The read, recorded and not gated (Product).** As SPEC/04 §4 was
+  first written, `build` would have failed `F4_2` on every envelope that
+  read #26, and the one run that read it could not have merged.
+  `observe_pr` now reads `f4_swaps.yaml` in every `evals` run,
+  `scripts/rule_swaps.py` has the gate rule each swap's own envelope at
+  its commit, and `build` copies the verdicts into `swaps`, which the
+  ledger's Measured cell prints (`11ef848`). Run here against #25 and #26
+  as they stand (not evidence): #25 RED, eleven regressed; #26 RED,
+  `g-005` regressed; both with the red seed checks the repair removes.
+- **After this PR merges:** `main` is merged into both swap branches,
+  their checks run again, and PR 4's run reads them.
