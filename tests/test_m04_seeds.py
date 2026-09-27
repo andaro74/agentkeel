@@ -69,22 +69,49 @@ def pin_of(tree: Path) -> dict[str, Any]:
     return yaml.safe_load((tree / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))["model"]
 
 
+TABLE = "data/rights_table.json"
+
+
+def the_call(golden: dict[str, Any]) -> dict[str, Any]:
+    """The `check_availability` call the question asks for, made on the real tool with the real table.
+
+    The title is the slate title the question names (the longest match), the
+    territory and platform are those of the golden's expected row, and the
+    date is the first ISO date in the question. The tool validates both the
+    arguments and its result against its contract, so every call here is one
+    the tool can make. For `g-021`, the sequel with no US row, it answers
+    `found: false` (data-owner F9 on M04 PR 1): the incumbent's answer to it
+    is not grounded, as it is not in any run on record."""
+    import re
+
+    from agents.refagent import agent
+
+    rows = json.loads((ROOT / TABLE).read_text(encoding="utf-8"))
+    titles = json.loads((ROOT / "data" / "slate.json").read_text(encoding="utf-8"))["titles"]
+    named = max((t for t in titles if t["title"] in golden["question"]), key=lambda t: len(t["title"]))
+    row = next(r for r in rows if r["table_row"] == golden["expected"]["table_row"])
+    date = re.search(r"\d{4}-\d{2}-\d{2}", golden["question"]).group(0)
+    arguments = {"title_id": named["title_id"], "territory": row["territory"], "platform": row["platform"],
+                 "date": date}  # fmt: skip
+    return {"name": "check_availability", "input": arguments, "status": "success",
+            "output": agent.check_availability(arguments, rows, TABLE)}
+
+
 def grounded(golden: dict[str, Any], latency: int = 500, tokens: int = 300) -> dict[str, Any]:
-    """An answer as the incumbent gives it: right, cited, and grounded in one successful tool call."""
+    """An answer as the incumbent gives it: right and cited, after the call its question asks for.
+
+    Grounded (SPEC/04 §2) wherever the tool's row is the golden's row, which
+    is every ordinary and trap golden but `g-021`."""
     base = {"id": golden["id"], "kind": golden["kind"], "question": golden["question"],
             "usage": {"inputTokens": tokens * 2 // 3, "outputTokens": tokens // 3, "totalTokens": tokens},
-            "latency_ms": latency, "source": "fixture"}  # fmt: skip
+            "latency_ms": latency, "source": TABLE}  # fmt: skip
     if golden["kind"] not in build.CITING_KINDS:
         return {**base, "text": "", "parsed": None, "stop_reason": "guardrail_intervened",
                 "guardrail_topics": [], "tool_calls": []}  # fmt: skip
     expected = golden["expected"]
     parsed = {**expected["answer_fields"], "table_row": expected["table_row"], "clause_id": expected["clause_id"]}
-    call = {"name": "check_availability", "input": {"title_id": "fixture", "territory": "fixture",
-            "platform": "fixture", "date": "2026-12-25"}, "status": "success",
-            "output": {"found": True, "row": {"table_row": parsed["table_row"]},
-                       "clause_candidates": [parsed["clause_id"]], "source": "fixture"}}  # fmt: skip
     return {**base, "text": json.dumps(parsed), "parsed": parsed, "stop_reason": "end_turn",
-            "guardrail_topics": [], "tool_calls": [call]}  # fmt: skip
+            "guardrail_topics": [], "tool_calls": [the_call(golden)]}  # fmt: skip
 
 
 @pytest.fixture
@@ -149,7 +176,8 @@ def incumbent_history(tmp_path: Path, goldens, measured):
 def test_s1_a_breaking_swap_whose_answers_the_tool_never_grounded_is_red(seeded, measured, incumbent_history):
     """The pin moved to Llama 3.1 8B. Every ordinary and trap answer has the expected fields and a
     real row and clause, and none came from a successful `check_availability` call: the call was
-    printed as text, or refused by the schema. The incumbent passed every one of them, grounded.
+    printed as text, or refused by the schema. The incumbent passed eleven of them grounded; g-021,
+    the sequel with no US row, it never grounds (the_call).
     SPEC/00 §9: the rights table is the truth, never inferred. So each is a golden that passed and
     now fails, and the swap is RED for that reason (F4.1; SPEC/04 §2, §7)."""
     tree = seeded("s1-breaking-pin.patch")

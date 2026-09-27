@@ -27,7 +27,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": true, \"exclusive\": true, \"constraints\": [], \"table_row\": \"r-019\", \"clause_id\": \"ML-2.1\"}",
    "parsed": {
     "available": true,
@@ -42,21 +42,32 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
+      "title_id": "t-005",
+      "territory": "US",
+      "platform": "SVOD",
       "date": "2026-12-25"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-019"
+       "table_row": "r-019",
+       "title_id": "t-005",
+       "territory": "US",
+       "platform": "SVOD",
+       "window_start": "2025-11-01",
+       "window_end": "2028-10-31",
+       "exclusive": true,
+       "holdback_until": null,
+       "clearance_expiry": null,
+       "embargo_lift_local": null
       },
       "clause_candidates": [
-       "ML-2.1"
+       "ML-2.1",
+       "ML-2.3",
+       "ML-3.1"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -71,7 +82,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": false, \"exclusive\": true, \"constraints\": [\"window_closed\"], \"table_row\": \"r-014\", \"clause_id\": \"ML-3.1\"}",
    "parsed": {
     "available": false,
@@ -88,21 +99,32 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-003",
+      "territory": "BR",
+      "platform": "SVOD",
+      "date": "2026-11-01"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-014"
+       "table_row": "r-014",
+       "title_id": "t-003",
+       "territory": "BR",
+       "platform": "SVOD",
+       "window_start": "2024-09-01",
+       "window_end": "2026-08-31",
+       "exclusive": true,
+       "holdback_until": null,
+       "clearance_expiry": null,
+       "embargo_lift_local": null
       },
       "clause_candidates": [
+       "ML-2.1",
+       "ML-2.3",
        "ML-3.1"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -117,7 +139,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": false, \"exclusive\": true, \"constraints\": [\"holdback\"], \"table_row\": \"r-016\", \"clause_id\": \"HS-2\"}",
    "parsed": {
     "available": false,
@@ -134,21 +156,34 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-004",
+      "territory": "US",
+      "platform": "PVOD",
+      "date": "2027-04-20"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-016"
+       "table_row": "r-016",
+       "title_id": "t-004",
+       "territory": "US",
+       "platform": "PVOD",
+       "window_start": "2027-04-15",
+       "window_end": "2027-10-31",
+       "exclusive": true,
+       "holdback_until": "2027-05-03",
+       "clearance_expiry": null,
+       "embargo_lift_local": null
       },
       "clause_candidates": [
-       "HS-2"
+       "ML-2.1",
+       "ML-2.3",
+       "ML-3.1",
+       "HS-2",
+       "HS-4"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -163,7 +198,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": false, \"exclusive\": false, \"constraints\": [\"clearance_expired\", \"non_exclusive\"], \"table_row\": \"r-029\", \"clause_id\": \"MC-3\"}",
    "parsed": {
     "available": false,
@@ -181,21 +216,35 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-007",
+      "territory": "US",
+      "platform": "SVOD",
+      "date": "2026-10-01"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-029"
+       "table_row": "r-029",
+       "title_id": "t-007",
+       "territory": "US",
+       "platform": "SVOD",
+       "window_start": "2020-01-01",
+       "window_end": "2029-12-31",
+       "exclusive": false,
+       "holdback_until": null,
+       "clearance_expiry": "2026-06-30",
+       "embargo_lift_local": null
       },
       "clause_candidates": [
-       "MC-3"
+       "ML-2.1",
+       "ML-2.3",
+       "ML-3.1",
+       "MC-3",
+       "MC-4",
+       "ML-5.2"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -210,7 +259,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": false, \"exclusive\": true, \"constraints\": [\"embargo\"], \"table_row\": \"r-027\", \"clause_id\": \"EM-2\"}",
    "parsed": {
     "available": false,
@@ -227,21 +276,34 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-006",
+      "territory": "BR",
+      "platform": "THEATRICAL",
+      "date": "2027-05-14"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-027"
+       "table_row": "r-027",
+       "title_id": "t-006",
+       "territory": "BR",
+       "platform": "THEATRICAL",
+       "window_start": "2027-05-01",
+       "window_end": "2027-08-12",
+       "exclusive": true,
+       "holdback_until": null,
+       "clearance_expiry": null,
+       "embargo_lift_local": "2027-05-14T00:00:00"
       },
       "clause_candidates": [
+       "ML-2.1",
+       "ML-2.3",
+       "ML-3.1",
+       "EM-1",
        "EM-2"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -256,7 +318,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": true, \"exclusive\": false, \"constraints\": [\"non_exclusive\"], \"table_row\": \"r-033\", \"clause_id\": \"ML-5.2\"}",
    "parsed": {
     "available": true,
@@ -273,21 +335,33 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-008",
+      "territory": "FR",
+      "platform": "SVOD",
+      "date": "2026-09-01"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-033"
+       "table_row": "r-033",
+       "title_id": "t-008",
+       "territory": "FR",
+       "platform": "SVOD",
+       "window_start": "2026-05-01",
+       "window_end": "2028-04-30",
+       "exclusive": false,
+       "holdback_until": null,
+       "clearance_expiry": null,
+       "embargo_lift_local": null
       },
       "clause_candidates": [
+       "ML-2.1",
+       "ML-2.3",
+       "ML-3.1",
        "ML-5.2"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -302,7 +376,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": true, \"exclusive\": true, \"constraints\": [], \"table_row\": \"r-038\", \"clause_id\": \"ML-2.1\"}",
    "parsed": {
     "available": true,
@@ -317,21 +391,32 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-011",
+      "territory": "US",
+      "platform": "SVOD",
+      "date": "2027-01-10"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-038"
+       "table_row": "r-038",
+       "title_id": "t-011",
+       "territory": "US",
+       "platform": "SVOD",
+       "window_start": "2026-12-01",
+       "window_end": "2029-11-30",
+       "exclusive": true,
+       "holdback_until": null,
+       "clearance_expiry": null,
+       "embargo_lift_local": null
       },
       "clause_candidates": [
-       "ML-2.1"
+       "ML-2.1",
+       "ML-2.3",
+       "ML-3.1"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -346,7 +431,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": true, \"exclusive\": false, \"constraints\": [\"non_exclusive\"], \"table_row\": \"r-031\", \"clause_id\": \"MC-4\"}",
    "parsed": {
     "available": true,
@@ -363,21 +448,35 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-007",
+      "territory": "AU",
+      "platform": "AVOD",
+      "date": "2026-10-01"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-031"
+       "table_row": "r-031",
+       "title_id": "t-007",
+       "territory": "AU",
+       "platform": "AVOD",
+       "window_start": "2021-01-01",
+       "window_end": "2028-12-31",
+       "exclusive": false,
+       "holdback_until": null,
+       "clearance_expiry": "2027-12-31",
+       "embargo_lift_local": null
       },
       "clause_candidates": [
-       "MC-4"
+       "ML-2.1",
+       "ML-2.3",
+       "ML-3.1",
+       "MC-3",
+       "MC-4",
+       "ML-5.2"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -392,7 +491,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": false, \"exclusive\": true, \"constraints\": [\"window_not_open\"], \"table_row\": \"r-035\", \"clause_id\": \"ML-3.1\"}",
    "parsed": {
     "available": false,
@@ -409,21 +508,32 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-009",
+      "territory": "DE",
+      "platform": "SVOD",
+      "date": "2026-12-01"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-035"
+       "table_row": "r-035",
+       "title_id": "t-009",
+       "territory": "DE",
+       "platform": "SVOD",
+       "window_start": "2027-02-01",
+       "window_end": "2029-01-31",
+       "exclusive": true,
+       "holdback_until": null,
+       "clearance_expiry": null,
+       "embargo_lift_local": null
       },
       "clause_candidates": [
+       "ML-2.1",
+       "ML-2.3",
        "ML-3.1"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -438,7 +548,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": false, \"exclusive\": true, \"constraints\": [\"holdback\"], \"table_row\": \"r-009\", \"clause_id\": \"HS-4\"}",
    "parsed": {
     "available": false,
@@ -455,21 +565,34 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-002",
+      "territory": "DE",
+      "platform": "PVOD",
+      "date": "2026-12-03"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-009"
+       "table_row": "r-009",
+       "title_id": "t-002",
+       "territory": "DE",
+       "platform": "PVOD",
+       "window_start": "2027-01-15",
+       "window_end": "2027-07-31",
+       "exclusive": true,
+       "holdback_until": "2027-02-01",
+       "clearance_expiry": null,
+       "embargo_lift_local": null
       },
       "clause_candidates": [
+       "ML-2.1",
+       "ML-2.3",
+       "ML-3.1",
+       "HS-2",
        "HS-4"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -484,7 +607,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": true, \"exclusive\": false, \"constraints\": [\"non_exclusive\"], \"table_row\": \"r-003\", \"clause_id\": \"ML-5.2\"}",
    "parsed": {
     "available": true,
@@ -501,21 +624,33 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-001",
+      "territory": "DE",
+      "platform": "SVOD",
+      "date": "2026-10-01"
      },
      "status": "success",
      "output": {
       "found": true,
       "row": {
-       "table_row": "r-003"
+       "table_row": "r-003",
+       "title_id": "t-001",
+       "territory": "DE",
+       "platform": "SVOD",
+       "window_start": "2025-06-01",
+       "window_end": "2027-05-31",
+       "exclusive": false,
+       "holdback_until": null,
+       "clearance_expiry": null,
+       "embargo_lift_local": null
       },
       "clause_candidates": [
+       "ML-2.1",
+       "ML-2.3",
+       "ML-3.1",
        "ML-5.2"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
@@ -530,7 +665,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "",
    "parsed": null,
    "stop_reason": "guardrail_intervened",
@@ -547,7 +682,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "",
    "parsed": null,
    "stop_reason": "guardrail_intervened",
@@ -564,7 +699,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "",
    "parsed": null,
    "stop_reason": "guardrail_intervened",
@@ -581,7 +716,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "",
    "parsed": null,
    "stop_reason": "guardrail_intervened",
@@ -598,7 +733,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "",
    "parsed": null,
    "stop_reason": "guardrail_intervened",
@@ -615,7 +750,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "",
    "parsed": null,
    "stop_reason": "guardrail_intervened",
@@ -632,7 +767,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "",
    "parsed": null,
    "stop_reason": "guardrail_intervened",
@@ -649,7 +784,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "",
    "parsed": null,
    "stop_reason": "guardrail_intervened",
@@ -666,7 +801,7 @@
     "totalTokens": 300
    },
    "latency_ms": 500,
-   "source": "fixture",
+   "source": "data/rights_table.json",
    "text": "{\"available\": false, \"exclusive\": false, \"constraints\": [\"sequel_no_inherit\"], \"table_row\": \"r-011\", \"clause_id\": \"ML-2.3\"}",
    "parsed": {
     "available": false,
@@ -683,21 +818,19 @@
     {
      "name": "check_availability",
      "input": {
-      "title_id": "fixture",
-      "territory": "fixture",
-      "platform": "fixture",
-      "date": "2026-12-25"
+      "title_id": "t-004",
+      "territory": "US",
+      "platform": "SVOD",
+      "date": "2026-12-01"
      },
      "status": "success",
      "output": {
-      "found": true,
-      "row": {
-       "table_row": "r-011"
-      },
+      "found": false,
+      "row": null,
       "clause_candidates": [
-       "ML-2.3"
+       "ML-2.1"
       ],
-      "source": "fixture"
+      "source": "data/rights_table.json"
      }
     }
    ]
