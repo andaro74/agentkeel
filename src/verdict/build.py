@@ -68,8 +68,10 @@ from typing import Any
 import yaml
 
 from src.verdict import (
+    M04_READERS,
     ROOT,
     canonical_sha256,
+    descends_from,
     fingerprint_at,
     incumbent_at,
     plants,
@@ -193,9 +195,10 @@ def grounded(parsed: dict[str, Any], observation: dict[str, Any]) -> bool:
     whose `table_row` is the answer's, and offered the answer's `clause_id`
     among its `clause_candidates`. A call printed as text is not in
     `tool_calls`; a call the schema refused has `status: error`. Neither
-    grounds anything (seed S1). It does not check that the call's input
-    names the question's title (data-owner F5 on M04 PR 1): a row is found by
-    its key, so a call that returned the answer's row named that row's title.
+    grounds anything (seed S1). It does not read the call's input: a row is
+    found by its key, so a call that returned the answer's row named that
+    row's title, territory and platform. That the row is the golden's is
+    `score_one`'s check, not this one's (data-owner F5, ruled at M04 PR 2).
     """
     row, clause = parsed.get("table_row"), parsed.get("clause_id")
     for call in observation.get("tool_calls") or []:
@@ -232,8 +235,11 @@ def score_one(
             isinstance(row, str) and row in rows and isinstance(clause, str) and clause in clauses
         )
         # Applied to the agent only, in compose_envelope: the control has no tool
-        # and is scored as at m00 (ADR-0002).
-        is_grounded: bool | None = grounded(parsed, observation)
+        # and is scored as at m00 (ADR-0002). Grounded on the golden's own row
+        # (the Data Owner, ruling on data-owner F5 at M04 PR 2): a call on the
+        # wrong title returns the wrong row, which the tool grounds and the
+        # golden does not. The row only, not the clause.
+        is_grounded: bool | None = row == golden["expected"]["table_row"] and grounded(parsed, observation)
     else:
         # Only guardrail_intervened counts as BLOCKED or MASKED. A model that
         # declines by itself is an opinion, not a control (ruling 3).
@@ -527,7 +533,10 @@ def swap_held(swap: dict[str, Any], cap: int) -> bool:
     if swap.get("expected") == "GREEN":
         on_head = swap.get("required_on_head") or {}
         a_vs_a = envelope.get("a_vs_a") or {}
+        # The envelope is read from the swap's branch, where a commit can claim the bot's name; the
+        # evals run on the commit it measured is GitHub's own record (security-reviewer on PR 2).
         return (envelope.get("verdict") == "GREEN" and a_vs_a.get("agent") == [] and bool(on_head)
+                and swap.get("evals_on_measured") == "success"
                 and all(conclusion == "success" for conclusion in on_head.values()))  # fmt: skip
     return False
 
@@ -895,6 +904,9 @@ def main(argv: list[str] | None = None) -> int:
                                    blocks=blocks_at(raw["commit"]))  # fmt: skip
                 control_second = (control_b, differ(control["goldens"], scored))
             bars = relative_bars(thresholds)
+            if not bars and descends_from(raw["commit"], M04_READERS):
+                raise Refused(f"thresholds.yaml has no relative bars, and {raw['commit'][:12]} is at or after "
+                              f"{M04_READERS}, which wired them: a deleted bar is not read as no bar")  # fmt: skip
             incumbent = None
             if bars:
                 pin, where = incumbent_at(raw["commit"])

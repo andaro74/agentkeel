@@ -417,3 +417,12 @@ def test_an_agent_envelope_from_m04s_readers_must_carry_claim_4s_checks(monkeypa
     assert gate.required_checks("e51892775b6b36236755f0f9a94e6d98d7628206") == before  # M04 PR 1's run
     monkeypatch.setattr(gate, "pin_moved", lambda commit, bundle, root: True)  # a swap
     assert gate.required_checks(head) == before + gate.CLAIM_4_CHECKS + ("F4_3",)
+
+
+def test_a_deleted_relative_bar_is_rejected_from_the_commit_that_wired_it(monkeypatch):
+    """threshold-owner F2 on M04 PR 2: from 15047b4 the gate does not read a missing `relative` as no bar."""
+    monkeypatch.setattr(gate, "thresholds_at", lambda commit, root=ROOT: ({"cost_cap": {"tokens_per_run": 1}}, "a test"))
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    with pytest.raises(gate.Rejected, match="no relative bars"):
+        gate.bars_at(head)
+    assert gate.bars_at("e51892775b6b36236755f0f9a94e6d98d7628206") == ({}, "a test")  # before it: no bar, as before

@@ -280,7 +280,8 @@ def test_the_equivalent_swap_passes_only_green_and_mergeable(tmp_path):
     red_check = {c: "success" for c in ("checks", "evals", "ruling-cited", "two-key")} | {"cold-review-ruling": "failure"}
     for over in ({"verdict": "RED"}, {"a_vs_a": {"agent": ["g-006"], "control": None}}, {"a_vs_a": None},
                  {"required_on_head": red_check}, {"required_on_head": {}}, {"required_on_head": None},
-                 {"merged": True}, {"model_id": BREAKING}):  # fmt: skip
+                 {"merged": True}, {"model_id": BREAKING},
+                 {"evals_on_measured": None}, {"evals_on_measured": "failure"}):  # GitHub's record of the run it names  # fmt: skip
         doc = {"swaps": [swap("RED"), swap("GREEN", **over)]}
         assert build.check_from_swaps(write(tmp_path, doc), "F4_2", CAP, URL)["status"] == "fail", over
     assert build.check_from_swaps(write(tmp_path, {"swaps": []}), "F4_2", CAP, URL)["status"] == "fail"

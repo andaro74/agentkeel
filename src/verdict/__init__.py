@@ -180,6 +180,21 @@ def incumbent_at(commit: str, bundle: str = "agents/refagent", root: Path = ROOT
     return (model if isinstance(model, dict) else None), where
 
 
+# The commit that wired claim 4's checks (M04 PR 2). The gate requires them
+# from here; from here a `thresholds.yaml` without `relative` is refused by
+# build and REJECTED by the gate, as a deleted cap is (threshold-owner F2).
+M04_READERS = "15047b4"
+
+
+def descends_from(commit: str, anchor: str, root: Path = ROOT) -> bool:
+    """True when `commit` is `anchor` or a descendant of it. False when git cannot say."""
+    import subprocess
+
+    done = subprocess.run(["git", "merge-base", "--is-ancestor", anchor, commit], cwd=root, capture_output=True,
+                          check=False)  # fmt: skip
+    return done.returncode == 0
+
+
 PIN_FIELDS = ("id", "version", "profile", "region")
 
 

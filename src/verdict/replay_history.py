@@ -103,6 +103,13 @@ def incumbent_runs(history_dir: Path, *, profile: str, region: str, mode: str, e
 
     Only schema version 2 counts: an envelope with no `mode` is not counted
     (threshold-owner F2 on M04 PR 1). The ancestors only, as `load` reads them.
+    An envelope whose `checks.F4_4` failed is not counted either (the
+    Threshold Owner, ruling on F1 at M04 PR 2): a run over the bar that later
+    merged must not lift the median the next run is held to. **Unless every
+    counted envelope failed it**: the envelope does not say why, and a pin's
+    first runs fail it for having no incumbent, not for being over one.
+    Leaving them all out would leave the pin no median, ever; so then all
+    are counted, as the only numbers the pin has.
     """
     keep = ancestry(ancestors_of, root) if ancestors_of is not None else None
     runs = []
@@ -117,5 +124,7 @@ def incumbent_runs(history_dir: Path, *, profile: str, region: str, mode: str, e
         if {r.get("scope") for r in envelope.get("goldens", {}).values()} != {"agent"}:
             continue
         runs.append({"commit": envelope["commit"], "p95_ms": envelope.get("p95_ms"),
-                     "agent_tokens": agent_tokens(envelope, root)})  # fmt: skip
-    return runs
+                     "agent_tokens": agent_tokens(envelope, root),
+                     "over": ((envelope.get("checks") or {}).get("F4_4") or {}).get("status") == "fail"})  # fmt: skip
+    clean = [r for r in runs if not r["over"]]
+    return [{k: v for k, v in r.items() if k != "over"} for r in (clean or runs)]

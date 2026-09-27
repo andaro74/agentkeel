@@ -385,3 +385,42 @@ def test_an_a_vs_a_pair_is_two_runs_of_one_pin_over_the_same_goldens(goldens):
     assert build.differ(results, results) == []
     with pytest.raises(build.Refused, match="different goldens"):
         build.differ(results, {g: r for g, r in results.items() if g != "g-001"})
+
+
+def test_a_grounded_answer_on_another_row_is_not_correct_for_the_agent(goldens):
+    """data-owner F5, ruled at M04 PR 2: g-001 answered from a call on 'Quorum of Kites' (r-001), not the golden's r-019.
+
+    The tool returned the row, the answer cites it and a clause the tool offered, and the fields are
+    g-001's. Grounded on its own row, it is not grounded on the golden's, so it is not correct.
+    """
+    from .conftest import grounding_call
+
+    raw = make_raw(goldens, right={"g-001"}, **AGENT_TOP)
+    g001 = next(o for o in raw["observations"] if o["id"] == "g-001")
+    other = {**goldens["g-001"]["expected"], "table_row": "r-001"}
+    g001["tool_calls"] = [grounding_call(other)]
+    g001["parsed"] = {**g001["parsed"], "table_row": "r-001"}
+    assert g001["parsed"]["clause_id"] in g001["tool_calls"][0]["output"]["clause_candidates"]
+    results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
+    assert results["g-001"]["cites"] is True and results["g-001"]["grounded"] is False
+    assert build.as_the_agent_is_scored(results)["g-001"]["pass"] is False
+    assert results["g-001"]["pass"] is True  # the control's reading is m00's, untouched
+
+
+def test_a_deleted_relative_bar_is_refused_from_the_commit_that_wired_it(tmp_path, goldens, capsys):
+    """threshold-owner F2 on M04 PR 2: from 15047b4, no `relative` in thresholds.yaml is a refusal, as no cap is."""
+    import subprocess
+
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=build.ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    control_raw, card = tmp_path / "control.json", tmp_path / "card.json"
+    control_raw.write_text(json.dumps(make_raw(goldens, commit=head)), encoding="utf-8")
+    assert build.main(["card", "--raw", str(control_raw), "--out", str(card)]) == 0
+    agent_raw = tmp_path / "agent.json"
+    agent_raw.write_text(json.dumps(make_raw(goldens, commit=head, **AGENT_TOP)), encoding="utf-8")
+    pinned = build.load_thresholds(build.THRESHOLDS)["baseline_card"]
+    thresholds = tmp_path / "thresholds.yaml"
+    thresholds.write_text(f"cost_cap:\n  tokens_per_run: 150000\nbaseline_card:\n  path: {pinned['path']}\n"
+                          f"  sha256: {pinned['sha256']}\n", encoding="utf-8")  # fmt: skip
+    out = tmp_path / "out.json"
+    assert build.main(envelope_args(agent_raw, card, out, "--thresholds", str(thresholds))) == 3
+    assert "no relative bars" in capsys.readouterr().err and not out.exists()

@@ -333,3 +333,18 @@ def test_every_claim_3_case_the_makefile_names_is_a_seed_test():
         names = re.search(rf"^{falsifier}_CASES := (.+)$", makefile, re.M).group(1).split(",")
         assert names and all(f"def {name}(" in seeds for name in names), (falsifier, names)
     assert "--check-ingest F3_5" in makefile
+
+
+def test_a_vs_a_is_decided_by_the_gates_own_test_or_a_label_and_reaches_make(workflow):
+    """M04 PR 2 (security-reviewer on PR 2): dropping `A_VS_A` from the make line would pass unseen on a labelled PR.
+
+    The step that decides uses `pin_moved`, the function the gate requires F4_3 by, and the label
+    only through `env:`, so no label text reaches a shell. The measuring step hands the answer to
+    make by name.
+    """
+    decide = next(step for step in steps(workflow) if step.get("id") == "a_vs_a")
+    assert "pin_moved" in decide["run"] and "${{" not in decide["run"]
+    assert "'a-vs-a'" in decide["env"]["LABELLED"]
+    step = measuring_steps(workflow)[0]
+    assert step["env"]["A_VS_A"] == "${{ steps.a_vs_a.outputs.a_vs_a }}"
+    assert 'A_VS_A="$A_VS_A"' in step["run"]

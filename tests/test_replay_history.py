@@ -78,3 +78,28 @@ def test_a_commit_git_cannot_resolve_reads_every_envelope():
     """A test's made-up sha, a shallow clone: the whole folder, as text_at reads the tree."""
     assert replay_history.ancestry("a" * 40) is None
     assert replay_history.load(HISTORY, ancestors_of="a" * 40) == replay_history.load(HISTORY)
+
+
+def test_the_incumbents_median_leaves_out_a_run_over_the_bar(tmp_path):
+    """The Threshold Owner, ruling on F1 at M04 PR 2: an envelope whose F4_4 failed does not count."""
+    import json
+
+    from src.verdict import replay_history
+
+    def envelope(commit: str, p95: int, f4_4: str | None) -> None:
+        checks = {"F4_4": {"status": f4_4, "url": "https://x"}} if f4_4 else {}
+        (tmp_path / f"{commit}.json").write_text(json.dumps({
+            "commit": commit, "schema_version": 2, "mode": "runner", "model_id": "us.m", "region": "us-west-2",
+            "goldens": {"g-001": {"scope": "agent"}}, "checks": checks, "p95_ms": p95, "agent_tokens": 100,
+        }), encoding="utf-8")  # fmt: skip
+
+    envelope("a" * 40, 500, None)
+    envelope("b" * 40, 510, "pass")
+    envelope("c" * 40, 9000, "fail")
+    runs = replay_history.incumbent_runs(tmp_path, profile="us.m", region="us-west-2", mode="runner")
+    assert sorted(r["p95_ms"] for r in runs) == [500, 510]
+    # a pin whose every run failed F4_4 (its first runs, with no incumbent) keeps them all: no deadlock
+    for commit in ("a" * 40, "b" * 40):
+        envelope(commit, 500, "fail")
+    runs = replay_history.incumbent_runs(tmp_path, profile="us.m", region="us-west-2", mode="runner")
+    assert sorted(r["p95_ms"] for r in runs) == [500, 500, 9000]

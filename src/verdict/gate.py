@@ -75,9 +75,11 @@ from typing import Any
 
 import yaml
 
+from src.verdict import M04_READERS as verdict_m04_readers
 from src.verdict import (
     ROOT,
     canonical_sha256,
+    descends_from,
     fingerprint_at,
     fingerprint_of,
     golden_kinds_at,
@@ -128,7 +130,7 @@ M03_READERS = "f82a02a"
 # now, and on PR 2's branch, which lands as a merge commit (ADR-0004
 # amendment 1).
 CLAIM_4_CHECKS = ("F4_1", "F4_2", "F4_4")
-M04_READERS = "15047b4"
+M04_READERS = verdict_m04_readers  # 15047b4, defined beside `descends_from` in src/verdict
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -190,6 +192,9 @@ def bars_at(commit: str, root: Path = ROOT) -> tuple[dict[str, float], str]:
     thresholds, where = thresholds_at(commit, root)
     bars = thresholds.get("relative")
     if bars is None:
+        if descends_from(commit, M04_READERS, root):
+            raise Rejected(f"thresholds.yaml at {where} has no relative bars, at or after {M04_READERS}, "
+                           "which wired them: a deleted bar is not read as no bar")  # fmt: skip
         return {}, where
     wanted = ("p95_ratio_max", "agent_tokens_ratio_max")
     if not isinstance(bars, dict) or not all(
