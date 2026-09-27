@@ -1,6 +1,7 @@
 """verdict.gate: the only reader that rules on an envelope (P5).
 
     python -m src.verdict.gate ENVELOPE      exit 0 GREEN, 1 RED or UNMEASURED, 2 REJECTED
+    python -m src.verdict.gate ENVELOPE --json OUT   the same, and the verdict and reasons written to OUT
     python -m src.verdict.gate --plants      make plants
 
 The gate does not trust the writer. It rejects an envelope that does not
@@ -722,6 +723,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("envelope", nargs="?", type=Path)
     parser.add_argument("--history-dir", type=Path, default=HISTORY)
     parser.add_argument("--plants", action="store_true")
+    # M04 PR 3: scripts/rule_swaps.py reads a swap PR's verdict from here, not from the text below.
+    parser.add_argument("--json", type=Path, help="also write {verdict, reasons} here")
     args = parser.parse_args(argv)
     if args.plants:
         return print_plants()
@@ -731,7 +734,11 @@ def main(argv: list[str] | None = None) -> int:
         verdict, reasons = rule(args.envelope, args.history_dir)
     except Rejected as rejection:
         print(f"REJECTED {rejection}")
+        if args.json:
+            args.json.write_text(json.dumps({"verdict": "REJECTED", "reasons": [str(rejection)]}), encoding="utf-8")
         return 2
+    if args.json:
+        args.json.write_text(json.dumps({"verdict": verdict, "reasons": reasons}), encoding="utf-8")
     print(f"{verdict} {args.envelope}")
     for reason in reasons:
         print(f"  {reason}")
