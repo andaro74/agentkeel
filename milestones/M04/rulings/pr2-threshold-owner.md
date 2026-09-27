@@ -9,6 +9,8 @@ authorises:
   - thresholds.yaml
   # pinned_roles, and the judge_model_id comment; the pin itself is unchanged
   - agents/refagent/manifest.yaml
+# The second key on g-021's retirement names the path exactly (ADR-0009; src/gates Ruling.names).
+keys:
   - evals/goldens/v1/g-021.yaml
 evidence:
   - SPEC/00-overview.md#8-M04
