@@ -339,8 +339,6 @@ def test_s4_a_run_over_the_incumbents_bar_is_red(seed, bar, field, times, measur
 SONNET_4 = "anthropic.claude-sonnet-4-20250514-v1:0"
 
 
-@pytest.mark.xfail(strict=True, raises=ImportError,
-                   reason="S5: validate does not read deprecated_after; src/validate/lifecycle.py is M04 PR 2's reader")
 def test_s5_a_pin_within_30_days_of_its_end_of_life_fails_validate(seeded):
     """The pin moved to Sonnet 4 with `deprecated_after: '2026-10-14'`, Bedrock's `endOfLifeTime`
     for it (read 2026-09-26, milestones/M04/runs/model_access_2026-09-26.md). Today's manifest
