@@ -108,6 +108,7 @@ SEEDS_M04: dict[str, tuple[str, str, str]] = {
 # nothing.
 SEEDS_M05: dict[str, tuple[str, str, str]] = {
     "S1": ("F5.1, F5.2", "milestones/M05/runs/f5_1_curl.yaml", "scripts/observe_containment.py"),
+    "S2": ("F5.1, F5.2", "milestones/M05/runs/f5_2_prefix.yaml", "scripts/observe_containment.py"),
 }
 
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.

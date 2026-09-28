@@ -175,3 +175,4 @@ The attempt seeds are not fixtures: they are run files under
 | Seed | File | What is wrong with it |
 |---|---|---|
 | S1 | `milestones/M05/runs/f5_1_curl.yaml` | curl to the internet from the platform VPC with refagent's security group, not yet attempted. Refused today, and its only record would be a flow-log group in the agent account, where an admin there can delete it |
+| S2 | `milestones/M05/runs/f5_2_prefix.yaml` | a write under `agents/ratings-helper/` in the audit bucket as refagent's stand-in, whose own policy grants it, not yet attempted. There is no audit bucket and no agent prefix today, so the refusal it needs, the bucket policy's prefix scoping, does not exist |

@@ -72,3 +72,17 @@ def test_s1_curl_to_the_internet_was_refused():
     run = run_file("f5_1_curl.yaml", "S1")
     observed = made(run)
     assert all(o.get("eni") and o.get("destination") and o.get("result") for o in observed), observed
+
+
+# --- S2: a write to another agent's prefix ------------------------------------
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2 is attempted during M05 PR 2 (SPEC/05 §5.1)")
+def test_s2_a_write_to_another_agents_prefix_was_refused():
+    """As refagent's stand-in, `s3:PutObject` under `agents/ratings-helper/` in the audit bucket.
+    The stand-in's own policy grants the write, so the refusal can only be the audit bucket's
+    policy, which scopes each agent role to its own prefix (SPEC/05 §2, §5). Today there is no
+    audit bucket and no prefix, own or another's (SPEC/05 §3.7)."""
+    run = run_file("f5_2_prefix.yaml", "S2")
+    observed = made(run)
+    assert all(o.get("result") == "AccessDenied" and o.get("request_id") for o in observed), observed
