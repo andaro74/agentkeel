@@ -9,7 +9,9 @@
 # required on its head, the commit its last evals run measured) and then
 # scripts/rule_swaps.py (the gate's verdict on that run's own envelope).
 # Recorded by build in the envelope's `swaps`, gated by nothing (Product,
-# M04 PR 3). A swap PR's own run skips itself.
+# M04 PR 3). A swap PR's own run skips itself. The re-runs are recorded at
+# M04 PR 4, which makes that PR's run measure and read them (M04 PR 3
+# ruling §4); the first run of #26 decides F4.2 (SPEC/04 §7).
 swaps:
   - swap: breaking
     falsifier: F4.1
@@ -25,8 +27,10 @@ observed:
     opened_at: 2026-09-27T20:17:26Z
     branch: m04-swap-breaking
     first_envelope: 133959f (bot bc75a53), RED; ordinary 0/9, traps 0/2, 11 citing goldens regressed; a_vs_a agent []
+    rerun_envelope: d61af92 (bot 9b6c8dd, run 36356731364), after main at 960d6db was merged in; RED; ordinary 0/9, traps 0/2, 11 citing goldens regressed, F1_4 fail; a_vs_a agent []; checks green
   - swap: equivalent
     pr: 26
     opened_at: 2026-09-27T20:17:35Z
     branch: m04-swap-equivalent
     first_envelope: 9ff21d5 (bot 131dc22), RED; ordinary 8/9, g-005 regressed in both runs (available true, EM-1, no embargo); a_vs_a agent []
+    rerun_envelope: a86262e (bot d1f27d7, run 36356761336), after main at 960d6db was merged in; RED; ordinary 8/9, g-005 regressed; a_vs_a agent []; checks green
