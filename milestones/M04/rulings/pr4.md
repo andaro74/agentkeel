@@ -33,7 +33,7 @@ pr: 28
 
 # Ruling: M04 PR 4, Product
 
-Drafted by the session; the human rules as Product before the merge.
+Ruled by andaro74 as Product, 2026-09-27, as written.
 
 ## 1. What this PR is
 

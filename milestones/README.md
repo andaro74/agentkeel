@@ -7,6 +7,9 @@ milestone open and the "Measured" cell is filled at close.
 
 The adoption PR (#1, `milestones/adoption/rulings/adopt-spec00.md`) is
 not counted against any milestone's cap of four.
+M04's sign-off PR (#29, `milestones/M04/rulings/signoff.md`) carries
+the close's ruling lines and signatures, which #28 merged without, and
+is not counted either.
 
 States: OPEN → GREEN | RED | UNMEASURED | UNSCHEDULED (two-key) | RETIRED.
 A milestone that closes without a measurement is RED.

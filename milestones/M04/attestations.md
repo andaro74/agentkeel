@@ -33,7 +33,7 @@ GitHub's own. `src/baseline/` is unchanged since tag `m00`. Each seed's
 strict marker came off in the commit that landed its reader
 (`pr2-engineering.md`); at the close the six seed tests pass.
 
-Signed: ________  Date: ________
+Signed: andaro74  Date: 2026-09-27
 
 ---
 
@@ -49,7 +49,7 @@ not accounted for (M05 `open.md` row 20). A model call made without the
 pinned guardrail has not been attempted in AWS, and this line does not
 say it is refused (row 8).
 
-Signed: ________  Date: ________
+Signed: andaro74  Date: 2026-09-27
 
 ---
 
@@ -65,7 +65,7 @@ The label "equivalent" was not moved when #26 regressed `g-005`. The two
 Haiku 4.5 run, was taken without its condition and is recorded so
 (`pr4.md` §4).
 
-Signed: ________  Date: ________
+Signed: andaro74  Date: 2026-09-27
 
 ---
 
@@ -77,7 +77,7 @@ the tool grounded it and the cited `table_row` equals the golden's
 (`pr2-data-owner.md`). `g-005` is unchanged: its expected answer is right,
 and the equivalent model's is wrong.
 
-Signed: ________  Date: ________
+Signed: andaro74  Date: 2026-09-27
 
 ---
 
@@ -92,4 +92,4 @@ Unsure item of M04 is closed, ruled, or in `milestones/M05/open.md` with a
 seat and a milestone. Nothing in this milestone is described as governed,
 secure or proven.
 
-Signed: ________  Date: ________
+Signed: andaro74  Date: 2026-09-27

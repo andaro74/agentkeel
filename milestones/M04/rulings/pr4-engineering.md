@@ -21,7 +21,7 @@ pr: 28
 
 # M04 PR 4, the close: Engineering's cold review
 
-Drafted by the session; the human rules as Engineering before the merge.
+Ruled by andaro74 as Engineering, 2026-09-27, as written.
 
 Read cold by `engineering-cold-reviewer`: `git diff 960d6db...5fb17b5`
 and ledger row 4 only, with a third read of M04 PR 3's second-round
