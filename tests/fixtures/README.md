@@ -157,3 +157,21 @@ answer unscored, and the S1 and S4 tests skip it.
 | S3 | `m04/s3-a.json`, `m04/s3-b.json` | two raw runs of the incumbent pin on one tree, each citing answer after the `check_availability` call its question asks for, made on the real tool and table at M04 PR 1, on the date the question asks about (so `g-021` gets `found: false` and is not grounded), identical but for `g-006`, whose `available` is flipped in the second. Each alone builds GREEN; `build` has no way to be given both, so a flaky golden is never seen as one |
 | S4 | `m04/s4-slow-raw.json`, `m04/s4-heavy-raw.json` | the incumbent's answers on its own pin, each after the call its question asks for, made on the real tool as S3's are: in the first every `latency_ms` is three times the incumbent's (1,500 ms against 500), in the second every answer's tokens twice (600 against 300). Ruled against three incumbent runs built into a temporary history, no golden regresses and the gate says GREEN: nothing reads `p95_ms` or the agent's tokens against the incumbent |
 | S5 | `m04/s5-deprecated-pin.patch` | the pin moved to Sonnet 4 with `deprecated_after: '2026-10-14'`, Bedrock's `endOfLifeTime` for it (`milestones/M04/runs/model_access_2026-09-26.md`). The manifest schema takes the date and nothing in `validate` reads it. Read before 2026-10-14 the seed is "within 30 days"; after, "already past" |
+
+## M05 (SPEC/05 section 5)
+
+Committed at M05 PR 1, one commit per seed, each with its test in
+`tests/test_m05_seeds.py`, before any code that reads them. Each test is
+`xfail(strict=True, raises=...)` until its reader lands or its attempt is
+made, asserts the planted reason, and was run once with `--runxfail` and
+its message read. Nothing here reaches `evals/history/`, calls AWS or
+calls a model.
+
+The attempt seeds are not fixtures: they are run files under
+`milestones/M05/runs/`, each the attempt to make with `observed: null`
+(M01 S4's pattern), made by the human against the deployed controls
+(SPEC/05 section 5.1). The code seeds are the files below.
+
+| Seed | File | What is wrong with it |
+|---|---|---|
+| S1 | `milestones/M05/runs/f5_1_curl.yaml` | curl to the internet from the platform VPC with refagent's security group, not yet attempted. Refused today, and its only record would be a flow-log group in the agent account, where an admin there can delete it |
