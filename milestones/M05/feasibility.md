@@ -189,6 +189,31 @@ fails (the boundary allows none); `logs:DeleteLogStream` fails (the
 boundary denies it). Those three are planted for their record in the
 security account, which is what is missing.
 
+The commits: `142a2a9` S1, `962ea72` S2, `bfd17c4` S3, `d1c1b0f` S4,
+`f8601c3` S5, `b1dc6c4` S6, `06f95d9` S7, each after the SPEC (`11490e0`)
+and before any reader. `git show <seed> --stat` shows the run file or
+fixture, the test, one row of `tests/fixtures/README.md` and one line of
+`SEEDS_M05`, and no reader. Every precondition raises `SeedBroken`; only
+the planted line is an `assert`. Each strict marker was checked with
+`--runxfail`:
+
+| Seed | Raises | The message read |
+|---|---|---|
+| S1 | `AssertionError` | "seed S1: the attempt has not been made" |
+| S2 | `AssertionError` | "seed S2: the attempt has not been made" |
+| S3 | `AssertionError` | "seed S3: the attempt has not been made" |
+| S4 | `AssertionError` | "a chain at depth 3 reached the model (1 call)", refagent's own handler served in-process with a model that records its calls, after the seed's checks (depth 2 in the manifest; two callers in the payload) passed |
+| S5 | `AssertionError` | "an answer repeating a credential passed: GREEN []", built and ruled with M04's harness against three incumbent runs, after the seed's checks (the key only in `g-001`, in its tool result and its answer) passed |
+| S6 | `AssertionError` | "seed S6: the attempt has not been made", after the four actions were read as SPEC/05 §5 names them |
+| S7 | `AssertionError` | "seed S7: the attempt has not been made" |
+
+The five attempt seeds fail for the only reason they can at PR 1: the
+controls they are made against do not exist. Their readers are the
+observer and the two stacks (`make plants`: "not in the tree yet"). S4's
+and S5's readers are files in the tree that change at PR 2, so `make
+plants` says "in the tree" beside them, and the markers are what say the
+seeds are not read.
+
 ## 4. The code that reads the answer
 
 SPEC/05 §6, all PR 2, in order: N in `thresholds.yaml`; `infra/security/`
@@ -204,3 +229,54 @@ None of it is in this PR.
 SPEC/05 §4. On every agent envelope from PR 2's merge, `F5_1` to `F5_4`
 come from the seed tests, as test-only witnesses. The live attempts are
 recorded in `containment` and read by row 5's cell (F16).
+
+## 6. What M04 carried in (`milestones/M05/open.md`), row by row
+
+Every row is answered here or moved on with a seat and a date. None is
+dropped. Ruled by the human, 2026-09-28, with the report's rulings
+(finding 14). Rows 25 to 41 were already dated to a later milestone and
+are carried to M06's `open.md` at the close as dated.
+
+| # | Seat | Now |
+|---|---|---|
+| 1 | Engineering, Product; Security for the workflow | **Done here** (`47f386d`): `evals.yml` no longer looks up `f4_swaps.yaml` or passes `SWAPS_OBS`. The swap PRs are closed and row 4 reads its own envelope (`05bd718`); `READ_THE_SWAPS` keys the reading to row 4 alone. `f4_swaps.yaml` stays as M04's record; `make evals` still takes `SWAPS_OBS` when given one |
+| 2 | Rule Owner proposes; Product rules | **M05 PR 2**, with the first `rules/**` change (S5's filter on tool results, SPEC/05 §6). If that filter does not land in M05, **M06**, with cut 1. Until then the Rule Owner files a second key by hand for a definition change (ADR-0009) |
+| 3 | Rule Owner | **With row 2**: the stale comments ride the first `rules/**` change |
+| 4 | Engineering, Security | **M06**. Not claim 5's reader |
+| 5 | Engineering | **M06** |
+| 6 | Rule Owner | **M06**, with row 30 (the guardrail re-examined with retrieval) |
+| 7 | Rule Owner | **M06**, with row 6. Until then the five attacks run as goldens |
+| 8 | Security | **M06**. Named in SPEC/05 §8; not one of the five |
+| 9 | Security | **M06**. The construct and the bootstrap change at M05 PR 2 for claim 5 only; the guardrail's `<arn>:*` is not claim 5's |
+| 10 | Threshold Owner, Product | **M05 PR 2** (finding 11): `detection.max_seconds: 600`, `relaxes: up`, before its reader |
+| 11 | Security | **M06**, with row 27's ingest redeploy |
+| 12 | Security, Engineering | **M06**, with the required workflows the template ships (SPEC/00 §8 M06): the reader taken from `main` |
+| 13 | Security | **M05 PR 2**: the production bucket's S3 data events in the same trail and selectors as the audit bucket's (SPEC/05 §6) |
+| 14 | Security, Engineering | **M07**, with the upgrade path, where a deployed pin moves |
+| 15 | Security | **M06**, with row 27's ingest redeploy |
+| 16 | Security, Engineering | **Ruled here.** M03 `open.md` row 11 items a, c and d: **M05 PR 2**, in `scripts/observe_containment.py` and `build` (the refusing principal read; two halves kept apart; `message_must_contain` required). Item k: **M05 PR 2**, with the construct edit, which regenerates its NagReport. Item b (the agent's raw committed): **M06**. M03 row 14 (M02's M05 items): the bot-author exemption and the workflow hash are row 12's, **M06**; the eval role's Deny recorded refusal, **M06** with row 8; the OIDC provider's origin, deferred with the landing zone. SPEC/01 §9's ceiling as a seeded case: **M08**, with the hostile copy, which makes calls outside the ceiling from the runtime itself (Unsure A) |
+| 17 | Security | **Ruled here**: deferred with the landing zone (SPEC/00 §2, §12). Named in SPEC/05 §8 |
+| 18 | Security, Product | **M05 PR 2**, with envelopes to the audit bucket: the copy CI puts there is the record no push to a branch can make. If cut 2 is taken, **M08**. `verification.verified` stays unrequired |
+| 19 | Product (SPEC/00 §5) | **Ruled here: no amendment.** Scripts run under the eval role's session stay Engineering's path; a PR that changes one calls `security-reviewer`, whose report goes in the PR body. Routing, not a gate |
+| 20 | Security | **M05 PR 2, its first infra commit**: the bootstrap template measured before the boundary and endpoint edit, and the 66 bytes accounted for or recorded as unaccounted |
+| 21 | Threshold Owner | **Ruled here: stands as SPEC/04 §2 wrote it** (no incumbent in the mode is `F4_4: fail`). No pin moves in M05 (SPEC/05 §10); **M07**, where an upgrade moves one |
+| 22 | Product, Security, Threshold Owner | **Ruled 2026-09-27, recorded here**: direct Converse stays; the gateway goes to **M07** with the Gateway tool form (SPEC/05 §10) |
+| 23 | Engineering; Threshold Owner | **M07** (SPEC/05 §9 cut d) |
+| 24 | Engineering, Security | **Done**: M04 PR 4's cold review read `70a979b`, `63712c7` and `12ebb54` (`milestones/M04/rulings/pr4-engineering.md`): no BLOCK; its notes are row 43 |
+| 25–41 | as dated | Carried unchanged to M06's `open.md` at the close |
+| 42 | Product | **Done here** (`38bf3a0`): 3:13 (193.4 s), 3,547,769 bytes, LFS; the Shows cell confirmed by Product (`rulings/pr1.md`) |
+| 43 | Engineering | **M06** |
+| 44 | Engineering, Product | **Done here for the skill** (`601fc8b`): `/close-milestone` and `/open-milestone` read every ruling with the PR's number on the pushed head before any merge command. **The gate that refuses a draft ruling at merge: M05 PR 2** (Engineering, in `cold-review-ruling`'s reader), cut to M06 if the cap is threatened |
+
+## 7. What PR 1 does not do
+
+- It builds no reader: `server.py`, `build`, the gate, `thresholds.yaml`,
+  the construct, the bootstrap and every stack are unchanged, and
+  `infra/security/` and `infra/audit/` do not exist. The strict markers
+  say so.
+- It touches no AWS, and no second account exists yet. The deploys and
+  the attempts are the human's, during and after PR 2.
+- It changes no pin and no bar: `agents/refagent/**` is untouched, so the
+  bundle digest is `main`'s.
+- It adds no specialist (R8). `platform-architect` exists (M01) and is
+  called by Security at PR 2 for the two new stacks.
