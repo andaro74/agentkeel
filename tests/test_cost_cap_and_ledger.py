@@ -147,21 +147,41 @@ def test_row_4_reads_the_swaps_and_closes_red_on_f4_2():
     assert "is not the verdict" in ledger.check_measured({**as_row, "State": "GREEN"}, history)
 
 
-def _swap(name, verdict, reasons=()):
-    return {"swap": name, "pr": 25 if name == "breaking" else 26, "verdict": verdict, "reasons": list(reasons)}
+GREEN_CHECKS = {"evals_on_measured": "success", "required_on_head": {"checks": "success", "evals": "success"}}
+
+
+def _swap(name, verdict, reasons=(), **seen):
+    seen = {**GREEN_CHECKS, **seen} if name == "equivalent" else seen
+    return {"swap": name, "pr": 25 if name == "breaking" else 26, "verdict": verdict, "reasons": list(reasons), **seen}
 
 
 REGRESSED = ["regressed: g-001 has passed before and fails now"]
+OK = _swap("equivalent", "GREEN")
 
 
 @pytest.mark.parametrize(("swaps", "misses"), [
-    ([_swap("breaking", "RED", REGRESSED), _swap("equivalent", "GREEN")], []),
-    ([_swap("breaking", "GREEN"), _swap("equivalent", "GREEN")], ["swap #25 breaking missed: GREEN, expected RED"]),
-    ([_swap("breaking", "RED", ["check F4_1 failed: x"]), _swap("equivalent", "GREEN")],
-     ["swap #25 breaking missed: RED with no golden regressed"]),
-    ([_swap("breaking", "REJECTED"), _swap("equivalent", "GREEN")], ["swap #25 breaking missed: REJECTED, expected RED"]),
+    ([_swap("breaking", "RED", REGRESSED), OK], []),
+    ([_swap("breaking", "GREEN"), OK], ["swap #25 breaking missed: GREEN, expected RED"]),
+    ([_swap("breaking", "RED", ["check F4_1 failed: x"]), OK],
+     ["swap #25 breaking missed: RED with no citing golden regressed"]),
+    ([_swap("breaking", "RED", ["regressed: g-016 has passed before and fails now"]), OK],
+     ["swap #25 breaking missed: RED with no citing golden regressed"]),
+    ([_swap("breaking", "RED", [*REGRESSED, "cost-cap: 160000 over 150000"]), OK],
+     ["swap #25 breaking missed: RED over the cost cap"]),
+    ([_swap("breaking", "RED", [*REGRESSED, "and 3 more reasons, not kept"]), OK],
+     ["swap #25 breaking missed: reasons cut, so no cost cap cannot be read"]),
+    ([_swap("breaking", "REJECTED"), OK], ["swap #25 breaking missed: REJECTED, expected RED"]),
     ([_swap("breaking", "RED", REGRESSED), _swap("equivalent", None)], ["swap equivalent missed: not read"]),
+    ([_swap("breaking", "RED", REGRESSED), _swap("equivalent", "GREEN", evals_on_measured="failure")],
+     ["swap #26 equivalent missed: GREEN with evals (measured) not green"]),
+    ([_swap("breaking", "RED", REGRESSED),
+      _swap("equivalent", "GREEN", required_on_head={"checks": "failure", "evals": None})],
+     ["swap #26 equivalent missed: GREEN with checks, evals not green"]),
+    ([_swap("breaking", "RED", REGRESSED), _swap("equivalent", "GREEN", required_on_head=None)],
+     ["swap #26 equivalent missed: no required check read on its head"]),
     ([], ["swap breaking missed: not read", "swap equivalent missed: not read"]),
 ])  # fmt: skip
 def test_a_swap_that_misses_its_falsifier_or_is_unread_is_named(swaps, misses):
+    """SPEC/04 §7, and the cold review of M04 PR 4 (F1, F2): a RED on the cost cap, or with no citing
+    golden, is not F4.1's RED; an equivalent GREEN with a required check red does not promote."""
     assert gate.swap_misses(swaps) == misses

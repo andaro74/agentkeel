@@ -642,8 +642,13 @@ def swap_misses(swaps: list[dict[str, Any]]) -> list[str]:
     """What a row in `READ_THE_SWAPS` finds wrong with the swaps an envelope recorded; [] if nothing.
 
     A swap not recorded, or recorded unread, is a miss: the row goes RED if
-    the reading run cannot read the swap PRs (SPEC/04 §7).
+    the reading run cannot read the swap PRs (SPEC/04 §7). F4.1: the breaking
+    swap's RED must name a citing golden (ordinary or trap) regressed, and no
+    cost cap; a list cut short cannot show that, so it is a miss too. F4.2:
+    "promotes" is mergeable, so the equivalent swap's GREEN needs its `evals`
+    run and every required check on its head green (cold review of PR 4, F1, F2).
     """
+    kinds = load_golden_kinds(GOLDENS)
     misses = []
     for name, expected in SWAP_EXPECTED.items():
         swap = next((s for s in swaps if s.get("swap") == name), None)
@@ -651,10 +656,25 @@ def swap_misses(swaps: list[dict[str, Any]]) -> list[str]:
             misses.append(f"swap {name} missed: not read")
             continue
         head = f"swap #{swap['pr']} {name} missed"
+        reasons = swap["reasons"]
         if swap["verdict"] != expected:
             misses.append(f"{head}: {swap['verdict']}, expected {expected}")
-        elif name == "breaking" and not any(r.startswith("regressed: ") for r in swap["reasons"]):
-            misses.append(f"{head}: RED with no golden regressed")
+        elif name == "breaking":
+            citing = [r.split()[1] for r in reasons if r.startswith("regressed: ")
+                      and kinds.get(r.split()[1]) in ("ordinary", "trap")]  # fmt: skip
+            if not citing:
+                misses.append(f"{head}: RED with no citing golden regressed")
+            if any(r.startswith("cost-cap: ") for r in reasons):
+                misses.append(f"{head}: RED over the cost cap")
+            if any(r.endswith("more reasons, not kept") for r in reasons):
+                misses.append(f"{head}: reasons cut, so no cost cap cannot be read")
+        else:
+            checks = {"evals (measured)": swap.get("evals_on_measured"), **(swap.get("required_on_head") or {})}
+            if not swap.get("required_on_head"):
+                misses.append(f"{head}: no required check read on its head")
+            red = sorted(check for check, conclusion in checks.items() if conclusion != "success")
+            if red:
+                misses.append(f"{head}: GREEN with {', '.join(red)} not green")
     return misses
 
 
