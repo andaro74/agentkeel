@@ -86,3 +86,18 @@ def test_s2_a_write_to_another_agents_prefix_was_refused():
     run = run_file("f5_2_prefix.yaml", "S2")
     observed = made(run)
     assert all(o.get("result") == "AccessDenied" and o.get("request_id") for o in observed), observed
+
+
+# --- S3: logs:DeleteLogStream --------------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S3 is attempted after M05 PR 2's merge deploy, read at PR 3 (SPEC/05 §5.1)")  # fmt: skip
+def test_s3_deleting_its_own_log_stream_was_refused():
+    """As refagent's stand-in, `logs:DeleteLogStream` on the runtime's own log stream. The boundary
+    denies `logs:Delete*` today and PR 2 adds the role's own deny; both are explicit, so this reads
+    "refused and recorded", and the record in the security account is what is new (SPEC/05 §3.8)."""
+    run = run_file("f5_3_logs.yaml", "S3")
+    observed = made(run)
+    assert all(o.get("result") == "AccessDenied" and o.get("request_id") and "explicit deny" in (o.get("message") or "")
+               for o in observed), observed  # fmt: skip
