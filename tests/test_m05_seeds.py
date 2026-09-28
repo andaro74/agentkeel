@@ -101,3 +101,72 @@ def test_s3_deleting_its_own_log_stream_was_refused():
     observed = made(run)
     assert all(o.get("result") == "AccessDenied" and o.get("request_id") and "explicit deny" in (o.get("message") or "")
                for o in observed), observed  # fmt: skip
+
+
+# --- S4: a call chain at depth 3 ----------------------------------------------
+
+
+class ModelThatRecords:
+    """A Bedrock client whose only call records itself and answers as a model would, with no tool."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def converse(self, **request: Any) -> dict[str, Any]:
+        self.calls.append(request)
+        return {"usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2}, "stopReason": "end_turn",
+                "output": {"message": {"role": "assistant", "content": [{"text": "{}"}]}}}  # fmt: skip
+
+
+def invoke(payload: dict[str, Any], monkeypatch) -> tuple[int, dict[str, Any], ModelThatRecords]:
+    """POST `payload` to refagent's own handler, served in-process with a model that records its calls.
+
+    The runtime's environment as GovernedAgent sets it, but for the model and the table, which are
+    stand-ins: nothing here reaches AWS."""
+    import json
+    import threading
+    import urllib.request
+    from http.server import HTTPServer
+
+    from agents.refagent import agent, server
+
+    manifest = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
+    monkeypatch.setattr(server, "MODEL_ID", "the agent's profile")
+    monkeypatch.setattr(server, "TABLE", "the rights table")
+    monkeypatch.setattr(server.boto3, "client", lambda *args, **kwargs: None)
+    monkeypatch.setattr(agent, "rights_rows", lambda table, client=None: ([], "the rights table"))
+    # What the construct passes from PR 2 (SPEC/05 section 6): the image has no YAML reader.
+    monkeypatch.setenv("AGENTKEEL_CEILING_DEPTH", str(manifest["ceilings"]["depth"]))
+    model = ModelThatRecords()
+    httpd = HTTPServer(("127.0.0.1", 0), server.Handler)
+    httpd._bedrock = model
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        request = urllib.request.Request(f"http://127.0.0.1:{httpd.server_port}/invocations",
+                                         data=json.dumps(payload).encode("utf-8"), method="POST")  # fmt: skip
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 - loopback only
+            return response.status, json.loads(response.read()), model
+    except urllib.error.HTTPError as refused:
+        return refused.code, json.loads(refused.read() or b"{}"), model
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S4's reader, the chain check in server.py, is M05 PR 2's")
+def test_s4_a_chain_at_depth_3_is_refused_before_the_model(monkeypatch):
+    """An invocation whose payload's `chain` names two agents before refagent: refagent is the third,
+    and its manifest's `ceilings.depth` is 2. Today `server.py` reads the question and nothing about
+    who called, and the model is called (SPEC/05 §3.2). From PR 2 the chain is refused before any
+    model call, and the refusal names the depth (SPEC/05 §5, S4)."""
+    import json
+
+    payload = json.loads((FIXTURES / "s4-depth3-request.json").read_text(encoding="utf-8"))
+    manifest = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
+    holds(manifest["ceilings"]["depth"] == 2, "refagent's ceiling is the one the seed was planted against")
+    holds(len(payload["chain"]) + 1 == 3 and payload["question"], "the seed is a question at depth 3")
+
+    status, answer, model = invoke(payload, monkeypatch)
+    holds(status in (200, 400, 403, 429), f"the handler answered: {status} {answer}")
+    assert model.calls == [], f"a chain at depth 3 reached the model ({len(model.calls)} call): {answer}"
+    assert "depth" in json.dumps(answer), answer
