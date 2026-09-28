@@ -165,3 +165,50 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
 - **After this PR merges:** `main` is merged into both swap branches,
   their checks run again, and PR 4 records their new envelopes in
   `f4_swaps.yaml`, which makes its own run measure and read them.
+
+### Close detail (PR 4, the close, 2026-09-27)
+
+**Row 4 is RED, on F4.2.** The cap was four and four were used. The
+breaking swap went RED for the reason F4.1 names; refagent's A-vs-A
+showed no diff; no real run crossed a bar; but the swap named equivalent
+before any run regressed `g-005`.
+
+**The measurement.** The Measured cell is copied from `make ledger`'s
+"as row M04 reads it" line for the envelope for
+`05bd718feb0cc72ab78df13fccf47c3efb8a9314`, written by CI run
+36362949356 and committed by `github-actions[bot]` (`a3bae6b`), this
+PR's run. `make ledger` exits 0 against it. As numbers: refagent GREEN
+on its own in `mode: runtime` at guardrail `1088aw3ujhyd:5`, ordinary
+9/9, traps 2/2, guardrail 2/3, red team 5/5; plants 7/7; `regressed` 0;
+`never_passed` 1 (`g-014`); every check passes; p95 6,242 ms; 48,731
+tokens. The swaps as this run recorded them: #25 breaking RED, eleven
+regressed, the one other reason `F1_4` (wrong fields); #26 equivalent
+RED, `g-005` regressed, its `evals` red and every other required check
+green. Row 4's reading: "swap #26 equivalent missed: RED, expected
+GREEN; RED".
+
+**Why this PR carries code.** PR 3 recorded the swaps but gave row 4 no
+way to be decided by them: the cell carried refagent's GREEN, and
+`src/ledger.py` refuses State RED beside it. `READ_THE_SWAPS`
+(`pr4-engineering.md`) makes row 4's cell read the swaps. The cold
+review blocked it as machinery in the last PR (B1); Product named it a
+second P3 exception in SPEC/04 §5.1 and this row's Expected cell before
+the reading run (`pr4.md` §2). F1 and F2 tightened what counts as each
+swap's verdict (`b8a2e5e`).
+
+**Row 4's RED conditions, each checked at the close:** no seed's test
+passes but by its reader (`uv run pytest tests/test_m04_seeds.py`, six
+passed; each marker came off with its reader at PR 2); the breaking
+swap is RED for a citing golden regressed, not a REJECTED, access error
+or cost cap (holds); the equivalent swap is RED (**fires**, on its first
+run `9ff21d5` and on the re-run `a86262e`); refagent's A-vs-A shows no
+diff (`9e4b559`, `agent: []`); no run over a bar ruled GREEN (none
+crossed one but the seeds); PR 4's run read both swap PRs (holds);
+`make ledger` still matches rows 0 to 3 (holds).
+
+**Findings and Unsure items.** Every one is closed in M04 or carried to
+`milestones/M05/open.md` with a seat and a milestone, 43 rows
+(`pr4.md` §5). SPEC/04 §9 cut 1 is recorded as taken at the close.
+
+**After the merge:** #25 and #26 closed unmerged; `git tag m04` on
+`main`; the M04 video recorded at the tag and committed in M05 PR 1.
