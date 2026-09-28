@@ -18,7 +18,7 @@ pr: 30
 
 # Ruling: M05 PR 1, Security
 
-Drafted by the session; the human rules as Security before the merge.
+Ruled by andaro74 as Security, 2026-09-28, as written.
 
 ## The workflow
 

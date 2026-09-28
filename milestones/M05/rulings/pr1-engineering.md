@@ -23,7 +23,7 @@ pr: 30
 
 # Ruling: M05 PR 1, Engineering, with the cold review
 
-Drafted by the session; the human rules as Engineering before the merge.
+Ruled by andaro74 as Engineering, 2026-09-28, as written.
 
 The dispositions below were ruled by andaro74, 2026-09-28, "as
 proposed" (`feasibility.md` §2.5).

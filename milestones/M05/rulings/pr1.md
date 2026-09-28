@@ -29,7 +29,7 @@ pr: 30
 
 # Ruling: M05 PR 1, Product
 
-Drafted by the session; the human rules as Product before the merge.
+Ruled by andaro74 as Product, 2026-09-28, as written.
 
 The rulings below were made by andaro74 as Product on 2026-09-28, before
 the draft or "as proposed" on `product-spec-reviewer`'s report, and all
