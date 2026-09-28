@@ -113,6 +113,7 @@ SEEDS_M05: dict[str, tuple[str, str, str]] = {
     "S4": ("F5.1, F5.2", "tests/fixtures/m05/s4-depth3-request.json, milestones/M05/runs/f5_4_chain.yaml", "agents/refagent/server.py"),
     "S5": ("F5.1", "tests/fixtures/m05/s5-credential-raw.json", "src/verdict/build.py"),
     "S6": ("F5.3", "milestones/M05/runs/f5_6_audit.yaml", "infra/security/"),
+    "S7": ("F5.4", "milestones/M05/runs/f5_7_quarantine.yaml", "infra/audit/"),
 }
 
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.

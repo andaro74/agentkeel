@@ -222,3 +222,18 @@ def test_s6_no_principal_in_the_agent_account_modifies_an_audit_object():
           "the four actions SPEC/05 section 5 names")  # fmt: skip
     observed = made(run)
     assert all(o.get("result") == "AccessDenied" and o.get("request_id") for o in observed), observed
+
+
+# --- S7: the quarantine leaves the agent live ---------------------------------
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S7 is attempted after M05 PR 2's merge deploy, read at PR 3 (SPEC/05 §5.1)")  # fmt: skip
+def test_s7_after_the_quarantine_the_agents_own_role_cannot_call_its_model():
+    """Quarantine refagent, then invoke its runtime: the model call its own role makes must be
+    refused by the quarantine's deny (F5.4 as restated at M05 PR 1; SPEC/05 §4). Today nothing
+    quarantines an agent (SPEC/05 §3.5)."""
+    run = run_file("f5_7_quarantine.yaml", "S7")
+    observed = made(run)
+    (invoke,) = [o for o in observed if o.get("event_name") == "InvokeAgentRuntime"]
+    assert invoke.get("result") == "AccessDenied" and invoke.get("request_id"), invoke
