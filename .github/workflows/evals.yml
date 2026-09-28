@@ -64,9 +64,9 @@
 # The label is a human's choice and only ever adds a measurement; nothing
 # the gate requires rests on it.
 #
-# M04 PR 3 (SPEC/04 §4): the swap PRs. The observer step below also reads
-# milestones/M04/runs/f4_swaps.yaml (GitHub's record of each swap PR), and
-# `make evals` hands it to scripts/rule_swaps.py, which has the gate rule each
+# M04 PR 3 (SPEC/04 §4): the swap PRs. From M04 PR 3 to M05 PR 1 the observer
+# step below also read milestones/M04/runs/f4_swaps.yaml (GitHub's record of
+# each swap PR), and `make evals` handed it to scripts/rule_swaps.py, which has the gate rule each
 # swap's own envelope, read at the bot's envelope commit in this checkout
 # (fetch-depth: 0 fetches every branch), in a worktree of HEAD, with no
 # credentials in its environment. build records the verdicts in `swaps`, gated
