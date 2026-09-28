@@ -63,6 +63,18 @@ one is either ruled here, with the seat named, or moved to
 - Write the ruling file. Its `evidence` names the envelope, the run URL,
   and the milestone's rulings.
 - Open the PR. Do not merge. The tag comes after the merge.
+- **Before giving anyone merge commands**, read every ruling file whose
+  `pr:` is this PR's number, and `attestations.md`, **on the PR's pushed
+  head**, not the working tree: `git fetch` and then
+  `git show origin/<branch>:milestones/M<NN>/rulings/<slug>.md`. Each
+  must read "Ruled by", not "Drafted", and every attestation line must be
+  signed. If one does not, the human's ruling or signature has not been
+  committed and pushed: say which file, and give no merge command until
+  the pushed head carries it. M04's close (#28) merged with two rulings
+  "Drafted" and five lines unsigned, and needed the uncounted sign-off
+  PR #29 (`milestones/M05/open.md` row 44). This step is Product's; a
+  gate that refuses a draft ruling at merge is Engineering's, dated in
+  M05's `feasibility.md` §6.
 
 ## Refuse to tag if
 

@@ -110,6 +110,11 @@ open as. Every path in `authorises` must exist in the tree or
 
 ### 9. Open the PR. Do not merge.
 
+Before giving anyone merge commands, read every ruling file whose `pr:`
+is this PR's number on the PR's pushed head (`git show
+origin/<branch>:<file>`): each must read "Ruled by", not "Drafted"
+(`milestones/M05/open.md` row 44; `/close-milestone` has the same step).
+
 PR body: what was planted, the seat reports verbatim, and an **Unsure**
 section. Every Unsure item names the seat whose ruling would settle it
 and the milestone by which it must be settled. An item with neither is
