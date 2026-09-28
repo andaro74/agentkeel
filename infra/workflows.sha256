@@ -26,8 +26,9 @@
 # Rewritten at M03 PR 2 when evals.yml began to look up seed S5's attempt (F3_5).
 # Rewritten at M04 PR 2 when evals.yml began to run A-vs-A on a swap or a labelled PR (SPEC/04 §4).
 # Rewritten at M04 PR 3 when evals.yml began to look up the swap PRs (f4_swaps.yaml; recorded, not gated).
+# Rewritten at M05 PR 1 when evals.yml stopped looking up the swap PRs (milestones/M05/open.md row 1).
 0d938815e7d3756e05659beb95a82f490b521a183bf34f9584cd98874cf36567  .github/workflows/cold-review-ruling.yml
 084903a2fc9104a22e7a4dd6bd216e625c75d9ef702b374bba9f71a2024e2ca2  .github/workflows/deploy.yml
-b3efb24df4185319443ae9af79b5375284a942d5dd6335e9d5b794a3a9234d43  .github/workflows/evals.yml
+fb5e1d57bc81addf2b56e352ade8d0f93a3bc6a341fc52b8b8d91c59b5e83d57  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml

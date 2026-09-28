@@ -75,7 +75,9 @@ A_VS_A ?=
 # milestones/M04/runs/f4_swaps.yaml. rule_swaps.py has the gate rule each
 # one's own envelope, in a scratch worktree of HEAD, and build copies the
 # verdicts into the envelope's `swaps`. Recorded, never gated (Product, M04
-# PR 3): F4_1 and F4_2 stay the seed tests' witnesses.
+# PR 3): F4_1 and F4_2 stay the seed tests' witnesses. From M05 PR 1 evals.yml
+# no longer passes it (milestones/M05/open.md row 1): the swap PRs are closed,
+# and row 4 reads its own envelope. Empty, the step is skipped.
 SWAPS_OBS ?=
 SWAPS_RULED = $(SWAPS_OBS:.json=-ruled.json)
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \

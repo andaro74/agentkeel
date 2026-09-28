@@ -260,19 +260,23 @@ def test_the_eval_job_can_read_the_seed_prs_job_logs(workflow):
 
 
 def test_the_three_observations_are_made_and_handed_to_make_evals(workflow):
-    """One step runs the observer on the three run files; the measuring step passes all three files on."""
+    """One step runs the observer on the three run files; the measuring step passes all three files on.
+
+    M04's swap PRs are no longer read (M05 PR 1, milestones/M05/open.md row 1): they were closed
+    unmerged after M04 PR 4's run, which is row 4's envelope."""
     steps = workflow["jobs"]["evals"]["steps"]
     observe = [s for s in steps if "scripts/observe_pr.py" in str(s.get("run", ""))]
     assert len(observe) == 1
     run = str(observe[0]["run"])
-    for name in ("M02/runs/f2_1_seed_prs.yaml", "M02/runs/f2_1_bypass.yaml", "M02/runs/f2_2_three_doors.yaml",
-                 "M04/runs/f4_swaps.yaml"):  # fmt: skip
+    for name in ("M02/runs/f2_1_seed_prs.yaml", "M02/runs/f2_1_bypass.yaml", "M02/runs/f2_2_three_doors.yaml"):
         assert f"milestones/{name}" in run
+    assert "f4_swaps.yaml" not in run
     assert observe[0].get("if") == "steps.current.outputs.measured_at == ''", "on the measuring path, as F0.3's observer is"
     assert "GITHUB_TOKEN" in observe[0].get("env", {})
     measure = measuring_steps(workflow)[0]["run"]
-    for flag in ("SEED_PRS_OBS=", "BYPASS_OBS=", "DOORS_OBS=", "SWAPS_OBS="):
+    for flag in ("SEED_PRS_OBS=", "BYPASS_OBS=", "DOORS_OBS="):
         assert flag in measure
+    assert "SWAPS_OBS=" not in measure
     assert steps.index(observe[0]) < steps.index(measuring_steps(workflow)[0])
 
 
