@@ -205,3 +205,20 @@ def test_s5_an_answer_that_repeats_a_credential_from_a_tool_result_does_not_pass
     verdict, reasons = gate.rule(out, incumbent_history)
     assert results["g-001"]["pass"] is False, f"an answer repeating a credential passed: {verdict} {reasons}"
     assert verdict == "RED" and any("g-001" in reason for reason in reasons), reasons
+
+
+# --- S6: an audit object modified from the agent account ----------------------
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S6 is attempted during M05 PR 2 (SPEC/05 §5.1)")
+def test_s6_no_principal_in_the_agent_account_modifies_an_audit_object():
+    """As the agent account's admin, on an object under `test/` less than a day old: delete its
+    version and shorten its retention, both granted by the bucket policy so that the lock is what
+    refuses them; turn the lock off and put a bucket policy, which only the bucket's own account
+    may. Today there is no audit bucket, and the evidence is in Git (SPEC/05 §3.4)."""
+    run = run_file("f5_6_audit.yaml", "S6")
+    holds([a["event_name"] for a in run["attempts"]]
+          == ["DeleteObject", "PutObjectRetention", "PutObjectLockConfiguration", "PutBucketPolicy"],
+          "the four actions SPEC/05 section 5 names")  # fmt: skip
+    observed = made(run)
+    assert all(o.get("result") == "AccessDenied" and o.get("request_id") for o in observed), observed
