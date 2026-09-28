@@ -463,7 +463,8 @@ M07 and no memory, so at M05 the quarantine is a deny-all policy on the
 agent's role, and **F5.4 reads: the quarantine leaves the agent's role
 able to call its model**. The live attempts are recorded in the
 envelope and read by row 5's cell, not gated on every pull request; the
-checks on every envelope come from the seed tests (SPEC/05 §4).
+check on every envelope is `F5_1`, from the two code seeds' tests
+(SPEC/05 §4).
 
 ### M06 — Developer template
 Build: `create-agent` template repo (refagent as the shipped example);

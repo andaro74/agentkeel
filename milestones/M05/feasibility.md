@@ -177,24 +177,53 @@ amended. Each is carried in `rulings/pr1*.md` with its seat.
 | F17 | An advanced event selector excludes the trail's own delivery prefix | Security | SPEC/05 §6 |
 | Notes 1 to 4 | Recorded; SPEC/05 §7 and §8 corrected (golden plants beside seeds; guardrail 2/3 and red team 5/5; a new guardrail version measured, not assumed; the Budgets trigger and CloudShell's ENI in §8) | Product | SPEC/05 §7, §8 |
 
+### 2.5 The cold review and security-reviewer, on the diff
+
+`engineering-cold-reviewer` (1 BLOCK, 3 FINDING, 5 NOTE) and
+`security-reviewer` (0 BLOCK, 10 FINDING, 10 NOTE), each on the diff
+`4206edf...cc36e31` and each saying so in its first line; both in the PR
+body verbatim. Ruled by the human, 2026-09-28, "as proposed". No other
+seat's path is in the diff.
+
+| Finding | Ruling | Seat | Where |
+|---|---|---|---|
+| cold B1; security F (the Security key) | The ruling files, one seat each, `pr: 30`: `pr1.md`, `pr1-security.md` (the workflow and R5's second key), `pr1-engineering.md`; each reads "Drafted" until the human rules it, and the ruling lines go in their own commit | each seat | `rulings/pr1*.md` |
+| cold F2 | `CLAIM_5_CHECKS` is `F5_1` alone, from S4's and S5's seed tests; F5.2, F5.3 and F5.4 are live only, read from `containment` by row 5's cell; the attempt tests write no check | Product | SPEC/05 §4; SPEC/00 §8 M05; row 5 |
+| cold F1 | Each attempt test reads its own attempt's `refused_when`, matched by position and `event_name` (`e38747b`, before any reader) | Engineering | `tests/test_m05_seeds.py` |
+| security (S6's action; S1's name) | S6 names `s3:DeleteObjectVersion` and turns the lock off against an explicit Deny in the bucket policy; S1 curls `1.1.1.1` (`e38747b`) | Security | the run files |
+| security (the PR 2 plan: put role, read role, bucket policy principals, stand-in trust and removal, S4's writer, the boundary statement, the quarantine detached, `evals.yml`'s header) | Constraints on PR 2, read by `security-reviewer` there | Security | SPEC/05 §6 |
+| security (no gate on the lock's retention) | Named in SPEC/05 §8; closing it is a SPEC/00 §5 amendment, not dated | Product, Security | SPEC/05 §8 |
+| cold F3 | The three held attempts are "expected to hold, with no attempt made"; S2's control does not exist yet | Product | SPEC/05 §3; explainer; READMEs; §3 below |
+| cold N5 | §3's sentence on the asserts corrected | Product | §3 |
+| cold N3 | `evals.yml`'s stale comment on the swap read corrected (Security) | Security | `evals.yml` |
+| cold N2 | `make ledger` will print a "swap ... not read" line for row 4 once the latest envelope has no `swaps`; printed only, never a problem. **M05 PR 2**: print it for row 4's own envelope alone | Engineering | PR 2 |
+
+**Recorded only:** cold N1 and N4 (the untracked ruling folder fails one
+M02 seed test locally until committed); security's notes on the workflow
+diff, the hash (the `checks` job is the witness), S3's two explicit
+denies, and the controls not yet fired.
+
 ## 3. The false state
 
 SPEC/05 §3, in full. Live today: nothing reaches a security account, so
 every record an attempt leaves is in the agent account (all seeds);
 `server.py` answers a chain at depth 3 (S4); a credential in a tool
 result reaches the answer and builds GREEN (S5); evidence has no
-write-once store (S6); nothing quarantines an agent (S7). Held today:
-curl to the internet fails (no route, the security group); a write to S3
-fails (the boundary allows none); `logs:DeleteLogStream` fails (the
-boundary denies it). Those three are planted for their record in the
-security account, which is what is missing.
+write-once store (S6); nothing quarantines an agent (S7). Expected to hold
+today, with no attempt made: curl to the internet should fail (no route,
+the security group); a write to S3 should fail (the boundary allows none,
+which is not the prefix scoping S2 measures: that does not exist yet);
+`logs:DeleteLogStream` should fail (the boundary denies it). Those three
+are planted for their record in the security account, which is what is
+missing (cold review F3).
 
 The commits: `142a2a9` S1, `962ea72` S2, `bfd17c4` S3, `d1c1b0f` S4,
 `f8601c3` S5, `b1dc6c4` S6, `06f95d9` S7, each after the SPEC (`11490e0`)
 and before any reader. `git show <seed> --stat` shows the run file or
 fixture, the test, one row of `tests/fixtures/README.md` and one line of
-`SEEDS_M05`, and no reader. Every precondition raises `SeedBroken`; only
-the planted line is an `assert`. Each strict marker was checked with
+`SEEDS_M05`, and no reader. Every precondition raises `SeedBroken`. The
+`assert`s are the planted line and, after it, the bar each reader must
+meet, unreachable until the planted line passes (cold review N5). Each strict marker was checked with
 `--runxfail`:
 
 | Seed | Raises | The message read |
@@ -226,9 +255,11 @@ None of it is in this PR.
 
 ## 5. Falsifiers, and what each would look like in the repo
 
-SPEC/05 §4. On every agent envelope from PR 2's merge, `F5_1` to `F5_4`
-come from the seed tests, as test-only witnesses. The live attempts are
-recorded in `containment` and read by row 5's cell (F16).
+SPEC/05 §4, as amended before the PR opened (cold review F2, §2.5). On
+every agent envelope from PR 2's merge, `F5_1` alone, from S4's and S5's
+seed tests, a test-only witness. F5.2, F5.3 and F5.4 are live only: the
+attempts recorded in `containment` and read by row 5's cell (F16). The
+attempt tests write no check.
 
 ## 6. What M04 carried in (`milestones/M05/open.md`), row by row
 
