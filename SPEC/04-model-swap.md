@@ -310,6 +310,14 @@ met.
   built in the last PR: it lands and runs at PR 3, where it reads the
   swaps as they stand then. If either misses at PR 4, row 4 closes RED
   with that as the finding. There is no fifth PR.
+- **Amended at PR 4, before its run (Product, `rulings/pr4.md`): a
+  second named P3 exception.** Row 4's cell reads the recorded swaps
+  (`READ_THE_SWAPS` in `src/verdict/gate.py`): a swap that misses its
+  falsifier's verdict, or is unread, makes the cell RED whatever
+  refagent's own verdict. It lands in the last PR because PR 3 left
+  `make ledger` unable to write the RED §7 names beside refagent's
+  GREEN, which the cold review of PR 4 found (B1). It gates no pull
+  request, leaves `rule` unchanged, and can only turn row 4's cell RED.
 - **Never:** no swap PR merges. The equivalent swap is closed unmerged
   once read.
 

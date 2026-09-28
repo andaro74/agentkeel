@@ -10,10 +10,10 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
 | Claim | A breaking model swap goes RED; an equivalent swap promotes; A-vs-A is zero diff |
 | Falsifiers | F4.1 the breaking swap is GREEN, or RED for a reason other than a citing golden regressed, ungrounded or with wrong fields (a REJECTED, an access error or the cost cap is not the reason) (live: the breaking swap PR, read at PR 4's run). F4.2 the equivalent swap is RED or REJECTED, or a required check on its PR is red for a reason of its own ("promotes" is mergeable, not merged; live: the equivalent swap PR, whose first run decides (#26, `9ff21d5`), read again at PR 4's run and recorded, not gated). F4.3 A-vs-A shows a diff: two runs of one pin in one `evals` job with any golden's `pass` different (the milestone stops). F4.4 a run over a `delta_max` bar is GREEN: `p95_ms` over 2.0x, or the agent's tokens over 1.5x, the incumbent's median in the same mode. |
 | Seeded commit | `a16e2c7` (S1); `c6b6cb8` (S2); `6f18507` (S3); `63033b7` (S4, two cases), S3's and S4's raw runs remade at `2dc81ae` and `e0ce2ce` before any reader; `8994dcb` (S5, no falsifier: SPEC/00 §8 M04's `deprecated_after`), each its own commit before any reader (SPEC/04 §5) |
-| Expected gate output | PR 1: refagent's envelope as at M03; it says nothing about claim 4. PR 1 leaves `agents/refagent/**` and `data/rights_table.json` alone, so its run may be the first `mode: runtime` envelope at guardrail `1088aw3ujhyd:5` (`open.md` row 10); the envelope says whether it is. `make plants` lists S1 to S5; `tests/test_m04_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 to S5 refused by their readers, each for its planted reason; refagent under tool grounding ordinary 9/9, traps 2/2 (`g-021` retired at PR 2 before grounding landed, nothing added; restated before PR 2's run), fewer being the finding; refagent's A-vs-A zero diff, the control's reported and not gated, on PR 2's own run (the `a-vs-a` label); p95 and tokens within their bars. From PR 2's merge the gate requires `F4_1`, `F4_2` and `F4_4` on every agent envelope and `F4_3` where A-vs-A runs; **`F4_1` and `F4_2` from the seed tests alone are test-only witnesses**. During PR 2 the human redeploys the bootstrap stack with the eval role's candidate list after reading `cdk diff --strict`, and opens the two swap PRs from PR 2's head. **A named P3 exception (SPEC/04 §5.1): PR 4's run reads the swap PRs, after their rulings are on `main`;** amended at PR 3, since PR 2 merged before the rulings joined it: PR 3 is the repair and the read's machinery, and the read is recorded in the envelope's `swaps` and gated by nothing (`F4_1` and `F4_2` stay test-only witnesses). The equivalent swap's first run regressed `g-005` in both of its runs, recorded at PR 3 before the reading run: that run decides F4.2 (SPEC/04 §7), and PR 4 records the swaps' re-runs in `f4_swaps.yaml` so its own run measures and reads them. Stated before: the breaking swap RED with at least one citing golden regressed, ungrounded or wrong, and no REJECTED, access error or cost cap; the equivalent swap GREEN with every required check green. RED if a seed's test passes but by its reader, if either swap reads otherwise, if refagent's A-vs-A shows a diff, if a run over a bar rules GREEN, if PR 4's run cannot read the swap PRs, or if `make ledger` stops matching rows 0 to 3. |
-| Measured | — |
-| PRs used / cap | 3 / 4 |
-| State | OPEN |
+| Expected gate output | PR 1: refagent's envelope as at M03; it says nothing about claim 4. PR 1 leaves `agents/refagent/**` and `data/rights_table.json` alone, so its run may be the first `mode: runtime` envelope at guardrail `1088aw3ujhyd:5` (`open.md` row 10); the envelope says whether it is. `make plants` lists S1 to S5; `tests/test_m04_seeds.py` shows 6 expected failures. PR 2, on the PR: S1 to S5 refused by their readers, each for its planted reason; refagent under tool grounding ordinary 9/9, traps 2/2 (`g-021` retired at PR 2 before grounding landed, nothing added; restated before PR 2's run), fewer being the finding; refagent's A-vs-A zero diff, the control's reported and not gated, on PR 2's own run (the `a-vs-a` label); p95 and tokens within their bars. From PR 2's merge the gate requires `F4_1`, `F4_2` and `F4_4` on every agent envelope and `F4_3` where A-vs-A runs; **`F4_1` and `F4_2` from the seed tests alone are test-only witnesses**. During PR 2 the human redeploys the bootstrap stack with the eval role's candidate list after reading `cdk diff --strict`, and opens the two swap PRs from PR 2's head. **A named P3 exception (SPEC/04 §5.1): PR 4's run reads the swap PRs, after their rulings are on `main`;** amended at PR 3, since PR 2 merged before the rulings joined it: PR 3 is the repair and the read's machinery, and the read is recorded in the envelope's `swaps` and gated by nothing (`F4_1` and `F4_2` stay test-only witnesses). The equivalent swap's first run regressed `g-005` in both of its runs, recorded at PR 3 before the reading run: that run decides F4.2 (SPEC/04 §7), and PR 4 records the swaps' re-runs in `f4_swaps.yaml` so its own run measures and reads them. Stated before: the breaking swap RED with at least one citing golden regressed, ungrounded or wrong, and no REJECTED, access error or cost cap; the equivalent swap GREEN with every required check green. RED if a seed's test passes but by its reader, if either swap reads otherwise, if refagent's A-vs-A shows a diff, if a run over a bar rules GREEN, if PR 4's run cannot read the swap PRs, or if `make ledger` stops matching rows 0 to 3. **Amended at PR 4, before its run (Product, `rulings/pr4.md`): a second named P3 exception.** The cell's verdict is row 4's reading of the recorded swaps, `READ_THE_SWAPS` in `src/verdict/gate.py`, landed in PR 4: a swap that misses its falsifier's verdict (the breaking swap RED with a citing golden regressed and no cost cap; the equivalent GREEN with its `evals` run and every required check green) or is unread makes the cell RED, whatever refagent's own verdict. Before it, `make ledger` refused State RED beside refagent's GREEN, so the RED §7 names could not be written. It gates no pull request, leaves `rule` unchanged and can only turn row 4's cell RED; its absence would have left row 4 closable only as "—" RED, with the measurement thrown away. |
+| Measured | agent: traps 2/2 (g-010, g-011); ordinary 9/9; guardrail 2/3; redteam 5/5; control: traps 0/2; ordinary 0/9; guardrail 0/3; redteam 0/5; mode runtime; never_passed 1; regressed 0; plants 7/7; F0_2 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F0_3 pass https://github.com/andaro74/agentkeel/actions/runs/35401176820/job/105781176255; F1_1 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F1_2 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F1_3 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F1_4 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F2_1 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F2_2 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F3_1 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F3_2 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F3_3 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F3_5 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F3_6 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F4_1 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F4_2 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; F4_4 pass https://github.com/andaro74/agentkeel/actions/runs/36362949356; swap #25 breaking RED (regressed 11; other reasons 1); swap #26 equivalent RED (regressed 1 g-005; other reasons 0); swap #26 equivalent missed: RED, expected GREEN; RED; envelope `05bd718feb0cc72ab78df13fccf47c3efb8a9314`; base b0219756 |
+| PRs used / cap | 4 / 4 |
+| State | RED |
 
 ### Open detail (PR 1, 2026-09-26)
 
@@ -165,3 +165,50 @@ Written at M04 PR 1 open. The row in `milestones/README.md` is the one
 - **After this PR merges:** `main` is merged into both swap branches,
   their checks run again, and PR 4 records their new envelopes in
   `f4_swaps.yaml`, which makes its own run measure and read them.
+
+### Close detail (PR 4, the close, 2026-09-27)
+
+**Row 4 is RED, on F4.2.** The cap was four and four were used. The
+breaking swap went RED for the reason F4.1 names; refagent's A-vs-A
+showed no diff; no real run crossed a bar; but the swap named equivalent
+before any run regressed `g-005`.
+
+**The measurement.** The Measured cell is copied from `make ledger`'s
+"as row M04 reads it" line for the envelope for
+`05bd718feb0cc72ab78df13fccf47c3efb8a9314`, written by CI run
+36362949356 and committed by `github-actions[bot]` (`a3bae6b`), this
+PR's run. `make ledger` exits 0 against it. As numbers: refagent GREEN
+on its own in `mode: runtime` at guardrail `1088aw3ujhyd:5`, ordinary
+9/9, traps 2/2, guardrail 2/3, red team 5/5; plants 7/7; `regressed` 0;
+`never_passed` 1 (`g-014`); every check passes; p95 6,242 ms; 48,731
+tokens. The swaps as this run recorded them: #25 breaking RED, eleven
+regressed, the one other reason `F1_4` (wrong fields); #26 equivalent
+RED, `g-005` regressed, its `evals` red and every other required check
+green. Row 4's reading: "swap #26 equivalent missed: RED, expected
+GREEN; RED".
+
+**Why this PR carries code.** PR 3 recorded the swaps but gave row 4 no
+way to be decided by them: the cell carried refagent's GREEN, and
+`src/ledger.py` refuses State RED beside it. `READ_THE_SWAPS`
+(`pr4-engineering.md`) makes row 4's cell read the swaps. The cold
+review blocked it as machinery in the last PR (B1); Product named it a
+second P3 exception in SPEC/04 §5.1 and this row's Expected cell before
+the reading run (`pr4.md` §2). F1 and F2 tightened what counts as each
+swap's verdict (`b8a2e5e`).
+
+**Row 4's RED conditions, each checked at the close:** no seed's test
+passes but by its reader (`uv run pytest tests/test_m04_seeds.py`, six
+passed; each marker came off with its reader at PR 2); the breaking
+swap is RED for a citing golden regressed, not a REJECTED, access error
+or cost cap (holds); the equivalent swap is RED (**fires**, on its first
+run `9ff21d5` and on the re-run `a86262e`); refagent's A-vs-A shows no
+diff (`9e4b559`, `agent: []`); no run over a bar ruled GREEN (none
+crossed one but the seeds); PR 4's run read both swap PRs (holds);
+`make ledger` still matches rows 0 to 3 (holds).
+
+**Findings and Unsure items.** Every one is closed in M04 or carried to
+`milestones/M05/open.md` with a seat and a milestone, 43 rows
+(`pr4.md` §5). SPEC/04 §9 cut 1 is recorded as taken at the close.
+
+**After the merge:** #25 and #26 closed unmerged; `git tag m04` on
+`main`; the M04 video recorded at the tag and committed in M05 PR 1.

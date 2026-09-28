@@ -152,6 +152,13 @@ ADR_0007 = "7f8d0aedcbffc0dee9c4abe1d7363dbef60369cb"
 # M01's second half is "refagent runs inside the construct": an envelope that
 # did not run there has not read it (PR 3 cold review, B1).
 READ_IN_THE_RUNTIME = {"M01"}
+# Rows whose claim is read from the swap PRs an envelope records in `swaps`
+# (SPEC/04 §7). The swaps gate no pull request (M04 PR 3), but they decide
+# the row: a swap that misses its falsifier's verdict, or was not read, makes
+# the row's reading RED whatever this run's own verdict (M04 PR 4).
+READ_THE_SWAPS = {"M04"}
+# F4.1: the breaking swap RED with a golden regressed. F4.2: the equivalent GREEN.
+SWAP_EXPECTED = {"breaking": "RED", "equivalent": "GREEN"}
 
 
 class Rejected(Exception):
@@ -567,7 +574,7 @@ def tallies(label: str, results: dict[str, dict[str, Any]]) -> str:
 
 
 def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any] | None = None,
-             *, in_the_runtime: bool = False) -> str:
+             *, in_the_runtime: bool = False, read_the_swaps: bool = False) -> str:
     """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's.
 
     An M00 envelope: its control tallies. From M01: the agent's tallies, then
@@ -580,6 +587,9 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     (PR 3 cold review, B1), and a State of GREEN cannot stand beside it
     (`src/ledger.py`). A pull request's own verdict is untouched: a run in the
     runner is still the right measurement of that pull request's code.
+
+    `read_the_swaps` is for a row whose claim is read from the swap PRs
+    (`READ_THE_SWAPS`): each miss is named, and a GREEN run reads RED.
     """
     results = envelope["goldens"]
     agent = {g: r for g, r in results.items() if r["scope"] == "agent"}
@@ -596,6 +606,9 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     if in_the_runtime and agent and envelope.get("mode") != "runtime":
         heads.append(f"not read in the runtime (mode {envelope.get('mode', 'unrecorded')})")
         verdict = "UNMEASURED"
+    misses = swap_misses(envelope.get("swaps") or []) if read_the_swaps and agent else []
+    if misses and verdict == "GREEN":
+        verdict = "RED"
     parts = [
         *heads,
         f"never_passed {len(envelope['never_passed'])}",
@@ -603,6 +616,7 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         f"plants {envelope['plants_fired']}/{envelope['plants_expected']}",
         *(f"{name} {c['status']} {c['url']}" for name, c in sorted(envelope["checks"].items())),
         *(swap_reading(swap) for swap in envelope.get("swaps") or []),
+        *misses,
         verdict,
         f"envelope `{envelope['commit']}`",
     ]
@@ -622,6 +636,46 @@ def swap_reading(swap: dict[str, Any]) -> str:
     regressed = [reason.split()[1] for reason in swap["reasons"] if reason.startswith("regressed: ")]
     named = f" {' '.join(regressed)}" if 0 < len(regressed) <= 3 else ""
     return f"{head} {swap['verdict']} (regressed {len(regressed)}{named}; other reasons {len(swap['reasons']) - len(regressed)})"
+
+
+def swap_misses(swaps: list[dict[str, Any]]) -> list[str]:
+    """What a row in `READ_THE_SWAPS` finds wrong with the swaps an envelope recorded; [] if nothing.
+
+    A swap not recorded, or recorded unread, is a miss: the row goes RED if
+    the reading run cannot read the swap PRs (SPEC/04 §7). F4.1: the breaking
+    swap's RED must name a citing golden (ordinary or trap) regressed, and no
+    cost cap; a list cut short cannot show that, so it is a miss too. F4.2:
+    "promotes" is mergeable, so the equivalent swap's GREEN needs its `evals`
+    run and every required check on its head green (cold review of PR 4, F1, F2).
+    """
+    kinds = load_golden_kinds(GOLDENS)
+    misses = []
+    for name, expected in SWAP_EXPECTED.items():
+        swap = next((s for s in swaps if s.get("swap") == name), None)
+        if swap is None or swap.get("verdict") is None:
+            misses.append(f"swap {name} missed: not read")
+            continue
+        head = f"swap #{swap['pr']} {name} missed"
+        reasons = swap["reasons"]
+        if swap["verdict"] != expected:
+            misses.append(f"{head}: {swap['verdict']}, expected {expected}")
+        elif name == "breaking":
+            citing = [r.split()[1] for r in reasons if r.startswith("regressed: ")
+                      and kinds.get(r.split()[1]) in ("ordinary", "trap")]  # fmt: skip
+            if not citing:
+                misses.append(f"{head}: RED with no citing golden regressed")
+            if any(r.startswith("cost-cap: ") for r in reasons):
+                misses.append(f"{head}: RED over the cost cap")
+            if any(r.endswith("more reasons, not kept") for r in reasons):
+                misses.append(f"{head}: reasons cut, so no cost cap cannot be read")
+        else:
+            checks = {"evals (measured)": swap.get("evals_on_measured"), **(swap.get("required_on_head") or {})}
+            if not swap.get("required_on_head"):
+                misses.append(f"{head}: no required check read on its head")
+            red = sorted(check for check, conclusion in checks.items() if conclusion != "success")
+            if red:
+                misses.append(f"{head}: GREEN with {', '.join(red)} not green")
+    return misses
 
 
 def latest(history_dir: Path = HISTORY) -> Path | None:
@@ -702,7 +756,8 @@ def measured_at(path: Path, history_dir: Path = HISTORY, *, milestone: str | Non
     verdict, _ = rule(path, history_dir)
     envelope = read(path)
     return measured(envelope, verdict, control_card_of(envelope, path),
-                    in_the_runtime=milestone in READ_IN_THE_RUNTIME)  # fmt: skip
+                    in_the_runtime=milestone in READ_IN_THE_RUNTIME,
+                    read_the_swaps=milestone in READ_THE_SWAPS)  # fmt: skip
 
 
 def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> str | None:
