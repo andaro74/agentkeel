@@ -52,12 +52,23 @@ def run_file(name: str, seed: str) -> dict[str, Any]:
     return run
 
 
-def made(run: dict[str, Any]) -> list[dict[str, Any]]:
-    """The observed entries, one per attempt: the planted failure is that there are none yet."""
+def made(run: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """Each attempt with its observed entry, matched in order: the planted failure is that there are none yet.
+
+    Matched by position and, where the attempt names one, by `event_name`, so an entry cannot stand
+    in for another attempt's (cold review F1 on M05 PR 1)."""
     observed = run["observed"]
     assert observed is not None, f"seed {run['seed']}: the attempt has not been made"
     assert len(observed) == len(run["attempts"]), f"seed {run['seed']}: every attempt is made, not some"
-    return observed
+    for attempt, entry in zip(run["attempts"], observed, strict=True):
+        assert entry.get("event_name") == attempt.get("event_name"), f"{attempt['what']}: {entry}"
+    return list(zip(run["attempts"], observed, strict=True))
+
+
+def denied(entry: dict[str, Any], *, by: str) -> bool:
+    """AWS answered AccessDenied, with a request id, and its message names the control `by` names."""
+    message = (entry.get("message") or "").lower()
+    return entry.get("result") == "AccessDenied" and bool(entry.get("request_id")) and by in message
 
 
 # --- S1: curl to the internet -------------------------------------------------
@@ -65,13 +76,17 @@ def made(run: dict[str, Any]) -> list[dict[str, Any]]:
 
 @pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1 is attempted during M05 PR 2 (SPEC/05 §5.1)")
 def test_s1_curl_to_the_internet_was_refused():
-    """From the platform VPC with refagent's security group, `curl https://example.com`. Held today
-    (no internet gateway, no NAT, egress to the listed endpoints only); what is missing is its
-    record in the security account (SPEC/05 §3.1, §3.6). Refused when curl cannot connect and the
-    flow record reads REJECT."""
+    """From the platform VPC with refagent's security group, `curl https://1.1.1.1`: a fixed address,
+    so no name lookup can fail first and leave no packet to record (security-reviewer on M05 PR 1).
+    Expected to be refused today (no internet gateway, no NAT, egress to the listed endpoints only),
+    with no attempt made; what is missing is its record in the security account (SPEC/05 §3.1,
+    §3.6). Refused when curl cannot connect and the flow record for that ENI and address reads
+    REJECT, not ACCEPT."""
     run = run_file("f5_1_curl.yaml", "S1")
-    observed = made(run)
-    assert all(o.get("eni") and o.get("destination") and o.get("result") for o in observed), observed
+    for _, entry in made(run):
+        assert entry.get("eni") and entry.get("destination") == "1.1.1.1", entry
+        assert entry.get("flow_action") == "REJECT", f"the flow record reads {entry.get('flow_action')}: {entry}"
+        assert entry.get("connected") is False, entry
 
 
 # --- S2: a write to another agent's prefix ------------------------------------
@@ -80,12 +95,13 @@ def test_s1_curl_to_the_internet_was_refused():
 @pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2 is attempted during M05 PR 2 (SPEC/05 §5.1)")
 def test_s2_a_write_to_another_agents_prefix_was_refused():
     """As refagent's stand-in, `s3:PutObject` under `agents/ratings-helper/` in the audit bucket.
-    The stand-in's own policy grants the write, so the refusal can only be the audit bucket's
-    policy, which scopes each agent role to its own prefix (SPEC/05 §2, §5). Today there is no
-    audit bucket and no prefix, own or another's (SPEC/05 §3.7)."""
+    The stand-in's own policy grants the write, so the refusal must be the audit bucket's policy,
+    which scopes each agent role to its own prefix, and AWS's message names a resource-based policy
+    (SPEC/05 §2, §5). Today there is no audit bucket and no prefix, own or another's, so the
+    control S2 needs does not exist (SPEC/05 §3.7)."""
     run = run_file("f5_2_prefix.yaml", "S2")
-    observed = made(run)
-    assert all(o.get("result") == "AccessDenied" and o.get("request_id") for o in observed), observed
+    for attempt, entry in made(run):
+        assert denied(entry, by="resource-based policy"), f"{attempt['what']}: {entry}"
 
 
 # --- S3: logs:DeleteLogStream --------------------------------------------------
@@ -98,9 +114,8 @@ def test_s3_deleting_its_own_log_stream_was_refused():
     denies `logs:Delete*` today and PR 2 adds the role's own deny; both are explicit, so this reads
     "refused and recorded", and the record in the security account is what is new (SPEC/05 §3.8)."""
     run = run_file("f5_3_logs.yaml", "S3")
-    observed = made(run)
-    assert all(o.get("result") == "AccessDenied" and o.get("request_id") and "explicit deny" in (o.get("message") or "")
-               for o in observed), observed  # fmt: skip
+    for attempt, entry in made(run):
+        assert denied(entry, by="explicit deny"), f"{attempt['what']}: {entry}"
 
 
 # --- S4: a call chain at depth 3 ----------------------------------------------
@@ -209,31 +224,40 @@ def test_s5_an_answer_that_repeats_a_credential_from_a_tool_result_does_not_pass
 
 # --- S6: an audit object modified from the agent account ----------------------
 
+OBJECT_LOCK_REFUSES = ("s3:DeleteObjectVersion", "s3:PutObjectRetention")  # granted on test/: the lock must refuse
+
 
 @pytest.mark.xfail(strict=True, raises=AssertionError, reason="S6 is attempted during M05 PR 2 (SPEC/05 §5.1)")
 def test_s6_no_principal_in_the_agent_account_modifies_an_audit_object():
     """As the agent account's admin, on an object under `test/` less than a day old: delete its
-    version and shorten its retention, both granted by the bucket policy so that the lock is what
-    refuses them; turn the lock off and put a bucket policy, which only the bucket's own account
-    may. Today there is no audit bucket, and the evidence is in Git (SPEC/05 §3.4)."""
+    version and shorten its retention, both granted by the bucket policy so that Object Lock is what
+    refuses them, and its message says so; turn the lock off and put a bucket policy, which the
+    bucket policy's explicit Deny and S3's owner rule refuse. Each entry is matched to its own
+    attempt (cold review F1). Today there is no audit bucket, and the evidence is in Git (SPEC/05
+    §3.4)."""
     run = run_file("f5_6_audit.yaml", "S6")
-    holds([a["event_name"] for a in run["attempts"]]
-          == ["DeleteObject", "PutObjectRetention", "PutObjectLockConfiguration", "PutBucketPolicy"],
-          "the four actions SPEC/05 section 5 names")  # fmt: skip
-    observed = made(run)
-    assert all(o.get("result") == "AccessDenied" and o.get("request_id") for o in observed), observed
+    holds([a["iam_action"] for a in run["attempts"]]
+          == ["s3:DeleteObjectVersion", "s3:PutObjectRetention", "s3:PutObjectLockConfiguration", "s3:PutBucketPolicy"],
+          "the four actions SPEC/05 section 5 names, by the IAM action S3 checks")  # fmt: skip
+    for attempt, entry in made(run):
+        control = "object lock" if attempt["iam_action"] in OBJECT_LOCK_REFUSES else ""
+        assert denied(entry, by=control), f"{attempt['what']}: {entry}"
 
 
 # --- S7: the quarantine leaves the agent live ---------------------------------
+
+AGENT_ROLE_PATH = ":role/agentkeel/agents/"  # refagent's own role, by the path the construct puts it under
 
 
 @pytest.mark.xfail(strict=True, raises=AssertionError,
                    reason="S7 is attempted after M05 PR 2's merge deploy, read at PR 3 (SPEC/05 §5.1)")  # fmt: skip
 def test_s7_after_the_quarantine_the_agents_own_role_cannot_call_its_model():
-    """Quarantine refagent, then invoke its runtime: the model call its own role makes must be
-    refused by the quarantine's deny (F5.4 as restated at M05 PR 1; SPEC/05 §4). Today nothing
+    """Quarantine refagent, then invoke its runtime: the model call refagent's OWN role makes must be
+    refused by the quarantine's deny (F5.4 as restated at M05 PR 1; SPEC/05 §4). The entry records
+    the principal the trail shows denied, not the caller's answer: a quarantine on the wrong role
+    would leave the caller's call refused for another reason (cold review F1). Today nothing
     quarantines an agent (SPEC/05 §3.5)."""
     run = run_file("f5_7_quarantine.yaml", "S7")
-    observed = made(run)
-    (invoke,) = [o for o in observed if o.get("event_name") == "InvokeAgentRuntime"]
-    assert invoke.get("result") == "AccessDenied" and invoke.get("request_id"), invoke
+    (entry,) = [e for attempt, e in made(run) if attempt["event_name"] == "InvokeAgentRuntime"]
+    assert AGENT_ROLE_PATH in (entry.get("denied_principal") or ""), entry
+    assert denied(entry, by="explicit deny"), entry

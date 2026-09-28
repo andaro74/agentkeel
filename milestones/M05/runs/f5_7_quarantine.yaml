@@ -17,7 +17,10 @@
 # here, so refagent answers again on the next run.
 #
 # Each observed entry: what, request_id, event_name, at (not read as the
-# attempt's time), result, message.
+# attempt's time), result, message; for the invocation, result and message
+# are the TRAIL's record of the model call refagent's role made, and
+# denied_principal the role it names, not what the caller was answered
+# (cold review F1 on M05 PR 1).
 seed: S7
 falsifiers: [F5.4]
 principal: the human, with the quarantine command and InvokeAgentRuntime on refagent's runtime

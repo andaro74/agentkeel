@@ -15,13 +15,19 @@
 # by itself.
 #
 # Each observed entry: what, at (ISO 8601, UTC, as the human saw it; not
-# read as the attempt's time), eni, destination, result (what curl printed).
+# read as the attempt's time), eni, destination, connected (false if curl
+# could not connect), result (what curl printed), flow_action (the flow
+# record's action for that ENI and destination: REJECT or ACCEPT).
+#
+# A fixed address, not a name (security-reviewer on M05 PR 1): if a name
+# does not resolve from the isolated subnet, no packet is sent, no flow
+# record exists, and F5.2 would fire for a reason that is not the control.
 seed: S1
 falsifiers: [F5.1, F5.2]
 principal: a CloudShell VPC environment, platform VPC isolated subnet, refagent's security group
 attempts:
   - what: curl to the internet
-    command: curl -m 5 https://example.com
-    refused_when: curl times out or cannot connect, and a flow record for the ENI to example.com's address reads REJECT
+    command: curl -m 5 https://1.1.1.1
+    refused_when: curl times out or cannot connect, and the flow record for the ENI to 1.1.1.1 reads REJECT
     recorded_when: that flow record is an object in the audit bucket within N of its start (thresholds.yaml, detection.max_seconds)
 observed: null

@@ -23,6 +23,6 @@ attempts:
   - what: put an object under ratings-helper's prefix in the audit bucket
     event_name: PutObject
     command: aws s3api put-object --bucket <audit bucket> --key agents/ratings-helper/seed-s2.txt --body seed-s2.txt
-    refused_when: AccessDenied, naming the bucket policy, and no object at that key
+    refused_when: AccessDenied whose message names a resource-based policy (the bucket policy), and no object at that key
     recorded_when: the trail's PutObject record for the request id is an object in the audit bucket within N of its eventTime
 observed: null
