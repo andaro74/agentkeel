@@ -129,7 +129,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"\nlatest CI-written envelope reads:\n    {gate.measured_at(path, args.history_dir)}")
             # The line a close copies must be the row's reading, not the envelope's
             # alone: for a row read in the runtime they differ (M01 PR 4).
-            for milestone in sorted(gate.READ_IN_THE_RUNTIME):
+            # So is a row read from the swap PRs (M04 PR 4).
+            for milestone in sorted(gate.READ_IN_THE_RUNTIME | gate.READ_THE_SWAPS):
                 print(f"as row {milestone} reads it:\n    "
                       f"{gate.measured_at(path, args.history_dir, milestone=milestone)}")
         except gate.Rejected as rejection:
