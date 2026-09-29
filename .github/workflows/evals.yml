@@ -80,19 +80,42 @@
 # alone. f4_swaps.yaml stays as M04's record, and `make evals` still takes
 # SWAPS_OBS for a run that is given one; this workflow no longer gives it.
 #
+# M05 PR 2 (SPEC/05 §4, §6): the attempts, and the envelopes, in the security
+# account. Before the eval role is assumed, the job assumes
+# `agentkeel-audit-read` in the security account (897698239547) by its own
+# OIDC provider there, since the eval role is denied sts:AssumeRole, and
+# `scripts/observe_containment.py` reads M05's run files against the audit
+# bucket. `make evals` hands build the observation (CONTAINMENT_OBS), which
+# records it in `containment` and `alarm_latency_s`; the gate rules nothing
+# on it, and only the ledger's row 5 reading reads it. A missing role
+# variable or a refused assume leaves no credentials, and the observation
+# says the bucket was unreadable; it never fails the job. F5_1 is read from
+# the S4 and S5 tests (the Makefile). On a push to main the `archive` job
+# puts each CI-written file the push added under `envelopes/` in the audit
+# bucket, as `agentkeel-envelope-put`, trusted on main only, running git and
+# the AWS CLI and no code from a pull request; a key already there is not
+# overwritten (`If-None-Match`), and Object Lock holds each for its day.
+# Object Lock stops an overwrite, not a forged first write: what the bucket
+# proves is what main's workflow put, and when.
+#
 # What this does not do:
 # - stop someone with write access from editing this file, or from adding
 #   a workflow that assumes the same role. `validate` fails on a workflow
-#   whose hash is not in infra/workflows.sha256, and a PR can edit both.
-#   Nothing gates that until M02.
+#   whose hash is not in infra/workflows.sha256, and a PR can edit both;
+#   since M02 `ruling-cited` holds a workflow change to a Security ruling,
+#   and it is still the PR's own code that runs until the reader is taken
+#   from main.
 # - tell a hand-written evals/history/<commit>.json from a recorded one,
-#   beyond what verdict.gate checks. `two-key` on a human commit there is M02.
-# - record on `push` to main. It measures and gates only.
+#   beyond what verdict.gate checks and `two-key` on a human commit there
+#   (M02). From M05 PR 2 the copy in the audit bucket is the record a push
+#   to a branch cannot make (open.md row 18).
+# - record on `push` to main. It measures and gates only; `archive` copies.
 # - stop the PR's own code from turning the live-ruleset compare off
 #   (M02 PR 2). The `checks` job sets AGENTKEEL_NO_RULESET_TOKEN so
 #   validate prints a skip there; the Makefile and src/validate/ sit between
 #   this file and that read, and both are the PR's. The reader taken from
-#   main is M05, with the rest of the header's first gap.
+#   main is M06's, with the required workflows the template ships
+#   (milestones/M05/feasibility.md section 6, row 12).
 name: evals
 
 on:
@@ -314,6 +337,28 @@ jobs:
           uv run python scripts/observe_pr.py milestones/M02/runs/f2_1_bypass.yaml --out "$RUNNER_TEMP/bypass.json"
           uv run python scripts/observe_pr.py milestones/M02/runs/f2_2_three_doors.yaml --out "$RUNNER_TEMP/doors.json"
 
+      # M05 PR 2 (SPEC/05 §4): the attempts, read in the security account as
+      # agentkeel-audit-read, before the eval role replaces these credentials.
+      # A refused assume, or no role variable yet, leaves none: the observer then
+      # writes that the bucket was unreadable, and row 5 reads that as unread.
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: steps.current.outputs.measured_at == '' && vars.AWS_AUDIT_READ_ROLE_ARN != ''
+        continue-on-error: true
+        with:
+          role-to-assume: ${{ vars.AWS_AUDIT_READ_ROLE_ARN }}
+          role-session-name: agentkeel-audit-read-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+
+      - name: Look up M05's attempts in the security account's audit bucket
+        if: steps.current.outputs.measured_at == ''
+        run: >-
+          uv run python scripts/observe_containment.py
+          milestones/M05/runs/f5_1_curl.yaml milestones/M05/runs/f5_2_prefix.yaml
+          milestones/M05/runs/f5_3_logs.yaml milestones/M05/runs/f5_4_chain.yaml
+          milestones/M05/runs/f5_6_audit.yaml milestones/M05/runs/f5_7_quarantine.yaml
+          --out "$RUNNER_TEMP/containment.json"
+
       # The three claims the role's trust policy matches on: `aud` and `sub`
       # exactly, `job_workflow_ref` by pattern. When an assume is refused, look
       # here first: the first deploy trusted a `sub` this repo never issues
@@ -335,6 +380,8 @@ jobs:
           role-session-name: agentkeel-evals-${{ github.run_id }}
           role-duration-seconds: 900
           aws-region: us-west-2
+          # The security account's read credentials go before these are set (M05 PR 2).
+          unset-current-credentials: true
 
       # Item 18: one refused call on a denied action, and one through an
       # unpinned profile. Neither has a seeded case (SPEC/01 §9), so this is
@@ -433,7 +480,7 @@ jobs:
           AGENTKEEL_RUNTIME_ARN: ${{ steps.runtime.outputs.arn }}
           # Empty: one run of each subject. 1: two (M04 PR 2).
           A_VS_A: ${{ steps.a_vs_a.outputs.a_vs_a }}
-        run: make evals A_VS_A="$A_VS_A" F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" SEED_PRS_OBS="$RUNNER_TEMP/seed_prs.json" BYPASS_OBS="$RUNNER_TEMP/bypass.json" DOORS_OBS="$RUNNER_TEMP/doors.json" INGEST_OBS="$RUNNER_TEMP/f3_5.json" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
+        run: make evals A_VS_A="$A_VS_A" F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" SEED_PRS_OBS="$RUNNER_TEMP/seed_prs.json" BYPASS_OBS="$RUNNER_TEMP/bypass.json" DOORS_OBS="$RUNNER_TEMP/doors.json" INGEST_OBS="$RUNNER_TEMP/f3_5.json" CONTAINMENT_OBS="$RUNNER_TEMP/containment.json" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
 
       # Which refagent answered, as the runner printed it. From ADR-0007 the
       # envelope records the mode itself (`mode`, `runtime_arn`); this line is
@@ -541,3 +588,71 @@ jobs:
           git add -- "evals/history/$COMMIT.json" "evals/history/$COMMIT.baseline-card.json" "evals/history/$COMMIT.baseline-raw.json"
           git commit -m "evals: CI-written envelope for $COMMIT" -m "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           git push origin "HEAD:refs/heads/$BRANCH"
+
+  # M05 PR 2 (SPEC/05 §6, finding 2; milestones/M05/open.md row 18). On a push
+  # to main, each file under evals/history/ that the push added is put under
+  # envelopes/ in the security account's audit bucket, as
+  # agentkeel-envelope-put, whose trust names main and this workflow on main
+  # and nothing else. git and the AWS CLI only: no `make`, no `uv`, no code from
+  # a pull request. A key already there is not overwritten (If-None-Match), so
+  # a second push of the same file changes nothing; Object Lock holds each
+  # object for its day. No role variable yet: the job says so and puts nothing.
+  archive:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write # OIDC to the security account
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Which CI-written files this push added
+        id: added
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "::warning::the push's before ($BEFORE) is not in this clone; reading against the first parent"
+            BEFORE=$(git rev-parse HEAD^1)
+          fi
+          git diff --name-only --diff-filter=A "$BEFORE" HEAD -- evals/history/ \
+            | grep -E '^evals/history/[0-9a-f]{40}(\.baseline-card|\.baseline-raw)?\.json$' > "$RUNNER_TEMP/added.txt" || true
+          echo "count=$(wc -l < "$RUNNER_TEMP/added.txt" | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/added.txt"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: steps.added.outputs.count != '0' && vars.AWS_ENVELOPE_PUT_ROLE_ARN != ''
+        with:
+          role-to-assume: ${{ vars.AWS_ENVELOPE_PUT_ROLE_ARN }}
+          role-session-name: agentkeel-envelope-put-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+
+      - name: Put each under envelopes/ in the audit bucket, once
+        if: steps.added.outputs.count != '0'
+        env:
+          PUT_ROLE: ${{ vars.AWS_ENVELOPE_PUT_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PUT_ROLE" ]; then
+            echo "::warning::AWS_ENVELOPE_PUT_ROLE_ARN is not set; nothing is put in the audit bucket"
+            exit 0
+          fi
+          while read -r path; do
+            key="envelopes/$(basename "$path")"
+            if aws s3api put-object --bucket agentkeel-audit-897698239547 --key "$key" --body "$path" \
+                --if-none-match '*' --checksum-algorithm SHA256 > /dev/null 2> "$RUNNER_TEMP/err"; then
+              echo "put $key"
+            elif grep -q PreconditionFailed "$RUNNER_TEMP/err"; then
+              echo "::notice::$key is already in the audit bucket; not overwritten"
+            else
+              cat "$RUNNER_TEMP/err"
+              exit 1
+            fi
+          done < "$RUNNER_TEMP/added.txt"
+          echo "### Put under envelopes/ in the audit bucket: $(wc -l < "$RUNNER_TEMP/added.txt") file(s)" >> "$GITHUB_STEP_SUMMARY"

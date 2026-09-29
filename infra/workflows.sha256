@@ -27,8 +27,9 @@
 # Rewritten at M04 PR 2 when evals.yml began to run A-vs-A on a swap or a labelled PR (SPEC/04 §4).
 # Rewritten at M04 PR 3 when evals.yml began to look up the swap PRs (f4_swaps.yaml; recorded, not gated).
 # Rewritten at M05 PR 1 when evals.yml stopped looking up the swap PRs (milestones/M05/open.md row 1).
+# Rewritten at M05 PR 2: evals.yml reads the attempts in the security account and archives envelopes there.
 0d938815e7d3756e05659beb95a82f490b521a183bf34f9584cd98874cf36567  .github/workflows/cold-review-ruling.yml
 084903a2fc9104a22e7a4dd6bd216e625c75d9ef702b374bba9f71a2024e2ca2  .github/workflows/deploy.yml
-997ea4a6675d391ebc0c3dc79e76c5b0af09fc757a059b121aab6a689e1d9ddf  .github/workflows/evals.yml
+7a36eaf3ccb5d23f7e2a1c595f21e5453557ef371148b866ed28e2a16fc7c5d5  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml

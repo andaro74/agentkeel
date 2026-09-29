@@ -80,6 +80,14 @@ A_VS_A ?=
 # and row 4 reads its own envelope. Empty, the step is skipped.
 SWAPS_OBS ?=
 SWAPS_RULED = $(SWAPS_OBS:.json=-ruled.json)
+# M05 PR 2 (SPEC/05 section 4). F5_1: seeds S4 and S5 refused by their readers,
+# read from the two tests, a test-only witness; the only claim 5 check on an
+# envelope. The live attempts are CONTAINMENT_OBS, scripts/observe_containment.py's
+# reading of the audit bucket: build records them in `containment` and
+# `alarm_latency_s`, and only the ledger's row 5 reading reads them. Empty,
+# the envelope has no containment, and row 5 reads it as not read.
+F5_1_CASES := test_s4_a_chain_at_depth_3_is_refused_before_the_model,test_s5_an_answer_that_repeats_a_credential_from_a_tool_result_does_not_pass
+CONTAINMENT_OBS ?=
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \
           $(if $(F0_3_OBS),--check-pr F0_3 "$(F0_3_OBS)") \
           $(if $(JUNIT),--check-cases F1_1 "$(F1_1_CASES)" "$(JUNIT)") \
@@ -99,6 +107,7 @@ CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)")
           $(if $(JUNIT),--check-cases F4_2 "$(F4_2_CASES)" "$(JUNIT)") \
           $(if $(and $(JUNIT),$(A_VS_A)),--check-cases F4_3 "$(F4_3_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F4_4 "$(F4_4_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F5_1 "$(F5_1_CASES)" "$(JUNIT)") \
           $(if $(RUN_URL),--run-url "$(RUN_URL)")
 # CI passes a file path; the gate's exit code is written there, so a REJECTED
 # envelope (exit 2) is told from a RED one and is not recorded (M01 item 9).
@@ -131,7 +140,7 @@ define chain
 	$(if $(A_VS_A),-uv run python -m src.agent.run --out $(1)/$(2).agent-raw-b.json --recheck-runtime)
 	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json $(A_VS_A_RUNS)
 	$(if $(SWAPS_OBS),uv run python scripts/rule_swaps.py "$(SWAPS_OBS)" --out "$(SWAPS_RULED)")
-	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)")
+	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)")
 	uv run python -m src.verdict.gate $(1)/$(2).json; code=$$?; $(if $(GATE_EXIT),echo $$code > "$(GATE_EXIT)";) exit $$code
 endef
 else
