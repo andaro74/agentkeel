@@ -158,10 +158,17 @@ The CloudShell VPC environment could not be S1's origin: its traffic to
 1.1.1.1 never reached its ENI (`runs/f5_1_curl.yaml`; `rulings/pr2.md`
 ruling 8). **Ruled, with Product:** `infra/audit/` adds
 `agentkeel-seed-s1`, a Lambda in the isolated subnets behind refagent's
-security group `sg-003ad866687089f27`, which opens one TCP connection to
-1.1.1.1:443 and returns what happened. Its role, `agentkeel-seed-s1-role`,
-carries the deploy boundary and holds only the EC2 network-interface
-actions Lambda needs to place its ENI; no logs, no other grant. The
+security group `sg-003ad866687089f27`, in one subnet (one ENI), which
+opens one TCP connection to 1.1.1.1:443 and returns what happened. Its
+role, `agentkeel-seed-s1-role`, holds only the EC2 network-interface
+actions Lambda needs to place its ENI, on `*` as AWS's VPC access policy
+grants them; no logs, no other grant. It carries the deploy boundary,
+which caps nothing more: the inline grant is its ceiling.
+`security-reviewer` read `b167dd2` (0 BLOCK, 3 FINDING, 6 NOTE): F2 one
+subnet, F3 the suppression's reason, F1 and N2 (refagent's group and the
+default network ACL recorded beside the invoke), N1 and N4 repaired in the
+next commit; N3 (the role can delete unattached ENIs until removed) and N5
+(only the audit bucket's flow log is evidence) recorded. The
 security group is refagent's, named by id; the refusal is that group's
 egress, which lists the manifest's endpoints and nothing else. Removed
 with `S1_ORIGIN = False` once S1 is read, as the stand-in is. Deployed by

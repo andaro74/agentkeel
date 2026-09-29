@@ -161,11 +161,11 @@ def test_s1s_origin_is_behind_refagents_security_group_in_the_platform_subnets(a
     (function,) = of_type(audit, "AWS::Lambda::Function")
     assert function["FunctionName"] == "agentkeel-seed-s1"
     assert function["VpcConfig"]["SecurityGroupIds"] == ["sg-003ad866687089f27"]
-    assert "subnet-ids" in json.dumps(audit["Parameters"])
+    assert function["VpcConfig"]["SubnetIds"] == ["subnet-00008bbb7a11551a0"]  # one subnet, one ENI
     code = function["Code"]["ZipFile"]
     assert '("1.1.1.1", 443)' in code and "settimeout(5)" in code
     role = next(r for r in roles(audit).values() if r["RoleName"] == "agentkeel-seed-s1-role")
-    assert role["PermissionsBoundary"]  # the deploy boundary
+    assert "agentkeel-deploy-boundary" in json.dumps(role["PermissionsBoundary"])
     policy = next(p for p in of_type(audit, "AWS::IAM::Policy") if "SeedS1Role" in json.dumps(p["Roles"]))
     granted = {a for s in policy["PolicyDocument"]["Statement"] for a in s["Action"]}
     assert all(a.startswith("ec2:") and "NetworkInterface" in a or a in ("ec2:DescribeSubnets",

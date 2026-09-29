@@ -23,7 +23,12 @@
 # (SPEC/05 §8).
 #
 # The human invokes the function once and records what it returned and the
-# ENI it ran on (the Lambda ENI in the subnet with refagent's group).
+# ENI it ran on: the one Lambda ENI in subnet-00008bbb7a11551a0 with
+# refagent's group. Beside it, read at the same time: refagent's runtime
+# ENI's security group (the same group, or the probe was not behind
+# refagent's), and the subnet's network ACL (the default, allowing all, or
+# a REJECT could be the ACL's and not the group's). security-reviewer on
+# b167dd2, F1 and N2.
 #
 # The human fills `observed` with what the command printed and the ENI it
 # ran on. PR 2's run then looks for the flow record in the audit bucket in

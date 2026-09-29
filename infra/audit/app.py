@@ -44,7 +44,8 @@ What it makes, each named in SPEC/05 §6 before this file:
   never reached its ENI, so no flow record of it could exist (SPEC/05 §5,
   §8). A Lambda in a VPC sends through its own ENI in the subnet, where the
   security group refuses the packet and the flow log records the refusal.
-  Its role carries the deploy boundary. Removed once S1 is read
+  One subnet, one ENI. Its inline grant is its ceiling; it carries the
+  deploy boundary, which caps nothing more. Removed once S1 is read
   (`S1_ORIGIN` below).
 
 Every name here is fixed, so the security account's policy can name it
@@ -84,12 +85,17 @@ QUARANTINE_NAME = "agentkeel-quarantine"
 # Seed S1's origin (M05 PR 2): True until S1 is read; the PR that records it sets False and the human redeploys.
 S1_ORIGIN = True
 S1_FUNCTION = "agentkeel-seed-s1"
-SUBNETS_PARAM = "/agentkeel/security/subnet-ids"  # the bootstrap stack's
+# One subnet, so the function has one ENI and the run file names the one that carried the connect
+# (security-reviewer on b167dd2, F2): the isolated subnet the CloudShell attempt used.
+S1_SUBNET = "subnet-00008bbb7a11551a0"
 # refagent's security group, which the construct makes: egress to the manifest's endpoints and nothing else.
 # Named by id, read 2026-09-29 (describe-network-interfaces on refagent's runtime ENI); the construct does not
-# publish it. A replaced group makes this stack's deploy fail, not the probe pass.
+# publish it. If the construct ever replaces the group, this still names the old one and nothing notices, so
+# the human records refagent's runtime ENI's group beside the invoke (security-reviewer on b167dd2, F1).
 REFAGENT_SG = "sg-003ad866687089f27"
-DEPLOY_BOUNDARY_NAME = "agentkeel-deploy-boundary"  # the bootstrap stack's; named, not imported
+# The bootstrap stack's deploy boundary: the right kind for a role that is not an agent's, but an allow-all
+# less a deny-list, so it caps nothing the inline grant does not; the inline grant is the ceiling (N1).
+DEPLOY_BOUNDARY_NAME = "agentkeel-deploy-boundary"
 S1_PROBE = '"""Seed S1\'s origin (SPEC/05 section 5): one TCP connect to 1.1.1.1:443 from the platform VPC. Decides nothing."""\nimport socket\nimport time\nfrom datetime import datetime, timezone\n\n\ndef handler(event, context):\n    started = datetime.now(timezone.utc).isoformat(timespec="seconds")\n    clock = time.monotonic()\n    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n    sock.settimeout(5)\n    try:\n        sock.connect(("1.1.1.1", 443))\n        result = "connected"\n    except OSError as exc:\n        result = f"{type(exc).__name__}: {exc}"\n    finally:\n        sock.close()\n    return {"destination": "1.1.1.1", "port": 443, "connected": result == "connected", "result": result,\n            "started": started, "elapsed_s": round(time.monotonic() - clock, 1)}\n'
 RUNTIME_LOG_GROUPS = f"arn:aws:logs:{REGION}:{AGENT_ACCOUNT}:log-group:/aws/bedrock-agentcore/runtimes/*"
 # refagent's explicit denies, as the construct puts them on refagent's role (SPEC/05 §6). Repeated, not
@@ -148,7 +154,7 @@ class AuditStack(cdk.Stack):
             code=lambda_.CfnFunction.CodeProperty(zip_file=S1_PROBE),
             vpc_config=lambda_.CfnFunction.VpcConfigProperty(
                 security_group_ids=[REFAGENT_SG],
-                subnet_ids=ssm.StringListParameter.value_for_typed_list_parameter(self, SUBNETS_PARAM)),
+                subnet_ids=[S1_SUBNET]),
             description="agentkeel M05 seed S1: one TCP connect to 1.1.1.1:443 from the platform VPC.",
         )  # fmt: skip
 
@@ -210,8 +216,10 @@ SUPPRESSIONS = {
     "SeedS1Role/DefaultPolicy/Resource": (
         "AwsSolutions-IAM5",
         "SPEC/05 §6 as amended at M05 PR 2, seed S1's origin: the EC2 network-interface actions Lambda needs to "
-        "place its ENI in a VPC take no resource-level scope for create and describe (AWS's own VPC access "
-        "permissions). The role carries the deploy boundary and is removed once S1 is read.",
+        "place its ENI in a VPC, on *, as AWS's own VPC access policy grants them. Describe takes no resource; "
+        "Create, Delete, Assign and Unassign could be scoped to the platform VPC and were not tried scoped, "
+        "because a refused create would leave S1 unmade (security-reviewer on b167dd2, F3). No other grant; "
+        "removed once S1 is read.",
     ),
     "Standin/DefaultPolicy/Resource": (
         "AwsSolutions-IAM5",
