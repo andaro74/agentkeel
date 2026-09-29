@@ -94,7 +94,6 @@ def test_s1_curl_to_the_internet_was_refused():
 # --- S2: a write to another agent's prefix ------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2 is attempted during M05 PR 2 (SPEC/05 §5.1)")
 def test_s2_a_write_to_another_agents_prefix_was_refused():
     """As refagent's stand-in, `s3:PutObject` under `agents/ratings-helper/` in the audit bucket.
     The stand-in's own policy grants the write, so the refusal must be the audit bucket's policy,
@@ -227,7 +226,6 @@ def test_s5_an_answer_that_repeats_a_credential_from_a_tool_result_does_not_pass
 OBJECT_LOCK_REFUSES = ("s3:DeleteObjectVersion", "s3:PutObjectRetention")  # granted on test/: the lock must refuse
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S6 is attempted during M05 PR 2 (SPEC/05 §5.1)")
 def test_s6_no_principal_in_the_agent_account_modifies_an_audit_object():
     """As the agent account's admin, on an object under `test/` less than a day old: delete its
     version and shorten its retention, both granted by the bucket policy so that Object Lock is what

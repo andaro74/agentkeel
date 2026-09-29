@@ -60,4 +60,39 @@ attempts:
     command: aws s3api put-bucket-policy --bucket <audit bucket> --policy file://seed-s6-policy.json
     granted_by: nothing; only the bucket's own account may
     refused_when: AccessDenied, and the policy unchanged
-observed: null
+# Made 2026-09-29 by the human as the agent account's admin
+# (user/hector.acevedo, AdministratorAccess). The object test/seed-s6.txt
+# was put first: version cnebtRsmKWpmLRzHuXgbVsMWFm2y8mE4, retention
+# COMPLIANCE until 2026-09-30T15:33:25.395Z, so put at about 15:33:25Z and
+# inside its day for every attempt below. Copied from the CLI's output as
+# pasted; each `at` is the human's clock before the call, not the attempt's
+# time (the trail record's eventTime is). Unsure J answered: the fourth
+# action was AccessDenied, not MethodNotAllowed.
+observed:
+  - what: delete the object's version
+    event_name: DeleteObject
+    request_id: X0TQ52HF4RGVXJZY
+    at: '2026-09-29T15:34:47Z'
+    version_id: cnebtRsmKWpmLRzHuXgbVsMWFm2y8mE4
+    result: AccessDenied
+    message: Access Denied because object protected by object lock.
+  - what: shorten the object's retention
+    event_name: PutObjectRetention
+    request_id: BFHP8MCDGD7FF0BM
+    at: '2026-09-29T15:34:55Z'
+    version_id: cnebtRsmKWpmLRzHuXgbVsMWFm2y8mE4
+    retain_until_before: '2026-09-30T15:33:25.395Z'
+    result: AccessDenied
+    message: Access Denied because object protected by object lock.
+  - what: turn the bucket's lock off
+    event_name: PutObjectLockConfiguration
+    request_id: DSHB2N47998KBX7K
+    at: '2026-09-29T15:35:02Z'
+    result: AccessDenied
+    message: 'User: arn:aws:iam::581208540944:user/hector.acevedo is not authorized to perform: s3:PutBucketObjectLockConfiguration on resource: "arn:aws:s3:::agentkeel-audit-897698239547" with an explicit deny in a resource-based policy'
+  - what: put a bucket policy that would allow the first two to anyone
+    event_name: PutBucketPolicy
+    request_id: 7B7Z5106QDVGXR39
+    at: '2026-09-29T15:35:08Z'
+    result: AccessDenied
+    message: 'User: arn:aws:iam::581208540944:user/hector.acevedo is not authorized to perform: s3:PutBucketPolicy on resource: "arn:aws:s3:::agentkeel-audit-897698239547" because no resource-based policy allows the s3:PutBucketPolicy action'

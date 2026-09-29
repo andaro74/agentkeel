@@ -89,9 +89,16 @@ Written at M05 PR 1 open. The row in `milestones/README.md` is the one
   and a Lambda, and recorded by neither, since routing drops the packet
   before anything that makes a flow record sees it. Row 5 closes RED on S1
   with that as the reason.
-- **Still the human's, during this PR:** deploy `infra/security/` in the
-  security account, then `infra/audit/` and the bootstrap in the agent
-  account, each after reading `cdk diff`; set the two repository
-  variables; attempt S1, S2 and S6; fill their run files. This PR's run
-  records them. S3, S4 and S7 are attempted after the merge deploy and
-  read at PR 3.
+- **Done by the human, 2026-09-29, each after reading `cdk diff`:**
+  `infra/security/` deployed in the security account
+  (`CREATE_COMPLETE`; S3 accepted the bucket policy under Block Public
+  Access) and `OrganizationAccountAccessRole` deleted there (`NoSuchEntity`,
+  read as `hector.flores`); the bootstrap redeployed (`UPDATE_COMPLETE`,
+  12:23:47Z); `infra/audit/` deployed (12:48:48Z; the trail delivering from
+  12:50:20Z, the flow log to the bucket from 12:53:41Z), then redeployed
+  twice for S1's Lambda and once to remove it (14:26:13Z). S1 attempted
+  twice (the finding above); S2 at 15:31Z, refused "with an explicit deny in
+  a resource-based policy"; S6's four actions at 15:34 to 15:35Z, two by
+  Object Lock, one by the bucket policy's Deny, one by S3's owner rule.
+  This PR's run records them. S3, S4 and S7 are attempted after the merge
+  deploy and read at PR 3.
