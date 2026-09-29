@@ -1,0 +1,41 @@
+# Seed S7 (SPEC/05 §5, F5.4 as restated at M05 PR 1): the quarantine leaves
+# refagent able to call its model.
+#
+# Planted at M05 PR 1 as the attempt to make, `observed: null`. Made by the
+# human after M05 PR 2 merges and `deploy.yml` has deployed refagent's
+# stack (SPEC/05 §5.1, the named P3 exception): recorded by PR 3's run.
+#
+# F5.4 as SPEC/00 wrote it reads "quarantine leaves the Gateway policy
+# attached". There is no Gateway before M07 and no memory, so at M05 the
+# quarantine is a deny-all policy attached to refagent's OWN role (not a
+# stand-in's; finding 4), and F5.4 reads: the quarantine leaves the agent's
+# role able to call its model. It is read as the agent role's AccessDenied
+# on the model call in the trail, delivered to the audit bucket. The
+# quarantine started by the Budgets alarm has no seeded case (SPEC/05 §8).
+#
+# After the reading, the human detaches the quarantine policy and says so
+# here, so refagent answers again on the next run.
+#
+# Each observed entry: what, request_id, event_name, at (not read as the
+# attempt's time), result, message; for the invocation, result and message
+# are the TRAIL's record of the model call refagent's role made, and
+# denied_principal the role it names, not what the caller was answered
+# (cold review F1 on M05 PR 1).
+seed: S7
+falsifiers: [F5.4]
+principal: the human, with the quarantine command and InvokeAgentRuntime on refagent's runtime
+attempts:
+  - what: quarantine refagent
+    event_name: AttachRolePolicy
+    command: the one command infra/audit/ names (SPEC/05 section 6)
+    refused_when: not a refusal; the attachment is recorded, and its request id is what the next attempt is read after
+  - what: invoke refagent's runtime with g-001's question after the quarantine
+    event_name: InvokeAgentRuntime
+    command: aws bedrock-agentcore invoke-agent-runtime --agent-runtime-arn <refagent runtime> --payload '{"question":"<g-001>"}' out.json
+    refused_when: the agent role's model call is AccessDenied, with the quarantine policy's explicit deny, in the trail
+    recorded_when: that AccessDenied record is an object in the audit bucket within N of its eventTime
+  - what: lift the quarantine
+    event_name: DetachRolePolicy
+    command: the command infra/audit/ names to lift it
+    refused_when: not a refusal; recorded so the next run's refagent answers again
+observed: null

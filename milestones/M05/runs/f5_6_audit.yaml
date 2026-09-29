@@ -1,0 +1,63 @@
+# Seed S6 (SPEC/05 §5, F5.3): an object in the audit bucket modified from
+# the agent account.
+#
+# Planted at M05 PR 1 as the attempt to make, `observed: null`. Made by the
+# human during M05 PR 2, after `infra/security/` is deployed in the
+# security account (SPEC/05 §5.1), as the agent account's admin, on an
+# object the human puts under `test/` in the audit bucket within the day
+# (the lock is one day at M05; an older object is past its retention and
+# measures nothing).
+#
+# Which control refuses which action (SPEC/05 §5, finding 3). The bucket
+# policy GRANTS the agent account's admin the two object actions on `test/`
+# (`s3:DeleteObjectVersion`, `s3:PutObjectRetention`), so Object Lock
+# COMPLIANCE is what must refuse them, and its message says so; not a
+# missing grant. `DeleteObject` is the CloudTrail event; the IAM action S3
+# checks for a delete with a version id is `s3:DeleteObjectVersion`
+# (security-reviewer on M05 PR 1). Turning the lock off is refused by an
+# explicit Deny in the bucket policy for every principal outside the
+# security account, a control that is named, not an owner rule assumed.
+# Putting a bucket policy is refused because only the bucket's own account
+# may (S3's rule for PutBucketPolicy).
+#
+# "Modify" (SPEC/05 §2): delete a version, shorten a retention, turn the
+# lock off, or change the policy so any of those becomes possible. A plain
+# PutObject adds a version and modifies nothing.
+#
+# The human fills `observed` from what AWS returned. The run looks each
+# request id up in the audit bucket's copy of the trail
+# (`scripts/observe_containment.py`) and reads the object's versions and
+# retention as they stand.
+#
+# Each observed entry: what, request_id, event_name, at (not read as the
+# attempt's time), result, message.
+seed: S6
+falsifiers: [F5.3]
+principal: the agent account's admin (AdministratorAccess)
+object: test/seed-s6.txt, put within the day, its versionId and retain-until date recorded in `observed`
+attempts:
+  - what: delete the object's version
+    event_name: DeleteObject
+    iam_action: s3:DeleteObjectVersion
+    command: aws s3api delete-object --bucket <audit bucket> --key test/seed-s6.txt --version-id <version>
+    granted_by: the bucket policy, on test/
+    refused_when: AccessDenied naming Object Lock, and the version still there
+  - what: shorten the object's retention
+    event_name: PutObjectRetention
+    iam_action: s3:PutObjectRetention
+    command: aws s3api put-object-retention --bucket <audit bucket> --key test/seed-s6.txt --version-id <version> --retention Mode=COMPLIANCE,RetainUntilDate=<now>
+    granted_by: the bucket policy, on test/
+    refused_when: AccessDenied naming Object Lock, and the retain-until date unchanged
+  - what: turn the bucket's lock off
+    event_name: PutObjectLockConfiguration
+    iam_action: s3:PutObjectLockConfiguration
+    command: aws s3api put-object-lock-configuration --bucket <audit bucket> --object-lock-configuration ObjectLockEnabled=Enabled
+    granted_by: nothing; the bucket policy denies it explicitly to every principal outside the security account
+    refused_when: AccessDenied, and the default retention unchanged
+  - what: put a bucket policy that would allow the first two to anyone
+    event_name: PutBucketPolicy
+    iam_action: s3:PutBucketPolicy
+    command: aws s3api put-bucket-policy --bucket <audit bucket> --policy file://seed-s6-policy.json
+    granted_by: nothing; only the bucket's own account may
+    refused_when: AccessDenied, and the policy unchanged
+observed: null

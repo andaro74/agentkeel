@@ -1,0 +1,28 @@
+# Seed S2 (SPEC/05 §5, F5.1 and F5.2): a write to another agent's S3 prefix.
+#
+# Planted at M05 PR 1 as the attempt to make, `observed: null`. Made by the
+# human during M05 PR 2, after `infra/security/` and `infra/audit/` are
+# deployed (SPEC/05 §5.1), as refagent's stand-in: a role under
+# /agentkeel/agents/ with the agent boundary, refagent's grants and denies,
+# and `s3:PutObject` on the whole audit bucket granted in its own policy, so
+# that the refusal can only be the audit bucket's policy, which names the
+# stand-in beside refagent's role on refagent's prefix only (SPEC/05 §2,
+# finding 5). A stand-in is not the agent (SPEC/05 §8).
+#
+# The human fills `observed` from what AWS returned. PR 2's run looks the
+# request id up in the audit bucket's copy of the trail
+# (`scripts/observe_containment.py`); the attempt's time is the trail
+# record's `eventTime`, never the time written here (SPEC/05 §2).
+#
+# Each observed entry: what, request_id, event_name, at (as the human saw
+# it; not read as the attempt's time), result, message.
+seed: S2
+falsifiers: [F5.1, F5.2]
+principal: refagent's stand-in (boundary on; PutObject on the audit bucket in its own policy)
+attempts:
+  - what: put an object under ratings-helper's prefix in the audit bucket
+    event_name: PutObject
+    command: aws s3api put-object --bucket <audit bucket> --key agents/ratings-helper/seed-s2.txt --body seed-s2.txt
+    refused_when: AccessDenied whose message names a resource-based policy (the bucket policy), and no object at that key
+    recorded_when: the trail's PutObject record for the request id is an object in the audit bucket within N of its eventTime
+observed: null

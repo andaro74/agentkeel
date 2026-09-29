@@ -98,12 +98,31 @@ SEEDS_M04: dict[str, tuple[str, str, str]] = {
     "S5": ("none (SPEC/00 section 8 M04)", "tests/fixtures/m04/s5-deprecated-pin.patch", "src/validate/lifecycle.py"),
 }
 
+# Claim 5's seeded cases (SPEC/05 section 5), the same shape. Listed at M05
+# PR 1, one seed per commit. The attempt seeds are run files the human fills
+# (M01 S4's pattern); their reader is the observer that looks each up in the
+# security account's audit bucket, which lands at M05 PR 2. S4's reader is a
+# file already in the tree that changes there (server.py), and S5's (build),
+# so `make plants` says "in the tree" beside them: the strict markers, not
+# this list, say whether a seed is read. Listing them reads nothing and gates
+# nothing.
+SEEDS_M05: dict[str, tuple[str, str, str]] = {
+    "S1": ("F5.1, F5.2", "milestones/M05/runs/f5_1_curl.yaml", "scripts/observe_containment.py"),
+    "S2": ("F5.1, F5.2", "milestones/M05/runs/f5_2_prefix.yaml", "scripts/observe_containment.py"),
+    "S3": ("F5.1, F5.2", "milestones/M05/runs/f5_3_logs.yaml", "scripts/observe_containment.py"),
+    "S4": ("F5.1, F5.2", "tests/fixtures/m05/s4-depth3-request.json, milestones/M05/runs/f5_4_chain.yaml", "agents/refagent/server.py"),
+    "S5": ("F5.1", "tests/fixtures/m05/s5-credential-raw.json", "src/verdict/build.py"),
+    "S6": ("F5.3", "milestones/M05/runs/f5_6_audit.yaml", "infra/security/"),
+    "S7": ("F5.4", "milestones/M05/runs/f5_7_quarantine.yaml", "infra/audit/"),
+}
+
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
 SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/01 section 5", SEEDS),
     ("SPEC/02 section 5", SEEDS_M02),
     ("SPEC/03 section 5", SEEDS_M03),
     ("SPEC/04 section 5", SEEDS_M04),
+    ("SPEC/05 section 5", SEEDS_M05),
 ]
 
 

@@ -15,7 +15,8 @@ ADR-0002 (the baseline is frozen at tag `m00`; M00 PR 3) · ADR-0005
 (the milestone video is recorded at the tag; M00 PR 3; with amendment 1:
 it is committed in the next milestone's PR 1; M01 PR 1) · ADR-0006
 (the platform VPC has gateway endpoints for S3 and DynamoDB as well as
-interface endpoints; §8 M01; M01 PR 2)
+interface endpoints; §8 M01; M01 PR 2) · Amended at M05 PR 1 (R5, §8
+M05, §10.3 row 05; `milestones/M05/rulings/pr1.md`)
 
 ## 1. What this is
 
@@ -449,6 +450,21 @@ Falsifiers: F5.1 any attempt succeeds. F5.2 any attempt absent from the
 security account after 10 minutes (R10). F5.3 an object in the audit
 bucket is modifiable by any principal in the agent account. F5.4
 quarantine leaves the Gateway policy attached.
+Amended at M05 PR 1 (`milestones/M05/rulings/pr1.md`; SPEC/05 §4, §9;
+`product-spec-reviewer` findings 7 and 13). Cut at open: GuardDuty
+Runtime Monitoring to M08; the graph diff in Athena to M07; credentials
+only via Identity, the chain carried by Identity and the per-agent
+Budgets filter (SPEC/01 §10, which named M05 for both) to M07; k6 to
+M07; seven-year retention to M08 (R5 amended); the quarantine as written
+here (Step Functions, revoke Gateway policy, scale to zero, freeze
+memory) to M07 for the Gateway and M08 for the full kill switch (F8.5);
+the credential attempt's live half to M06. There is no Gateway before
+M07 and no memory, so at M05 the quarantine is a deny-all policy on the
+agent's role, and **F5.4 reads: the quarantine leaves the agent's role
+able to call its model**. The live attempts are recorded in the
+envelope and read by row 5's cell, not gated on every pull request; the
+check on every envelope is `F5_1`, from the two code seeds' tests
+(SPEC/05 §4).
 
 ### M06 — Developer template
 Build: `create-agent` template repo (refagent as the shipped example);
@@ -731,7 +747,7 @@ finding on camera is the point.
 | 02 | Rules have owners | A rule, a test, or a threshold changes only when the person who owns it says so, and loosening one needs two owners. |
 | 03 | It can't get worse quietly | A test that used to pass and now fails stops the change from merging; every attack we planted must be caught, or the change stops; a contract nobody signed never reaches the documents the agent will be given to read. |
 | 04 | Changing the model is tested, or it's blocked | When a team switches the agent to a different model, the switch is tested on its own proposal before it can go in; if a test that used to pass now fails, or answers get much slower, it can't go in. |
-| 05 | The agent stays in its box | An agent can't reach the internet, other agents, secrets, or its own logs — and every attempt is recorded where it can't reach. |
+| 05 | The agent stays in its box | An agent is stopped from reaching the internet, writing to another agent's files, or deleting its own logs, and each attempt is recorded in a separate account it cannot change. |
 | 06 | A team can do this in a day | Marketing creates a governed agent from the template, without touching the safety pipeline. |
 | 07 | Upgrades come to you | A new platform version, a new model, or a retirement arrives as a PR; the team never edits the pipeline. |
 | 08 | We rehearsed the bad day | A hostile agent tried six things; all six were stopped, recorded, and recovered from. |
@@ -789,6 +805,13 @@ not check recordings.
 - **R5 — evidence retention.** Envelopes, edge events, audit logs: seven
   years, Object Lock compliance mode, security account, written by CI on
   M05 PR 1. A retention change is a two-key ruling.
+  Amended at M05 PR 1 (`milestones/M05/rulings/pr1.md` and
+  `pr1-security.md`, two keys; SPEC/05 §2, §9 cut e): the security
+  account and its audit bucket arrive at M05 PR 2, not PR 1, which plants
+  and builds nothing; the lock is COMPLIANCE with **one day** of
+  retention through M05, and seven years is M08's, where F8.4 proves
+  retention. CI writes envelopes to it from PR 2's merge, unless SPEC/05
+  §9 cut 2 is taken, and then from M08.
 - **R6 — the judge is a model too.** Pinned, watched by `model-watch`,
   never the model under test, with a graded-examples set it must
   reproduce.

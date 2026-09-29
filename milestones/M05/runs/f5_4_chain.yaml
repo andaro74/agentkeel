@@ -1,0 +1,34 @@
+# Seed S4 (SPEC/05 §5, F5.1 and F5.2): a call chain at depth 3, sent to
+# refagent's deployed runtime.
+#
+# Planted at M05 PR 1 as the attempt to make, `observed: null`, beside the
+# code seed tests/fixtures/m05/s4-depth3-request.json, whose payload it
+# sends. Made by the human after M05 PR 2 merges and `deploy.yml` has
+# deployed the runtime image with the chain check (SPEC/05 §5.1, the named
+# P3 exception): recorded by PR 3's run.
+#
+# The chain is the `chain` list in the invocation's JSON payload: the
+# agents that called before refagent. Two names, so refagent is the third
+# agent, and its manifest's ceilings.depth is 2. The chain is asserted by
+# the caller until Identity carries it (M07; SPEC/05 §5): this measures that
+# a chain refagent is told is too deep is refused and recorded, not that a
+# caller cannot lie about its depth.
+#
+# Self-reported (SPEC/05 §2, finding 9): the trail's record of the
+# InvokeAgentRuntime call is the agent's to neither write nor change; that
+# the call was refused rests on the agent's refusal event under its own
+# prefix and on no model call by its role in the same minute. The
+# attempt's time is the trail record's eventTime.
+#
+# Each observed entry: what, request_id (InvokeAgentRuntime's), at (not
+# read as the attempt's time), result (the runtime's answer, verbatim).
+seed: S4
+falsifiers: [F5.1, F5.2]
+principal: the human, with InvokeAgentRuntime on refagent's runtime
+attempts:
+  - what: invoke refagent's runtime with a chain of two callers before it
+    event_name: InvokeAgentRuntime
+    command: aws bedrock-agentcore invoke-agent-runtime --agent-runtime-arn <refagent runtime> --payload fileb://tests/fixtures/m05/s4-depth3-request.json out.json
+    refused_when: the answer is a refusal naming the depth, and the agent role made no model call for it
+    recorded_when: the trail's InvokeAgentRuntime record and refagent's refusal event, each an object in the audit bucket within N of the call's eventTime
+observed: null

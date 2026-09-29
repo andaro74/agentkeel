@@ -1,0 +1,33 @@
+# Seed S1 (SPEC/05 §5, F5.1 and F5.2): curl to the internet from where
+# refagent runs.
+#
+# Planted at M05 PR 1 as the attempt to make, `observed: null`. It is made
+# by the human during M05 PR 2, after `infra/security/` and `infra/audit/`
+# are deployed (SPEC/05 §5.1), from a CloudShell VPC environment in the
+# platform VPC's isolated subnet with refagent's security group. Its ENI is
+# CloudShell's, not the runtime's (SPEC/05 §8).
+#
+# The human fills `observed` with what the command printed and the ENI it
+# ran on. PR 2's run then looks for the flow record in the audit bucket in
+# the security account (`scripts/observe_containment.py`), and that lookup
+# is what records it: the attempt's time is the flow record's `start`, never
+# the time written here (SPEC/05 §2). A human-written file feeds no reading
+# by itself.
+#
+# Each observed entry: what, at (ISO 8601, UTC, as the human saw it; not
+# read as the attempt's time), eni, destination, connected (false if curl
+# could not connect), result (what curl printed), flow_action (the flow
+# record's action for that ENI and destination: REJECT or ACCEPT).
+#
+# A fixed address, not a name (security-reviewer on M05 PR 1): if a name
+# does not resolve from the isolated subnet, no packet is sent, no flow
+# record exists, and F5.2 would fire for a reason that is not the control.
+seed: S1
+falsifiers: [F5.1, F5.2]
+principal: a CloudShell VPC environment, platform VPC isolated subnet, refagent's security group
+attempts:
+  - what: curl to the internet
+    command: curl -m 5 https://1.1.1.1
+    refused_when: curl times out or cannot connect, and the flow record for the ENI to 1.1.1.1 reads REJECT
+    recorded_when: that flow record is an object in the audit bucket within N of its start (thresholds.yaml, detection.max_seconds)
+observed: null
