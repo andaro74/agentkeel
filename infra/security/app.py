@@ -39,7 +39,9 @@ What it makes, each named in SPEC/05 §6 before this file:
   including one refused for the caller alone, which the caller's own trail
   may redact. The trail's own delivery prefix (`AWSLogs/`) is not among
   the prefixes it logs, so its writes are not events that make more writes
-  (finding 17);
+  (finding 17). Every region, with IAM's global events, so a change to a
+  role in this account, the deletion of `OrganizationAccountAccessRole`
+  included, is recorded here;
 - **GitHub's OIDC provider** in this account, and two roles CI assumes by
   it: `agentkeel-audit-read` (the observer; `evals.yml` on a pull request
   or `main`), which reads `AWSLogs/`, `agents/` and `test/` and nothing
@@ -49,7 +51,10 @@ What it makes, each named in SPEC/05 §6 before this file:
 - **the boundary** every role here carries, applied stack-wide.
 
 What it does not do: stop this account's own admin or root, who own the
-bucket (the lock stops them on an object's day, not on the policy); hold
+bucket (the lock stops them on an object's day, not on the policy); stop
+the organization's management account, which is the agent account, from
+reaching this one through Organizations (centralized root access, removing
+the account, an SCP; `milestones/M05/runs/security_account.md`); hold
 anything seven years (M08); read the lock's retention in a gate (SPEC/05
 §8).
 """
@@ -77,10 +82,13 @@ PUT_ROLE = "agentkeel-envelope-put"
 AGENT_TRAIL = f"arn:aws:cloudtrail:{REGION}:{AGENT_ACCOUNT}:trail/agentkeel-audit"  # infra/audit/
 OWN_TRAIL_NAME = "agentkeel-audit-bucket"
 OWN_TRAIL = f"arn:aws:cloudtrail:{REGION}:{SECURITY_ACCOUNT}:trail/{OWN_TRAIL_NAME}"
-# The agent roles, by ARN. refagent's is named by CloudFormation from its logical id; the pattern is
-# that stack's role and no other, and the stand-in's name does not match it.
+# The agent roles, by their whole ARN (security-reviewer and platform-architect on M05 PR 2: a pattern
+# under `Principal: *` may read as public to S3, and would admit any role an admin names to match).
+# refagent's name is the one CloudFormation gave it (the refagent stack's AgentRoleArn output, read
+# 2026-09-28). A redeploy that replaces the role changes it: its puts are then refused and read as
+# unrecorded, closed and not open, until this stack is redeployed with the new name.
 AGENT_ROLES = f"arn:aws:iam::{AGENT_ACCOUNT}:role/agentkeel/agents/"
-REFAGENT_ROLE = f"{AGENT_ROLES}agentkeel-refagent-RefagentRole*"
+REFAGENT_ROLE = f"{AGENT_ROLES}agentkeel-refagent-RefagentRole5888DB41-i9IqTXU6NVSL"
 STANDIN_ROLE = f"{AGENT_ROLES}agentkeel-refagent-standin"  # infra/audit/
 # Repeated from infra/bootstrap/app.py, not imported: the two stacks are deployed by hand, in two accounts.
 REPO = "andaro74/agentkeel"
@@ -186,7 +194,7 @@ class SecurityStack(cdk.Stack):
         # Each agent role, and refagent's stand-in, on refagent's prefix only (finding 5, Security).
         bucket.add_to_resource_policy(iam.PolicyStatement(
             sid="RefagentPutsUnderItsOwnPrefix", principals=[iam.AnyPrincipal()], actions=["s3:PutObject"],
-            resources=[objects("agents/refagent/*")], conditions={"ArnLike": {"aws:PrincipalArn": REFAGENT_ROLE}},
+            resources=[objects("agents/refagent/*")], conditions={"ArnEquals": {"aws:PrincipalArn": REFAGENT_ROLE}},
         ))  # fmt: skip
         bucket.add_to_resource_policy(iam.PolicyStatement(
             sid="TheStandinPutsUnderItsOwnCornerOfIt", principals=[iam.AnyPrincipal()], actions=["s3:PutObject"],
@@ -197,7 +205,7 @@ class SecurityStack(cdk.Stack):
         bucket.add_to_resource_policy(iam.PolicyStatement(
             sid="NoAgentPutsOutsideItsOwnPrefix", effect=iam.Effect.DENY, principals=[iam.AnyPrincipal()],
             actions=["s3:PutObject"], not_resources=[objects("agents/refagent/*")],
-            conditions={"ArnLike": {"aws:PrincipalArn": [REFAGENT_ROLE, STANDIN_ROLE]}},
+            conditions={"ArnEquals": {"aws:PrincipalArn": [REFAGENT_ROLE, STANDIN_ROLE]}},
         ))  # fmt: skip
         # The observer accepts S4's refusal event only from refagent's role; the stand-in cannot write one.
         bucket.add_to_resource_policy(iam.PolicyStatement(
@@ -209,6 +217,13 @@ class SecurityStack(cdk.Stack):
         bucket.add_to_resource_policy(iam.PolicyStatement(
             sid="SeedS6TheLockMustRefuseTheseOnTest", principals=[iam.AccountPrincipal(AGENT_ACCOUNT)],
             actions=["s3:PutObject", "s3:GetObjectRetention", *S6_OBJECT_ACTIONS], resources=[objects("test/*")],
+        ))  # fmt: skip
+        # An envelope is written once: a put under envelopes/ without If-None-Match is refused, so no
+        # workflow on main can lay a second version over the first (security-reviewer on M05 PR 2).
+        bucket.add_to_resource_policy(iam.PolicyStatement(
+            sid="AnEnvelopeIsWrittenOnce", effect=iam.Effect.DENY, principals=[iam.AnyPrincipal()],
+            actions=["s3:PutObject"], resources=[objects("envelopes/*")],
+            conditions={"Null": {"s3:if-none-match": "true"}},
         ))  # fmt: skip
         bucket.add_to_resource_policy(iam.PolicyStatement(
             sid="NobodyOutsideThisAccountTurnsTheLockOff", effect=iam.Effect.DENY, principals=[iam.AnyPrincipal()],
@@ -223,7 +238,9 @@ class SecurityStack(cdk.Stack):
         selector = cloudtrail.CfnTrail.AdvancedFieldSelectorProperty
         trail = cloudtrail.CfnTrail(
             self, "Trail", trail_name=OWN_TRAIL_NAME, s3_bucket_name=bucket.bucket_name, is_logging=True,
-            is_multi_region_trail=False, include_global_service_events=False, enable_log_file_validation=True,
+            # Every region and IAM's global events (security-reviewer and platform-architect on M05 PR 2):
+            # the deletion of OrganizationAccountAccessRole, and any later change to a role here, is recorded.
+            is_multi_region_trail=True, include_global_service_events=True, enable_log_file_validation=True,
             advanced_event_selectors=[
                 cloudtrail.CfnTrail.AdvancedEventSelectorProperty(
                     name="Management events", field_selectors=[selector(field="eventCategory", equal_to=["Management"])]),

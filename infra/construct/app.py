@@ -94,7 +94,7 @@ WILDCARDS = {
 }
 NagSuppressions.add_resource_suppressions_by_path(
     stack, "AgentkeelRefagent/Refagent/Role/DefaultPolicy/Resource",
-    [{"id": "AwsSolutions-IAM5", "reason": reason, "applies_to": [finding]} for finding, reason in WILDCARDS.items()],
+    [{"id": "AwsSolutions-IAM5", "reason": reason, "appliesTo": [finding]} for finding, reason in WILDCARDS.items()],
 )
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

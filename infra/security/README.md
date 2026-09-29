@@ -2,12 +2,16 @@
 
 The security account's stack, `AgentkeelSecurity` (Security). SPEC/05 §6
 names each part; `app.py` builds them. It lives in account 897698239547
-(`milestones/M05/runs/security_account.md`), not in the agent account, and
-nothing in the agent account deploys or changes it.
+(`milestones/M05/runs/security_account.md`), not in the agent account. No
+role in the agent account deploys it or can assume a role in it once
+`OrganizationAccountAccessRole` is deleted; the agent account is still the
+organization's management account, and what that leaves open is below.
 
 What it is for, in one line: every attempt SPEC/05 §5 makes leaves its
-record in an S3 bucket that no principal in the agent account can delete,
-re-date, unlock or re-policy, and CI reads those records from here.
+record in an S3 bucket where no principal in the agent account can delete
+or re-date an object within its day, turn the lock off, or put a bucket
+policy through IAM, and CI reads those records from here. None of those
+refusals has been attempted yet (seed S6 is this PR's).
 
 ## Deploy, once, at M05 PR 2
 
@@ -55,5 +59,10 @@ flow log to the bucket, delete every version, then the bucket, then
 ## What it does not stop
 
 This account's own admin and root, who own the bucket and its policy (the
-lock holds each object for its day, not the policy); anything seven years
-(M08); a gate on the lock's retention (SPEC/05 §8).
+lock holds each object for its day, not the policy); the agent account as
+the organization's management account, which can enable centralized root
+access (`sts:AssumeRoot` with the `S3UnlockBucketPolicy` task policy, which
+deletes a bucket policy) or remove this account or attach an SCP to it: not
+enabled when read on 2026-09-28 (IAM trusted access off), and nothing here
+stops it being enabled (the landing zone's, SPEC/00 §12); anything seven
+years (M08); a gate on the lock's retention (SPEC/05 §8).

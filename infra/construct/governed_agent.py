@@ -181,6 +181,9 @@ class GovernedAgent(Construct):
         """The agent's role, under the agent path, with the boundary on it."""
         if given is not None:
             rules.own_role(given, self.boundary_arn, given=True)
+            # A given role is held to what the construct's own is (platform-architect F3 on M05 PR 2):
+            # the explicit denies and its own record, added to it, not assumed of it.
+            self._contain(given)
             return given
         role = iam.Role(
             self, "Role",
@@ -270,17 +273,22 @@ class GovernedAgent(Construct):
             resources=[f"arn:aws:kms:{stack.region}:{stack.account}:key/*"],
             conditions={"ForAnyValue:StringEquals": {"kms:ResourceAliases": f"alias/agentkeel-{self.agent_name}"}},
         ))  # fmt: skip
-        # M05 PR 2 (SPEC/05 §6). Its own record in the security account, under its own prefix; the audit
-        # bucket's policy refuses any other (seed S2), and the boundary caps it at agents/*.
-        role.add_to_policy(iam.PolicyStatement(
+        self._contain(role)
+        rules.own_role(role, self.boundary_arn, given=False)
+        return role
+
+    def _contain(self, role: iam.IRole) -> None:
+        """M05 PR 2 (SPEC/05 §6): its own record in the security account, and its own explicit denies.
+
+        The put is under its own prefix; the audit bucket's policy refuses any other (seed S2), and the
+        boundary caps it at agents/*. The denies are the role's own, beside the boundary's."""
+        role.add_to_principal_policy(iam.PolicyStatement(
             sid="ItsOwnRecordInTheAuditBucket",
             actions=["s3:PutObject"],
             resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/agents/{self.agent_name}/*"],
         ))  # fmt: skip
-        role.add_to_policy(iam.PolicyStatement(
+        role.add_to_principal_policy(iam.PolicyStatement(
             sid="NeverEscalateNeverEraseItsTracks", effect=iam.Effect.DENY, actions=AGENT_DENIES, resources=["*"]))
-        rules.own_role(role, self.boundary_arn, given=False)
-        return role
 
     # --- the model ---------------------------------------------------------
 

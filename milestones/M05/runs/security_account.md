@@ -53,9 +53,26 @@ change").
 3. Any later change to `infra/security/` is deployed as `hector.flores`.
 
 What the deletion does not stop: the management account can still act on
-a member through Organizations itself (remove the account from the
-organization, or attach an SCP to it). Those are organization-level
-controls, and closing them is the landing zone's (SPEC/00 §12).
+a member through Organizations itself: remove the account from the
+organization, attach an SCP to it, update its primary email, or enable
+**centralized root access** and then `sts:AssumeRoot` into it with a
+root-task policy (`S3UnlockBucketPolicy` deletes a bucket policy;
+`IAMCreateRootUserPassword` recovers root). Read-only from the agent
+account on 2026-09-28: `aws iam list-organizations-features` answered
+"Trusted Access for IAM not enabled by organization", and the
+organization's service access lists CloudFormation StackSets and IAM
+Identity Center only, so centralized root access is **not enabled**. An
+agent-account admin could enable it; nothing stops that. Object Lock
+COMPLIANCE still holds each object for its day against root; the bucket's
+policy, its default retention for new objects and the delivery are what
+that route reaches. Closing it is the landing zone's (SPEC/00 §12),
+recorded in SPEC/05 §8 (platform-architect and security-reviewer on M05
+PR 2).
+
+The deletion is to be recorded: the security account's trail is
+multi-region with IAM's global events, so the `DeleteRole` the human makes
+after the deploy reaches the audit bucket under `AWSLogs/897698239547/`.
+Until that record is read, the deletion is the human's word.
 
 ## SCPs never bind a management account
 

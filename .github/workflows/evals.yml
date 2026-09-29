@@ -93,10 +93,11 @@
 # the S4 and S5 tests (the Makefile). On a push to main the `archive` job
 # puts each CI-written file the push added under `envelopes/` in the audit
 # bucket, as `agentkeel-envelope-put`, trusted on main only, running git and
-# the AWS CLI and no code from a pull request; a key already there is not
-# overwritten (`If-None-Match`), and Object Lock holds each for its day.
-# Object Lock stops an overwrite, not a forged first write: what the bucket
-# proves is what main's workflow put, and when.
+# the AWS CLI and no code from a pull request. It is built to put each key
+# once (`If-None-Match`, and the bucket policy refuses a put there without
+# it) under Object Lock for its day; none of that has run until the first
+# push to main after this PR, and its first put is the record that it did.
+# Object Lock would stop an overwrite, not a forged first write.
 #
 # What this does not do:
 # - stop someone with write access from editing this file, or from adding
