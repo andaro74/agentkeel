@@ -168,7 +168,6 @@ def invoke(payload: dict[str, Any], monkeypatch) -> tuple[int, dict[str, Any], M
         httpd.server_close()
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S4's reader, the chain check in server.py, is M05 PR 2's")
 def test_s4_a_chain_at_depth_3_is_refused_before_the_model(monkeypatch):
     """An invocation whose payload's `chain` names two agents before refagent: refagent is the third,
     and its manifest's `ceilings.depth` is 2. Today `server.py` reads the question and nothing about
