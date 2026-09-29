@@ -145,8 +145,8 @@ def test_the_flow_log_goes_to_the_audit_bucket_every_minute(audit):
 
 
 def test_each_iam5_finding_on_refagents_role_has_a_reason_of_its_own(tmp_path_factory):
-    """M03 open.md row 11 item k. cdk-nag's CSV prints one reason for the rule on a resource; the suppressions
-    themselves are in the template's metadata, one per finding, and that is what this reads."""
+    """M03 open.md row 11 item k. Each suppression is in the template's metadata with the one finding it applies
+    to; before `appliesTo` each suppressed every finding and the CSV printed one reason for all six."""
     template = synth(tmp_path_factory, "construct", "AgentkeelRefagent")
     policy = next(r for k, r in template["Resources"].items() if r["Type"] == "AWS::IAM::Policy")
     rules = policy["Metadata"]["cdk_nag"]["rules_to_suppress"]

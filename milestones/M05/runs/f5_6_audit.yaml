@@ -53,7 +53,7 @@ attempts:
     iam_action: s3:PutObjectLockConfiguration
     command: aws s3api put-object-lock-configuration --bucket <audit bucket> --object-lock-configuration ObjectLockEnabled=Enabled
     granted_by: nothing; the bucket policy denies it explicitly to every principal outside the security account
-    refused_when: AccessDenied, and the default retention unchanged
+    refused_when: AccessDenied whose message says "explicit deny in a resource-based policy" (the bucket policy's own Deny; amended at M05 PR 2 before the attempt), and the default retention unchanged
   - what: put a bucket policy that would allow the first two to anyone
     event_name: PutBucketPolicy
     iam_action: s3:PutBucketPolicy

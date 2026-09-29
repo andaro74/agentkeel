@@ -65,6 +65,12 @@ the named P3 exception ruled at PR 1).
    `infra/security/` makes; §8 names the organization's reach over the
    security account and the controls this PR adds that no seed attempts.
    None of them is described as working.
+7. **SPEC/05 §6 amended on the second Security read** (its F1): S6's
+   `test/` grant names the agent account, not the admin alone, and lists
+   the put and the retention read beside the two actions; the lock's IAM
+   action is named. S2's and S6's run files say the phrase the reader
+   requires, "explicit deny in a resource-based policy", before either
+   attempt is made (second cold read, F2).
 
 ## What a reader can run
 

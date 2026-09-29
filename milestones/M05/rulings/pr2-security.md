@@ -119,18 +119,35 @@ called by Security (0 BLOCK, 6 FINDING, 9 NOTE), each read the diff
 
 | Finding | Status |
 |---|---|
-| security: S2's and S6's lock-off readers could not tell the named control from a missing grant | **Repaired** (`ec6747b`, Engineering): "explicit deny in a resource-based policy" required |
+| security (two findings, S2 and S6's lock-off): the readers could not tell the named control from a missing grant | **Repaired** (`ec6747b`, Engineering): "explicit deny in a resource-based policy" required |
 | security: If-None-Match only a client flag | **Repaired** (`ca0d07d`): the bucket policy denies a put under `envelopes/` without it |
-| security, platform F2: the security account's trail missed IAM's events | **Repaired** (`ca0d07d`): multi-region with global events; the role's deletion reaches the bucket |
+| security, platform F2: the security account's trail missed IAM's events | **Repaired** (`ca0d07d`): multi-region with global events; the role's deletion will reach the bucket once it is made after the deploy |
 | security, platform F1: the organization's route to the security account (centralized root access) | **Named** (`ca0d07d`, and SPEC/05 §8): read 2026-09-28, not enabled; nothing stops it being enabled; the landing zone's |
 | security: a pattern in `aws:PrincipalArn` may read as public | **Repaired** (`ca0d07d`): refagent by its whole ARN, `ArnEquals`; the first deploy reads whether S3 accepts the policy |
 | platform F3: a role handed to the construct skipped the denies | **Repaired** (`ca0d07d`): `_contain` adds them and the record's put; tested |
 | platform F4: "every role in that account carries a boundary" | **Worded** (SPEC/05 §6, Product): every role `infra/security/` makes. `ecsTaskExecutionRole` may be deleted by the human; nothing reads it |
 | platform F5, F6: controls with no seeded case | **Named** in SPEC/05 §8, none described as working |
 | security NOTE, platform NOTE 4: any same-repo PR's code can read `AWSLogs/` | **Accepted for M05**: read-only, both accounts' management events; the reader from `main` is M06's |
-| security NOTE: S6's grant to the account root, not the admin | **Kept** as SPEC/05 §6 allowed; the lock must refuse any principal in the agent account, which is the stronger reading |
+| security NOTE: S6's grant to the account root, not the admin | **Kept, and SPEC/05 §6 amended to say so** (Product, `rulings/pr2.md` ruling 7, on the second read's F1): the lock must refuse any principal in the agent account, F5.3's reading, and the grant lists the put and the retention read beside the two actions |
 | platform NOTE 3: `PutObjectRetention` on `test/` can lengthen a hold | **Recorded**: the teardown waits for it; not a modification (SPEC/05 §2) |
 | platform NOTE 5: the manifest's `s3` comment still says image layers only | **Carried to M06**: a comment in `manifest.yaml` changes the bundle digest and would put this PR's run in the runner |
 | platform NOTE 6: the bucket policy names refagent only | **Carried to M06/M07**, with the second agent's code |
 | cold review F5: `evals.yml` described the archive as done | **Repaired** (`ca0d07d`) |
 | item k, found while testing: `applies_to` dropped by cdk-nag's binding | **Repaired** (`ca0d07d`): `appliesTo`; each row its own reason |
+
+### The second read, of the repairs (`27f2678...a07d6ba`)
+
+`security-reviewer` read the repair diff: 0 BLOCK, 1 FINDING, 14 NOTE,
+verbatim in the PR body. Its six first-read findings: closed in code, none
+fired. F1 (the S6 row above cited SPEC/05 §6 for what it did not say):
+**repaired** by amending §6 and this row. Notes repaired here: the security
+stack's suppression reason quotes §6 as amended (N4); the archive job's
+comment says it has not run (N5); §6 names the IAM action (N9); this
+table's trail row and its count of two findings in one row (N11, N12).
+Recorded: N3, the other stacks' suppressions still have no `appliesTo`
+(M06, Security); N7, a cross-account `PutBucketPolicy` may be answered
+`MethodNotAllowed`, not `AccessDenied`, which the reader would read as not
+refused: stated before this PR's run, read by it, and not widened ahead of
+the record; N8, the write-once Deny also refuses a multipart put there,
+which the archive does not use. N10: the cleanup is dated 2026-09-29 as the
+human dated it.

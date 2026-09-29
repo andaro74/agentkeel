@@ -86,6 +86,20 @@ role passed `applies_to`, which cdk-nag's binding dropped, so each
 suppressed every finding and the CSV printed one reason. Repaired with
 `appliesTo` (`ca0d07d`); the test reads the six reasons in the template.
 
+## The second read, of the repairs (`27f2678...a07d6ba`)
+
+`engineering-cold-reviewer` read the repair diff and row 5: 0 BLOCK, 2
+FINDING, 6 NOTE, verbatim in the PR body. Each repair closes what it
+claims; every gap left fails closed. F1 (the phrase seen in no real
+record) is F2 above, read by this PR's run. F2 (the run files' stated
+tests looser than the reader): **repaired**, S2's and S6's lock-off
+`refused_when` say the phrase, before the attempts (Product). N4 (a test
+docstring) **repaired**; N5 (the stack's docstring) **repaired** (Security).
+Recorded: N1, the refagent ARN is six literals, each divergence closed;
+N2, build's N from another tree reads RED, never GREEN; N3, S7's window
+opens at the call less a minute, not at the attach; N6, the write-once
+Deny and the archive agree, and neither has run.
+
 ## The run that decides this ruling
 
 Filled in before the ruling line: the head whose run records S1, S2 and

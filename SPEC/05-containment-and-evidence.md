@@ -334,10 +334,15 @@ PR 2):
   roles and a leftover `ecsTaskExecutionRole`, which no stack of this
   platform makes.)
 - **The bucket policy** names role ARNs per prefix, never the agent
-  account's root, but for S6's `test/` grant to the admin, which lists
+  account's root, but for S6's `test/` grant, which lists
   `s3:DeleteObjectVersion` and `s3:PutObjectRetention` on `test/*` only.
-  It denies `s3:PutObjectLockConfiguration` explicitly to every principal
-  outside the security account.
+  It denies `s3:PutObjectLockConfiguration` (the IAM action
+  `s3:PutBucketObjectLockConfiguration`) explicitly to every principal
+  outside the security account. Amended at M05 PR 2 (security-reviewer's
+  second read): S6's grant names the agent account, not the admin alone,
+  so that the lock must refuse any principal there, which is F5.3's
+  reading; and it lists two more actions on `test/*`, the put that makes
+  the object and the read of its retention.
 - **The stand-in** is assumable only by the human's admin role with MFA,
   and is deleted, or its trust emptied, once S2 and S3 are read. It is
   kept off the prefix that holds refagent's refusal events, and the

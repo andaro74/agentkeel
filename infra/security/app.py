@@ -41,7 +41,7 @@ What it makes, each named in SPEC/05 §6 before this file:
   the prefixes it logs, so its writes are not events that make more writes
   (finding 17). Every region, with IAM's global events, so a change to a
   role in this account, the deletion of `OrganizationAccountAccessRole`
-  included, is recorded here;
+  included, will be recorded here once it is made;
 - **GitHub's OIDC provider** in this account, and two roles CI assumes by
   it: `agentkeel-audit-read` (the observer; `evals.yml` on a pull request
   or `main`), which reads `AWSLogs/`, `agents/` and `test/` and nothing
@@ -317,7 +317,7 @@ SUPPRESSIONS = {
     ),
     "Boundary/Resource": (
         "AwsSolutions-IAM5",
-        "SPEC/05 §6: 'every role in that account carries a boundary'. Its Allow is the audit bucket and its "
+        "SPEC/05 §6: 'so does every role infra/security/ makes'. Its Allow is the audit bucket and its "
         "objects (arn/*), because the keys are written by CloudTrail, flow-log delivery and the agents; the "
         "wildcard on * is in the Deny, which must cover every resource.",
     ),

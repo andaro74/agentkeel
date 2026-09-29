@@ -595,9 +595,10 @@ jobs:
   # envelopes/ in the security account's audit bucket, as
   # agentkeel-envelope-put, whose trust names main and this workflow on main
   # and nothing else. git and the AWS CLI only: no `make`, no `uv`, no code from
-  # a pull request. A key already there is not overwritten (If-None-Match), so
-  # a second push of the same file changes nothing; Object Lock holds each
-  # object for its day. No role variable yet: the job says so and puts nothing.
+  # a pull request. It is built so that a key already there is not
+  # overwritten (If-None-Match, which the bucket policy requires) and each
+  # object is locked for its day; it has not run until the first push to main
+  # after M05 PR 2. No role variable yet: the job says so and puts nothing.
   archive:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
