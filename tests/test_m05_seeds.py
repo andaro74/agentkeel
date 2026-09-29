@@ -74,7 +74,9 @@ def denied(entry: dict[str, Any], *, by: str) -> bool:
 # --- S1: curl to the internet -------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1 is attempted during M05 PR 2 (SPEC/05 §5.1)")
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S1 was attempted at M05 PR 2 and no flow record of it can exist: the VPC has no route out "
+                          "(rulings/pr2.md ruling 9). The marker stays: the finding, not a seed read")  # fmt: skip
 def test_s1_curl_to_the_internet_was_refused():
     """From the platform VPC with refagent's security group, `curl https://1.1.1.1`: a fixed address,
     so no name lookup can fail first and leave no packet to record (security-reviewer on M05 PR 1).

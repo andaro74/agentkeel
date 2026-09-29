@@ -5,30 +5,35 @@
 # by the human during M05 PR 2, after `infra/security/` and `infra/audit/`
 # are deployed (SPEC/05 §5.1).
 #
-# **The origin, amended at M05 PR 2 before the attempt is recorded** (ruled
-# by the human as Product, with Security, 2026-09-29). It was to be a
-# CloudShell VPC environment in the isolated subnet with refagent's security
-# group. On 2026-09-29 one was made (ENI eni-0940204e9da05de92, 10.20.0.248)
-# and `curl -m 5 https://1.1.1.1` at 12:56:42Z timed out, but no flow record
-# of it exists: the ENI read NODATA for every window from 12:56:10 to
-# 13:15:41, in both the audit bucket's flow log and the agent account's
-# CloudWatch one, while a connection from the same shell to the Bedrock
-# endpoint at 13:15:47Z was recorded on that ENI as ACCEPT (13:16:19 to
-# 13:16:33). CloudShell drops traffic to an outside address inside its own
-# networking, before the ENI, so the security group never refused it and
-# nothing could record it. The origin is now `agentkeel-seed-s1`
-# (`infra/audit/`), a Lambda in the isolated subnets with refagent's
-# security group, whose packets leave through its own ENI, where the group
-# refuses them and the flow log records the refusal. Neither is the runtime
-# (SPEC/05 §8).
+# **What happened, and the finding** (M05 PR 2, 2026-09-29; ruled by the
+# human as Product, with Security: `rulings/pr2.md` rulings 8 and 9).
 #
-# The human invokes the function once and records what it returned and the
-# ENI it ran on: the one Lambda ENI in subnet-00008bbb7a11551a0 with
-# refagent's group. Beside it, read at the same time: refagent's runtime
-# ENI's security group (the same group, or the probe was not behind
-# refagent's), and the subnet's network ACL (the default, allowing all, or
-# a REJECT could be the ACL's and not the group's). security-reviewer on
-# b167dd2, F1 and N2.
+# 1. From a CloudShell VPC environment in subnet-00008bbb7a11551a0 with
+#    refagent's group (ENI eni-0940204e9da05de92, 10.20.0.248):
+#    `curl -m 5 https://1.1.1.1` at 12:56:42Z timed out (curl 28). The ENI
+#    read NODATA in every window from 12:56:10 to 13:15:41, in the audit
+#    bucket's flow log and in the agent account's CloudWatch one. A
+#    connection from the same shell to the Bedrock endpoint at 13:15:47Z
+#    was recorded on that ENI as ACCEPT (13:16:19 to 13:16:33).
+# 2. From `agentkeel-seed-s1`, a Lambda in the same subnet with refagent's
+#    group (ENI eni-0c08046521e03ba3c, 10.20.0.33, the same group as
+#    refagent's runtime ENIs; the subnet's network ACL the default,
+#    allowing all): one TCP connect to 1.1.1.1:443 at 13:54:22Z timed out
+#    after 5.0 s. The ENI read NODATA in all 67 records to 14:07:48,
+#    including every window spanning the attempt.
+#
+# Two origins, one absence. The VPC has no internet gateway, no NAT and no
+# route to 0.0.0.0/0, so a packet for 1.1.1.1 is dropped by routing before
+# the security group or the network ACL sees it, and a drop by routing
+# leaves no flow record. The first explanation, recorded at `b167dd2`, that
+# CloudShell dropped the traffic before its ENI, was wrong: the Lambda shows
+# the same. S1 is refused, by the missing route (ADR-0006), not by the
+# security group this file first named, and no record of the refusal can
+# exist in the audit bucket from any origin in this VPC. F5.2 is unmet for
+# S1, and row 5 reads it so.
+#
+# The one entry below is the Lambda's attempt, the origin with its ENI and
+# group read beside it. `flow_action` is null: no flow record exists.
 #
 # The human fills `observed` with what the command printed and the ENI it
 # ran on. PR 2's run then looks for the flow record in the audit bucket in
@@ -51,6 +56,18 @@ principal: the Lambda agentkeel-seed-s1, platform VPC isolated subnets, refagent
 attempts:
   - what: curl to the internet
     command: aws lambda invoke --function-name agentkeel-seed-s1 --payload '{}' s1.json (one TCP connect to 1.1.1.1:443, 5 s timeout)
-    refused_when: the function cannot connect, and the flow record for its ENI to 1.1.1.1 reads REJECT
+    refused_when: 'the function cannot connect, and the flow record for its ENI to 1.1.1.1 reads REJECT (as planted; the refusal is the missing route, which leaves no record, as above)'
     recorded_when: that flow record is an object in the audit bucket within N of its start (thresholds.yaml, detection.max_seconds)
-observed: null
+observed:
+  - what: curl to the internet
+    at: '2026-09-29T13:54:22Z'
+    eni: eni-0c08046521e03ba3c
+    private_ip: 10.20.0.33
+    security_group: sg-003ad866687089f27
+    same_group_as_refagents_runtime: true
+    network_acl: acl-07ac88462cc60d983 (default, allow all)
+    destination: 1.1.1.1
+    connected: false
+    result: 'TimeoutError: timed out (elapsed 5.0 s)'
+    flow_action: null
+    note: no flow record for this ENI and 1.1.1.1; the ENI read NODATA throughout (the finding above)

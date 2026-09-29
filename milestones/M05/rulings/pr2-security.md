@@ -152,24 +152,26 @@ the record; N8, the write-once Deny also refuses a multipart put there,
 which the archive does not use. N10: the cleanup is dated 2026-09-29 as the
 human dated it.
 
-## 8. S1's origin (ruled 2026-09-29, after the first attempt)
+## 8. S1: the origin tried twice, and the finding (ruled 2026-09-29)
 
-The CloudShell VPC environment could not be S1's origin: its traffic to
-1.1.1.1 never reached its ENI (`runs/f5_1_curl.yaml`; `rulings/pr2.md`
-ruling 8). **Ruled, with Product:** `infra/audit/` adds
-`agentkeel-seed-s1`, a Lambda in the isolated subnets behind refagent's
-security group `sg-003ad866687089f27`, in one subnet (one ENI), which
-opens one TCP connection to 1.1.1.1:443 and returns what happened. Its
-role, `agentkeel-seed-s1-role`, holds only the EC2 network-interface
-actions Lambda needs to place its ENI, on `*` as AWS's VPC access policy
-grants them; no logs, no other grant. It carries the deploy boundary,
-which caps nothing more: the inline grant is its ceiling.
-`security-reviewer` read `b167dd2` (0 BLOCK, 3 FINDING, 6 NOTE): F2 one
-subnet, F3 the suppression's reason, F1 and N2 (refagent's group and the
-default network ACL recorded beside the invoke), N1 and N4 repaired in the
-next commit; N3 (the role can delete unattached ENIs until removed) and N5
-(only the audit bucket's flow log is evidence) recorded. The
-security group is refagent's, named by id; the refusal is that group's
-egress, which lists the manifest's endpoints and nothing else. Removed
-with `S1_ORIGIN = False` once S1 is read, as the stand-in is. Deployed by
-the human with a redeploy of `infra/audit/` after reading `cdk diff`.
+S1 was attempted from a CloudShell VPC environment (12:56:42Z) and then,
+on the first attempt's absent record, from `agentkeel-seed-s1`, a Lambda
+added to `infra/audit/` for it (13:54:22Z): one subnet, refagent's group
+`sg-003ad866687089f27` (read the same as refagent's runtime ENIs'), the
+default network ACL (read). Both timed out; both ENIs recorded only
+NODATA. The reason recorded at `b167dd2`, that CloudShell dropped the
+traffic before its ENI, was wrong. The VPC has no route out, so routing
+drops the packet before the security group or the network ACL sees it,
+and a drop by routing leaves no flow record. The control that refuses S1
+is the missing route (ADR-0006), not the security group; it holds, and
+nothing can record it.
+
+**Ruled, with Product** (`rulings/pr2.md` ruling 9): S1 is the finding,
+unmet for F5.2, and row 5 closes RED on it. The Lambda is removed:
+`S1_ORIGIN = False`, and the human redeploys `infra/audit/`, which
+deletes the function and its role. Its first deploy had rolled back
+(`24e05db`): the function was created before its role's separate policy,
+and Lambda's `CreateNetworkInterface` was refused six times; the grant
+went inline. `security-reviewer` read `b167dd2` (0 BLOCK, 3 FINDING, 6
+NOTE; one subnet, the reason, the group and ACL read beside the invoke:
+repaired at `067243b`).

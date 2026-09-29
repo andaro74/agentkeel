@@ -237,7 +237,7 @@ Each is named in `tests/fixtures/README.md` and listed in
 
 | Seed | Falsifier | Planted as | Fails today because | Read by (PR 2) |
 |---|---|---|---|---|
-| S1 curl to the internet | F5.1, F5.2 | `runs/f5_1_curl.yaml`: `curl -m 5 https://1.1.1.1`, a fixed address so no name lookup fails first, from a Lambda (`agentkeel-seed-s1`, `infra/audit/`) in the platform VPC's isolated subnets with refagent's security group, one TCP connect to 1.1.1.1:443 (amended at M05 PR 2: a CloudShell VPC environment's traffic to an outside address never reached its ENI, so no flow record could exist; `runs/f5_1_curl.yaml`); `observed: null` | the attempt is not made; its only record would be a flow-log group in the agent account | flow logs delivered to the audit bucket at one-minute aggregation (`infra/audit/`); the observer finds the `REJECT` for that ENI and destination |
+| S1 curl to the internet | F5.1, F5.2 | `runs/f5_1_curl.yaml`: `curl -m 5 https://1.1.1.1`, a fixed address so no name lookup fails first, from inside the platform VPC with refagent's security group; `observed: null`. **The finding, at M05 PR 2** (`rulings/pr2.md` ruling 9; `runs/f5_1_curl.yaml`): attempted from a CloudShell VPC environment and from a Lambda, each timed out, and neither ENI recorded anything but NODATA. The VPC has no route out, so the packet is dropped by routing before the security group or network ACL sees it, and that drop leaves no flow record: S1 is refused by the missing route (ADR-0006), and no record of it can reach the audit bucket from any origin in this VPC. F5.2 is unmet for S1 | the attempt is not made; its only record would be a flow-log group in the agent account | flow logs delivered to the audit bucket at one-minute aggregation (`infra/audit/`); the observer finds the `REJECT` for that ENI and destination |
 | S2 a write to another agent's prefix | F5.1, F5.2 | `runs/f5_2_prefix.yaml`: `s3:PutObject` to `agents/ratings-helper/` in the audit bucket as refagent's stand-in, whose own policy grants it; `observed: null` | the attempt is not made; there is no audit bucket and no prefix | the audit bucket's policy (each agent role, and refagent's stand-in, on its own prefix only); the audit bucket's S3 data events in the trail |
 | S3 `logs:DeleteLogStream` | F5.1, F5.2 | `runs/f5_3_logs.yaml`: `logs:DeleteLogStream` on refagent's runtime log stream as the stand-in, whose own policy grants it; `observed: null` | the attempt is not made; its only record would be the agent account's event history | the explicit deny on the agent role and the stand-in (`infra/construct/`, `infra/audit/`); the trail delivering to the audit bucket |
 | S4 a chain at depth 3 | F5.1, F5.2 | `tests/fixtures/m05/s4-depth3-request.json`: an invocation whose payload's `chain` names two agents before refagent; `runs/f5_4_chain.yaml`: the same payload sent to the deployed runtime; `observed: null` | `server.py` calls the model on it: nothing reads a chain | `server.py` refuses a chain deeper than `ceilings.depth` before any model call and writes a refusal event with the call's id to its own prefix in the audit bucket (self-reported, §2) |
@@ -388,10 +388,13 @@ PR 2):
 SPEC/00 §10.5: no document describes these as working.
 
 - a hostile agent inside the runtime. S2 and S3 are made as a stand-in,
-  and S1 from a Lambda in the platform VPC whose ENI is the Lambda's, not
-  the runtime's (note 4; amended at M05 PR 2, where a CloudShell VPC
-  environment was tried first and its traffic to 1.1.1.1 never reached its
-  ENI). The hostile copy is M08's (SPEC/00 §9);
+  and S1 from a CloudShell VPC environment and from a Lambda, neither of
+  them the runtime (note 4);
+- a record of a refusal by the missing route (added at M05 PR 2, S1's
+  finding): a packet for an outside address is dropped by routing before
+  any security group or network ACL, and no flow record is made. The
+  control holds and nothing records it; recording it would need something
+  that sees the attempt, not the drop (M08, with the hostile copy). The hostile copy is M08's (SPEC/00 §9);
 - a caller lying about its depth (§5, S4): Identity, M07;
 - that S4 was refused, beyond the agent's own word and the absence of a
   model call (§2, self-reported);

@@ -186,8 +186,10 @@ The attempt seeds are not fixtures: they are run files under
 refuses the chain before any model call) and S5's in `52b1051` (`build`
 fails the answer that carries the key); each test, with its reader switched
 off, still fails on its planted message. The attempt seeds' markers come
-off in the commit that records each attempt: S1, S2 and S6 during PR 2, S3
-and S7 at PR 3 (SPEC/05 section 5.1). What reads the attempts is
+off in the commit that records each attempt: S2 and S6 during PR 2, S3 and
+S7 at PR 3 (SPEC/05 section 5.1). S1's stays on: it was attempted at PR 2,
+refused by the missing route, and no flow record of it can exist in a VPC
+with no route out (`milestones/M05/rulings/pr2.md` ruling 9). What reads the attempts is
 `scripts/observe_containment.py` and the ledger's row 5 reading, not these
 tests. One name, recorded: S6's run file lists the lock's action as
 `s3:PutObjectLockConfiguration`, the API's name; the IAM action a policy

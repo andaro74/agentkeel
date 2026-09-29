@@ -155,20 +155,8 @@ def test_each_iam5_finding_on_refagents_role_has_a_reason_of_its_own(tmp_path_fa
     assert len({r["reason"] for r in iam5}) == 6
 
 
-def test_s1s_origin_is_behind_refagents_security_group_in_the_platform_subnets(audit):
-    """Amended at M05 PR 2: S1 from a Lambda in the VPC, whose packets cross its own ENI, where the security group
-    refuses them and the flow log records it. A CloudShell VPC environment's never reached its ENI."""
-    (function,) = of_type(audit, "AWS::Lambda::Function")
-    assert function["FunctionName"] == "agentkeel-seed-s1"
-    assert function["VpcConfig"]["SecurityGroupIds"] == ["sg-003ad866687089f27"]
-    assert function["VpcConfig"]["SubnetIds"] == ["subnet-00008bbb7a11551a0"]  # one subnet, one ENI
-    code = function["Code"]["ZipFile"]
-    assert '("1.1.1.1", 443)' in code and "settimeout(5)" in code
-    role = next(r for r in roles(audit).values() if r["RoleName"] == "agentkeel-seed-s1-role")
-    assert "agentkeel-deploy-boundary" in json.dumps(role["PermissionsBoundary"])
-    # Inline in the role, so the role never exists without it (the first deploy's function beat a separate policy).
-    assert not [p for p in of_type(audit, "AWS::IAM::Policy") if "SeedS1Role" in json.dumps(p["Roles"])]
-    (policy,) = role["Policies"]
-    granted = {a for s in policy["PolicyDocument"]["Statement"] for a in s["Action"]}
-    assert all(a.startswith("ec2:") and "NetworkInterface" in a or a in ("ec2:DescribeSubnets",
-               "ec2:AssignPrivateIpAddresses", "ec2:UnassignPrivateIpAddresses") for a in granted)
+def test_s1s_origin_is_removed_once_it_showed_the_finding(audit):
+    """M05 PR 2: the Lambda tried as S1's origin timed out and left no flow record, as CloudShell had, because the VPC
+    has no route out (rulings/pr2.md ruling 9). S1_ORIGIN = False: the stack makes neither the function nor its role."""
+    assert of_type(audit, "AWS::Lambda::Function") == []
+    assert "agentkeel-seed-s1-role" not in roles(audit)

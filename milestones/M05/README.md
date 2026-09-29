@@ -84,6 +84,11 @@ Written at M05 PR 1 open. The row in `milestones/README.md` is the one
   not its grants, which neither S2 nor S3 uses (SPEC/05 §8). S4's and S7's
   invocations are found by their session id, which the run files now name
   (amended before either attempt is made).
+- **S1 is the finding** (`rulings/pr2.md` ruling 9): refused by the
+  missing route from two origins inside the VPC, a CloudShell environment
+  and a Lambda, and recorded by neither, since routing drops the packet
+  before anything that makes a flow record sees it. Row 5 closes RED on S1
+  with that as the reason.
 - **Still the human's, during this PR:** deploy `infra/security/` in the
   security account, then `infra/audit/` and the bootstrap in the agent
   account, each after reading `cdk diff`; set the two repository

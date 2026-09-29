@@ -36,17 +36,16 @@ What it makes, each named in SPEC/05 §6 before this file:
   denies everything, attached to nothing. The human attaches it to
   refagent's own role with the one command `README.md` names, and detaches
   it with the other;
-- **seed S1's origin** (amended at M05 PR 2, ruled by the human as Product
-  with Security): `agentkeel-seed-s1`, a Lambda in the platform VPC's
-  isolated subnets with refagent's security group, which opens one TCP
-  connection to 1.1.1.1:443 and returns what happened. A CloudShell VPC
-  environment was the planned origin; its traffic to an outside address
-  never reached its ENI, so no flow record of it could exist (SPEC/05 §5,
-  §8). A Lambda in a VPC sends through its own ENI in the subnet, where the
-  security group refuses the packet and the flow log records the refusal.
-  One subnet, one ENI. Its inline grant is its ceiling; it carries the
-  deploy boundary, which caps nothing more. Removed once S1 is read
-  (`S1_ORIGIN` below).
+- **seed S1's origin, tried and removed** (M05 PR 2): `agentkeel-seed-s1`,
+  a Lambda in one isolated subnet with refagent's security group, which
+  opened one TCP connection to 1.1.1.1:443 at 13:54:22Z on 2026-09-29 and
+  timed out. Its ENI recorded NODATA throughout, as the CloudShell VPC
+  environment's had at 12:56:42Z. Two origins, one absence: the VPC has no
+  route out, so the packet is dropped by routing before the security group
+  or the network ACL sees it, and that drop leaves no flow record. S1 is
+  refused and cannot be recorded; that is the finding (`rulings/pr2.md`
+  ruling 9; SPEC/05 §5, §8). `S1_ORIGIN = False`: the next deploy deletes
+  the function and its role. The code stays as the record of what ran.
 
 Every name here is fixed, so the security account's policy can name it
 before it exists.
@@ -82,8 +81,9 @@ ADMIN = f"arn:aws:iam::{AGENT_ACCOUNT}:user/hector.acevedo"
 # reads S3 sets it False and the human redeploys this stack, which deletes the role.
 STANDIN = True
 QUARANTINE_NAME = "agentkeel-quarantine"
-# Seed S1's origin (M05 PR 2): True until S1 is read; the PR that records it sets False and the human redeploys.
-S1_ORIGIN = True
+# Seed S1's origin (M05 PR 2): tried at 13:54:22Z, 2026-09-29, and removed once it had shown that no flow record
+# of S1 can exist in a VPC with no route out (rulings/pr2.md ruling 9). False deletes the function and its role.
+S1_ORIGIN = False
 S1_FUNCTION = "agentkeel-seed-s1"
 # One subnet, so the function has one ENI and the run file names the one that carried the connect
 # (security-reviewer on b167dd2, F2): the isolated subnet the CloudShell attempt used.
@@ -233,6 +233,8 @@ SUPPRESSIONS = {
     ),
 }
 for path, (rule, reason) in SUPPRESSIONS.items():
+    if path.startswith("SeedS1Role/") and not S1_ORIGIN:
+        continue  # the seed's role is not made once S1 is read
     NagSuppressions.add_resource_suppressions_by_path(stack, f"AgentkeelAudit/{path}", [{"id": rule, "reason": reason}])
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

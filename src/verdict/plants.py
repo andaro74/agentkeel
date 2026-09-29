@@ -107,7 +107,8 @@ SEEDS_M04: dict[str, tuple[str, str, str]] = {
 # this list, say whether a seed is read. Listing them reads nothing and gates
 # nothing. From M05 PR 2 every reader here is in the tree: S4's and S5's
 # markers came off with their readers; the attempt seeds' come off as each
-# attempt is recorded (S1, S2, S6 during PR 2; S3, S7 at PR 3).
+# attempt is recorded (S2, S6 during PR 2; S3, S7 at PR 3). S1's stays on: no flow record of it can exist in a
+# VPC with no route out (milestones/M05/rulings/pr2.md ruling 9).
 SEEDS_M05: dict[str, tuple[str, str, str]] = {
     "S1": ("F5.1, F5.2", "milestones/M05/runs/f5_1_curl.yaml", "scripts/observe_containment.py"),
     "S2": ("F5.1, F5.2", "milestones/M05/runs/f5_2_prefix.yaml", "scripts/observe_containment.py"),

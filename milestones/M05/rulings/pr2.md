@@ -71,17 +71,26 @@ the named P3 exception ruled at PR 1).
    action is named. S2's and S6's run files say the phrase the reader
    requires, "explicit deny in a resource-based policy", before either
    attempt is made (second cold read, F2).
-8. **S1's origin is a Lambda in the platform VPC, not a CloudShell VPC
-   environment** (ruled by the human as Product, with Security,
-   2026-09-29, on the evidence recorded in `runs/f5_1_curl.yaml`). The
-   CloudShell environment's curl to 1.1.1.1 at 12:56:42Z timed out, and no
-   flow record of it exists: its ENI read NODATA in every window through
-   13:15:41, while its connection to the Bedrock endpoint at 13:15:47Z was
-   recorded as ACCEPT on the same ENI. CloudShell drops outside traffic
-   before its ENI, so the security group never refused it and no record
-   could exist. `agentkeel-seed-s1` (`infra/audit/`) sends from its own ENI
-   behind refagent's security group. SPEC/05 §5 and §8 amended. Neither
-   origin is the runtime (§8).
+8. **S1's origin moved from a CloudShell VPC environment to a Lambda**
+   (ruled by the human as Product, with Security, 2026-09-29), on the
+   first attempt's absent record. The reason given then, that CloudShell
+   dropped the traffic before its ENI, was **wrong**, and ruling 9 says
+   why.
+9. **S1 is recorded as the finding** (ruled by the human as Product, with
+   Security, 2026-09-29, after the Lambda's attempt). From a CloudShell VPC
+   environment (12:56:42Z) and from `agentkeel-seed-s1` (13:54:22Z), each in
+   the isolated subnet behind refagent's group, the connection to 1.1.1.1
+   timed out and the ENI recorded only NODATA. The VPC has no route out:
+   the packet is dropped by routing before the security group or the
+   network ACL sees it, and that drop leaves no flow record. S1 is refused,
+   by the missing route (ADR-0006), and no record of it can reach the audit
+   bucket from any origin in this VPC. F5.2 is unmet for S1 by
+   construction; the observer and `build` read S1 as unrecorded, row 5
+   reads "S1 not shown refused" and "S1 unrecorded", and row 5 closes RED
+   on S1 with this as the reason. The standard is not bent to fit: no
+   other kind of record stands in for the flow record. The Lambda is
+   removed (`S1_ORIGIN = False`); S1's strict marker stays on. SPEC/05 §5
+   and §8 say so.
 
 ## What a reader can run
 
