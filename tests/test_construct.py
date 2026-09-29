@@ -317,3 +317,25 @@ def test_the_runtime_is_given_its_depth_ceiling_and_where_to_record_a_refusal(te
     assert env["AGENTKEEL_CEILING_DEPTH"] == str(manifest["ceilings"]["depth"])
     assert env["AGENTKEEL_AUDIT_BUCKET"] == "agentkeel-audit-897698239547"
     assert env["AGENTKEEL_AUDIT_PREFIX"] == "agents/refagent/events/"
+
+
+def test_a_given_role_is_held_to_the_same_denies_and_record_as_the_constructs_own():
+    """platform-architect F3 on M05 PR 2: a role handed in gets the explicit denies and its own record, added to it."""
+    import aws_cdk as cdk
+    from aws_cdk import assertions
+    from aws_cdk import aws_iam as iam
+    from aws_cdk import aws_ssm as ssm
+
+    from infra.construct import GovernedAgent
+
+    stack = cdk.Stack(cdk.App(), "Given", env=cdk.Environment(region="us-west-2"))
+    boundary = ssm.StringParameter.value_for_string_parameter(stack, "/agentkeel/security/boundary-arn")
+    role = iam.Role(stack, "Handed", path="/agentkeel/agents/",
+                    assumed_by=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+                    permissions_boundary=iam.ManagedPolicy.from_managed_policy_arn(stack, "B", boundary))  # fmt: skip
+    GovernedAgent(stack, "R", bundle="agents/refagent", role=role)
+    policies = assertions.Template.from_stack(stack).find_resources("AWS::IAM::Policy")
+    statements = [s for p in policies.values() for s in p["Properties"]["PolicyDocument"]["Statement"]]
+    denies = [s for s in statements if s["Effect"] == "Deny"]
+    assert len(denies) == 1 and set(denies[0]["Action"]) == AGENT_DENIES
+    assert any(s.get("Sid") == "ItsOwnRecordInTheAuditBucket" for s in statements)
