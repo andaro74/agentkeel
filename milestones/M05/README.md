@@ -70,7 +70,7 @@ Written at M05 PR 1 open. The row in `milestones/README.md` is the one
 - **The readers, in SPEC/05 §6's order:** N (`a4e8922`);
   `infra/security/` and `infra/audit/` (`7c9a681`, `456f2d2`), each
   deployed by hand; the boundary's `s3:PutObject` and the S3 endpoint's
-  way out (`8e086ea`, 49,685 of 51,200 bytes; row 20 in
+  way out (`8e086ea`, 49,613 of 51,200 bytes read as UTF-8; row 20, the 66 bytes a Windows read, in
   `runs/bootstrap_size.md`); the agent role's denies and its depth ceiling
   (`5cbf34c`); S4's reader (`27fd1e7`) and S5's (`52b1051`), each marker
   off and each test failing on its planted message with its reader

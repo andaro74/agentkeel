@@ -54,15 +54,18 @@ M05.
 
 ## 2. The bootstrap: a ceiling widened, not a bar relaxed
 
-Measured first (`open.md` row 20; `runs/bootstrap_size.md`): 49,173 of
-51,200 bytes at `5a5720e`, and the 66 bytes accounted for (M04 PR 1's
-scratch edit against the committed one; never in the tree at a merge).
+Measured first (`open.md` row 20; `runs/bootstrap_size.md`). The 66 bytes
+are the measuring script: read as UTF-8 the template at `5a5720e` is
+49,107 bytes, M04 PR 1's figure; read with Windows' default (cp1252), each
+of its eleven `§` counts 6 bytes more, 49,173, M04 PR 3's figure. Corrected
+on the reviews; the first account (`30a04f5`, a scratch edit) was wrong.
 **Ruled:** the agent boundary allows `s3:PutObject` on
 `arn:aws:s3:::agentkeel-audit-897698239547/agents/*`, as a statement of
 its own with its reason beside it (`8e086ea`). It widens a ceiling; it
 moves no bar in `thresholds.yaml` and is not on ADR-0009's list: one key.
 The S3 gateway endpoint lets that put, and only that put, out to the
-security account. After both: **49,685 of 51,200 bytes**, 1,515 left.
+security account. After both: **49,613 of 51,200 bytes** read as UTF-8,
+1,587 left.
 
 ## 3. Security's constraints on PR 2 (`pr1-security.md`), each held
 
@@ -107,3 +110,27 @@ PR until then. It cannot tell who typed the line.
 - Unsure G: the stand-in's MFA condition works when the human's CLI
   profile for it carries `mfa_serial`; read by S2's attempt.
 - No gate reads the lock's retention in `infra/security/` (SPEC/05 §8).
+
+## 7. The reviews, and what came of them
+
+`security-reviewer` (0 BLOCK, 6 FINDING, 29 NOTE) and `platform-architect`,
+called by Security (0 BLOCK, 6 FINDING, 9 NOTE), each read the diff
+`5a5720e...27f2678`, verbatim in the PR body.
+
+| Finding | Status |
+|---|---|
+| security: S2's and S6's lock-off readers could not tell the named control from a missing grant | **Repaired** (`ec6747b`, Engineering): "explicit deny in a resource-based policy" required |
+| security: If-None-Match only a client flag | **Repaired** (`ca0d07d`): the bucket policy denies a put under `envelopes/` without it |
+| security, platform F2: the security account's trail missed IAM's events | **Repaired** (`ca0d07d`): multi-region with global events; the role's deletion reaches the bucket |
+| security, platform F1: the organization's route to the security account (centralized root access) | **Named** (`ca0d07d`, and SPEC/05 §8): read 2026-09-28, not enabled; nothing stops it being enabled; the landing zone's |
+| security: a pattern in `aws:PrincipalArn` may read as public | **Repaired** (`ca0d07d`): refagent by its whole ARN, `ArnEquals`; the first deploy reads whether S3 accepts the policy |
+| platform F3: a role handed to the construct skipped the denies | **Repaired** (`ca0d07d`): `_contain` adds them and the record's put; tested |
+| platform F4: "every role in that account carries a boundary" | **Worded** (SPEC/05 §6, Product): every role `infra/security/` makes. `ecsTaskExecutionRole` may be deleted by the human; nothing reads it |
+| platform F5, F6: controls with no seeded case | **Named** in SPEC/05 §8, none described as working |
+| security NOTE, platform NOTE 4: any same-repo PR's code can read `AWSLogs/` | **Accepted for M05**: read-only, both accounts' management events; the reader from `main` is M06's |
+| security NOTE: S6's grant to the account root, not the admin | **Kept** as SPEC/05 §6 allowed; the lock must refuse any principal in the agent account, which is the stronger reading |
+| platform NOTE 3: `PutObjectRetention` on `test/` can lengthen a hold | **Recorded**: the teardown waits for it; not a modification (SPEC/05 §2) |
+| platform NOTE 5: the manifest's `s3` comment still says image layers only | **Carried to M06**: a comment in `manifest.yaml` changes the bundle digest and would put this PR's run in the runner |
+| platform NOTE 6: the bucket policy names refagent only | **Carried to M06/M07**, with the second agent's code |
+| cold review F5: `evals.yml` described the archive as done | **Repaired** (`ca0d07d`) |
+| item k, found while testing: `applies_to` dropped by cdk-nag's binding | **Repaired** (`ca0d07d`): `appliesTo`; each row its own reason |

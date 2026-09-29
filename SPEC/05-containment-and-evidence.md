@@ -65,9 +65,11 @@ account-per-team landing zone (R3, SPEC/00 §12).
 - **As the agent.** refagent's role is assumable by
   `bedrock-agentcore.amazonaws.com` only, and M05 does not change that
   trust. An API attempt (S2, S3) is made as a **stand-in**: a role under
-  `/agentkeel/agents/` with the agent boundary, the agent role's grants
-  and its explicit denies, and the attempted action granted in its own
-  policy, so that the refusal can only come from the control named for
+  `/agentkeel/agents/` with the agent boundary and the agent role's
+  explicit denies (amended at M05 PR 2, `rulings/pr2.md` ruling 3: not
+  its grants, which neither attempt uses and which would let a second
+  principal call refagent's model), and the attempted action granted in
+  its own policy, so that the refusal can only come from the control named for
   it (M01 S6's pattern). The audit bucket's policy names the stand-in
   beside refagent's role, on refagent's prefix and nothing else
   (finding 5, Security), so S2 is refused by the prefix scoping, not by
@@ -327,7 +329,10 @@ PR 2):
   overwrite, not a forged first write.
 - **The read-only role** CI assumes in the security account names its
   trust, reads the prefixes the observer needs and not `*`, and carries a
-  boundary; so does every role in that account.
+  boundary; so does every role `infra/security/` makes. (Amended at M05
+  PR 2, platform-architect F4: the account also holds AWS service-linked
+  roles and a leftover `ecsTaskExecutionRole`, which no stack of this
+  platform makes.)
 - **The bucket policy** names role ARNs per prefix, never the agent
   account's root, but for S6's `test/` grant to the admin, which lists
   `s3:DeleteObjectVersion` and `s3:PutObjectRetention` on `test/*` only.
@@ -403,6 +408,23 @@ SPEC/00 §10.5: no document describes these as working.
   already written; a later pull request could shorten the default for new
   ones with one ruling. Closing it is a SPEC/00 §5 amendment (Product,
   with Security), not dated here (security-reviewer on PR 1);
+- the organization's reach over the security account (added at M05 PR 2,
+  platform-architect F1, security-reviewer). The agent account is the
+  organization's management account: it can enable centralized root
+  access and `sts:AssumeRoot` into the security account with a root-task
+  policy that deletes a bucket policy, remove the account, attach an SCP
+  or change its email. Not enabled when read on 2026-09-28; nothing stops
+  it being enabled. Object Lock holds each object for its day against
+  root; the policy, the default retention and the delivery are what the
+  route reaches. The landing zone's (SPEC/00 §12);
+- the controls PR 2 adds that no seed attempts (platform-architect F5,
+  F6): the envelope-put role refusing a pull request's token; the read
+  role refused outside its three prefixes; the S3 endpoint refusing a put
+  to another account's bucket or prefix; the stand-in refused without MFA;
+  the bucket policy's Deny on the stand-in under `events/`; a put under
+  `envelopes/` without If-None-Match; and refagent's own explicit denies,
+  since S3 is made as the stand-in and `iam:*`, `sts:AssumeRole`,
+  `s3:PutBucketPolicy` and the guardrail verbs are attempted by no one;
 - GuardDuty, the graph diff, k6 at the ceiling, Identity: §9.
 
 ## 9. Cut list

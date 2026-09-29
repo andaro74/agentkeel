@@ -6,6 +6,7 @@
 ruling: pr2
 seat: Product
 authorises:
+  - SPEC/05-containment-and-evidence.md
   - milestones/README.md
   - milestones/M05/README.md
   - milestones/M05/runs/f5_4_chain.yaml
@@ -58,6 +59,12 @@ the named P3 exception ruled at PR 1).
    envelope. That is expected and is not the row's measurement: PR 3's run
    is. A row 5 reading RED gates nothing, so this PR can merge with it.
 5. **Unsure D stays named** in SPEC/05 §8, as ruled at PR 1.
+6. **SPEC/05 amended on the reviews** (platform-architect F1, F4 to F6;
+   security-reviewer): §2 says the stand-in carries the denies, not the
+   grants (ruling 3); §6's "every role in that account" is every role
+   `infra/security/` makes; §8 names the organization's reach over the
+   security account and the controls this PR adds that no seed attempts.
+   None of them is described as working.
 
 ## What a reader can run
 

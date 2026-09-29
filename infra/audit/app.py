@@ -4,7 +4,7 @@ Deployed by the human with admin, by hand, in the agent account
 (581208540944), after `infra/security/` is deployed in the security
 account: the audit bucket's policy must admit this stack's trail and flow
 log before either can deliver. No workflow and no platform role deploys it.
-Outside the bootstrap on purpose: the bootstrap template has 2,027 bytes
+Outside the bootstrap on purpose: the bootstrap template had 2,093 bytes
 left (milestones/M05/runs/bootstrap_size.md; finding 15).
 
     cd infra/audit && npx aws-cdk@2 diff
