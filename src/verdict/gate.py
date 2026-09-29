@@ -80,6 +80,7 @@ from typing import Any
 import yaml
 
 from src.verdict import M04_READERS as verdict_m04_readers
+from src.verdict import M05_READERS
 from src.verdict import (
     ROOT,
     canonical_sha256,
@@ -135,6 +136,11 @@ M03_READERS = "f82a02a"
 # amendment 1).
 CLAIM_4_CHECKS = ("F4_1", "F4_2", "F4_4")
 M04_READERS = verdict_m04_readers  # 15047b4, defined beside `descends_from` in src/verdict
+# What an agent envelope must carry from M05 PR 2 (SPEC/05 section 4, amended before PR 1 opened, cold
+# review F2): F5_1 alone, from the S4 and S5 seed tests, a test-only witness. F5.2 to F5.4 are live only,
+# read from `containment` by row 5 (READ_THE_CONTAINMENT), never required here: a failed attempt must
+# not make every later pull request's `evals` red. Held from M05_READERS (2c88265), which wired it.
+CLAIM_5_CHECKS = ("F5_1",)
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -306,7 +312,7 @@ def from_m04_readers(commit: str, root: Path = ROOT) -> bool:
 
 def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
     """What an agent envelope for `commit` must carry: claim 1's; claim 2's from M02 PR 2's merge; claim 3's from
-    M03's readers; claim 4's from M04's, with F4_3 where the pin moved.
+    M03's readers; claim 4's from M04's, with F4_3 where the pin moved; claim 5's F5_1 from M05's.
 
     A commit git cannot place is held to claims 1 and 2, as before; claims 3
     and 4 are required only where git shows their readers in its history.
@@ -317,7 +323,8 @@ def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
     claim_4 = ()
     if from_m04_readers(commit, root):
         claim_4 = CLAIM_4_CHECKS + (("F4_3",) if pin_moved(commit, AGENT_BUNDLE, root) else ())
-    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4
+    claim_5 = CLAIM_5_CHECKS if descends_from(commit, M05_READERS, root) else ()
+    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5
 
 
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:

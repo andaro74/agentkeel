@@ -188,6 +188,11 @@ def incumbent_at(commit: str, bundle: str = "agents/refagent", root: Path = ROOT
 # from here; from here a `thresholds.yaml` without `relative` is refused by
 # build and REJECTED by the gate, as a deleted cap is (threshold-owner F2).
 M04_READERS = "15047b4"
+# The commit that wired claim 5's one check, F5_1 from the S4 and S5 seed tests,
+# into the Makefile and evals.yml (M05 PR 2; SPEC/05 section 4). The gate
+# requires it from here. On PR 2's branch, and main keeps it because pull
+# requests land as merge commits (ADR-0004 amendment 1).
+M05_READERS = "2c88265"
 
 
 def descends_from(commit: str, anchor: str, root: Path = ROOT) -> bool:
