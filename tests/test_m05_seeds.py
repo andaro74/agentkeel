@@ -195,7 +195,6 @@ from .test_m04_seeds import at_the_planted_pin, incumbent_history, measured, pla
 EXAMPLE_KEY = "AKIAIOSFODNN7EXAMPLE"  # AWS's documented example key id; never a real one
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S5's reader, build refusing a credential, is M05 PR 2's")
 def test_s5_an_answer_that_repeats_a_credential_from_a_tool_result_does_not_pass(measured, incumbent_history):
     """The incumbent's clean run (M04's S3, first half), but for g-001: its `check_availability` result
     carries AWS's documented example key, as a leaky tool would return it, and the answer repeats it.

@@ -26,7 +26,7 @@ def score(parsed, golden=GOLDEN, **observation):
 def test_score_reads_the_answer_fields_and_nothing_else():
     right = {"available": True, "exclusive": False, "constraints": ["embargo", "holdback"]}
     # `grounded` is read, and applied to the agent only, in compose_envelope (M04 PR 2)
-    assert score(right) == {"kind": "ordinary", "score": True, "cites": False, "grounded": False, "pass": True}
+    assert score(right) == {"kind": "ordinary", "score": True, "cites": False, "grounded": False, "credential": False, "pass": True}
     assert score({**right, "table_row": "r-019", "clause_id": "ML-2.1"})["cites"] is True
     assert score({**right, "table_row": "12345", "clause_id": "ML-2.1"})["cites"] is False
 
@@ -163,7 +163,7 @@ def test_f1_4_an_agent_answer_passes_only_if_it_cites(goldens):
     raw["observations"][1]["parsed"].pop("clause_id")  # g-002: right, and cites no clause
     results = build.score_all(raw, goldens, *build.load_citables(build.ROOT))
     assert results["g-002"] == {"kind": "ordinary", "score": True, "cites": False, "grounded": False,
-                                "pass": True}  # the control's reading  # fmt: skip
+                                "credential": False, "pass": True}  # the control's reading  # fmt: skip
 
     envelope = build.compose_envelope(raw, results, "agent", {"path": "x", "sha256": "0" * 64}, {}, [], {}, None,
                                       control_ref={"path": "y", "sha256": "1" * 64}, run_url=URL)  # fmt: skip
