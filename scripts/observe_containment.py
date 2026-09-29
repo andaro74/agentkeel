@@ -64,7 +64,7 @@ TRAIL_REGIONS = ("us-west-2", "us-east-1")
 BEFORE = timedelta(minutes=30)  # either side of the human's `at` for the event itself
 DELIVERY = timedelta(hours=3)  # how long after it an object is still looked for: a late record is late, not absent
 MODEL_EVENTS = ("Converse", "ConverseStream", "InvokeModel", "InvokeModelWithResponseStream")
-REFAGENT_ROLE = ":role/agentkeel/agents/agentkeel-refagent-RefagentRole"
+REFAGENT_ROLE = ":role/agentkeel/agents/agentkeel-refagent-RefagentRole5888DB41-i9IqTXU6NVSL"
 QUARANTINE = f"arn:aws:iam::{AGENT_ACCOUNT}:policy/agentkeel-quarantine"
 EVENTS_PREFIX = "agents/refagent/events/"
 
@@ -287,8 +287,17 @@ def one(run: dict[str, Any], attempt: dict[str, Any], entry: dict[str, Any], tra
     if run["seed"] == "S1":
         return flow_attempt(attempt, entry, bucket, at)
     if attempt.get("event_name") == "InvokeAgentRuntime":
+        # S7: the model calls up to the detach as the trail recorded it, never past it: a call after the
+        # quarantine is lifted is refagent working again, not the quarantine (cold review F1 on M05 PR 2).
         detach = next((e for e in run["observed"] if e.get("event_name") == "DetachRolePolicy"), None)
-        until = parse_time(detach["at"]) + BEFORE if run["seed"] == "S7" and detach and detach.get("at") else None
+        until = None
+        if run["seed"] == "S7" and detach:
+            found = trails.matching(request_id=detach.get("request_id"), event_name="DetachRolePolicy") \
+                if detach.get("request_id") else []
+            until = parse_time(found[0]["event_time"]) if found else None
+            if until is None:
+                return {"what": attempt["what"], "mismatch": "the detach is not in the trail: the window the "
+                                                             "quarantine held cannot be read"}
         found = session_attempt(attempt, entry, trails, bucket, until=until)
         if run["seed"] == "S4":
             found["refusal_event"] = refusal_event(entry.get("session_id"), bucket, trails, at - BEFORE, at + DELIVERY)

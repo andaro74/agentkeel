@@ -129,7 +129,7 @@ from src.verdict import containment as held  # noqa: E402
 from src.verdict import gate, schema_errors  # noqa: E402
 
 STANDIN_ARN = "arn:aws:iam::581208540944:role/agentkeel/agents/agentkeel-refagent-standin"
-REFAGENT_ARN = "arn:aws:iam::581208540944:role/agentkeel/agents/agentkeel-refagent-RefagentRole5888DB41-x"
+REFAGENT_ARN = "arn:aws:iam::581208540944:role/agentkeel/agents/agentkeel-refagent-RefagentRole5888DB41-i9IqTXU6NVSL"
 ADMIN_ARN = "arn:aws:iam::581208540944:user/admin"
 T0, T1 = "2026-09-29T18:00:00Z", "2026-09-29T18:05:00Z"  # 300 s
 
@@ -156,7 +156,7 @@ def observation(**override: dict[str, Any]) -> dict[str, Any]:
         "S6": {"object": {"versions": [{"version_id": "v1"}]}, "attempts": [
             {"what": "delete", "event_name": "DeleteObject", "records": [trail(ADMIN_ARN, "Access Denied because object protected by object lock")]},
             {"what": "retain", "event_name": "PutObjectRetention", "records": [trail(ADMIN_ARN, "Access Denied because object protected by object lock")]},
-            {"what": "unlock", "event_name": "PutObjectLockConfiguration", "records": [trail(ADMIN_ARN, "explicit deny")]},
+            {"what": "unlock", "event_name": "PutObjectLockConfiguration", "records": [trail(ADMIN_ARN, "with an explicit deny in a resource-based policy")]},
             {"what": "policy", "event_name": "PutBucketPolicy", "records": [trail(ADMIN_ARN, "Access Denied")]}]},
         "S7": {"attempts": [
             {"what": "attach", "event_name": "AttachRolePolicy", "records": [trail(ADMIN_ARN, None, None)]},
@@ -179,7 +179,7 @@ def test_every_attempt_refused_and_recorded_within_n_is_no_miss():
     envelope = enveloped(observation())
     assert all(seed["refused"] and seed["recorded"] and seed["within_n"] for seed in envelope["containment"]["seeds"])
     assert envelope["alarm_latency_s"] == 300
-    assert gate.containment_misses(envelope, 600, "here") == []
+    assert gate.containment_misses(envelope, 600.0, "here") == []
 
 
 @pytest.mark.parametrize("seed, change, miss", [
@@ -212,7 +212,34 @@ def test_a_record_later_than_n_is_a_miss_and_n_is_the_envelopes_commits():
     envelope = enveloped(late)
     assert envelope["alarm_latency_s"] == 601
     assert gate.containment_misses(envelope, 600, "here") == ["S1 recorded 601 s after the attempt, over N 600 s"]
-    assert gate.containment_misses(envelope, 700, "here") == []
+    # build read N 600; a commit whose N is 700 is not the N build read, and the gate says so (threshold-owner F8)
+    assert gate.containment_misses(envelope, 700, "here") == ["containment was read against N 600, the commit's is 700 (here)"]
+
+
+def test_n_is_read_at_the_envelopes_commit_not_from_the_tree():
+    """threshold-owner F7 on M05 PR 2: M05 PR 1's merge has no N; this branch's commits have 600."""
+    assert gate.detection_at("5a5720e")[0] is None
+    assert gate.detection_at("a4e8922")[0] == 600.0  # the commit that added it
+
+
+def test_a_record_that_arrived_before_its_attempt_is_a_miss():
+    early = observation(S3={"attempts": [{"what": "delete", "event_name": "DeleteLogStream", "records": [
+        trail(STANDIN_ARN, "with an explicit deny in an identity-based policy", delivered="2026-09-29T17:59:00Z")]}]})
+    assert any("arrived before its attempt" in m for m in gate.containment_misses(enveloped(early), 600, "here"))
+
+
+@pytest.mark.parametrize("seed, what, event, message", [
+    # AWS's words for a grant that is simply missing: no named control refused it (security-reviewer on M05 PR 2)
+    ("S2", "put", "PutObject", "not authorized ... because no resource-based policy allows the s3:PutObject action"),
+    ("S6", "unlock", "PutObjectLockConfiguration", "Access Denied"),
+])
+def test_a_missing_grant_is_not_the_named_control(seed, what, event, message):
+    obs = observation()
+    (entry,) = [s for s in obs["seeds"] if s["seed"] == seed]
+    attempt = next(a for a in entry["attempts"] if a["event_name"] == event)
+    attempt["records"] = [trail(STANDIN_ARN if seed == "S2" else ADMIN_ARN, message)]
+    misses = gate.containment_misses(enveloped(obs), 600, "here")
+    assert any(m.startswith(f"{seed} not shown refused") and "names the control" in m for m in misses), misses
 
 
 def test_an_envelope_with_no_containment_or_an_unread_bucket_reads_red_for_row_5():
@@ -230,7 +257,7 @@ def test_build_and_the_gate_can_disagree_on_the_alarm_latency():
     """P5: the gate works each latency out again; an alarm_latency_s edited after build is a miss."""
     envelope = enveloped(observation())
     envelope["alarm_latency_s"] = 12.0
-    assert gate.containment_misses(envelope, 600, "here") == ["alarm_latency_s: the envelope says 12.0, the gate reads 300.0"]
+    assert gate.containment_misses(envelope, 600.0, "here") == ["alarm_latency_s: the envelope says 12.0, the gate reads 300.0"]
 
 
 def test_an_envelope_carrying_containment_validates():

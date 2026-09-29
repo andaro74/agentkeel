@@ -168,11 +168,13 @@ def test_s7_reads_the_model_calls_between_the_attach_and_the_detach_and_the_quar
     model = record("Converse", "REQ-M", AT + timedelta(minutes=2, seconds=3), REFAGENT, "AccessDenied",
                    "with an explicit deny in an identity-based policy")  # fmt: skip
     detach = record("DetachRolePolicy", "REQ-D", AT + timedelta(minutes=5), admin, policyArn=observer.QUARANTINE, roleName="r")
+    # refagent answering again one minute after the detach: not the quarantine's, and not read (cold review F1)
+    after = record("Converse", "REQ-AFTER", AT + timedelta(minutes=6), REFAGENT)
     trail_file(s3, AGENT, "us-east-1", [attach, detach], AT + timedelta(minutes=9), 1)
-    trail_file(s3, AGENT, "us-west-2", [invoke, model], AT + timedelta(minutes=8), 2)
+    trail_file(s3, AGENT, "us-west-2", [invoke, model, after], AT + timedelta(minutes=8), 2)
     entries = [{"event_name": "AttachRolePolicy", "request_id": "REQ-A", "at": AT.isoformat()},
                {"event_name": "InvokeAgentRuntime", "session_id": session, "at": (AT + timedelta(minutes=2)).isoformat()},
-               {"event_name": "DetachRolePolicy", "request_id": "REQ-D", "at": (AT + timedelta(minutes=5)).isoformat()}]
+               {"event_name": "DetachRolePolicy", "request_id": "REQ-D", "at": (AT + timedelta(minutes=25)).isoformat()}]  # written late: the trail's time is read
     run = {"seed": "S7", "attempts": [{"what": w, "event_name": e["event_name"]} for w, e in zip("aid", entries)],
            "observed": entries}
     out = observer.observe([run], s3)
@@ -215,3 +217,14 @@ def test_every_run_file_as_committed_is_one_the_observer_reads(name):
     run = yaml.safe_load((ROOT / "milestones" / "M05" / "runs" / name).read_text(encoding="utf-8"))
     out = observer.observe([run], FakeS3())
     assert out["seeds"][0]["seed"] == run["seed"]
+
+
+def test_s7_with_no_detach_in_the_trail_cannot_bound_the_window():
+    s3 = FakeS3()
+    entries = [{"event_name": "AttachRolePolicy", "request_id": "REQ-A", "at": AT.isoformat()},
+               {"event_name": "InvokeAgentRuntime", "session_id": "s7-" + "c" * 40, "at": AT.isoformat()},
+               {"event_name": "DetachRolePolicy", "request_id": "NOT-IN-THE-TRAIL", "at": AT.isoformat()}]
+    run = {"seed": "S7", "attempts": [{"what": w, "event_name": e["event_name"]} for w, e in zip("aid", entries)],
+           "observed": entries}
+    invoke = observer.observe([run], s3)["seeds"][0]["attempts"][1]
+    assert "the detach is not in the trail" in invoke["mismatch"]

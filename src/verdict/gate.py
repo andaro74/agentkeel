@@ -737,6 +737,9 @@ def containment_misses(envelope: dict[str, Any], n: float | None, where: str) ->
     misses = []
     if n is None:
         misses.append(f"no detection.max_seconds in thresholds.yaml at {where}: N cannot be read")
+    elif containment.get("max_seconds") != n:
+        # build's within_n was worked out against another N (threshold-owner F8 on M05 PR 2).
+        misses.append(f"containment was read against N {containment.get('max_seconds')}, the commit's is {n} ({where})")
     if not containment["readable"]:
         misses.append(f"the audit bucket could not be read: {containment.get('error')}")
     if containment.get("quarantine_attached"):
@@ -750,6 +753,9 @@ def containment_misses(envelope: dict[str, Any], n: float | None, where: str) ->
         if seed["refused"] is not True:
             misses.append(f"{name} not shown refused: {'; '.join(seed['reasons'][:3]) or 'no reason recorded'}")
         latency = seed_latency(seed)
+        negative = [latency_s(t["event_time"], t["delivered"]) for a in seed["attempts"] for t in a["timings"]]
+        if any(value is not None and value < 0 for value in negative):
+            misses.append(f"{name} has a record that arrived before its attempt: the wrong record was matched")
         if not seed["recorded"] or latency is None:
             misses.append(f"{name} unrecorded in the audit bucket")
             continue
