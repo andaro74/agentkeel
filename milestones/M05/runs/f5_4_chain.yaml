@@ -20,15 +20,18 @@
 # prefix and on no model call by its role in the same minute. The
 # attempt's time is the trail record's eventTime.
 #
-# Each observed entry: what, request_id (InvokeAgentRuntime's), at (not
-# read as the attempt's time), result (the runtime's answer, verbatim).
+# Each observed entry: what, event_name, session_id (the --runtime-session-id
+# passed, 33 characters or more), at (not read as the attempt's time), result
+# (the runtime's answer, verbatim). Amended at M05 PR 2, before the attempt:
+# the call is found in the trail by its session id, which the trail records
+# and the runtime is handed, not by a request id the CLI does not print.
 seed: S4
 falsifiers: [F5.1, F5.2]
 principal: the human, with InvokeAgentRuntime on refagent's runtime
 attempts:
   - what: invoke refagent's runtime with a chain of two callers before it
     event_name: InvokeAgentRuntime
-    command: aws bedrock-agentcore invoke-agent-runtime --agent-runtime-arn <refagent runtime> --payload fileb://tests/fixtures/m05/s4-depth3-request.json out.json
+    command: aws bedrock-agentcore invoke-agent-runtime --agent-runtime-arn <refagent runtime> --runtime-session-id <session id> --payload fileb://tests/fixtures/m05/s4-depth3-request.json out.json
     refused_when: the answer is a refusal naming the depth, and the agent role made no model call for it
     recorded_when: the trail's InvokeAgentRuntime record and refagent's refusal event, each an object in the audit bucket within N of the call's eventTime
 observed: null
