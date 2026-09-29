@@ -3,9 +3,27 @@
 #
 # Planted at M05 PR 1 as the attempt to make, `observed: null`. It is made
 # by the human during M05 PR 2, after `infra/security/` and `infra/audit/`
-# are deployed (SPEC/05 §5.1), from a CloudShell VPC environment in the
-# platform VPC's isolated subnet with refagent's security group. Its ENI is
-# CloudShell's, not the runtime's (SPEC/05 §8).
+# are deployed (SPEC/05 §5.1).
+#
+# **The origin, amended at M05 PR 2 before the attempt is recorded** (ruled
+# by the human as Product, with Security, 2026-09-29). It was to be a
+# CloudShell VPC environment in the isolated subnet with refagent's security
+# group. On 2026-09-29 one was made (ENI eni-0940204e9da05de92, 10.20.0.248)
+# and `curl -m 5 https://1.1.1.1` at 12:56:42Z timed out, but no flow record
+# of it exists: the ENI read NODATA for every window from 12:56:10 to
+# 13:15:41, in both the audit bucket's flow log and the agent account's
+# CloudWatch one, while a connection from the same shell to the Bedrock
+# endpoint at 13:15:47Z was recorded on that ENI as ACCEPT (13:16:19 to
+# 13:16:33). CloudShell drops traffic to an outside address inside its own
+# networking, before the ENI, so the security group never refused it and
+# nothing could record it. The origin is now `agentkeel-seed-s1`
+# (`infra/audit/`), a Lambda in the isolated subnets with refagent's
+# security group, whose packets leave through its own ENI, where the group
+# refuses them and the flow log records the refusal. Neither is the runtime
+# (SPEC/05 §8).
+#
+# The human invokes the function once and records what it returned and the
+# ENI it ran on (the Lambda ENI in the subnet with refagent's group).
 #
 # The human fills `observed` with what the command printed and the ENI it
 # ran on. PR 2's run then looks for the flow record in the audit bucket in
@@ -16,18 +34,18 @@
 #
 # Each observed entry: what, at (ISO 8601, UTC, as the human saw it; not
 # read as the attempt's time), eni, destination, connected (false if curl
-# could not connect), result (what curl printed), flow_action (the flow
-# record's action for that ENI and destination: REJECT or ACCEPT).
+# could not connect), result (what the function returned), flow_action (the
+# flow record's action for that ENI and destination: REJECT or ACCEPT).
 #
 # A fixed address, not a name (security-reviewer on M05 PR 1): if a name
 # does not resolve from the isolated subnet, no packet is sent, no flow
 # record exists, and F5.2 would fire for a reason that is not the control.
 seed: S1
 falsifiers: [F5.1, F5.2]
-principal: a CloudShell VPC environment, platform VPC isolated subnet, refagent's security group
+principal: the Lambda agentkeel-seed-s1, platform VPC isolated subnets, refagent's security group (amended at M05 PR 2)
 attempts:
   - what: curl to the internet
-    command: curl -m 5 https://1.1.1.1
-    refused_when: curl times out or cannot connect, and the flow record for the ENI to 1.1.1.1 reads REJECT
+    command: aws lambda invoke --function-name agentkeel-seed-s1 --payload '{}' s1.json (one TCP connect to 1.1.1.1:443, 5 s timeout)
+    refused_when: the function cannot connect, and the flow record for its ENI to 1.1.1.1 reads REJECT
     recorded_when: that flow record is an object in the audit bucket within N of its start (thresholds.yaml, detection.max_seconds)
 observed: null

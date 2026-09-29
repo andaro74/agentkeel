@@ -122,12 +122,12 @@ def test_the_read_role_reads_three_prefixes_and_the_put_role_trusts_main_only(se
 def test_the_standin_is_assumed_with_mfa_and_carries_the_constructs_denies(audit):
     from infra.construct.governed_agent import AGENT_DENIES
 
-    (standin,) = [r for r in roles(audit).values()]
+    (standin,) = [r for r in roles(audit).values() if r["RoleName"] == "agentkeel-refagent-standin"]
     trust = standin["AssumeRolePolicyDocument"]["Statement"][0]
     assert trust["Principal"] == {"AWS": f"arn:aws:iam::{AGENT}:user/hector.acevedo"}
     assert trust["Condition"] == {"Bool": {"aws:MultiFactorAuthPresent": "true"}}
     assert standin["Path"] == "/agentkeel/agents/"
-    (policy,) = of_type(audit, "AWS::IAM::Policy")
+    (policy,) = [p for p in of_type(audit, "AWS::IAM::Policy") if "Standin" in json.dumps(p["Roles"])]
     (deny,) = [s for s in policy["PolicyDocument"]["Statement"] if s["Effect"] == "Deny"]
     assert set(deny["Action"]) == set(AGENT_DENIES), "infra/audit/ repeats the construct's list; the two must agree"
 
@@ -153,3 +153,20 @@ def test_each_iam5_finding_on_refagents_role_has_a_reason_of_its_own(tmp_path_fa
     iam5 = [r for r in rules if r["id"] == "AwsSolutions-IAM5"]
     assert len(iam5) == 6 and all(len(r["applies_to"]) == 1 for r in iam5)
     assert len({r["reason"] for r in iam5}) == 6
+
+
+def test_s1s_origin_is_behind_refagents_security_group_in_the_platform_subnets(audit):
+    """Amended at M05 PR 2: S1 from a Lambda in the VPC, whose packets cross its own ENI, where the security group
+    refuses them and the flow log records it. A CloudShell VPC environment's never reached its ENI."""
+    (function,) = of_type(audit, "AWS::Lambda::Function")
+    assert function["FunctionName"] == "agentkeel-seed-s1"
+    assert function["VpcConfig"]["SecurityGroupIds"] == ["sg-003ad866687089f27"]
+    assert "subnet-ids" in json.dumps(audit["Parameters"])
+    code = function["Code"]["ZipFile"]
+    assert '("1.1.1.1", 443)' in code and "settimeout(5)" in code
+    role = next(r for r in roles(audit).values() if r["RoleName"] == "agentkeel-seed-s1-role")
+    assert role["PermissionsBoundary"]  # the deploy boundary
+    policy = next(p for p in of_type(audit, "AWS::IAM::Policy") if "SeedS1Role" in json.dumps(p["Roles"]))
+    granted = {a for s in policy["PolicyDocument"]["Statement"] for a in s["Action"]}
+    assert all(a.startswith("ec2:") and "NetworkInterface" in a or a in ("ec2:DescribeSubnets",
+               "ec2:AssignPrivateIpAddresses", "ec2:UnassignPrivateIpAddresses") for a in granted)

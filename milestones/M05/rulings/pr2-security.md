@@ -151,3 +151,18 @@ refused: stated before this PR's run, read by it, and not widened ahead of
 the record; N8, the write-once Deny also refuses a multipart put there,
 which the archive does not use. N10: the cleanup is dated 2026-09-29 as the
 human dated it.
+
+## 8. S1's origin (ruled 2026-09-29, after the first attempt)
+
+The CloudShell VPC environment could not be S1's origin: its traffic to
+1.1.1.1 never reached its ENI (`runs/f5_1_curl.yaml`; `rulings/pr2.md`
+ruling 8). **Ruled, with Product:** `infra/audit/` adds
+`agentkeel-seed-s1`, a Lambda in the isolated subnets behind refagent's
+security group `sg-003ad866687089f27`, which opens one TCP connection to
+1.1.1.1:443 and returns what happened. Its role, `agentkeel-seed-s1-role`,
+carries the deploy boundary and holds only the EC2 network-interface
+actions Lambda needs to place its ENI; no logs, no other grant. The
+security group is refagent's, named by id; the refusal is that group's
+egress, which lists the manifest's endpoints and nothing else. Removed
+with `S1_ORIGIN = False` once S1 is read, as the stand-in is. Deployed by
+the human with a redeploy of `infra/audit/` after reading `cdk diff`.

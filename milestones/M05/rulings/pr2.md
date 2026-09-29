@@ -71,6 +71,17 @@ the named P3 exception ruled at PR 1).
    action is named. S2's and S6's run files say the phrase the reader
    requires, "explicit deny in a resource-based policy", before either
    attempt is made (second cold read, F2).
+8. **S1's origin is a Lambda in the platform VPC, not a CloudShell VPC
+   environment** (ruled by the human as Product, with Security,
+   2026-09-29, on the evidence recorded in `runs/f5_1_curl.yaml`). The
+   CloudShell environment's curl to 1.1.1.1 at 12:56:42Z timed out, and no
+   flow record of it exists: its ENI read NODATA in every window through
+   13:15:41, while its connection to the Bedrock endpoint at 13:15:47Z was
+   recorded as ACCEPT on the same ENI. CloudShell drops outside traffic
+   before its ENI, so the security group never refused it and no record
+   could exist. `agentkeel-seed-s1` (`infra/audit/`) sends from its own ENI
+   behind refagent's security group. SPEC/05 §5 and §8 amended. Neither
+   origin is the runtime (§8).
 
 ## What a reader can run
 

@@ -35,7 +35,17 @@ What it makes, each named in SPEC/05 §6 before this file:
 - **the quarantine** (seed S7): `agentkeel-quarantine`, a policy that
   denies everything, attached to nothing. The human attaches it to
   refagent's own role with the one command `README.md` names, and detaches
-  it with the other.
+  it with the other;
+- **seed S1's origin** (amended at M05 PR 2, ruled by the human as Product
+  with Security): `agentkeel-seed-s1`, a Lambda in the platform VPC's
+  isolated subnets with refagent's security group, which opens one TCP
+  connection to 1.1.1.1:443 and returns what happened. A CloudShell VPC
+  environment was the planned origin; its traffic to an outside address
+  never reached its ENI, so no flow record of it could exist (SPEC/05 §5,
+  §8). A Lambda in a VPC sends through its own ENI in the subnet, where the
+  security group refuses the packet and the flow log records the refusal.
+  Its role carries the deploy boundary. Removed once S1 is read
+  (`S1_ORIGIN` below).
 
 Every name here is fixed, so the security account's policy can name it
 before it exists.
@@ -50,6 +60,7 @@ import aws_cdk as cdk
 from aws_cdk import aws_cloudtrail as cloudtrail
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_ssm as ssm
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from constructs import Construct
@@ -70,6 +81,16 @@ ADMIN = f"arn:aws:iam::{AGENT_ACCOUNT}:user/hector.acevedo"
 # reads S3 sets it False and the human redeploys this stack, which deletes the role.
 STANDIN = True
 QUARANTINE_NAME = "agentkeel-quarantine"
+# Seed S1's origin (M05 PR 2): True until S1 is read; the PR that records it sets False and the human redeploys.
+S1_ORIGIN = True
+S1_FUNCTION = "agentkeel-seed-s1"
+SUBNETS_PARAM = "/agentkeel/security/subnet-ids"  # the bootstrap stack's
+# refagent's security group, which the construct makes: egress to the manifest's endpoints and nothing else.
+# Named by id, read 2026-09-29 (describe-network-interfaces on refagent's runtime ENI); the construct does not
+# publish it. A replaced group makes this stack's deploy fail, not the probe pass.
+REFAGENT_SG = "sg-003ad866687089f27"
+DEPLOY_BOUNDARY_NAME = "agentkeel-deploy-boundary"  # the bootstrap stack's; named, not imported
+S1_PROBE = '"""Seed S1\'s origin (SPEC/05 section 5): one TCP connect to 1.1.1.1:443 from the platform VPC. Decides nothing."""\nimport socket\nimport time\nfrom datetime import datetime, timezone\n\n\ndef handler(event, context):\n    started = datetime.now(timezone.utc).isoformat(timespec="seconds")\n    clock = time.monotonic()\n    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)\n    sock.settimeout(5)\n    try:\n        sock.connect(("1.1.1.1", 443))\n        result = "connected"\n    except OSError as exc:\n        result = f"{type(exc).__name__}: {exc}"\n    finally:\n        sock.close()\n    return {"destination": "1.1.1.1", "port": 443, "connected": result == "connected", "result": result,\n            "started": started, "elapsed_s": round(time.monotonic() - clock, 1)}\n'
 RUNTIME_LOG_GROUPS = f"arn:aws:logs:{REGION}:{AGENT_ACCOUNT}:log-group:/aws/bedrock-agentcore/runtimes/*"
 # refagent's explicit denies, as the construct puts them on refagent's role (SPEC/05 §6). Repeated, not
 # imported: the construct is deployed from main by the deploy role, this stack by hand.
@@ -102,6 +123,34 @@ class AuditStack(cdk.Stack):
         cdk.CfnOutput(self, "QuarantinePolicyArn", value=quarantine.managed_policy_arn)
         if STANDIN:
             cdk.CfnOutput(self, "StandinRoleArn", value=self._standin().role_arn)
+        if S1_ORIGIN:
+            cdk.CfnOutput(self, "SeedS1Function", value=self._s1_origin().ref)
+
+    def _s1_origin(self) -> lambda_.CfnFunction:
+        """Seed S1's origin: in the platform VPC, behind refagent's security group, and nothing more."""
+        role = iam.Role(
+            self, "SeedS1Role", role_name=f"{S1_FUNCTION}-role",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self, "DeployBoundary",
+                                                                            DEPLOY_BOUNDARY_NAME),
+            description="agentkeel: seed S1's origin, a Lambda in the platform VPC. Removed once S1 is read.",
+        )  # fmt: skip
+        # What Lambda needs to place its ENI in the subnet (AWS's VPC access permissions), and no more.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="PlaceItsNetworkInterface",
+            actions=["ec2:CreateNetworkInterface", "ec2:DescribeNetworkInterfaces", "ec2:DescribeSubnets",
+                     "ec2:DeleteNetworkInterface", "ec2:AssignPrivateIpAddresses", "ec2:UnassignPrivateIpAddresses"],
+            resources=["*"],
+        ))  # fmt: skip
+        return lambda_.CfnFunction(
+            self, "SeedS1", function_name=S1_FUNCTION, role=role.role_arn, runtime="python3.14",
+            handler="index.handler", timeout=15, memory_size=128,
+            code=lambda_.CfnFunction.CodeProperty(zip_file=S1_PROBE),
+            vpc_config=lambda_.CfnFunction.VpcConfigProperty(
+                security_group_ids=[REFAGENT_SG],
+                subnet_ids=ssm.StringListParameter.value_for_typed_list_parameter(self, SUBNETS_PARAM)),
+            description="agentkeel M05 seed S1: one TCP connect to 1.1.1.1:443 from the platform VPC.",
+        )  # fmt: skip
 
     def _trail(self) -> cloudtrail.CfnTrail:
         selector = cloudtrail.CfnTrail.AdvancedFieldSelectorProperty
@@ -158,6 +207,12 @@ stack = AuditStack(
     synthesizer=cdk.LegacyStackSynthesizer(),  # the account is not CDK-bootstrapped in us-west-2
 )
 SUPPRESSIONS = {
+    "SeedS1Role/DefaultPolicy/Resource": (
+        "AwsSolutions-IAM5",
+        "SPEC/05 §6 as amended at M05 PR 2, seed S1's origin: the EC2 network-interface actions Lambda needs to "
+        "place its ENI in a VPC take no resource-level scope for create and describe (AWS's own VPC access "
+        "permissions). The role carries the deploy boundary and is removed once S1 is read.",
+    ),
     "Standin/DefaultPolicy/Resource": (
         "AwsSolutions-IAM5",
         "SPEC/05 §6, refagent's stand-in: its own policy grants what seeds S2 and S3 attempt, on the whole audit "
