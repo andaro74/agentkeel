@@ -134,20 +134,24 @@ class AuditStack(cdk.Stack):
 
     def _s1_origin(self) -> lambda_.CfnFunction:
         """Seed S1's origin: in the platform VPC, behind refagent's security group, and nothing more."""
+        # What Lambda needs to place its ENI in the subnet (AWS's VPC access permissions), and no more. Inline, in
+        # the role itself: as a separate policy it was created after the function, and Lambda's
+        # CreateNetworkInterface was refused six times (13:41:07 to 13:41:15Z, 2026-09-29) before it landed at
+        # 13:41:21, so the function failed to stabilise and the deploy rolled back.
+        place = iam.PolicyDocument(statements=[iam.PolicyStatement(
+            sid="PlaceItsNetworkInterface",
+            actions=["ec2:CreateNetworkInterface", "ec2:DescribeNetworkInterfaces", "ec2:DescribeSubnets",
+                     "ec2:DeleteNetworkInterface", "ec2:AssignPrivateIpAddresses", "ec2:UnassignPrivateIpAddresses"],
+            resources=["*"],
+        )])  # fmt: skip
         role = iam.Role(
             self, "SeedS1Role", role_name=f"{S1_FUNCTION}-role",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             permissions_boundary=iam.ManagedPolicy.from_managed_policy_name(self, "DeployBoundary",
                                                                             DEPLOY_BOUNDARY_NAME),
+            inline_policies={"PlaceItsNetworkInterface": place},
             description="agentkeel: seed S1's origin, a Lambda in the platform VPC. Removed once S1 is read.",
         )  # fmt: skip
-        # What Lambda needs to place its ENI in the subnet (AWS's VPC access permissions), and no more.
-        role.add_to_policy(iam.PolicyStatement(
-            sid="PlaceItsNetworkInterface",
-            actions=["ec2:CreateNetworkInterface", "ec2:DescribeNetworkInterfaces", "ec2:DescribeSubnets",
-                     "ec2:DeleteNetworkInterface", "ec2:AssignPrivateIpAddresses", "ec2:UnassignPrivateIpAddresses"],
-            resources=["*"],
-        ))  # fmt: skip
         return lambda_.CfnFunction(
             self, "SeedS1", function_name=S1_FUNCTION, role=role.role_arn, runtime="python3.14",
             handler="index.handler", timeout=15, memory_size=128,
@@ -213,7 +217,7 @@ stack = AuditStack(
     synthesizer=cdk.LegacyStackSynthesizer(),  # the account is not CDK-bootstrapped in us-west-2
 )
 SUPPRESSIONS = {
-    "SeedS1Role/DefaultPolicy/Resource": (
+    "SeedS1Role/Resource": (
         "AwsSolutions-IAM5",
         "SPEC/05 §6 as amended at M05 PR 2, seed S1's origin: the EC2 network-interface actions Lambda needs to "
         "place its ENI in a VPC, on *, as AWS's own VPC access policy grants them. Describe takes no resource; "

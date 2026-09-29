@@ -166,7 +166,9 @@ def test_s1s_origin_is_behind_refagents_security_group_in_the_platform_subnets(a
     assert '("1.1.1.1", 443)' in code and "settimeout(5)" in code
     role = next(r for r in roles(audit).values() if r["RoleName"] == "agentkeel-seed-s1-role")
     assert "agentkeel-deploy-boundary" in json.dumps(role["PermissionsBoundary"])
-    policy = next(p for p in of_type(audit, "AWS::IAM::Policy") if "SeedS1Role" in json.dumps(p["Roles"]))
+    # Inline in the role, so the role never exists without it (the first deploy's function beat a separate policy).
+    assert not [p for p in of_type(audit, "AWS::IAM::Policy") if "SeedS1Role" in json.dumps(p["Roles"])]
+    (policy,) = role["Policies"]
     granted = {a for s in policy["PolicyDocument"]["Statement"] for a in s["Action"]}
     assert all(a.startswith("ec2:") and "NetworkInterface" in a or a in ("ec2:DescribeSubnets",
                "ec2:AssignPrivateIpAddresses", "ec2:UnassignPrivateIpAddresses") for a in granted)
