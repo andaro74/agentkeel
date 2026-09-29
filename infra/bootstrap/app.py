@@ -53,8 +53,11 @@ What it makes:
   human who deploys this stack writes those two parameters, with one command
   each (`infra/bootstrap/README.md`).
 
-What it does not do: wire Gateway or Identity (cut at open), reach the
-security account (cut 2), or hold anything M05 owns.
+What it does not do: wire Gateway or Identity (cut at open). From M05 PR 2
+two things of claim 5 are here and nothing else: the agent boundary's
+`s3:PutObject` on the audit bucket's `agents/*`, and the S3 endpoint's
+statement that lets that put out to the security account (SPEC/05 §5.1,
+§6). The rest of M05 is `infra/security/` and `infra/audit/`.
 """
 
 from __future__ import annotations
@@ -200,6 +203,9 @@ INTERFACE_ENDPOINTS = {
 # endpoint's this-account policy refused it; it is named here and nowhere
 # else is outside the account (B1, from AgentCore's VPC documentation).
 ECR_LAYER_BUCKET = f"prod-{REGION}-starport-layer-bucket"
+# M05 PR 2 (SPEC/05 §6): the security account's audit bucket (infra/security/), named, not imported.
+SECURITY_ACCOUNT = "897698239547"
+AUDIT_BUCKET = f"agentkeel-audit-{SECURITY_ACCOUNT}"
 GATEWAY_ENDPOINTS = {
     "s3": ec2.GatewayVpcEndpointAwsService.S3,
     "dynamodb": ec2.GatewayVpcEndpointAwsService.DYNAMODB,
@@ -297,6 +303,17 @@ class BootstrapStack(cdk.Stack):
                              # grants it on the one guardrail.
                              "bedrock:ApplyGuardrail"],
                     resources=["*"],
+                ),
+                # M05 PR 2 (SPEC/05 §6; a Security ruling, rulings/pr2-security.md: a
+                # ceiling widened, not a bar relaxed). An agent writes its own refusal
+                # events to the security account's audit bucket, under its own prefix
+                # there (seed S4's record). Its own statement, on that bucket's agents/*
+                # and nothing else; the statement above does not take it. The audit
+                # bucket's policy is what holds each agent to its own prefix (seed S2).
+                iam.PolicyStatement(
+                    sid="AgentsWriteTheirRecordToTheAuditBucket",
+                    actions=["s3:PutObject"],
+                    resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/agents/*"],
                 ),
                 iam.PolicyStatement(
                     sid="NeverEscalateNeverEraseNeverOpenTheNetwork",
@@ -407,6 +424,14 @@ class BootstrapStack(cdk.Stack):
                     sid="EcrImageLayersOnly",
                     principals=[iam.AnyPrincipal()], actions=["s3:GetObject"],
                     resources=[f"arn:aws:s3:::{ECR_LAYER_BUCKET}/*"],
+                ))  # fmt: skip
+                # M05 PR 2 (SPEC/05 §6): the one way out to the security account. A
+                # put, on the audit bucket's agents/ prefix, in that account only.
+                endpoint.add_to_policy(iam.PolicyStatement(
+                    sid="AgentsRecordsToTheAuditBucketOnly",
+                    principals=[iam.AnyPrincipal()], actions=["s3:PutObject"],
+                    resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/agents/*"],
+                    conditions={"StringEquals": {"aws:ResourceAccount": SECURITY_ACCOUNT}},
                 ))  # fmt: skip
         return vpc
 
@@ -1141,7 +1166,8 @@ SUPPRESSIONS = {
     "Boundary/Resource": (
         "SPEC/01 §6: 'the permission boundary, on every role either stack synthesises, applied "
         "stack-wide'. This is that boundary, and it is what seed S5 reads: a role handed to GovernedAgent "
-        f"without it is refused at synth. {CEILING}"
+        f"without it is refused at synth. {CEILING} M05 PR 2: PutObject on the audit bucket's agents/*, whose "
+        "keys the agents write at run time (SPEC/05 §6)."
     ),
     "ExecutionRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the CloudFormation execution role the deploy passes, which carries the "
