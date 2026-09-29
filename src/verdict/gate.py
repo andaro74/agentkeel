@@ -73,6 +73,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -159,6 +160,14 @@ READ_IN_THE_RUNTIME = {"M01"}
 READ_THE_SWAPS = {"M04"}
 # F4.1: the breaking swap RED with a golden regressed. F4.2: the equivalent GREEN.
 SWAP_EXPECTED = {"breaking": "RED", "equivalent": "GREEN"}
+# Rows whose claim is read from the live attempts an envelope records in `containment` (SPEC/05 §4). They
+# gate no pull request (ruled at M05 PR 1), but they decide the row: an attempt not made, not refused by
+# the control named for it, unrecorded or later than N makes the row's reading RED whatever the run's own
+# verdict, as READ_THE_SWAPS does for row 4.
+READ_THE_CONTAINMENT = {"M05"}
+# The seeds row 5 reads (SPEC/05 §4): the five attempts but S5, a fixture only at M05 (§9 cut 1), with
+# S6 (F5.3) and S7 (F5.4) beside them.
+CONTAINMENT_SEEDS = ("S1", "S2", "S3", "S4", "S6", "S7")
 
 
 class Rejected(Exception):
@@ -574,7 +583,8 @@ def tallies(label: str, results: dict[str, dict[str, Any]]) -> str:
 
 
 def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any] | None = None,
-             *, in_the_runtime: bool = False, read_the_swaps: bool = False) -> str:
+             *, in_the_runtime: bool = False, read_the_swaps: bool = False,
+             detection: tuple[float | None, str] | None = None) -> str:
     """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's.
 
     An M00 envelope: its control tallies. From M01: the agent's tallies, then
@@ -590,6 +600,10 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
 
     `read_the_swaps` is for a row whose claim is read from the swap PRs
     (`READ_THE_SWAPS`): each miss is named, and a GREEN run reads RED.
+
+    `detection` is N and where it was read, for a row whose claim is read
+    from the live attempts (`READ_THE_CONTAINMENT`): each seed's reading and
+    each miss are named, and a GREEN run reads RED (M05 PR 2).
     """
     results = envelope["goldens"]
     agent = {g: r for g, r in results.items() if r["scope"] == "agent"}
@@ -607,7 +621,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         heads.append(f"not read in the runtime (mode {envelope.get('mode', 'unrecorded')})")
         verdict = "UNMEASURED"
     misses = swap_misses(envelope.get("swaps") or []) if read_the_swaps and agent else []
-    if misses and verdict == "GREEN":
+    held = containment_misses(envelope, *detection) if detection is not None and agent else []
+    if (misses or held) and verdict == "GREEN":
         verdict = "RED"
     parts = [
         *heads,
@@ -617,6 +632,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         *(f"{name} {c['status']} {c['url']}" for name, c in sorted(envelope["checks"].items())),
         *(swap_reading(swap) for swap in envelope.get("swaps") or []),
         *misses,
+        *(containment_reading(envelope) if detection is not None and agent else []),
+        *held,
         verdict,
         f"envelope `{envelope['commit']}`",
     ]
@@ -676,6 +693,80 @@ def swap_misses(swaps: list[dict[str, Any]]) -> list[str]:
             if red:
                 misses.append(f"{head}: GREEN with {', '.join(red)} not green")
     return misses
+
+
+def latency_s(event_time: Any, delivered: Any) -> float | None:
+    """The gate's own reading of one latency: the record's arrival less the attempt's own time. build has one too."""
+    try:
+        start = datetime.fromisoformat(str(event_time).replace("Z", "+00:00"))
+        end = datetime.fromisoformat(str(delivered).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return (end - start).total_seconds()
+
+
+def seed_latency(seed: dict[str, Any]) -> float | None:
+    found = [latency_s(t["event_time"], t["delivered"]) for a in seed["attempts"] for t in a["timings"]
+             if t["event_time"] and t["delivered"]]  # fmt: skip
+    found = [f for f in found if f is not None]
+    return max(found) if found else None
+
+
+def detection_at(commit: str, root: Path = ROOT) -> tuple[float | None, str]:
+    """N, `detection.max_seconds`, as it stood at the envelope's commit (ruling m), and where it was read."""
+    bars, where = thresholds_at(commit, root)
+    n = (bars.get("detection") or {}).get("max_seconds")
+    return (float(n) if isinstance(n, (int, float)) and not isinstance(n, bool) and n > 0 else None), where
+
+
+def containment_misses(envelope: dict[str, Any], n: float | None, where: str) -> list[str]:
+    """What row 5 finds wrong with the attempts an envelope recorded; [] if nothing (SPEC/05 §4, §7).
+
+    Refused and made are build's readings of AWS's records; each latency is worked out here again from
+    the two times build kept, and held to N read at the envelope's commit, not to the N build was given."""
+    containment = envelope.get("containment")
+    if containment is None:
+        return ["containment not read: the envelope records no attempt"]
+    misses = []
+    if n is None:
+        misses.append(f"no detection.max_seconds in thresholds.yaml at {where}: N cannot be read")
+    if not containment["readable"]:
+        misses.append(f"the audit bucket could not be read: {containment.get('error')}")
+    if containment.get("quarantine_attached"):
+        misses.append("the quarantine is still attached to refagent's role: nothing after it measures refagent")
+    seeds = {seed["seed"]: seed for seed in containment["seeds"]}
+    for name in CONTAINMENT_SEEDS:
+        seed = seeds.get(name)
+        if seed is None or not seed["made"]:
+            misses.append(f"{name} {'not read' if seed is None else 'not made'}")
+            continue
+        if seed["refused"] is not True:
+            misses.append(f"{name} not shown refused: {'; '.join(seed['reasons'][:3]) or 'no reason recorded'}")
+        latency = seed_latency(seed)
+        if not seed["recorded"] or latency is None:
+            misses.append(f"{name} unrecorded in the audit bucket")
+            continue
+        if n is not None and latency > n:
+            misses.append(f"{name} recorded {latency:.0f} s after the attempt, over N {n:.0f} s")
+    recorded = [seed_latency(s) for s in containment["seeds"] if s["recorded"]]
+    mine = max((latency for latency in recorded if latency is not None), default=None)
+    said = envelope.get("alarm_latency_s")
+    if (mine is None) != (said is None) or (mine is not None and abs(mine - said) > 0.5):
+        misses.append(f"alarm_latency_s: the envelope says {said}, the gate reads {mine}")
+    return misses
+
+
+def containment_reading(envelope: dict[str, Any]) -> list[str]:
+    """Each seed in the Measured cell, as the envelope recorded it: printed; the misses decide."""
+    containment = envelope.get("containment")
+    if containment is None:
+        return []
+    parts = []
+    for seed in containment["seeds"]:
+        state = "not made" if not seed["made"] else ("refused" if seed["refused"] else "not shown refused")
+        latency = seed_latency(seed) if seed["made"] else None
+        parts.append(f"{seed['seed']} {state}" + (f" {latency:.0f} s" if latency is not None else ""))
+    return [*parts, f"alarm_latency_s {envelope.get('alarm_latency_s')}"]
 
 
 def latest(history_dir: Path = HISTORY) -> Path | None:
@@ -757,7 +848,8 @@ def measured_at(path: Path, history_dir: Path = HISTORY, *, milestone: str | Non
     envelope = read(path)
     return measured(envelope, verdict, control_card_of(envelope, path),
                     in_the_runtime=milestone in READ_IN_THE_RUNTIME,
-                    read_the_swaps=milestone in READ_THE_SWAPS)  # fmt: skip
+                    read_the_swaps=milestone in READ_THE_SWAPS,
+                    detection=detection_at(envelope["commit"]) if milestone in READ_THE_CONTAINMENT else None)  # fmt: skip
 
 
 def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> str | None:
