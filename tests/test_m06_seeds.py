@@ -143,3 +143,36 @@ def test_s1b_goldens_under_the_minimum_are_refused(worktree):
     holds((agent / "goldens").is_dir() and not list((agent / "goldens").glob("g-*.yaml")), "S1b has no goldens")
     refused = about_the_agent(validate_over(tree))
     assert any("golden" in e for e in refused), f"seed S1b: no check refused an agent with no goldens ({refused})"
+
+
+# --- The attempt seeds' run files (S2, S3) -----------------------------------
+
+
+def run_file(name: str, seed: str) -> dict[str, Any]:
+    run = yaml.safe_load((RUNS / name).read_text(encoding="utf-8"))
+    holds(isinstance(run, dict) and run.get("seed") == seed, f"{name} is seed {seed}'s run file")
+    holds(isinstance(run.get("attempts"), list) and run["attempts"], f"{name} names the attempts to make")
+    holds(all(a.get("what") and a.get("refused_when") for a in run["attempts"]),
+          f"{name}: every attempt says what it is and when it counts as refused")  # fmt: skip
+    return run
+
+
+def made(run: dict[str, Any]) -> list[dict[str, Any]]:
+    """The observed entries, one per attempt: the planted failure is that there are none yet."""
+    observed = run["observed"]
+    assert observed is not None, f"seed {run['seed']}: the attempt has not been made"
+    assert len(observed) == len(run["attempts"]), f"seed {run['seed']}: every attempt is made, not some"
+    return observed
+
+
+# --- S2: a stand-in for the platform check -------------------------------------
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2 is attempted after M06 PR 2 merges (SPEC/06 §5.1)")
+def test_s2_a_stand_in_for_the_platform_check_was_refused():
+    """In an agent repository, a pull request whose own workflow answers to the platform check's name
+    and never asks agentkeel for it. Refused when it is not mergeable and no check run on its head
+    came from the platform's App (F6.2, BLOCK 2). Read by PR 3's run, not by this test."""
+    run = run_file("f6_2_standin.yaml", "S2")
+    observed = made(run)
+    assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
