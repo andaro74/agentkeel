@@ -24,6 +24,14 @@
 # (the --runtime-session-id passed) in place of a request id: the trail
 # records it, and the model calls are read between the attach and the
 # detach (amended at M05 PR 2, before the attempt).
+#
+# Stated before the attempt (M05 PR 3; ruled by the human as Product, with Security, 2026-09-30, option A):
+# under the quarantine refagent is expected never to reach its model. `server.py` reads the rights table
+# (a DynamoDB Scan) before it calls Converse, the deny-all refuses the Scan, and the handler answers with that
+# error; the trail logs no DynamoDB data events. So the expected reading is "no model call by refagent's role
+# is recorded after the quarantine": S7 unrecorded and not shown refused, a finding for row 5 with this reason.
+# The standard is not moved to fit: no other call stands in for the model call, and the trail is not widened
+# to record the Scan. The image cannot change before PR 3's run (it deploys from main only; SPEC/05 §5.1).
 seed: S7
 falsifiers: [F5.4]
 principal: the human, with the quarantine command and InvokeAgentRuntime on refagent's runtime
