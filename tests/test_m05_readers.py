@@ -277,3 +277,16 @@ def test_row_5s_cell_names_each_seed_and_reads_red_on_a_miss():
     envelope = enveloped(observation(S3={"made": False, "note": "not made"}))
     parts = gate.containment_reading(envelope)
     assert parts[:2] == ["S1 refused 300 s", "S2 refused 300 s"] and "S3 not made" in parts
+
+
+def test_a_seed_with_an_unrecorded_attempt_is_not_read_as_refused():
+    """#31's first run read S1, with no record, and S6, with two attempts unrecorded, as refused."""
+    obs = observation(S6={"attempts": [
+        {"what": "delete", "event_name": "DeleteObject", "records": [trail(ADMIN_ARN, "Access Denied because object protected by object lock")]},
+        {"what": "retain", "event_name": "PutObjectRetention", "records": []}]},
+        S1={"attempts": [{"what": "curl", "records": []}]})  # fmt: skip
+    seeds = {s["seed"]: s for s in enveloped(obs)["containment"]["seeds"]}
+    assert seeds["S1"]["refused"] is False and seeds["S1"]["recorded"] is False
+    assert seeds["S6"]["refused"] is False and "retain: unrecorded" in seeds["S6"]["reasons"]
+    assert "S1 not made" not in gate.containment_reading(enveloped(obs))
+    assert "S1 not shown refused" in gate.containment_reading(enveloped(obs))

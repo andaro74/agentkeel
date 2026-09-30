@@ -175,7 +175,10 @@ NOT_FOUND = {"found": False}
 
 def api_attempt(attempt: dict[str, Any], entry: dict[str, Any], trails: Trails) -> dict[str, Any]:
     request_id = entry.get("request_id")
-    records = trails.matching(request_id=request_id, event_name=attempt.get("event_name")) if request_id else []
+    # By the request id alone, which is the call's own: CloudTrail's event name need not be the API's. It logged
+    # S6's lock-off, the API PutObjectLockConfiguration, as PutBucketObjectLockConfiguration, and matching the
+    # run file's name read a recorded refusal as unrecorded (#31's first run). Each record keeps the name it has.
+    records = trails.matching(request_id=request_id) if request_id else []
     return {"what": attempt["what"], "event_name": attempt.get("event_name"), "request_id": entry.get("request_id"),
             "records": records, "human_said": {"result": entry.get("result"), "message": entry.get("message")}}  # fmt: skip
 

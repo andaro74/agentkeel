@@ -228,3 +228,16 @@ def test_s7_with_no_detach_in_the_trail_cannot_bound_the_window():
            "observed": entries}
     invoke = observer.observe([run], s3)["seeds"][0]["attempts"][1]
     assert "the detach is not in the trail" in invoke["mismatch"]
+
+
+def test_an_attempt_is_found_by_its_request_id_whatever_cloudtrail_names_it():
+    """#31's first run: CloudTrail logged S6's lock-off, the API PutObjectLockConfiguration, as
+    PutBucketObjectLockConfiguration; matching the run file's name read a recorded refusal as unrecorded."""
+    s3 = FakeS3()
+    denied = record("PutBucketObjectLockConfiguration", "DSHB2N47998KBX7K", AT, f"arn:aws:iam::{AGENT}:user/admin",
+                    "AccessDenied", "with an explicit deny in a resource-based policy")  # fmt: skip
+    trail_file(s3, AGENT, "us-west-2", [denied], AT + timedelta(minutes=5), 1)
+    run = {"seed": "S6", "attempts": [{"what": "unlock", "event_name": "PutObjectLockConfiguration"}],
+           "observed": [{"event_name": "PutObjectLockConfiguration", "request_id": "DSHB2N47998KBX7K", "at": AT.isoformat()}]}
+    (attempt,) = observer.observe([run], s3)["seeds"][0]["attempts"]
+    assert attempt["records"][0]["event_name"] == "PutBucketObjectLockConfiguration"

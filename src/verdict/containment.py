@@ -95,8 +95,11 @@ def read_seed(seed: dict[str, Any]) -> dict[str, Any]:
     out["attempts"] = attempts
     unrecorded = [a["what"] for a in attempts if not a["recorded"]]
     out["recorded"] = bool(attempts) and not unrecorded
+    # Refused only when every attempt has its record and none shows otherwise: a refusal nobody recorded is not
+    # shown. #31's first run read S1, with no record at all, as refused, since this once came before the
+    # unrecorded reasons were added.
     out["reasons"] = reasons + [f"{what}: unrecorded" for what in unrecorded]
-    out["refused"] = bool(attempts) and not reasons
+    out["refused"] = bool(attempts) and not out["reasons"]
     times = [t["latency_s"] for a in attempts for t in a["timings"] if t["latency_s"] is not None]
     out["latency_s"] = max(times) if times and out["recorded"] else None
     return out
