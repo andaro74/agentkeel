@@ -214,3 +214,4 @@ section 5.1).
 | Seed | File | What is wrong with it |
 |---|---|---|
 | S1a | `m06/s1a-unassigned-seat/` | an agent folder as the template ships it: `manifest.yaml` schema-valid with all seven seats `null`, and one ordinary and one trap golden citing the agent's own `data/`. Placed at `agents/premiere-desk/`, `validate` over the tree is green: no check reads a seat's value |
+| S1b | `m06/s1b-no-goldens/` | the same agent folder with every seat `andaro74` and an empty `goldens/` (a `.gitkeep` only, since Git keeps no empty folder). Placed at `agents/premiere-desk/`, `validate` over the tree is green: nothing asks an agent to bring goldens |

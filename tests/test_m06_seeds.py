@@ -126,3 +126,20 @@ def test_s1a_an_unassigned_seat_is_refused(worktree):
     holds(sorted(g["kind"] for g in goldens) == ["ordinary", "trap"], "S1a's goldens are at the minimum")
     refused = about_the_agent(validate_over(tree))
     assert any("seat" in e for e in refused), f"seed S1a: no check refused the unassigned seats ({refused})"
+
+
+# --- S1b: goldens under the minimum --------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1b's reader is M06 PR 2's (SPEC/06 §6)")
+def test_s1b_goldens_under_the_minimum_are_refused(worktree):
+    """The same agent folder with every seat assigned and an empty goldens folder: a first PR adding
+    it must not be mergeable (F6.1). Today `validate` over the tree with it is green: goldens are
+    one folder, evals/goldens/v1/, and nothing asks an agent to bring any (SPEC/06 §3.4)."""
+    tree = worktree()
+    agent = with_agent(tree, "s1b-no-goldens")
+    seats = yaml.safe_load((agent / "manifest.yaml").read_text(encoding="utf-8"))["seats"]
+    holds(len(seats) == 7 and set(seats.values()) <= LOGINS, "S1b's seven seats are assigned")
+    holds((agent / "goldens").is_dir() and not list((agent / "goldens").glob("g-*.yaml")), "S1b has no goldens")
+    refused = about_the_agent(validate_over(tree))
+    assert any("golden" in e for e in refused), f"seed S1b: no check refused an agent with no goldens ({refused})"

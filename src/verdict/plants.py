@@ -126,6 +126,7 @@ SEEDS_M05: dict[str, tuple[str, str, str]] = {
 # merge (SPEC/06 section 5.1). Listing them reads nothing and gates nothing.
 SEEDS_M06: dict[str, tuple[str, str, str]] = {
     "S1a": ("F6.1", "tests/fixtures/m06/s1a-unassigned-seat/", "src/validate/"),
+    "S1b": ("F6.1", "tests/fixtures/m06/s1b-no-goldens/", "src/validate/"),
 }
 
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
