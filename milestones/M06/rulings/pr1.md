@@ -29,8 +29,7 @@ pr: 34
 
 # Ruling: M06 PR 1, Product
 
-Drafted for andaro74 as Product, 2026-09-30. Not ruled until this line
-reads "Ruled by".
+Ruled by andaro74 as Product, 2026-09-30, as written.
 
 The rulings below were made by andaro74 on 2026-09-30, in the seats
 named, before any seed; the placements marked *proposed* in
