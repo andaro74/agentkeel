@@ -84,6 +84,26 @@ no event-name mismatch, inside the observer's window (13:24Z on 09-29 to
 | N5 | This file had no cold review | Repaired: this file |
 | N6 | S4's key and S7's window are PR 2's reader's | Recorded; the run reads them (Unsure F) |
 
+## The second cold read, of the repairs (`5a5fe1e..d703c48`)
+
+`engineering-cold-reviewer` read the repair diff (8 files, `evals/history`
+excluded) and row 5, the code it calls and the `5a5fe1e` envelope: 0
+BLOCK, 1 FINDING, 9 NOTE, verbatim in the PR body. It found both repairs
+to be readers fitted to records AWS wrote, not a standard moved, and
+expects S4 to read refused and recorded and S7 unrecorded on the next run.
+
+| # | Finding | Status |
+|---|---|---|
+| F1 | The time fallback could take a returned call under another session as the attempt's | **Repaired** (`01b40f5`): only a call with an error and no session id in either field; tested |
+| N1 | The role-id match is tight | Recorded |
+| N2 | The id's source is not in the repo | `aws iam get-role --role-name agentkeel-refagent-RefagentRole5888DB41-i9IqTXU6NVSL --query Role.RoleId` answered `AROAYOUV2Q4IB5XHNMPGI` (the session, 2026-09-30, as `hector.acevedo`) |
+| N3 | The fallback ran with no session id in the entry | **Repaired** (`01b40f5`): it needs one; tested |
+| N4 | Dedupe by `eventID` could collapse on `None`, and kept the first copy loaded | **Repaired** (`01b40f5`): request id and time when there is no event id; the earliest delivered copy |
+| N5 | `RUNTIME` is an exact ARN, and the test builds it from the constant | Recorded; errs closed. The next run reads it against the real record, whose `resources` carries that ARN |
+| N6 | The time fallback is the one loosening: `at` picks the record, AWS's time is read | Recorded; closed on two and on none, and S4's refusal event is still keyed by the session |
+| N7 | The stand-in's grant is by name | Security's F2: carried to M06 |
+| N8, N9 | The stack test and the new reader test can each fail | Recorded |
+
 ## The run that decides this ruling
 
 Pending: the head and the `evals` run on it that read S3, S4 and S7 from
