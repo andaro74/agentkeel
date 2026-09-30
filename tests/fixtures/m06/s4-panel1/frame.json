@@ -1,0 +1,10 @@
+{
+  "results": {
+    "A": {
+      "status": 200,
+      "frames": [
+        {"schema": {"refId": "A", "fields": [{"name": "name", "type": "string"}]}, "data": {"values": [["refagent", "ghost-agent"]]}}
+      ]
+    }
+  }
+}

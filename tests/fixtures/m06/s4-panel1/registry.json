@@ -1,0 +1,7 @@
+{
+  "Items": [
+    {"name": {"S": "refagent"}, "platform_version": {"S": "m05"}}
+  ],
+  "Count": 1,
+  "ScannedCount": 1
+}

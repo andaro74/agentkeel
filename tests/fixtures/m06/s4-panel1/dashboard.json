@@ -1,0 +1,16 @@
+{
+  "title": "agentkeel",
+  "uid": "agentkeel-registry",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Registry",
+      "type": "table",
+      "targets": [
+        {"refId": "A", "datasource": {"type": "grafana-dynamodb-datasource", "uid": "registry"}, "query": "SELECT name FROM \"agentkeel-registry\""},
+        {"refId": "B", "datasource": {"type": "grafana-testdata-datasource", "uid": "static"}, "scenarioId": "csv_content", "csvContent": "name\nghost-agent"}
+      ],
+      "transformations": [{"id": "merge", "options": {}}]
+    }
+  ]
+}

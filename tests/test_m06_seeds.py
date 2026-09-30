@@ -191,3 +191,47 @@ def test_s3_the_timed_quickstart_was_made():
     observed = made(run)
     assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
     assert run.get("agent_name"), "seed S3: the agent's name was not stated before the run"
+
+
+# --- S4: panel 1 shows an agent the registry does not ----------------------------
+
+PANEL = "infra/grafana/panel1.json"  # the dashboard's path from PR 2 (finding 16: Security's)
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S4's query reader is M06 PR 2's (SPEC/06 §6)")
+def test_s4_a_panel_1_query_with_a_second_source_is_refused(worktree):
+    """Panel 1 of S4's dashboard reads the registry and a static list naming ghost-agent. `validate`
+    must refuse a panel 1 query that names anything but the registry (finding 11). Today nothing
+    reads a dashboard: placed at infra/grafana/panel1.json, `validate` over the tree is green."""
+    import json
+
+    dashboard = json.loads((FIXTURES / "s4-panel1" / "dashboard.json").read_text(encoding="utf-8"))
+    panel = next((p for p in dashboard.get("panels", []) if p.get("id") == 1), None)
+    holds(panel is not None, "S4's dashboard has a panel 1")
+    sources = {t["datasource"]["uid"] for t in panel["targets"]}
+    holds(sources == {"registry", "static"}, "S4's panel 1 reads the registry and one other source")
+    tree = worktree()
+    (tree / PANEL).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(FIXTURES / "s4-panel1" / "dashboard.json", tree / PANEL)
+    refused = [e for e in validate_over(tree) if "panel1.json" in e]
+    assert refused, "seed S4: no check refused a panel 1 query that names a second source"
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S4's comparison is build's, M06 PR 2 (SPEC/06 §4)")
+def test_s4_a_panel_row_with_no_registry_row_is_found_by_build():
+    """Panel 1's rows as Grafana's /api/ds/query returns them name ghost-agent; the registry scan does
+    not. The observer writes both lists raw, and `build` compares them by agent name (BLOCK 3):
+    `build.panel_not_in_registry(frame, registry)` must return ["ghost-agent"]. Today build has no
+    such comparison, and nothing else in the tree compares a panel with the registry."""
+    import json
+
+    from src.verdict import build
+
+    frame = json.loads((FIXTURES / "s4-panel1" / "frame.json").read_text(encoding="utf-8"))
+    registry = json.loads((FIXTURES / "s4-panel1" / "registry.json").read_text(encoding="utf-8"))
+    rows = frame["results"]["A"]["frames"][0]["data"]["values"][0]
+    holds("ghost-agent" in rows and "refagent" in rows, "S4's panel rows name refagent and ghost-agent")
+    holds([i["name"]["S"] for i in registry["Items"]] == ["refagent"], "S4's registry names refagent only")
+    compare = getattr(build, "panel_not_in_registry", None)
+    assert compare is not None, "seed S4: nothing compares panel 1's rows with the registry"
+    assert compare(frame, registry) == ["ghost-agent"]

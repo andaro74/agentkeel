@@ -129,6 +129,7 @@ SEEDS_M06: dict[str, tuple[str, str, str]] = {
     "S1b": ("F6.1", "tests/fixtures/m06/s1b-no-goldens/", "src/validate/"),
     "S2": ("F6.2", "milestones/M06/runs/f6_2_standin.yaml", "scripts/observe_template.py"),
     "S3": ("F6.1, F6.3", "milestones/M06/runs/f6_3_quickstart.yaml", "scripts/observe_template.py"),
+    "S4": ("F6.4", "tests/fixtures/m06/s4-panel1/", "src/validate/, src/verdict/build.py"),
 }
 
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
