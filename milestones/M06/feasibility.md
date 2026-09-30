@@ -339,3 +339,17 @@ the report's):
 
 Every BLOCK, FINDING and NOTE of §1 is ruled. SPEC/06 is revised once on
 all of them (§2.5).
+
+## 2.5 SPEC/06 revised on the rulings
+
+Revised once, after every item of §1 was ruled (the commit after
+`991cf12`): the director's sentence (finding 13); "ships" as five records
+and the clock to the last (findings 4, 8); the platform check as a GitHub
+App's `integration_id` (BLOCK 1); F6.1 and F6.2 restated (finding 6,
+BLOCK 2); five seeds, S1 split (finding 10); S4 with the dashboard's query
+(finding 11); `build` as the comparer (BLOCK 3); one seat per build item
+(finding 16); §8's three new rows (findings 17, 18); the cut list with a
+third cut and FRAGILE moved by amendment (findings 14, 15); the knowledge
+base's fourth move with the rows that ride it (NOTE 21); PR 3 as the read
+(NOTE 22); §11's open questions replaced by the four reads still owed
+before PR 2.

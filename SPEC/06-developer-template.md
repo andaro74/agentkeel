@@ -3,84 +3,112 @@
 Status: DRAFT · Owner: Product seat · Milestone M06 · Opened at M06 PR 1
 (`milestones/M06/rulings/pr1.md`) · Build list: SPEC/00 §8 M06, which is
 the ruling for this milestone's build paths (`SPEC/00-overview.md#8-M06`),
-as cut in §9 and as amended at this PR (§10: the knowledge base to M07) ·
-To be reviewed by `product-spec-reviewer` before anything else in PR 1 is
-written (`milestones/M06/feasibility.md` §1).
+as cut in §9 and as amended at this PR (§10) · Reviewed by
+`product-spec-reviewer` before anything else in PR 1 was written (3 BLOCK,
+16 FINDING, 4 NOTE on `69721b6`; `milestones/M06/feasibility.md` §1) and
+revised once on the rulings in §2 of that note, all made by the human on
+2026-09-30, BLOCK 1 as option (d) and the rest "as proposed".
 
 ## 1. The claim
 
 **Claim 6.** A developer ships a governed agent from the template in under
 one day.
 
-For a director: *a team creates a governed agent from the template, without
-touching the safety pipeline* (SPEC/00 §10.3, M06). The table's word
-"Marketing" is dropped here: the developer who is timed is the author
-(§2), not a marketing team, and the sentence must not say otherwise.
+For a director: *one developer creates an agent from the template and
+ships it in a day, without touching the safety pipeline* (SPEC/00 §10.3
+row 06, amended at this PR on finding 13: the developer timed is one
+person, the author, and "governed" is not said of controls that have not
+fired).
 
 Threats answered (SPEC/00 §3): the negligent developer (forgets a seat,
 ships no goldens); the malicious developer (edits a workflow, bypasses a
 check). M02 answered both inside this repository, for one human. M06
-answers them for a second repository and a second person, who has write
+answers them for a second repository and a second login, which has write
 access and nothing more.
 
-**"Ships a governed agent" means all of these, in the new repository, and
-nothing less** (each is read, none is taken on the developer's word):
+**"Ships" means all five of these, in the new repository, and nothing
+less.** Each is read from a record; none is taken on the developer's word.
 
-1. The repository was created from the template.
-2. Its first pull request was refused for its planted reasons, an
-   unassigned seat and no goldens (F6.1), then made green and merged.
-3. The merge was deployed by the platform's deploy workflow, not the
-   repository's own: a signed bundle, verified, in the construct (claim
-   1's controls, reached from a repository that is not this one).
-4. The deployed agent answered one of its own goldens in the runtime.
-5. The registry holds the agent, and Grafana panel 1 shows it (F6.4).
+1. **Created.** The organisation owner created the repository from the
+   template (finding 4). Its `created_at` starts the clock.
+2. **Refused, then merged.** Its first pull request was not mergeable
+   while a seat was unassigned or its goldens were under the minimum
+   (F6.1), then was made green and merged.
+3. **Deployed by the platform.** The merge was deployed by the platform's
+   deploy path, not the repository's own: a signed bundle, verified, in
+   the construct (claim 1's controls, reached from a repository that is
+   not this one).
+4. **Answered.** The deployed agent answered one of its own goldens in
+   the runtime, recorded in an envelope `build` wrote (§6).
+5. **Listed.** The registry holds the agent, and Grafana panel 1 shows it
+   (F6.4).
 
-**"Under one day"** is the elapsed time between two records GitHub keeps,
-never the developer's clock (M05's rule for attempt times): the new
-repository's `created_at`, and the completion of the deploy run that
-satisfies item 3 above. The bar is one working day, **8 hours (28,800 s)**, as
-`quickstart.max_seconds` in `thresholds.yaml` with `relaxes: up`
-(Threshold Owner, proposed; §11 Q5). Breaks are not subtracted. The
-elapsed time is the measured value for claim 6 (SPEC/00 §8 M06, F6.3).
+**"Under one day"** is the elapsed time from item 1's record to the
+**last** of items 2 to 5's records (finding 8), every time GitHub's or
+AWS's, never the developer's clock. The bar is one working day, **28,800 s
+wall clock, breaks not subtracted**, as `quickstart.max_seconds` in
+`thresholds.yaml` with `relaxes: up` (Threshold Owner). Nothing is
+prepared before `created_at` beyond the account set-up recorded in
+`feasibility.md` §2 (NOTE 23). The elapsed time is the measured value for
+claim 6 (SPEC/00 §8 M06, F6.3).
 
 ## 2. Words used here
 
-- **The template.** A GitHub template repository that a developer creates
-  an agent repository from. It ships refagent as the example (SPEC/00 §8
-  M06), a manifest with every seat null, an empty goldens folder, and
-  caller workflows whose jobs `uses:` the platform's reusable workflows.
-  Where its source lives, and which seat owns that path, is §11 Q1 and Q2.
-- **An agent repository.** A repository created from the template. The
-  developer has **write** on it and nothing more: no admin, so no edit to
-  its rulesets, its settings or its secrets.
-- **The platform's workflows.** The workflows that evaluate, sign and
-  deploy an agent, owned by Security in this repository. An agent
-  repository calls them; it does not contain them.
-- **Required workflow.** A workflow the platform requires on an agent
-  repository's default branch that the repository's own files cannot
-  replace or satisfy. On GitHub this is the `workflows` rule of an
-  **organization** ruleset; a repository ruleset can only require a
-  status check by name (§3.2). Whether this account can have one is §11
-  Q1.
-- **Seat assigned.** A manifest seat whose value is a real GitHub login
-  (or team) with access to the repository. Null, empty or a login GitHub
-  does not answer for is unassigned. Seats to IdP groups is SPEC/00 §6's
-  wording; there is no IdP (§11 Q3).
-- **Goldens, for an agent repository.** The repository's own golden files,
-  in SPEC/00 §6's shape. "Empty" is fewer than the minimum the Data Owner
-  rules (proposed: one ordinary and one trap; §11 Q4).
+- **The template.** A GitHub template repository in the organisation.
+  It ships refagent as the example (SPEC/00 §8 M06), a manifest with every
+  seat null, an empty goldens folder, a README that points at the
+  quickstart, and the one caller workflow that asks `agentkeel` for the
+  platform check. Its source lives there only; nothing of it sits under a
+  path with no seat in `agentkeel` (finding 16).
+- **The organisation.** A GitHub organisation on the Free plan, owned by
+  `andaro74`, holding the template and the agent repositories, all
+  public. Member repository creation is off (finding 4). `agentkeel`
+  stays under the personal account: moving it would change the deploy
+  role's `sub` and the signing identity (§3.5).
+- **An agent repository.** A repository the owner creates from the
+  template. The developer has **write** on it and nothing more: no admin,
+  so no edit to its ruleset, settings or secrets.
+- **The platform check** (BLOCK 1, option (d)). A required status check on
+  each agent repository's default branch whose ruleset names an
+  `integration_id`: a GitHub App the platform owns. GitHub accepts that
+  check only from that App ("The optional integration ID that this status
+  check must originate from", REST reference for repository rules). The
+  check is posted by a workflow in `agentkeel` that runs from `main`,
+  evaluates the pull request's head with the platform's code, and holds
+  the App's key (Security). A job of the same name in the pull request's
+  own workflow files runs as the GitHub Actions app and does not satisfy
+  it. If `agentkeel`'s run is never asked for, no check arrives and the
+  pull request stays blocked. GitHub documents the `workflows` rule, the
+  first-party form of this, for Enterprise Cloud only (read 2026-09-30),
+  so M06 does not use it.
+- **Seat assigned** (NOTE 20, Q3). A manifest seat whose value is a real
+  GitHub login with access to the repository, checked as M02 checks
+  CODEOWNERS logins. Null, empty, or a login GitHub does not answer for is
+  unassigned. SPEC/00 R1 and §6 are amended at this PR from "IdP groups".
+  Under R1 every seat is `andaro74`; the second developer's login holds
+  none.
+- **Goldens, for an agent repository** (finding 7, Q4). The repository's
+  own golden files in SPEC/00 §6's shape: at least **one ordinary and one
+  trap**. For an agent that is not refagent, `table_row` and `clause_id`
+  name a row and a clause in that agent's own data, carried in its
+  repository; the Data Owner rules the files at PR 2. Fewer is "under the
+  minimum". A golden that has never passed does not gate (P7).
 - **The registry.** A DynamoDB table in the agent account holding each
-  agent's manifest, flattened, written on merge to an agent repository's
-  default branch by the platform's workflow. One row per agent name.
-- **Grafana panel 1.** The registry panel: one row per agent, read from the
-  registry and from nothing else. Panel 2 is the verdict history (§9 cut
-  1).
-- **The second developer.** The author, on a fresh Windows user profile
-  with nothing installed, and a second GitHub account with write access
-  only (ruled by the human, 2026-09-30). No AWS credentials on that
-  profile: the developer ships through CI and never holds a platform
-  credential. The one-human rule (R1) still holds for seats; the second
-  account is a second login, not a second seat holder (§8).
+  agent's manifest, flattened, written by the platform's deploy path on a
+  merge to an agent repository's default branch. One row per agent name.
+- **Grafana panel 1.** The registry panel: one row per agent, whose query
+  names the registry and nothing else. Panel 2 is the verdict history (§9
+  cut 1).
+- **The second developer.** The author, on a fresh Windows user profile,
+  as `floresinnovations` (id 336113686), a GitHub account with write on
+  the agent repository only (ruled 2026-09-30; `feasibility.md` §2, NOTE
+  23). No AWS credentials on that profile: the developer ships through CI
+  and never holds a platform credential.
+- **The template works** (finding 9). Read from PR 2's own run: the
+  template's example agent deployed from a test repository the owner
+  creates and owns, through the platform check and the deploy path. That
+  run is `andaro74`'s, is not a quickstart run and is not timed. Any run of
+  the quickstart by the second developer is an attempt and is recorded.
 - **Stated before.** An expected reading committed **and pushed** before
   the attempt it states, so that GitHub dates it (`open.md` row 17, ruled
   by Product at M06 open).
@@ -94,30 +122,35 @@ reader can look at.
 
 1. **There is no template and no agent repository** (all falsifiers).
    `gh api repos/andaro74/agentkeel --jq .is_template` answers `false`;
-   the account owns no organization (`gh api user/orgs` answers `[]`, read
+   the account owns no organisation (`gh api user/orgs` answers `[]`, read
    2026-09-30). Nothing a developer could create an agent from exists.
 2. **A required check is a name, and any workflow can answer to it**
    (F6.2). `infra/ruleset/main.json` requires `checks`, `cold-review-ruling`,
    `evals`, `ruling-cited` and `two-key` as contexts, none with an
-   `integration_id`, on a repository ruleset. A job named `evals` in a
-   workflow the pull request itself adds reports a check of that name.
-   Inside this repository `ruling-cited` asks a ruling for the workflow
-   path and `validate` asks its hash in `infra/workflows.sha256`, and both
-   are files the same pull request can carry (`open.md` row 8: the reader
-   is the PR's own code). Expected, not attempted here.
+   `integration_id`. A job named `evals` in a workflow the pull request
+   itself adds reports a check of that name. Inside this repository
+   `ruling-cited` asks a ruling for the workflow path and `validate` asks
+   its hash in `infra/workflows.sha256`, and both are files the same pull
+   request can carry (`open.md` row 8: the reader is the PR's own code).
+   Expected, not attempted here.
 3. **Every seat is unassigned and validate passes** (F6.1).
    `agents/refagent/manifest.yaml` and `agents/ratings-helper/manifest.yaml`
    carry `seats:` with all seven values `null`, and `make validate` is
-   green on `main`. No check reads a seat's value.
+   green on `main`. No check reads a seat's value, though SPEC/00 R1 lists
+   "seats assigned to real groups" among `validate`'s checks from M01
+   (NOTE 20): the promise was never built.
 4. **No agent has goldens of its own** (F6.1). Goldens are one folder,
-   `evals/goldens/v1/`, keyed to refagent's questions. Nothing asks an
+   `evals/goldens/v1/`, keyed to refagent's questions and to
+   `data/rights_table.json` and `data/clause_index.json`. Nothing asks an
    agent to bring any.
-5. **The deploy role trusts one repository** (item 3 of "ships").
-   `infra/bootstrap/app.py` `SUBJECT = "repo:andaro74@3157440/agentkeel@1376369685"`,
-   with `job_workflow_ref` exact to this repository's `deploy.yml` on
-   `main`; `src/bundle/verify.py` accepts that one signing identity. An
-   agent repository can neither assume the role nor sign a bundle that
-   `verify` accepts. `deploy.yml` packs `agents/refagent` only.
+5. **The platform trusts one repository** (item 3 of "ships").
+   `infra/bootstrap/app.py` `SUBJECT = "repo:andaro74@3157440/agentkeel@1376369685"`:
+   the deploy role trusts it with `job_workflow_ref` exact to this
+   repository's `deploy.yml` on `main`, and the eval role trusts its
+   `pull_request` and `main` subjects. `src/bundle/verify.py` accepts one
+   signing identity and one repository id. `deploy.yml` packs
+   `agents/refagent` only. An agent repository can assume neither role nor
+   sign a bundle that `verify` accepts.
 6. **There is no registry and no Grafana** (F6.4). No table, no workspace,
    no panel. Panel 1 cannot show a wrong agent because it does not exist;
    the seed (§5, S4) is the false state a panel can have.
@@ -127,31 +160,36 @@ reader can look at.
 
 | Id | Fires when | What it looks like in the repo |
 |---|---|---|
-| F6.1 | a green first PR with an unassigned seat (or no goldens) | S1's fixture passed by its reader in a copy of the tree (`checks.F6_1: fail` from the seed test); live: the timed run's first pull request in the agent repository with any required check green while a seat is null or the goldens are empty |
-| F6.2 | a repository without the required workflow can merge | S2's attempt merged: a pull request in an agent repository that removes the caller's `uses:` line, or replaces the job with one of the same name that runs no platform code, and is mergeable (GitHub's `mergeable_state` `clean`, or merged) |
-| F6.3 | the timed quickstart exceeds one working day | S3's elapsed time, read from GitHub's two records (§1), over `quickstart.max_seconds`, or unread |
-| F6.4 | Grafana panel 1 shows an agent the registry does not | S4's fixture passed by its reader (`checks.F6_4: fail`); live: panel 1's data, read through Grafana's API, names an agent with no registry row, or the reading is absent |
+| F6.1 | a first pull request is mergeable with an unassigned seat or goldens under the minimum (finding 6) | S1a's or S1b's fixture passed by its reader in a copy of the tree (`checks.F6_1: fail` from the seed tests); live: the timed run's first pull request with `mergeable_state` `clean` (or merged) while a seat is null or the goldens are under the minimum, read from GitHub by the observer and ruled on by `build` |
+| F6.2 | a pull request in an agent repository merges without the platform's check having run on it and passed (BLOCK 2) | S2's pull request merged, or `mergeable_state` `clean`, with no check run from the platform's App on its head |
+| F6.3 | the timed quickstart exceeds one working day | S3's elapsed time (§1) over `quickstart.max_seconds`, or any of its five records unread |
+| F6.4 | Grafana panel 1 shows an agent the registry does not | S4's fixture passed by its reader (`checks.F6_4: fail`); live: panel 1's rows, read through Grafana's API, name an agent with no registry row, or either list is unread |
 
 **Where each reading comes from** (the M04 and M05 lesson, planned at
 open, not found at the close).
 
 - **On every agent envelope, from PR 2's merge: `F6_1` and `F6_4`**, from
-  S1's and S4's seed tests: their readers refusing their fixtures in a copy
-  of the tree. **Test-only witnesses**, and the ledger says so.
+  S1a's, S1b's and S4's seed tests: their readers refusing their fixtures
+  in a copy of the tree. **Test-only witnesses**, and the ledger says so.
   `CLAIM_6_CHECKS` in the gate is `F6_1`, `F6_4`.
-- **F6.2, F6.3 and F6.4's live half are recorded, not gated.** They live
-  in an agent repository and in Grafana, which exist only after PR 2
-  merges (§5.1). `scripts/observe_template.py` (Engineering) reads each
-  from GitHub's and Grafana's records and writes raw observations; `build`
-  copies them into an optional envelope field `template` (per seed: made,
-  refused, the record read, the elapsed seconds); the gate rules nothing
-  on them. **Row 6's Measured cell reads them**, as row 5's read
-  `containment`: an attempt that merged, a time over the bar, a panel row
-  with no registry row, or anything unread makes row 6's cell RED whatever
-  refagent's own verdict. Written here at open; lands at PR 2.
+- **F6.1's and F6.4's live halves, F6.2 and F6.3 are recorded, not
+  gated.** They live in an agent repository, in the organisation and in
+  Grafana, which exist only after PR 2 merges (§5.1).
+  `scripts/observe_template.py` (Engineering) writes raw observations
+  only (BLOCK 3): the first pull request's required checks and
+  `mergeable_state`; S2's pull request's check runs, with each run's App,
+  and its merge state; the five records' times; panel 1's rows as
+  Grafana's API returns them and a registry scan, each with the time it
+  was read. `build` rules on them, compares panel 1's rows with the
+  registry's by agent name, and writes an optional envelope field
+  `template`; the gate rules nothing on it. **Row 6's Measured cell reads
+  it**, as row 5's read `containment`: a first pull request mergeable
+  while it should not be, an S2 merge, a time over the bar, a panel row
+  with no registry row, or anything unread makes row 6's cell RED
+  whatever refagent's own verdict. Written here at open; lands at PR 2.
 - **A human-written file feeds no reading by itself.** The run file names
-  the repository and the pull request; the observer reads GitHub. A name
-  it cannot find is unread.
+  the repository and the pull requests; the observer reads GitHub,
+  Grafana and AWS. A name it cannot find is unread.
 
 **P5.** Observers write raw observations; `verdict.build` writes the
 checks and `template`; the gate reads the envelope and the ledger reads
@@ -167,71 +205,86 @@ under `milestones/M06/runs/`, each the attempt to make with
 reason raises, run once with `--runxfail` so the message is read;
 preconditions raise `SeedBroken`. Each is named in
 `tests/fixtures/README.md` and in `src/verdict/plants.py` as `SEEDS_M06`;
-none is copied to `evals/history/`.
+none is copied to `evals/history/`. Five seeds (finding 10 split S1).
 
 | Seed | Falsifier | Planted as | Fails today because | Read by (PR 2) |
 |---|---|---|---|---|
-| S1 first PR: unassigned seat, no goldens | F6.1 | `tests/fixtures/m06/s1-first-pr/`: an agent folder as the template ships it, `manifest.yaml` with all seven seats `null` and an empty `goldens/` | `make validate` on a copy of the tree with it applied is green: no check reads a seat's value or an agent's goldens | two `validate` checks: every seat a real login with access (§11 Q3); an agent's goldens at or over the Data Owner's minimum (§11 Q4). The same checks run in an agent repository through the required workflow |
-| S2 `uses:` removed | F6.2 | `runs/f6_2_uses.yaml`: in an agent repository, a pull request that deletes the caller workflow's `uses:` line and adds a job of the same name that echoes success; `observed: null` | the attempt is not made; there is no agent repository. In this repository the same shape is not refused by anything that reads outside the pull request (§3.2) | the organization ruleset's `workflows` rule, requiring the platform's workflow from its own repository at a pinned ref; the observer reads the pull request's `mergeable_state` and the rule suite GitHub recorded |
-| S3 the timed quickstart | F6.3 | `runs/f6_3_quickstart.yaml`: the steps of `docs/developer/quickstart.md`, the second developer, the agent's name (fictional, named by Product before the run), `observed: null` | the attempt is not made; there is no template and no quickstart | the observer reads the repository's `created_at` and the deploy run's completion from GitHub, and the answer, the registry row and panel 1 from AWS and Grafana (§1, items 1 to 5) |
-| S4 panel 1 shows an agent the registry does not | F6.4 | `tests/fixtures/m06/s4-panel1.json`: panel 1's data frame as Grafana's `/api/ds/query` returns it, naming `ghost-agent`, beside `s4-registry.json`, a registry scan without it | nothing compares a panel with the registry; there is no panel | `scripts/observe_template.py`'s panel reading: panel 1's rows equal to a registry scan, by agent name, both read in the same minute; the dashboard's panel 1 query names the registry as its only source |
+| S1a an unassigned seat | F6.1 | `tests/fixtures/m06/s1a-unassigned-seat/`: an agent folder as the template ships it, `manifest.yaml` with all seven seats `null`, and one ordinary and one trap golden | `make validate` over a copy of the tree with it applied is green: no check reads a seat's value | a `validate` check: every seat a real GitHub login with access (§2). The same check runs in an agent repository under the platform check |
+| S1b goldens under the minimum | F6.1 | `tests/fixtures/m06/s1b-no-goldens/`: the same agent folder with every seat `andaro74` and an empty `goldens/` | `make validate` over a copy of the tree with it applied is green: no check reads an agent's goldens | a `validate` check: an agent's goldens at or over one ordinary and one trap (§2) |
+| S2 a stand-in for the platform check | F6.2 | `runs/f6_2_standin.yaml`: in an agent repository, a pull request whose own workflow file adds a job with the platform check's name that echoes success, and deletes the caller's request to `agentkeel`; `observed: null` | the attempt is not made; there is no agent repository. In this repository the same shape is answered by the pull request's own files (§3.2) | the agent repository's ruleset: the platform check required with the App's `integration_id`; the observer reads the pull request's check runs, each with its App, and its `mergeable_state` |
+| S3 the timed quickstart | F6.1, F6.3 | `runs/f6_3_quickstart.yaml`: the steps of `docs/developer/quickstart.md`; the second developer (`floresinnovations`, id 336113686, set up as `feasibility.md` §2 records); the agent's name, fictional, named by Product before the run; `observed: null` | the attempt is not made; there is no template and no quickstart | the observer reads the five records of §1 from GitHub, AWS and Grafana, and the first pull request's checks and merge state (F6.1's live half) |
+| S4 panel 1 shows an agent the registry does not | F6.4 | `tests/fixtures/m06/s4-panel1/`: `dashboard.json`, a dashboard whose panel 1 query names a second source beside the registry; `frame.json`, panel 1's rows as Grafana's `/api/ds/query` returns them, naming `ghost-agent`; `registry.json`, a registry scan without it | nothing reads a panel's query or compares a panel with the registry; there is no panel | `validate` refuses a panel 1 query that names anything but the registry (finding 11); `build` compares panel 1's rows with the registry's by agent name (BLOCK 3) |
 
 ### 5.1 When each is measured
 
-**A named P3 exception** (ruled by the human at M06 open, 2026-09-30, as
-"if that needs PR 2's merge"). The template, the organization ruleset,
-the deploy role's new trust and the registry write all run from `main`:
-an agent repository calls the platform's workflows at a ref on `main`,
-and the deploy role trusts `main` only (claim 1). A pull request refused
-by a required workflow cannot exist before the workflow is on `main`, and
-a quickstart cannot be timed against a template that is on a branch. So:
+**A named P3 exception** (ruled by the human at M06 open, 2026-09-30:
+"if that needs PR 2's merge, name it a P3 exception at open"). The
+platform check posts from `agentkeel`'s `main`, the deploy role trusts
+`main` only (claim 1), and the template is published from what PR 2
+merges. A pull request refused by the platform check cannot exist before
+the check is on `main`, and a quickstart cannot be timed against a
+template that is on a branch. So:
 
-- **PR 2's run, on the PR.** S1 and S4 read by their tests (test-only
-  witnesses). The organization, its ruleset and the Grafana workspace are
-  made by hand during PR 2 (§11 Q1, Q6), after reading the plan.
-- **After PR 2 merges.** The template is published from `main`. **S2 is
-  attempted, then S3 is timed, and PR 3's run records both** with S4's
-  live half. PR 3 is the repair and that read. If the read misses, row 6
-  closes RED at PR 4 with that as the finding; there is no fifth PR.
+- **PR 2's run, on the PR.** S1a, S1b and S4 read by their tests
+  (test-only witnesses). During PR 2 the owner makes the organisation,
+  the App and the Grafana workspace by hand (Security, after reading the
+  plan).
+- **After PR 2 merges.** The owner reads that the template works (§2),
+  from a test repository. Then **S2 is attempted, then S3 is timed, and
+  PR 3's run records both** with F6.1's and S4's live halves. **PR 3 is
+  that read and cannot be skipped** (NOTE 22), whatever PR 2's cold review
+  finds; it is also the repair. If the read misses, row 6 closes RED at PR
+  4 with that as the finding; there is no fifth PR.
 - **S3 is made once.** SPEC/00 §10.5: timed on a clean account by the
-  author at M06 PR 3. A failed step is kept and explained (§10.5,
-  recordings), not retaken; a second timing is a second attempt, recorded
-  beside the first, and the first is the measured value.
+  author at M06 PR 3. A failed step is kept and explained, not retaken; a
+  second timing is a second attempt, recorded beside the first, and the
+  first is the measured value. A repository deleted during an attempt is
+  recorded, never replaced by a later one's `created_at` (finding 4).
+- **Act 1 is recorded during S3** (finding 14): the unedited screen
+  capture of the timed run is SPEC/00 §10.2's Act 1. Act 2 is recorded at
+  the close, against M02's pull requests.
 
 ## 6. The code that reads the answer (PR 2)
 
-None of it is in PR 1. Each with one seat and one path; the paths marked
-† have no seat today (§11 Q2).
+None of it is in PR 1. Each with one seat and one path (finding 16).
 
 - **The bar** (`thresholds.yaml`, Threshold Owner): `quickstart.max_seconds:
   28800`, `relaxes: up`.
-- **The organization and its ruleset** (Security; by hand, exported beside
-  `infra/ruleset/main.json` so `validate` compares the live ruleset with
-  the export, as M02 does for `main`): the `workflows` rule on every
-  agent repository's default branch, `bypass_actors: []`.
-- **The platform's reusable workflows** (`.github/workflows/`, Security):
-  evals, sign and deploy, called by an agent repository by path and ref.
-  Their hashes in `infra/workflows.sha256`.
-- **The deploy role's trust and the signing identity** (`infra/bootstrap/`,
-  `src/bundle/verify.py`; Security, Engineering): `job_workflow_ref` exact
-  to the reusable deploy workflow at `main`, `sub` scoped to the
-  organization's repositories; `verify` accepting the reusable workflow as
-  the build signer and the caller repository by id.
-- **The template** † (§11 Q1, Q2): the example agent, a null-seat manifest,
-  an empty goldens folder, the caller workflows, a README that points at
-  the quickstart.
-- **The two `validate` checks** (`src/validate/`, Engineering): S1's
-  reader.
-- **The registry** (`infra/`, Security; the write step, Engineering): the
-  table, and the step in the reusable deploy workflow that writes the
-  flattened manifest on merge.
-- **Grafana panel 1** (Security for the workspace, Engineering for the
-  dashboard JSON, §11 Q6): the panel's query names the registry only.
-- **`scripts/observe_template.py`** (Engineering): S2, S3 and S4's live
-  readings; S4's fixture reading.
-- **`template`**, `CLAIM_6_CHECKS` (`F6_1`, `F6_4`) and row 6's reading of
-  `template` (`src/verdict/`, `src/ledger.py`, Engineering); the step in
-  `evals.yml` (Security).
+- **The organisation, the App and each agent repository's ruleset**
+  (Security; by hand, each ruleset exported under `infra/ruleset/` so
+  `validate` compares the live one with its export, as for `main`):
+  member repository creation off; the platform check required with the
+  App's `integration_id`; `bypass_actors: []`.
+- **The platform check's workflow** (`.github/workflows/`, Security): runs
+  from `main`, is asked for by an agent repository's pull request,
+  evaluates its head with the platform's code, and posts the check as the
+  App. Its hash in `infra/workflows.sha256`.
+- **Every per-agent platform change, each automatic or timed** (finding 5;
+  Security lists them here before PR 2): the deploy role's and the eval
+  role's trust for the organisation's repositories; `verify`'s accepted
+  caller repositories and the second signing identity, whose constants
+  move from `src/bundle/verify.py` to a Security-owned file under `infra/`;
+  the construct's per-agent resources, with the agent's own table; the
+  audit bucket's policy for the agent's prefix (`open.md` row 29). A change
+  that needs a Security pull request per agent is made inside the timed
+  run and counts.
+- **The template** (the template repository; Security for its caller
+  workflow, Engineering for the example agent, Product for its README).
+- **Three `validate` checks** (`src/validate/`, Engineering): S1a's, S1b's
+  and S4's query readers. Engineering names here, before PR 2, which of
+  the sixteen checks run in an agent repository.
+- **The registry** (`infra/`, Security; its write step in the platform's
+  deploy path, `.github/workflows/`, Security).
+- **Grafana panel 1** (`infra/grafana/panel1.json`, Security; the workspace,
+  Security, §11).
+- **`scripts/observe_template.py`** (Engineering): raw observations only.
+- **`template`**, `CLAIM_6_CHECKS` (`F6_1`, `F6_4`), `build`'s comparisons
+  and row 6's reading of `template` (`src/verdict/`, `src/ledger.py`,
+  Engineering); the step in `evals.yml` (Security). Where item 4's
+  envelope is written is named here by Engineering before PR 2.
+- **The seats** (the manifests' `seats`, Security): refagent's and
+  ratings-helper's, both assigned in PR 2, since S1a's reader reads every
+  manifest (finding 12).
 - **The documents** (Product): `docs/developer/quickstart.md`,
   `manifest.md`, `goldens.md`, `edges.md`, `docs/refagent/README.md` and
   `walkthrough.md`. Each says what is not built (SPEC/00 §10.5): no
@@ -240,39 +293,47 @@ None of it is in PR 1. Each with one seat and one path; the paths marked
 ## 7. Expected on the plant (row 6)
 
 - **PR 1.** refagent's envelope, gated and recorded as at M05; it says
-  nothing about claim 6. `make plants` lists S1 to S4 (seeds, not golden
-  plants). `uv run pytest tests/test_m06_seeds.py` shows four expected
-  failures. `make validate` passes: nothing reads a seat's value, an
-  agent's goldens, a run file or a panel. `make ledger` exits 0 with row 6
-  OPEN and its Measured cell empty.
-- **PR 2's run, stated before it** (pushed first, §2). S1 and S4 refused
-  by their readers for their planted reasons. refagent's envelope
-  otherwise as at M05: ordinary 9/9, traps 2/2, guardrail 2/3, red team
-  5/5, golden plants 7/7. refagent's own seats assigned in the same PR,
-  since S1's reader reads every manifest (a Security field, §11 Q3).
-- **PR 3's run, stated before it.** S2 refused by the required workflow,
-  the pull request not mergeable; S3's elapsed time under 28,800 s, with
-  all five items of §1 read; panel 1's rows equal to the registry's.
-- **The row goes RED** if a first pull request is green with a seat
-  unassigned or no goldens; if S2's pull request can merge; if S3 is over
-  the bar or any of its five items is unread; if panel 1 shows an agent
-  the registry does not; if a seed's test passes for a reason other than
-  its reader; or if `make ledger` stops matching rows 0 to 5.
+  nothing about claim 6. `make plants` lists S1a, S1b, S2, S3 and S4
+  (seeds, not golden plants). `uv run pytest tests/test_m06_seeds.py`
+  shows five expected failures. `make validate` passes: nothing reads a
+  seat's value, an agent's goldens, a run file or a panel. `make ledger`
+  exits 0 with row 6 OPEN and its Measured cell empty.
+- **PR 2's run, stated before it** (pushed first, §2). S1a, S1b and S4
+  refused by their readers for their planted reasons. Both manifests'
+  seats assigned. refagent's envelope otherwise as at M05: ordinary 9/9,
+  traps 2/2, guardrail 2/3, red team 5/5, golden plants 7/7.
+- **PR 3's run, stated before it.** The timed run's first pull request not
+  mergeable while a seat was null or the goldens were under the minimum;
+  S2's pull request not mergeable, with no check run from the App on its
+  head; S3's elapsed time under 28,800 s with all five records read;
+  panel 1's rows equal to the registry's.
+- **The row goes RED** if a first pull request is mergeable with a seat
+  unassigned or goldens under the minimum; if S2's pull request can merge;
+  if S3 is over the bar or any of its five records is unread; if panel 1
+  shows an agent the registry does not; if a seed's test passes for a
+  reason other than its reader; or if `make ledger` stops matching rows 0
+  to 5.
 
 ## 8. Controls with no seeded case at M06
 
 SPEC/00 §10.5: no document describes these as working.
 
-- **A second person writing a ruling as a seat they do not hold.** Seats
-  are one human (R1), and a ruling's `seat:` is a line in a file any
-  writer can commit. With a second login, `ruling-cited` and `two-key`
-  still read the line, not who wrote it. M06 adds a second login, not a
-  second seat holder, and does not close this.
-- An agent repository in another organization (SPEC/00 §12: required
-  workflows assume one organization; the workflow-hash check is the only
-  cross-organization guard).
-- An organization owner removing the ruleset: `bypass_actors: []` binds
-  the owner at merge, not at the settings page (as M02 for `main`).
+- **A second person writing a ruling as a seat they do not hold.** A
+  ruling's `seat:` is a line in a file any writer can commit, and
+  `ruling-cited` and `two-key` read the line, not who wrote it. M06 adds a
+  second login, not a second seat holder, and does not close this.
+- **`agentkeel`'s own required checks** (finding 17; `open.md` row 8).
+  The App check closes row 8 for agent repositories only. In `agentkeel`
+  a job of a required check's name, in a pull request's own workflow
+  file, still answers to it; and a same-repository pull request there can
+  change the workflow that holds the App's key. Carried to M07.
+- **The widened trust** (finding 18). The deploy and eval roles trusting
+  the organisation's repositories, and `verify` accepting a second
+  identity and a list of callers: no M06 seed attempts a deploy from a
+  repository outside the organisation, or a caller not on the list.
+- An agent repository in another organisation (SPEC/00 §12).
+- An organisation owner removing a ruleset or the App: `bypass_actors: []`
+  binds the owner at merge, not at the settings page (as M02 for `main`).
 - Anything the example agent does beyond refagent's M05 controls: its
   containment is M05's, reached through the construct, and is not
   re-measured here.
@@ -281,29 +342,33 @@ SPEC/00 §10.5: no document describes these as working.
 
 ## 9. Cut list
 
-In order, if the cap is threatened (SPEC/00 §8 M06). None cuts S1 to S4,
-their readers, the template, the organization ruleset, the registry,
-panel 1, Acts 1–2 or `docs/refagent/`.
+In order, if the cap is threatened. None cuts S1a to S4, their readers,
+the template, the platform check, the registry, panel 1, Acts 1–2 or
+`docs/refagent/`.
 
 | # | Item | Milestone | Why |
 |---|---|---|---|
 | 1 | Grafana panel 2 (verdict history) | M07 | SPEC/00 §8 M06's first cut. No M06 falsifier reads it |
-| 2 | Act 3 (the reference agent) | M07 | SPEC/00 §8 M06's second cut. Act 3 shows a HITL refusal and a Braintrust trace, both M07's; recorded now it would show neither. **Proposed as taken at open** (§11 Q7) |
-| a | FRAGILE, the state and its ruling (`open.md` row 25) | M07, with the judge | **Proposed as taken at open** (§11 Q7). Nothing marks a golden FRAGILE without a judge's score to disagree with; `goldens.md` says it is not built |
-
-Never cut: S1 to S4 and their readers; the template; the required
-workflow; the registry and panel 1; Acts 1–2; `docs/refagent/`.
+| 2 | Act 3 (the reference agent) | M07 | SPEC/00 §8 M06's second cut. Act 3 shows a HITL refusal and a Braintrust trace, both M07's |
+| 3 | `docs/developer/manifest.md`, `goldens.md`, `edges.md` | M07 | Added at open (finding 14) to relieve PR 2. The quickstart stays: F6.3 times it |
 
 ## 10. Not in M06
+
+Amendments to SPEC/00 §8 M06 made in this PR (`rulings/pr1.md`):
 
 - **The Bedrock Knowledge Base over the production bucket, and refagent
   retrieving from it**, with the cached-answer seed, F3.5's second half
   and `g-014` counted as a plant: **moved to M07** (ruled by the human at
-  M06 open, 2026-09-30; SPEC/00 §8 M06 and M07 amended in this PR). **A
-  finding, not a cut: this is its fourth move** (M01 → M03 at M01 open,
-  M03 → M04 at M03 open, M04 → M06 at M04 open, M06 → M07 now). It feeds
-  no M06 falsifier. The `open.md` rows that ride it (18, 22, 23, 24) move
-  with it.
+  M06 open, 2026-09-30). **A finding, not a cut: this is its fourth
+  move** (M01 → M03 at M01 open, M03 → M04 at M03 open, M04 → M06 at M04
+  open, M06 → M07 now; NOTE 21). It feeds no M06 falsifier. `open.md`
+  rows 11, 18, 21, 22, 23 and 24 move with it.
+- **FRAGILE, the state and its ruling** (`open.md` row 25): **moved to
+  M07**, with the judge (finding 15). Nothing marks a golden FRAGILE
+  without a judge's score to disagree with.
+
+Also not in M06:
+
 - The `open.md` rows dated M06 that feed no M06 falsifier are placed in
   `feasibility.md` §6, each with a seat and a date; none is dropped.
 - Any change to `src/baseline/` (ADR-0002), to refagent's model pin, or
@@ -313,37 +378,18 @@ workflow; the registry and panel 1; Acts 1–2; `docs/refagent/`.
   row 48, ruled at M06 open: deferred with the landing zone, re-ruled at
   M08 open).
 
-## 11. Needs a ruling before the seeds
+## 11. Read before PR 2
 
-Each names its seat. The seeds are written after these are ruled.
+Ruled, and still to be read by their seats before PR 2's first commit:
 
-- **Q1 — Where the template and the agent repositories live** (Security,
-  Product). SPEC/00 names a template *repo* and required workflows
-  (§12: "assume the same GitHub org"). The account has no organization.
-  Proposed: a GitHub organization on the Free plan holding the template
-  and the agent repositories, public, with an organization ruleset whose
-  `workflows` rule requires the platform's workflow. **Unread:** whether
-  GitHub Free for organizations offers the `workflows` rule on public
-  repositories; Security reads it from GitHub before PR 2. If it does not,
-  F6.2 has no reader that a writer cannot answer (§3.2), and that is the
-  finding. `agentkeel` itself stays where it is: moving it would change
-  the deploy role's `sub` and the signing identity (§3.5).
-- **Q2 — The template's source path and its seat** (Product; a SPEC/00 §5
-  amendment). If the template's files are kept in this repository (for
-  example `template/`), that path has no seat today, and a file no seat
-  owns is deleted. If they live only in the template repository, the
-  gates of this repository do not read them.
-- **Q3 — What a seat is assigned to** (Security). SPEC/00 §6 says IdP
-  groups; there is no IdP. Proposed: a GitHub login with access to the
-  repository, checked as M02 checks CODEOWNERS logins.
-- **Q4 — The goldens minimum** (Data Owner). Proposed: one ordinary and
-  one trap, in SPEC/00 §6's shape, before a first pull request can be
-  green. Whether those goldens are regression-gated from the first run is
-  P7's answer: a golden that has never passed does not gate.
-- **Q5 — The bar** (Threshold Owner). 8 hours, wall clock, between two
-  GitHub records (§1), breaks not subtracted.
-- **Q6 — Where Grafana runs** (Security). Amazon Managed Grafana needs
-  IAM Identity Center or SAML; the agent account is the organization's
-  management account (`open.md` row 48). A Grafana on a laptop is not
-  evidence (P11).
-- **Q7 — Cuts 2 and a taken at open** (Product; the Data Owner for a).
+- **Where Grafana runs** (Security; finding 19). Whether Amazon Managed
+  Grafana can run in the agent account (IAM Identity Center in the
+  management account, against `open.md` row 48's deferral), read the
+  registry with a data source that is not a custom plugin, and at what
+  cost against SPEC/00 §14. If any answer is no, F6.4's live half is
+  recorded as unread and row 6 says so; panel 1 is not cut.
+- **The per-agent change list** (Security; finding 5), into §6.
+- **The `validate` checks that run in an agent repository, and where item
+  4's envelope is written** (Engineering; finding 7), into §6.
+- **The golden files for an agent that is not refagent** (Data Owner;
+  finding 7).
