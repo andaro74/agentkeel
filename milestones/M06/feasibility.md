@@ -353,3 +353,96 @@ third cut and FRAGILE moved by amendment (findings 14, 15); the knowledge
 base's fourth move with the rows that ride it (NOTE 21); PR 3 as the read
 (NOTE 22); §11's open questions replaced by the four reads still owed
 before PR 2.
+
+## 3. The false state
+
+SPEC/06 §3 names seven things on `main` that make claim 6 false; items 2
+to 5 are live in files a reader can open (`infra/ruleset/main.json`, both
+manifests' `seats`, `evals/goldens/v1/`, `infra/bootstrap/app.py`'s
+`SUBJECT`). Planted as five seeds, one commit each, before any reader.
+Each test was run once with `--runxfail` and its message read:
+
+| Seed | Commit | `--runxfail` message |
+|---|---|---|
+| S1a | `672fc1d` | `seed S1a: no check refused the unassigned seats ([])` |
+| S1b | `1a576f4` | `seed S1b: no check refused an agent with no goldens ([])` |
+| S2 | `0f3b977` | `seed S2: the attempt has not been made` |
+| S3 | `b4eb959` | `seed S3: the attempt has not been made` |
+| S4 | `06c485a` | `seed S4: no check refused a panel 1 query that names a second source`; `seed S4: nothing compares panel 1's rows with the registry` |
+
+The empty lists in S1a's and S1b's messages are every error that
+fourteen of `validate`'s sixteen checks returned about
+`agents/premiere-desk/` with the fixture placed: none. The two not run are
+the cdk-nag synth (minutes, reads no manifest) and the live ruleset (the
+GitHub API); CODEOWNERS' logins are looked up through a stand-in, so no
+test calls GitHub. `git show <seed> --stat` shows each seed with its test,
+its README row and its `SEEDS_M06` line, and no reader.
+
+## 4. The code that reads the answer
+
+SPEC/06 §6, one seat and one path each, all in PR 2. Two names are fixed
+here by the seed tests, so PR 2 does not choose them: `build.panel_not_in_registry(frame,
+registry)`, S4's comparison, and the dashboard's path,
+`infra/grafana/panel1.json`. The `validate` checks for S1a, S1b and S4's
+query are added to `src/validate/checks.CHECKS`, where the seed tests
+look.
+
+## 5. Falsifiers, and what each would look like in the repo
+
+SPEC/06 §4. Test-only witnesses on every envelope from PR 2's merge:
+`F6_1` (S1a, S1b) and `F6_4` (S4). Recorded in `template` and read by row
+6's cell: F6.1's and F6.4's live halves, F6.2 (S2) and F6.3 (S3).
+
+## 6. What M05 carried in (`milestones/M06/open.md`), row by row
+
+Every row is answered here or moved on with a seat and a date. None is
+dropped. Rows 1, 2, 3, 17 and 48 and the knowledge base's rows (11, 18,
+21, 22, 23, 24) and FRAGILE (25) were ruled by the human at M06 open,
+2026-09-30. The other placements are Product's at open, **proposed**, and
+confirmed or changed by the human in `rulings/pr1.md` before the push.
+Rows 28 to 47 were already dated M07 or M08 and are carried to M07's
+`open.md` at the close as dated, but for row 29, which PR 2 takes
+(finding 5).
+
+| # | Seat | Now |
+|---|---|---|
+| 1 | Product | **Done here** (`eb5dcec`): M05's video as an LFS object, its row filled; Product's confirmation in `rulings/pr1.md` |
+| 2 | Security | **M06 PR 2** (ruled): the Allow removed in one hand deploy of `infra/security/` as `hector.flores`, after reading `cdk diff`; the two Denies stay (`runs/security_account.md`) |
+| 3 | Security | **Done before PR 1** (ruled): `ecsTaskExecutionRole` deleted 2026-09-30 13:18:06Z; `get-role` `NoSuchEntity` and CloudTrail's `DetachRolePolicy` and `DeleteRole` recorded (`cfeff6e`) |
+| 4 | Security | **M06 PR 2** for every stack PR 2 edits (the bootstrap's trust, the registry's): each suppression gets `appliesTo`. The stacks PR 2 does not edit: **M07** |
+| 5 | Engineering (the path); Security (the note) | **M06 PR 2**: assigning refagent's seats (finding 12) moves its bundle digest and redeploys anyway, so the `s3` comment rides it |
+| 6 | Engineering | **M08**: S3 of M05 was read and closed; a reader that looks the stream up after the refusal is the hostile copy's `logs:DeleteLogStream` in run 1 |
+| 7 | Rule Owner; Data Owner and Engineering | **M07**: no `rules/**` change in M06. With it M05 `open.md` rows 2 and 3 |
+| 8 | Security, Engineering | **Split** (finding 17): agent repositories **M06 PR 2** (the App check, posted from `main`); `agentkeel` itself **M07**, named in SPEC/06 §8 |
+| 9 | Engineering, Security | **M07**, with the upgrade path, where a deployed pin or table moves |
+| 10 | Engineering | **M07** |
+| 11 | Rule Owner | **M07** (ruled), with row 23 and the knowledge base |
+| 12 | Security | **M07**: PR 2 edits the eval role's trust (finding 5), not its invoke condition; SPEC/04 §8's seeded refusal with the model path |
+| 13 | Security | **M07** |
+| 14 | Security | **M07**, with the ingest redeploy the knowledge base brings |
+| 15 | Security, Engineering | **M07** |
+| 16 | Engineering | **M07**, with the swap read's next use (model-watch) |
+| 17 | Product | **Ruled at open**: from M06 a "stated before" commit is pushed before the attempt it states, so GitHub dates it (SPEC/06 §2). The ruling was proposed at M05's close and is Product's here |
+| 18 | Data Owner | **M07** (ruled), with the knowledge base |
+| 19 | Data Owner, Tool Owner; Product | **M07**, with the knowledge base and the second tool. M06's goldens for a new agent (finding 7) carry rows that govern; an absence form is not needed for S1a or S3 |
+| 20 | Security, Engineering | **M07**, with row 14's ingest redeploy |
+| 21 | Engineering; Product | **M07** (ruled): the cached-answer seed moves with the knowledge base (NOTE 21) |
+| 22 | Product; Security | **M07** (ruled): the knowledge base's fourth move, a finding (SPEC/00 §8 M06 amended) |
+| 23 | Rule Owner | **M07** (ruled), with the knowledge base |
+| 24 | Data Owner | **M07** (ruled), with the knowledge base |
+| 25 | Data Owner | **M07** (ruled, finding 15): FRAGILE with the judge, by SPEC/00 amendment |
+| 26 | Threshold Owner | **M07**, with `ratings-helper`'s code |
+| 27 | Tool Owner | **M07** (both halves) |
+| 28 | Engineering; Security | **M07**, as dated |
+| 29 | Security | **M06 PR 2** (finding 5): the audit bucket's policy for an agent from the template, automatic or timed; for `ratings-helper`, **M07** with its code |
+| 30 to 40 | as dated | **M07**, as dated |
+| 41 to 47 | as dated | **M08**, as dated |
+| 48 | Security | **Ruled at open**: stays deferred with the landing zone, named as a gap (SPEC/06 §10), and re-ruled at M08 open |
+
+## 7. What PR 1 does not do
+
+No reader, no workflow, no stack, no deploy, no call to AWS but the
+human's read-only reads recorded in `runs/security_account.md`, and no
+call to GitHub but reads. No organisation, App, template or registry is
+made. No seat is assigned in either manifest: that is PR 2's, beside
+S1a's reader, or PR 2's own `validate` would refuse `main` (finding 12).
