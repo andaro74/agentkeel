@@ -241,3 +241,56 @@ seat, before the PR opens and before any seed.
   It must stay paid until M06 closes. The rest of the risk stands:
   GitHub may still suspend an account under its other terms, with the
   consequence above.
+
+**Findings ruled by the human, 2026-09-30, "as proposed"** (the numbers are
+the report's):
+
+- **FINDING 4 (Security, Product).** The organisation owner (`andaro74`)
+  creates each agent repository from the template; member repository
+  creation is off. The second developer is given write on it and nothing
+  more. F6.3's clock starts at that repository's `created_at`. A
+  repository deleted during an attempt is recorded in the run file, never
+  replaced by a later one's `created_at`.
+- **FINDING 5 (Security).** Every per-agent platform change is automatic,
+  made from `main` by the platform's own workflow when an agent
+  repository first calls it, or it is a Security pull request inside the
+  timed run and counts against the clock. Security lists all of them in
+  SPEC/06 §6 before PR 2: the eval role's trust, `verify`'s accepted
+  caller repositories, the construct's per-agent resources (with the
+  agent's own table, M05: no shared surfaces) and the audit bucket's
+  policy (`open.md` row 29).
+- **FINDING 8 (Threshold Owner, Product).** F6.3's clock stops at the
+  last of the five records of SPEC/06 §1 (merge refusal read, deploy run
+  completed, the answer, the registry row, panel 1's row), not at the
+  deploy. The bar is 28,800 s wall clock, breaks not subtracted
+  (`quickstart.max_seconds`, `relaxes: up`, SPEC/06 §11 Q5). Nothing is
+  prepared before `created_at` beyond the account set-up recorded under
+  NOTE 23.
+- **FINDING 9 (Product).** "The template works" is read from PR 2's own
+  run: the template's example agent deployed from a test repository the
+  owner creates and owns, through the same App check and deploy path.
+  That run is not a quickstart run, is not timed and is made by
+  `andaro74`, never by `floresinnovations`. Any run of the quickstart by
+  the second developer is an attempt and is recorded.
+- **FINDING 10 (Engineering, Product).** S1 is split: **S1a** a manifest
+  with every seat null and valid goldens; **S1b** assigned seats and an
+  empty goldens folder. Each has its own test and its own planted reason.
+  Five seeds: S1a, S1b, S2, S3, S4.
+- **FINDING 7 / Q4 (Data Owner; Engineering).** An agent's goldens are at
+  least one ordinary and one trap, in SPEC/00 §6's shape. For an agent
+  that is not refagent, `table_row` and `clause_id` name a row and a
+  clause in that agent's own data, carried in its repository; the Data
+  Owner rules the files at PR 2. Engineering names in SPEC/06 which of the
+  sixteen `validate` checks run in an agent repository and where the
+  answer's envelope (SPEC/06 §1 item 4) is written.
+- **NOTE 20 / Q3 (Security; Product).** A seat is assigned to a GitHub
+  login with access to the repository, checked as M02 checks CODEOWNERS
+  logins. SPEC/00 R1's `validate` list ("seats assigned to real groups")
+  and §6 ("seats → IdP groups") are amended in this PR to say so. Under
+  R1 every seat is `andaro74`; the second developer's login holds none.
+- **FINDING 19 / Q6 (Security).** Security reads, before PR 2, whether
+  Amazon Managed Grafana can run in the agent account (IAM Identity
+  Center in the management account, against `open.md` row 48's
+  deferral), read the registry with a data source that is not a custom
+  plugin, and at what cost against SPEC/00 §14. If any answer is no, F6.4's
+  live half is recorded as unread and row 6 says so; panel 1 is not cut.
