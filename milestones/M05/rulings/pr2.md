@@ -8,10 +8,11 @@ seat: Product
 authorises:
   - SPEC/05-containment-and-evidence.md
   - milestones/README.md
-  - milestones/M05/README.md
-  - milestones/M05/runs/f5_4_chain.yaml
-  - milestones/M05/runs/f5_7_quarantine.yaml
-  - milestones/M05/rulings/**
+  # The README, the run files (security_account.md, bootstrap_size.md and the
+  # attempts' files among them: Product's path, whichever seat's record they
+  # hold) and the rulings. ruling-cited on #31's first head found five run files
+  # this file did not name.
+  - milestones/M05/**
 evidence:
   - SPEC/00-overview.md#8-M05
   - SPEC/05-containment-and-evidence.md
