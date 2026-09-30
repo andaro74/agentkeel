@@ -112,17 +112,19 @@ Written at M05 PR 1 open. The row in `milestones/README.md` is the one
   `AGENTKEEL_CEILING_DEPTH` 2. The merge's `archive` job put six objects
   under `envelopes/` (01:55:59Z to 01:56:03Z), the first puts there.
 - **Attempted by the human, 2026-09-30, after that deploy:**
-  S3 at 02:04:35Z as the stand-in, refused "with an explicit deny in an
+  S3 at 02:04:35Z as the stand-in, answered "with an explicit deny in an
   identity-based policy", the stream still there; S4 at 02:06:56Z through
-  the runtime, answered 403 by refagent, no Converse near it; S7 from
-  02:13:10Z (attach) to 02:16:00Z (detach).
+  the runtime, answered 403; S7 from 02:13:10Z (attach) to 02:16:00Z
+  (detach). What follows each is the human's and the session's reading in
+  the agent account (the CLI, refagent's log, CloudTrail's event history),
+  not the audit bucket's, which is this PR's run's.
 - **S7 is a second finding, stated before the attempt** (`e1a6bb2`; ruled
   by the human as Product, with Security, option A). Under the deny-all
   refagent reads its rights table before it calls its model, and the
   quarantine refuses that read, so no model call is made and none can be
   recorded. The caller was answered with the Scan refused by
-  `agentkeel-quarantine`; no Converse was made; refagent's log is silent
-  while the quarantine holds. F5.4 as restated reads a model call; there
+  `agentkeel-quarantine`; the event history shows no Converse from 02:10Z,
+  and refagent's log has no line while the quarantine held. F5.4 as restated reads a model call; there
   is none, and no other call stands in for it. S7's marker stays, as S1's.
 - **This PR's run** reads S3, S4 and S7 in the audit bucket: pending.
 

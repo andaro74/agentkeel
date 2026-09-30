@@ -53,8 +53,8 @@ observed:
   # Made 2026-09-30 by the human (hector.acevedo, admin), after M05 PR 2's merge deploy (run 36657429406), as stated
   # above. The quarantine held from 02:13:10Z to 02:16:00Z. As expected, refagent never reached its model: its
   # answer is the Scan refused by the quarantine, and the agent account's event history has no Converse from
-  # 02:10Z (read 2026-09-30). refagent's log has no line at all from 02:13 to 02:16:40Z: the deny-all refuses the
-  # role's own log writes too. The invocation's `result`, `message` and `denied_principal` are the trail's record
+  # 02:10Z (read 2026-09-30). refagent's log has no line at all from 02:13 to 02:16:40Z; that the deny-all
+  # refused its log writes is a likely cause, not read. The invocation's `result`, `message` and `denied_principal` are the trail's record
   # of a model call (cold review F1 on M05 PR 1), and there is none, so they are empty; what the caller was
   # answered is `caller_answer`, which feeds no reading.
   - what: quarantine refagent

@@ -36,8 +36,9 @@ measures in the runtime that deploy made.
    trail is not widened to record the table read. S7 reads unrecorded and
    not shown refused: a second finding for row 5, beside S1's.
 2. **The run files record what the caller was answered, verbatim.** S3's
-   is the Logs API's `AccessDeniedException`; the trail's record of it is
-   `AccessDenied`. S7's model-call fields are empty; the answer is in
+   is the Logs API's `AccessDeniedException`; the event history's record of
+   the same request is `AccessDenied`, and the audit bucket's is this PR's
+   run's reading (cold review F1). S7's model-call fields are empty; the answer is in
    `caller_answer`, which feeds no reading.
 
 ## The run that decides this ruling
