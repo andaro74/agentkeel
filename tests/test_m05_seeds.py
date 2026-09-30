@@ -65,10 +65,15 @@ def made(run: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     return list(zip(run["attempts"], observed, strict=True))
 
 
+# What the caller is answered for a refusal: S3 and IAM say AccessDenied; the JSON-protocol APIs (CloudWatch Logs
+# for S3) say AccessDeniedException for the same refusal, which the trail records as AccessDenied (M05 PR 3).
+REFUSED = ("AccessDenied", "AccessDeniedException")
+
+
 def denied(entry: dict[str, Any], *, by: str) -> bool:
-    """AWS answered AccessDenied, with a request id, and its message names the control `by` names."""
+    """AWS refused it, with a request id, and its message names the control `by` names."""
     message = (entry.get("message") or "").lower()
-    return entry.get("result") == "AccessDenied" and bool(entry.get("request_id")) and by in message
+    return entry.get("result") in REFUSED and bool(entry.get("request_id")) and by in message
 
 
 # --- S1: curl to the internet -------------------------------------------------
@@ -108,8 +113,6 @@ def test_s2_a_write_to_another_agents_prefix_was_refused():
 # --- S3: logs:DeleteLogStream --------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S3 is attempted after M05 PR 2's merge deploy, read at PR 3 (SPEC/05 §5.1)")  # fmt: skip
 def test_s3_deleting_its_own_log_stream_was_refused():
     """As refagent's stand-in, `logs:DeleteLogStream` on the runtime's own log stream. The boundary
     denies `logs:Delete*` today and PR 2 adds the role's own deny; both are explicit, so this reads
