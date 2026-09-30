@@ -52,15 +52,19 @@ attempt had been made before it. refagent GREEN in `mode: runtime`; S2
 and S7 not shown refused and unrecorded; `alarm_latency_s` 307. Row 5:
 **RED, on S1 and S7 alone.** `make ledger` exits 0.
 
-This PR's own run reads the same audit bucket and the same run files.
-Stated before it: refagent GREEN in `mode: runtime` with the same counts;
-`containment` with the same six seeds, the same latencies (each is AWS's
-record time less AWS's attempt time, not the run's) and the same two
-unrecorded; row 5's reading RED on S1 and S7. It is not the cell's
-envelope, and it does not replace it. What it read:
-
-*(filled after the run: head, run, envelope, bot commit, and whether it
-reads the same.)*
+This PR's own run was stated before it as reading the same audit bucket
+and run files to the same result. **It measured nothing, and wrote no
+envelope.** Head `38ef391`, run
+https://github.com/andaro74/agentkeel/actions/runs/36712123730:
+`evals.yml`'s step "Is this tree already measured?" found `28634e9` an
+ancestor of the head with nothing measured changed since (the diff is
+`docs/` and `milestones/**/*.md` only, which that step excludes), noted
+"measured at 28634e9…; nothing measured has changed since", and gated
+that envelope: `GREEN`, exit 0, every bar read at `28634e9`. `record` and
+`archive` were skipped, and no bot commit reached this branch. So this
+PR's reading is the `28634e9` envelope itself, not a second one that
+agrees with it. The statement above assumed a fresh run and was wrong
+about that; the cell and its envelope are unchanged by it.
 
 ## 3. The findings, as the row closes on them
 
