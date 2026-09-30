@@ -44,6 +44,22 @@ AGENT = "premiere-desk"  # the fixtures' agent: fictional, as the slate is
 NOT_RUN = {"cdk-nag, every stack", "live main ruleset equals its export, bypass_actors []"}
 LOGINS = {"andaro74"}  # the one login a stand-in lookup answers for (R1: every seat is the author)
 
+# `validate`'s sixteen checks at M06 PR 1's base (0b96da4). A seed is read only
+# by a check added after these, whose name says what it reads (cold review F1
+# on PR 1): a refusal by one of these, or by a new check about something else,
+# is not the planted reason, and must not take a strict marker off.
+BASE_CHECKS = frozenset({
+    "golden front matter", "golden citations exist in data/", "ruling front matter", "workflow-hash",
+    "manifest schema", "cdk-nag, every stack", "CODEOWNERS complete, single-owner, logins real",
+    "relaxes: on every bar", "edges two-sided, no cycle, ceilings within bounds",
+    "golden ids against origin/main", "computed semver",
+    "live main ruleset equals its export, bypass_actors []",
+    "plant controls name live goldens of their kind",
+    "golden/corpus overlap (12 words), no row id in the corpus",
+    "admitted.yaml is the corpus, byte for byte, under a Data Owner ruling",
+    "deprecated_after more than 30 days away, or null",
+})
+
 
 class SeedBroken(Exception):
     """A seed's own precondition failed. Not AssertionError, which the strict markers expect of the
@@ -77,19 +93,32 @@ def worktree():
                        capture_output=True)  # fmt: skip
 
 
-def validate_over(tree: Path) -> list[str]:
-    """Every error the tree's own `validate` checks return over `tree`, but those in NOT_RUN."""
+def validate_over(tree: Path) -> dict[str, list[str]]:
+    """Each `validate` check's errors over `tree`, by check name, but those in NOT_RUN.
+
+    The checks are this checkout's (src/validate/ as imported here), run against `tree`; the two
+    are the same code in a clean checkout, which is where the seed tests are read."""
     from src.validate import checks
 
-    errors: list[str] = []
+    holds(BASE_CHECKS <= set(checks.CHECKS), "every check at the base is still in validate")
+    errors: dict[str, list[str]] = {}
     for name, check in checks.CHECKS.items():
         if name in NOT_RUN:
             continue
         if "lookup" in inspect.signature(check).parameters:
-            errors += check(tree, lookup=stand_in_lookup)
+            errors[name] = check(tree, lookup=stand_in_lookup)
         else:
-            errors += check(tree)
+            errors[name] = check(tree)
     return errors
+
+
+def refused_by(errors: dict[str, list[str]], about: str, reads: str) -> list[str]:
+    """The checks added since the base whose name says they read `reads` and that refused `about`.
+
+    A base check refusing the fixture means the fixture carries a second fault, and is SeedBroken."""
+    refusing = {name for name, errs in errors.items() if any(about in e.replace("\\", "/") for e in errs)}
+    holds(not refusing & BASE_CHECKS, f"no check at the base refuses the fixture ({sorted(refusing & BASE_CHECKS)})")
+    return sorted(name for name in refusing - BASE_CHECKS if reads in name)
 
 
 def with_agent(tree: Path, fixture: str) -> Path:
@@ -106,10 +135,6 @@ def with_agent(tree: Path, fixture: str) -> Path:
     return target
 
 
-def about_the_agent(errors: list[str]) -> list[str]:
-    return [e for e in errors if f"agents/{AGENT}/" in e.replace("\\", "/")]
-
-
 # --- S1a: an unassigned seat -------------------------------------------------
 
 
@@ -124,8 +149,8 @@ def test_s1a_an_unassigned_seat_is_refused(worktree):
     holds(len(seats) == 7 and all(v is None for v in seats.values()), "S1a's seven seats are null")
     goldens = [yaml.safe_load(p.read_text(encoding="utf-8")) for p in sorted((agent / "goldens").glob("g-*.yaml"))]
     holds(sorted(g["kind"] for g in goldens) == ["ordinary", "trap"], "S1a's goldens are at the minimum")
-    refused = about_the_agent(validate_over(tree))
-    assert any("seat" in e for e in refused), f"seed S1a: no check refused the unassigned seats ({refused})"
+    refused = refused_by(validate_over(tree), f"agents/{AGENT}/", "seat")
+    assert refused, "seed S1a: no check that reads seats refused the unassigned seats"
 
 
 # --- S1b: goldens under the minimum --------------------------------------------
@@ -141,8 +166,8 @@ def test_s1b_goldens_under_the_minimum_are_refused(worktree):
     seats = yaml.safe_load((agent / "manifest.yaml").read_text(encoding="utf-8"))["seats"]
     holds(len(seats) == 7 and set(seats.values()) <= LOGINS, "S1b's seven seats are assigned")
     holds((agent / "goldens").is_dir() and not list((agent / "goldens").glob("g-*.yaml")), "S1b has no goldens")
-    refused = about_the_agent(validate_over(tree))
-    assert any("golden" in e for e in refused), f"seed S1b: no check refused an agent with no goldens ({refused})"
+    refused = refused_by(validate_over(tree), f"agents/{AGENT}/", "golden")
+    assert refused, "seed S1b: no check that reads an agent's goldens refused an agent with none"
 
 
 # --- The attempt seeds' run files (S2, S3) -----------------------------------
@@ -213,8 +238,8 @@ def test_s4_a_panel_1_query_with_a_second_source_is_refused(worktree):
     tree = worktree()
     (tree / PANEL).parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(FIXTURES / "s4-panel1" / "dashboard.json", tree / PANEL)
-    refused = [e for e in validate_over(tree) if "panel1.json" in e]
-    assert refused, "seed S4: no check refused a panel 1 query that names a second source"
+    refused = refused_by(validate_over(tree), PANEL, "panel")
+    assert refused, "seed S4: no check that reads panel 1's query refused a second source"
 
 
 @pytest.mark.xfail(strict=True, raises=AssertionError, reason="S4's comparison is build's, M06 PR 2 (SPEC/06 §4)")
