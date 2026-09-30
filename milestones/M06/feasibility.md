@@ -312,7 +312,7 @@ the report's):
   day, without touching the safety pipeline." The title stays.
 - **FINDING 14 (Product).** Act 1 is recorded during S3's timed run; Act
   2 at the close, against M02's pull requests. A third cut, after panel
-  2: the four `docs/developer/` pages other than the quickstart
+  2: the three `docs/developer/` pages other than the quickstart
   (`manifest.md`, `goldens.md`, `edges.md`) to M07. `docs/refagent/` stays
   never-cut.
 - **FINDING 15 (Product; Data Owner).** FRAGILE moves to M07 by a SPEC/00
