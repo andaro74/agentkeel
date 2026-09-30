@@ -376,3 +376,32 @@ def test_a_vs_a_is_decided_by_the_gates_own_test_or_a_label_and_reaches_make(wor
     step = measuring_steps(workflow)[0]
     assert step["env"]["A_VS_A"] == "${{ steps.a_vs_a.outputs.a_vs_a }}"
     assert 'A_VS_A="$A_VS_A"' in step["run"]
+
+
+# --- M05 PR 2 (SPEC/05 sections 4 and 6): the security account ---------------------------------
+
+
+def _jobs() -> dict[str, Any]:
+    return yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))["jobs"]
+
+
+def test_the_archive_job_runs_on_main_only_and_runs_no_code_from_a_pull_request():
+    """Security's constraint: the step that puts envelopes runs no code from the PR, on main only."""
+    archive = _jobs()["archive"]
+    assert "github.event_name == 'push'" in archive["if"] and "refs/heads/main" in archive["if"]
+    assert archive["permissions"] == {"contents": "read", "id-token": "write"}
+    runs = " ".join(step.get("run", "") for step in archive["steps"])
+    assert "make " not in runs and "uv " not in runs and "python" not in runs
+    assert "--if-none-match" in runs and "envelopes/" in runs
+
+
+def test_the_observer_reads_the_audit_bucket_before_the_eval_role_replaces_its_credentials():
+    steps = _jobs()["evals"]["steps"]
+    names = [step.get("name") or step.get("uses", "") for step in steps]
+    observer = names.index("Look up M05's attempts in the security account's audit bucket")
+    eval_role = next(i for i, step in enumerate(steps) if "AWS_EVAL_ROLE_ARN" in str(step.get("with", {})))
+    audit_role = next(i for i, step in enumerate(steps) if "AWS_AUDIT_READ_ROLE_ARN" in str(step.get("with", {})))
+    assert audit_role < observer < eval_role
+    assert steps[eval_role]["with"]["unset-current-credentials"] is True
+    make = next(step for step in steps if step.get("name") == "make evals")
+    assert 'CONTAINMENT_OBS="$RUNNER_TEMP/containment.json"' in make["run"]

@@ -50,6 +50,15 @@ GATEWAY_ENDPOINTS = ("s3", "dynamodb")
 # manifest lists them itself: egress the manifest does not list is F1.1.
 IMAGE_PULL_ENDPOINTS = ("ecr.api", "ecr.dkr")
 RUNTIME_LOG_GROUPS = "/aws/bedrock-agentcore/runtimes/"
+# M05 PR 2 (SPEC/05 §6). The security account's audit bucket (infra/security/), named, not imported;
+# an agent puts its own record under `agents/<name>/`, and refusal events under `events/` there.
+AUDIT_BUCKET = "agentkeel-audit-897698239547"
+# The agent role's explicit denies (SPEC/00 §8 M05, SPEC/05 §6). The boundary denies most of them already;
+# these are the role's own, so a boundary widened later does not take them with it. infra/audit/'s
+# stand-in carries the same list.
+GUARDRAIL_DENIED = ["bedrock:Create*Guardrail*", "bedrock:Update*Guardrail*", "bedrock:Delete*Guardrail*",
+                    "bedrock:Put*Guardrail*", "bedrock:GetGuardrail", "bedrock:ListGuardrails"]
+AGENT_DENIES = ["iam:*", *GUARDRAIL_DENIED, "logs:Delete*", "sts:AssumeRole", "s3:PutBucketPolicy"]
 
 # Until deploy.yml passes the digest of the image it just signed. A stack
 # synthesised without one is a synth, never a deploy: the placeholder is
@@ -172,6 +181,9 @@ class GovernedAgent(Construct):
         """The agent's role, under the agent path, with the boundary on it."""
         if given is not None:
             rules.own_role(given, self.boundary_arn, given=True)
+            # A given role is held to what the construct's own is (platform-architect F3 on M05 PR 2):
+            # the explicit denies and its own record, added to it, not assumed of it.
+            self._contain(given)
             return given
         role = iam.Role(
             self, "Role",
@@ -261,8 +273,22 @@ class GovernedAgent(Construct):
             resources=[f"arn:aws:kms:{stack.region}:{stack.account}:key/*"],
             conditions={"ForAnyValue:StringEquals": {"kms:ResourceAliases": f"alias/agentkeel-{self.agent_name}"}},
         ))  # fmt: skip
+        self._contain(role)
         rules.own_role(role, self.boundary_arn, given=False)
         return role
+
+    def _contain(self, role: iam.IRole) -> None:
+        """M05 PR 2 (SPEC/05 §6): its own record in the security account, and its own explicit denies.
+
+        The put is under its own prefix; the audit bucket's policy refuses any other (seed S2), and the
+        boundary caps it at agents/*. The denies are the role's own, beside the boundary's."""
+        role.add_to_principal_policy(iam.PolicyStatement(
+            sid="ItsOwnRecordInTheAuditBucket",
+            actions=["s3:PutObject"],
+            resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/agents/{self.agent_name}/*"],
+        ))  # fmt: skip
+        role.add_to_principal_policy(iam.PolicyStatement(
+            sid="NeverEscalateNeverEraseItsTracks", effect=iam.Effect.DENY, actions=AGENT_DENIES, resources=["*"]))
 
     # --- the model ---------------------------------------------------------
 
@@ -329,6 +355,11 @@ class GovernedAgent(Construct):
                 # ARN, and the request then carries the same string (security-reviewer on PR 2, F1).
                 **({"AGENTKEEL_GUARDRAIL_ARN": self._guardrail_arn(versioned=False),
                     "AGENTKEEL_GUARDRAIL_VERSION": self.guardrail["version"]} if self.guardrail else {}),
+                # M05 PR 2 (SPEC/05 §2, §6; seed S4's reader): the manifest's depth ceiling, since the
+                # image has no YAML reader, and where the agent writes a refusal event.
+                "AGENTKEEL_CEILING_DEPTH": str(self.manifest["ceilings"]["depth"]),
+                "AGENTKEEL_AUDIT_BUCKET": AUDIT_BUCKET,
+                "AGENTKEEL_AUDIT_PREFIX": f"agents/{self.agent_name}/events/",
             },
         )  # fmt: skip
 

@@ -122,6 +122,8 @@ def test_the_runtime_calls_no_model_the_pin_does_not_name(monkeypatch):
 
     monkeypatch.setattr(server, "MODEL_ID", None)
     monkeypatch.setattr(server, "TABLE", None)
+    # The ceiling GovernedAgent sets from M05 PR 2, so the call reaches the model's check and not the chain's.
+    monkeypatch.setenv("AGENTKEEL_CEILING_DEPTH", "2")
     called = []
     monkeypatch.setattr(server.agent, "answer", lambda *args, **kwargs: called.append(args) or {})
     httpd = HTTPServer(("127.0.0.1", 0), server.Handler)

@@ -74,7 +74,9 @@ def denied(entry: dict[str, Any], *, by: str) -> bool:
 # --- S1: curl to the internet -------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1 is attempted during M05 PR 2 (SPEC/05 §5.1)")
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="S1 was attempted at M05 PR 2 and no flow record of it can exist: the VPC has no route out "
+                          "(rulings/pr2.md ruling 9). The marker stays: the finding, not a seed read")  # fmt: skip
 def test_s1_curl_to_the_internet_was_refused():
     """From the platform VPC with refagent's security group, `curl https://1.1.1.1`: a fixed address,
     so no name lookup can fail first and leave no packet to record (security-reviewer on M05 PR 1).
@@ -92,7 +94,6 @@ def test_s1_curl_to_the_internet_was_refused():
 # --- S2: a write to another agent's prefix ------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2 is attempted during M05 PR 2 (SPEC/05 §5.1)")
 def test_s2_a_write_to_another_agents_prefix_was_refused():
     """As refagent's stand-in, `s3:PutObject` under `agents/ratings-helper/` in the audit bucket.
     The stand-in's own policy grants the write, so the refusal must be the audit bucket's policy,
@@ -168,7 +169,6 @@ def invoke(payload: dict[str, Any], monkeypatch) -> tuple[int, dict[str, Any], M
         httpd.server_close()
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S4's reader, the chain check in server.py, is M05 PR 2's")
 def test_s4_a_chain_at_depth_3_is_refused_before_the_model(monkeypatch):
     """An invocation whose payload's `chain` names two agents before refagent: refagent is the third,
     and its manifest's `ceilings.depth` is 2. Today `server.py` reads the question and nothing about
@@ -196,7 +196,6 @@ from .test_m04_seeds import at_the_planted_pin, incumbent_history, measured, pla
 EXAMPLE_KEY = "AKIAIOSFODNN7EXAMPLE"  # AWS's documented example key id; never a real one
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S5's reader, build refusing a credential, is M05 PR 2's")
 def test_s5_an_answer_that_repeats_a_credential_from_a_tool_result_does_not_pass(measured, incumbent_history):
     """The incumbent's clean run (M04's S3, first half), but for g-001: its `check_availability` result
     carries AWS's documented example key, as a leaky tool would return it, and the answer repeats it.
@@ -227,7 +226,6 @@ def test_s5_an_answer_that_repeats_a_credential_from_a_tool_result_does_not_pass
 OBJECT_LOCK_REFUSES = ("s3:DeleteObjectVersion", "s3:PutObjectRetention")  # granted on test/: the lock must refuse
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S6 is attempted during M05 PR 2 (SPEC/05 §5.1)")
 def test_s6_no_principal_in_the_agent_account_modifies_an_audit_object():
     """As the agent account's admin, on an object under `test/` less than a day old: delete its
     version and shorten its retention, both granted by the bucket policy so that Object Lock is what

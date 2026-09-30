@@ -542,6 +542,33 @@ def test_the_s3_endpoint_reaches_outside_the_account_for_the_image_layers_only(t
     assert unscoped[0]["Resource"] == "arn:aws:s3:::prod-us-west-2-starport-layer-bucket/*"
 
 
+AUDIT_AGENTS = "arn:aws:s3:::agentkeel-audit-897698239547/agents/*"
+
+
+def test_the_s3_endpoint_lets_an_agent_put_to_the_audit_bucket_and_nothing_else_out(template):
+    """M05 PR 2 (SPEC/05 §6): the one other way out, a put on the audit bucket's agents/ prefix, in the
+    security account only. Everything else the endpoint allows is scoped to this account or is ECR's layers."""
+    gateways = [e for e in endpoints(template) if e.get("VpcEndpointType") == "Gateway"]
+    s3 = next(e for e in gateways if json.dumps(e["ServiceName"]).endswith('.s3"]]}'))
+    outside = [s for s in s3["PolicyDocument"]["Statement"]
+               if s.get("Condition", {}).get("StringEquals", {}).get("aws:ResourceAccount") == "897698239547"]
+    assert len(outside) == 1
+    assert outside[0]["Action"] == "s3:PutObject" and outside[0]["Resource"] == AUDIT_AGENTS
+    others = [s for s in s3["PolicyDocument"]["Statement"] if s not in outside and "Condition" in s]
+    assert all(json.dumps(s["Condition"]).count("aws:ResourceAccount") == 1 and "897698239547" not in json.dumps(s)
+               for s in others)  # fmt: skip
+
+
+def test_the_agent_boundarys_put_is_a_statement_of_its_own_on_the_audit_bucket(template):
+    """Security's constraint on M05 PR 2: s3:PutObject on the audit bucket's agents/*, in its own statement,
+    and the boundary's * statement does not take it."""
+    boundary = named(template, "agentkeel-boundary")
+    puts = [s for s in statements(boundary, "Allow") if "s3:PutObject" in actions(s)]
+    assert len(puts) == 1
+    assert actions(puts[0]) == {"s3:PutObject"} and puts[0]["Resource"] == AUDIT_AGENTS
+    assert puts[0]["Sid"] == "AgentsWriteTheirRecordToTheAuditBucket"
+
+
 # --- BLOCK F: what the deploy role may do (M01 PR 3) -----------------------
 
 DEPLOY_YML = ROOT / ".github" / "workflows" / "deploy.yml"

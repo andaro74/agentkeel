@@ -65,9 +65,11 @@ account-per-team landing zone (R3, SPEC/00 §12).
 - **As the agent.** refagent's role is assumable by
   `bedrock-agentcore.amazonaws.com` only, and M05 does not change that
   trust. An API attempt (S2, S3) is made as a **stand-in**: a role under
-  `/agentkeel/agents/` with the agent boundary, the agent role's grants
-  and its explicit denies, and the attempted action granted in its own
-  policy, so that the refusal can only come from the control named for
+  `/agentkeel/agents/` with the agent boundary and the agent role's
+  explicit denies (amended at M05 PR 2, `rulings/pr2.md` ruling 3: not
+  its grants, which neither attempt uses and which would let a second
+  principal call refagent's model), and the attempted action granted in
+  its own policy, so that the refusal can only come from the control named for
   it (M01 S6's pattern). The audit bucket's policy names the stand-in
   beside refagent's role, on refagent's prefix and nothing else
   (finding 5, Security), so S2 is refused by the prefix scoping, not by
@@ -235,7 +237,7 @@ Each is named in `tests/fixtures/README.md` and listed in
 
 | Seed | Falsifier | Planted as | Fails today because | Read by (PR 2) |
 |---|---|---|---|---|
-| S1 curl to the internet | F5.1, F5.2 | `runs/f5_1_curl.yaml`: `curl -m 5 https://1.1.1.1`, a fixed address so no name lookup fails first, from a CloudShell VPC environment in the platform VPC's isolated subnet with refagent's security group; `observed: null` | the attempt is not made; its only record would be a flow-log group in the agent account | flow logs delivered to the audit bucket at one-minute aggregation (`infra/audit/`); the observer finds the `REJECT` for that ENI and destination |
+| S1 curl to the internet | F5.1, F5.2 | `runs/f5_1_curl.yaml`: `curl -m 5 https://1.1.1.1`, a fixed address so no name lookup fails first, from inside the platform VPC with refagent's security group; `observed: null`. **The finding, at M05 PR 2** (`rulings/pr2.md` ruling 9; `runs/f5_1_curl.yaml`): attempted from a CloudShell VPC environment and from a Lambda, each timed out, and neither ENI recorded anything but NODATA. The VPC has no route out, so the packet is dropped by routing before the security group or network ACL sees it, and that drop leaves no flow record: S1 is refused by the missing route (ADR-0006), and no record of it can reach the audit bucket from any origin in this VPC. F5.2 is unmet for S1 | the attempt is not made; its only record would be a flow-log group in the agent account | flow logs delivered to the audit bucket at one-minute aggregation (`infra/audit/`); the observer finds the `REJECT` for that ENI and destination |
 | S2 a write to another agent's prefix | F5.1, F5.2 | `runs/f5_2_prefix.yaml`: `s3:PutObject` to `agents/ratings-helper/` in the audit bucket as refagent's stand-in, whose own policy grants it; `observed: null` | the attempt is not made; there is no audit bucket and no prefix | the audit bucket's policy (each agent role, and refagent's stand-in, on its own prefix only); the audit bucket's S3 data events in the trail |
 | S3 `logs:DeleteLogStream` | F5.1, F5.2 | `runs/f5_3_logs.yaml`: `logs:DeleteLogStream` on refagent's runtime log stream as the stand-in, whose own policy grants it; `observed: null` | the attempt is not made; its only record would be the agent account's event history | the explicit deny on the agent role and the stand-in (`infra/construct/`, `infra/audit/`); the trail delivering to the audit bucket |
 | S4 a chain at depth 3 | F5.1, F5.2 | `tests/fixtures/m05/s4-depth3-request.json`: an invocation whose payload's `chain` names two agents before refagent; `runs/f5_4_chain.yaml`: the same payload sent to the deployed runtime; `observed: null` | `server.py` calls the model on it: nothing reads a chain | `server.py` refuses a chain deeper than `ceilings.depth` before any model call and writes a refusal event with the call's id to its own prefix in the audit bucket (self-reported, §2) |
@@ -327,12 +329,20 @@ PR 2):
   overwrite, not a forged first write.
 - **The read-only role** CI assumes in the security account names its
   trust, reads the prefixes the observer needs and not `*`, and carries a
-  boundary; so does every role in that account.
+  boundary; so does every role `infra/security/` makes. (Amended at M05
+  PR 2, platform-architect F4: the account also holds AWS service-linked
+  roles and a leftover `ecsTaskExecutionRole`, which no stack of this
+  platform makes.)
 - **The bucket policy** names role ARNs per prefix, never the agent
-  account's root, but for S6's `test/` grant to the admin, which lists
+  account's root, but for S6's `test/` grant, which lists
   `s3:DeleteObjectVersion` and `s3:PutObjectRetention` on `test/*` only.
-  It denies `s3:PutObjectLockConfiguration` explicitly to every principal
-  outside the security account.
+  It denies `s3:PutObjectLockConfiguration` (the IAM action
+  `s3:PutBucketObjectLockConfiguration`) explicitly to every principal
+  outside the security account. Amended at M05 PR 2 (security-reviewer's
+  second read): S6's grant names the agent account, not the admin alone,
+  so that the lock must refuse any principal there, which is F5.3's
+  reading; and it lists two more actions on `test/*`, the put that makes
+  the object and the read of its retention.
 - **The stand-in** is assumable only by the human's admin role with MFA,
   and is deleted, or its trust emptied, once S2 and S3 are read. It is
   kept off the prefix that holds refagent's refusal events, and the
@@ -378,8 +388,13 @@ PR 2):
 SPEC/00 §10.5: no document describes these as working.
 
 - a hostile agent inside the runtime. S2 and S3 are made as a stand-in,
-  and S1 from a CloudShell VPC environment whose ENI is CloudShell's, not
-  the runtime's (note 4). The hostile copy is M08's (SPEC/00 §9);
+  and S1 from a CloudShell VPC environment and from a Lambda, neither of
+  them the runtime (note 4);
+- a record of a refusal by the missing route (added at M05 PR 2, S1's
+  finding): a packet for an outside address is dropped by routing before
+  any security group or network ACL, and no flow record is made. The
+  control holds and nothing records it; recording it would need something
+  that sees the attempt, not the drop (M08, with the hostile copy). The hostile copy is M08's (SPEC/00 §9);
 - a caller lying about its depth (§5, S4): Identity, M07;
 - that S4 was refused, beyond the agent's own word and the absence of a
   model call (§2, self-reported);
@@ -403,6 +418,23 @@ SPEC/00 §10.5: no document describes these as working.
   already written; a later pull request could shorten the default for new
   ones with one ruling. Closing it is a SPEC/00 §5 amendment (Product,
   with Security), not dated here (security-reviewer on PR 1);
+- the organization's reach over the security account (added at M05 PR 2,
+  platform-architect F1, security-reviewer). The agent account is the
+  organization's management account: it can enable centralized root
+  access and `sts:AssumeRoot` into the security account with a root-task
+  policy that deletes a bucket policy, remove the account, attach an SCP
+  or change its email. Not enabled when read on 2026-09-28; nothing stops
+  it being enabled. Object Lock holds each object for its day against
+  root; the policy, the default retention and the delivery are what the
+  route reaches. The landing zone's (SPEC/00 §12);
+- the controls PR 2 adds that no seed attempts (platform-architect F5,
+  F6): the envelope-put role refusing a pull request's token; the read
+  role refused outside its three prefixes; the S3 endpoint refusing a put
+  to another account's bucket or prefix; the stand-in refused without MFA;
+  the bucket policy's Deny on the stand-in under `events/`; a put under
+  `envelopes/` without If-None-Match; and refagent's own explicit denies,
+  since S3 is made as the stand-in and `iam:*`, `sts:AssumeRole`,
+  `s3:PutBucketPolicy` and the guardrail verbs are attempted by no one;
 - GuardDuty, the graph diff, k6 at the ceiling, Identity: §9.
 
 ## 9. Cut list

@@ -287,3 +287,55 @@ def test_the_runtime_is_given_the_guardrail_pin(template):
     assert env["AGENTKEEL_GUARDRAIL_ARN"] == {"Fn::Join": ["", ["arn:aws:bedrock:us-west-2:", {"Ref": "AWS::AccountId"},
                                                                 f":guardrail/{pin['id']}"]]}  # fmt: skip
     assert env["AGENTKEEL_GUARDRAIL_VERSION"] == pin["version"] and "AGENTKEEL_GUARDRAIL_ID" not in env
+
+
+# --- M05 PR 2 (SPEC/05 section 6): the agent role's denies, its record, its ceiling ----------
+
+AGENT_DENIES = {"iam:*", "logs:Delete*", "sts:AssumeRole", "s3:PutBucketPolicy", "bedrock:Create*Guardrail*",
+                "bedrock:Update*Guardrail*", "bedrock:Delete*Guardrail*", "bedrock:Put*Guardrail*",
+                "bedrock:GetGuardrail", "bedrock:ListGuardrails"}
+
+
+def test_the_agent_role_carries_its_own_explicit_denies(template):
+    """The role's own, beside the boundary's: a boundary widened later does not take them (SPEC/05 section 6)."""
+    denies = [s for s in agent_statements(template) if s["Effect"] == "Deny"]
+    assert len(denies) == 1 and denies[0]["Resource"] == "*"
+    assert set(denies[0]["Action"]) == AGENT_DENIES
+
+
+def test_the_agent_role_puts_under_its_own_audit_prefix_and_nowhere_else(template):
+    puts = [s for s in agent_statements(template) if s["Effect"] == "Allow" and "s3:PutObject" in json.dumps(s["Action"])]
+    assert len(puts) == 1 and puts[0]["Action"] == "s3:PutObject"
+    assert puts[0]["Resource"] == "arn:aws:s3:::agentkeel-audit-897698239547/agents/refagent/*"
+
+
+def test_the_runtime_is_given_its_depth_ceiling_and_where_to_record_a_refusal(template):
+    """Seed S4's reader reads the ceiling from here: the image has no YAML reader (SPEC/05 section 2)."""
+    manifest = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
+    runtime = next(r for r in template["Resources"].values() if r["Type"] == "AWS::BedrockAgentCore::Runtime")
+    env = runtime["Properties"]["EnvironmentVariables"]
+    assert env["AGENTKEEL_CEILING_DEPTH"] == str(manifest["ceilings"]["depth"])
+    assert env["AGENTKEEL_AUDIT_BUCKET"] == "agentkeel-audit-897698239547"
+    assert env["AGENTKEEL_AUDIT_PREFIX"] == "agents/refagent/events/"
+
+
+def test_a_given_role_is_held_to_the_same_denies_and_record_as_the_constructs_own():
+    """platform-architect F3 on M05 PR 2: a role handed in gets the explicit denies and its own record, added to it."""
+    import aws_cdk as cdk
+    from aws_cdk import assertions
+    from aws_cdk import aws_iam as iam
+    from aws_cdk import aws_ssm as ssm
+
+    from infra.construct import GovernedAgent
+
+    stack = cdk.Stack(cdk.App(), "Given", env=cdk.Environment(region="us-west-2"))
+    boundary = ssm.StringParameter.value_for_string_parameter(stack, "/agentkeel/security/boundary-arn")
+    role = iam.Role(stack, "Handed", path="/agentkeel/agents/",
+                    assumed_by=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+                    permissions_boundary=iam.ManagedPolicy.from_managed_policy_arn(stack, "B", boundary))  # fmt: skip
+    GovernedAgent(stack, "R", bundle="agents/refagent", role=role)
+    policies = assertions.Template.from_stack(stack).find_resources("AWS::IAM::Policy")
+    statements = [s for p in policies.values() for s in p["Properties"]["PolicyDocument"]["Statement"]]
+    denies = [s for s in statements if s["Effect"] == "Deny"]
+    assert len(denies) == 1 and set(denies[0]["Action"]) == AGENT_DENIES
+    assert any(s.get("Sid") == "ItsOwnRecordInTheAuditBucket" for s in statements)

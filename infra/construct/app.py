@@ -54,25 +54,47 @@ stack = RefagentStack(
     description="agentkeel M01: refagent, as an instance of GovernedAgent. Security seat.",
     synthesizer=cdk.LegacyStackSynthesizer(),  # the account is not CDK-bootstrapped in us-west-2
 )
-# One suppression per resource, each naming the seeded case or the SPEC/01 §6
-# line it serves. A suppression that names neither is a finding, not a
-# suppression (Security, M01 PR 2).
+# One suppression per wildcard, each with its own reason naming the seeded
+# case or the SPEC/01 section 6 line it serves. A suppression that names neither
+# is a finding, not a suppression (Security, M01 PR 2). One reason per finding
+# from M05 PR 2 (M03 open.md row 11, item k): the rows had shared one reason,
+# which said less about each than each needed.
+ACCOUNT = "<AWS::AccountId>"  # how cdk-nag names the account in a finding: it comes from the deployer
+RUNTIMES = f"arn:aws:logs:{REGION}:{ACCOUNT}:log-group:/aws/bedrock-agentcore/runtimes/*"
+GUARDRAIL = stack.agent.manifest["guardrail"]["id"]
+WILDCARDS = {
+    "Resource::*": (
+        "SPEC/01 §6, B1 (M01 PR 3): ecr:GetAuthorizationToken and logs:DescribeLogGroups take no resource-level "
+        "permission. The image pull itself is on this agent's repository, by name, and the boundary (seed S5) "
+        "caps the rest."
+    ),
+    f"Resource::{RUNTIMES}": (
+        "SPEC/01 §6, 'its own log group': under /aws/bedrock-agentcore/runtimes/*, whose suffix AgentCore "
+        "assigns when it makes the runtime; CreateLogGroup and DescribeLogStreams only."
+    ),
+    f"Resource::{RUNTIMES}:log-stream:*": (
+        "SPEC/01 §6, 'its own log group': the runtime's own streams, which AgentCore names at run time; "
+        "CreateLogStream and PutLogEvents only. The role and the boundary deny logs:Delete* (seed S5's boundary)."
+    ),
+    f"Resource::arn:aws:kms:{REGION}:{ACCOUNT}:key/*": (
+        "SPEC/01 §6, 'the agent's key': Decrypt and GenerateDataKey on key/* conditioned on kms:ResourceAliases "
+        "being this agent's alias, because the key's id is the bootstrap stack's and the construct does not read "
+        "it (PR 3 security-reviewer F6). The key policy denies this role its own key policy (seed S6)."
+    ),
+    f"Resource::arn:aws:bedrock:{REGION}:{ACCOUNT}:guardrail/{GUARDRAIL}:*": (
+        "SPEC/01 §6 as built on at M03 PR 2: ApplyGuardrail on the guardrail the manifest pins and <arn>:*, its "
+        "numbered versions, and every model invoke is conditioned on bedrock:GuardrailIdentifier at the pinned "
+        "version. The boundary (seed S5) caps it."
+    ),
+    "Resource::arn:aws:s3:::agentkeel-audit-897698239547/agents/refagent/*": (
+        "SPEC/01 §6's boundary (seed S5) as widened at M05 PR 2: PutObject under this agent's own prefix in the "
+        "security account's audit bucket, whose keys the agent writes at run time (SPEC/05 §6). The bucket's "
+        "policy refuses any other prefix."
+    ),
+}
 NagSuppressions.add_resource_suppressions_by_path(
     stack, "AgentkeelRefagent/Refagent/Role/DefaultPolicy/Resource",
-    [{"id": "AwsSolutions-IAM5",
-      "reason": "SPEC/01 §6, 'its own log group' and 'the agent's key'. The log streams are "
-                "log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*, because AgentCore names the group "
-                "and the stream at runtime. kms:Decrypt and kms:GenerateDataKey are on key/* conditioned on "
-                "kms:ResourceAliases being this agent's alias, because the key's id is the bootstrap stack's "
-                "and the construct does not read it (PR 3 security-reviewer F6: the earlier reason, 'reached "
-                "through the grant', named a grant that does not exist). The boundary (S5) caps all of it, and "
-                "the key policy denies this role its own key policy (S6). The profile and the rights table are "
-                "named by ARN. B1 (M01 PR 3): "
-                "ecr:GetAuthorizationToken and logs:DescribeLogGroups take no resource-level permission; "
-                "the image pull is on this agent's repository and the log group under "
-                "/aws/bedrock-agentcore/runtimes/*, whose suffix AgentCore assigns. M03 PR 2: ApplyGuardrail is "
-                "on the guardrail the manifest pins and <arn>:*, its numbered versions, and every model invoke "
-                "is conditioned on bedrock:GuardrailIdentifier at the pinned version."}],
+    [{"id": "AwsSolutions-IAM5", "reason": reason, "appliesTo": [finding]} for finding, reason in WILDCARDS.items()],
 )
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

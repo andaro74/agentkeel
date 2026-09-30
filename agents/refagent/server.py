@@ -17,6 +17,19 @@ from the manifest's pin, and nothing else: with no default, a runtime
 started without it answers with an error rather than call a model the pin
 does not name (M04 PR 2; M04 open.md row 22, item f).
 
+From M05 PR 2 (SPEC/05 §2, §5, seed S4's reader) a request may carry `chain`,
+the agents that called before this one, in order; the chain's depth is its
+length plus one. A chain deeper than `AGENTKEEL_CEILING_DEPTH` (the manifest's
+`ceilings.depth`, which `GovernedAgent` sets: the image has no YAML reader) is
+refused **before any model call or table read**, and the refusal is written
+as an event under the agent's own prefix in the security account's audit
+bucket (`AGENTKEEL_AUDIT_BUCKET`, `AGENTKEEL_AUDIT_PREFIX`), with the call's
+session id so the trail's record of the call can be matched to it. A runtime
+with no ceiling set refuses every call rather than hold a chain to nothing.
+The chain is what the caller asserts; that a caller cannot lie about it is
+Identity's, at M07 (SPEC/05 §5). That the call was refused rests on this
+event and on no model call by the role (self-reported, SPEC/05 §2).
+
 This server judges nothing and writes no envelope (P5).
 """
 
@@ -24,6 +37,8 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
@@ -41,6 +56,44 @@ TABLE = os.environ.get("AGENTKEEL_RIGHTS_TABLE")
 # neither; the image has no YAML reader to read it itself.
 GUARDRAIL = ({"id": os.environ["AGENTKEEL_GUARDRAIL_ARN"], "version": os.environ["AGENTKEEL_GUARDRAIL_VERSION"]}
              if os.environ.get("AGENTKEEL_GUARDRAIL_ARN") else None)  # fmt: skip
+# The header AgentCore Runtime passes the caller's runtimeSessionId in; the trail records the same id.
+SESSION_HEADER = "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id"
+
+
+def chain_refusal(payload: dict[str, Any], session_id: str | None) -> dict[str, Any] | None:
+    """Why this call is refused for its chain, or None. Read at call time, before anything else is called."""
+    chain = payload.get("chain", [])
+    if not isinstance(chain, list) or not all(isinstance(agent, str) and agent for agent in chain):
+        return {"refused": "a chain is a list of the agents that called before this one, by name", "depth": None}
+    depth = len(chain) + 1
+    try:
+        ceiling = int(os.environ["AGENTKEEL_CEILING_DEPTH"])
+    except (KeyError, ValueError):
+        return {"refused": f"no depth ceiling is set in the runtime (AGENTKEEL_CEILING_DEPTH): a chain at depth "
+                           f"{depth} is held to nothing, so it is refused", "depth": depth, "ceiling": None}  # fmt: skip
+    if depth <= ceiling:
+        return None
+    return {"refused": f"a call chain at depth {depth} is deeper than this agent's ceiling, depth {ceiling}",
+            "depth": depth, "ceiling": ceiling, "chain": chain, "session_id": session_id}  # fmt: skip
+
+
+def record_refusal(refusal: dict[str, Any], s3: Any) -> dict[str, Any]:
+    """Write the refusal event under the agent's own prefix in the audit bucket; say where, or why not.
+
+    A refusal is returned whether or not it is recorded: a failed write is reported in the answer, and the
+    record's absence is what the observer reads as unrecorded."""
+    bucket, prefix = os.environ.get("AGENTKEEL_AUDIT_BUCKET"), os.environ.get("AGENTKEEL_AUDIT_PREFIX")
+    if not bucket or not prefix:
+        return {"recorded": None, "record_error": "AGENTKEEL_AUDIT_BUCKET or AGENTKEEL_AUDIT_PREFIX is not set"}
+    now = datetime.now(UTC)
+    key = f"{prefix}{now:%Y%m%dT%H%M%SZ}-{refusal.get('session_id') or uuid.uuid4()}.json"
+    event = {"event": "chain_refused", "at": now.isoformat(timespec="seconds"), **refusal}
+    try:
+        s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(event).encode("utf-8"),
+                      ContentType="application/json", ChecksumAlgorithm="SHA256")  # fmt: skip
+    except Exception as exc:  # noqa: BLE001 - the refusal stands; the missing record is the observer's to read
+        return {"recorded": None, "record_error": f"{type(exc).__name__}: {exc}"}
+    return {"recorded": f"s3://{bucket}/{key}"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -52,9 +105,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, {"error": "only /invocations"})
         body = self.rfile.read(int(self.headers.get("Content-Length", 0) or 0))
         try:
-            question = json.loads(body or b"{}")["question"]
-        except (ValueError, KeyError) as exc:
+            payload = json.loads(body or b"{}")
+            question = payload["question"]
+        except (ValueError, KeyError, TypeError) as exc:
             return self._send(400, {"error": f"a JSON object with a question: {exc}"})
+        # Seed S4's reader (M05 PR 2): the chain first, before the model, the table or anything else.
+        if refusal := chain_refusal(payload, self.headers.get(SESSION_HEADER)):
+            s3 = boto3.client("s3", region_name=REGION) if os.environ.get("AGENTKEEL_AUDIT_BUCKET") else None
+            return self._send(403, {**refusal, **record_refusal(refusal, s3)})
         if not MODEL_ID or not TABLE:
             missing = [name for name, value in (("AGENTKEEL_MODEL_PROFILE", MODEL_ID), ("AGENTKEEL_RIGHTS_TABLE", TABLE))
                        if not value]  # fmt: skip

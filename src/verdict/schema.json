@@ -193,7 +193,7 @@
       "minimum": 0
     },
     "alarm_latency_s": {
-      "description": "null until the security account exists (M05).",
+      "description": "From M05 PR 2 (SPEC/05 section 2): the largest latency, in seconds, from an attempt's own time in AWS's record to its record's arrival in the security account's audit bucket, across the attempts recorded in `containment`. null when none was recorded, or before M05 PR 2.",
       "type": [
         "number",
         "null"
@@ -263,6 +263,202 @@
       "properties": {
         "agent": {"$ref": "#/$defs/golden_ids"},
         "control": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/golden_ids"}]}
+      }
+    },
+    "containment": {
+      "description": "From M05 PR 2 (SPEC/05 section 4). The live attempts as scripts/observe_containment.py read them from the security account's audit bucket and verdict.build read them: per seed, made, refused by the control named for it, recorded, and the latency of its record. Recorded, never gated; the ledger's row 5 reading reads it. Optional, so no envelope before it becomes invalid.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "readable",
+        "error",
+        "looked_up_at",
+        "max_seconds",
+        "quarantine_attached",
+        "seeds"
+      ],
+      "properties": {
+        "readable": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "looked_up_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "quarantine_attached": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "seeds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "seed",
+              "falsifiers",
+              "made",
+              "refused",
+              "recorded",
+              "latency_s",
+              "within_n",
+              "reasons",
+              "attempts"
+            ],
+            "properties": {
+              "seed": {
+                "type": "string"
+              },
+              "falsifiers": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "made": {
+                "type": "boolean"
+              },
+              "refused": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "recorded": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "latency_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "within_n": {
+                "type": "boolean"
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "attempts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "what",
+                    "event_name",
+                    "recorded",
+                    "timings",
+                    "principal",
+                    "error_code",
+                    "error_message",
+                    "record_key"
+                  ],
+                  "properties": {
+                    "what": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "event_name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "recorded": {
+                      "type": "boolean"
+                    },
+                    "principal": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "error_code": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "error_message": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "record_key": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "timings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "of",
+                          "event_time",
+                          "delivered",
+                          "latency_s"
+                        ],
+                        "properties": {
+                          "of": {
+                            "type": "string"
+                          },
+                          "event_time": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "delivered": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "latency_s": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "swaps": {

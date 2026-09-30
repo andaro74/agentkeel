@@ -23,6 +23,18 @@ attempts:
   - what: put an object under ratings-helper's prefix in the audit bucket
     event_name: PutObject
     command: aws s3api put-object --bucket <audit bucket> --key agents/ratings-helper/seed-s2.txt --body seed-s2.txt
-    refused_when: AccessDenied whose message names a resource-based policy (the bucket policy), and no object at that key
+    refused_when: AccessDenied whose message says "explicit deny in a resource-based policy" (the bucket policy's own Deny, not a missing grant; amended at M05 PR 2 before the attempt), and no object at that key
     recorded_when: the trail's PutObject record for the request id is an object in the audit bucket within N of its eventTime
-observed: null
+# Made 2026-09-29 by the human, as the stand-in assumed with MFA (Unsure G
+# answered: the assume succeeds only with MFA, and did). Copied from the
+# CLI's output as pasted; `at` is the human's clock before the call and S3's
+# Date header read 15:31:13 GMT. Neither is the attempt's time: the trail
+# record's eventTime is, read by the observer.
+observed:
+  - what: put an object under ratings-helper's prefix in the audit bucket
+    event_name: PutObject
+    request_id: 8XXVXVFSQ9X9TTAH
+    at: '2026-09-29T15:31:09Z'
+    principal: arn:aws:sts::581208540944:assumed-role/agentkeel-refagent-standin/botocore-session-1790695830
+    result: AccessDenied
+    message: 'User: arn:aws:sts::581208540944:assumed-role/agentkeel-refagent-standin/botocore-session-1790695830 is not authorized to perform: s3:PutObject on resource: "arn:aws:s3:::agentkeel-audit-897698239547/agents/ratings-helper/seed-s2.txt" with an explicit deny in a resource-based policy'

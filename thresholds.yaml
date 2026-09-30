@@ -71,6 +71,21 @@ relative:
   p95_ratio_max: 2.0
   agent_tokens_ratio_max: 1.5
 
+# Threshold Owner (M05 PR 2; SPEC/05 §2, finding 11 on M05 PR 1): N, R10's
+# detection bar. An attempt's record must be an object in the security
+# account's audit bucket no more than this many seconds after the attempt's
+# own time, which is AWS's record of it (CloudTrail's eventTime, the flow
+# record's start), never a time a human wrote. Read by the ledger's row 5
+# reading of an envelope's `containment` and by build, which writes
+# `alarm_latency_s`, the largest such difference. Added before its reader;
+# adding a bar is not a relaxation (ADR-0009). The margin is thin:
+# CloudTrail delivers to S3 in about five minutes on average, with no
+# guarantee, and flow logs publish about every five minutes even at a
+# one-minute aggregation. A miss is the finding, not a bar to move. Relaxes
+# upward.
+detection:
+  max_seconds: 600
+
 # Threshold Owner (M02 PR 2): which direction relaxes each bar, read by
 # `two-key` (src/gates/two_key.py) instead of the comments above. A bar is a
 # numeric leaf under the mappings in this file; `baseline_card` is a pin,
@@ -85,3 +100,4 @@ relaxes:
   ceilings.fan_out: up
   relative.p95_ratio_max: up
   relative.agent_tokens_ratio_max: up
+  detection.max_seconds: up

@@ -290,6 +290,8 @@ STACKS = {
     "AgentkeelBootstrap": "infra/bootstrap",
     "AgentkeelRefagent": "infra/construct",
     "AgentkeelIngest": "infra/ingest",  # M03 PR 2
+    "AgentkeelSecurity": "infra/security",  # M05 PR 2: the security account's stack
+    "AgentkeelAudit": "infra/audit",  # M05 PR 2: delivery from the agent account
 }
 NAG_REPORT = "AwsSolutions--{stack}-NagReport.csv"
 
@@ -348,7 +350,8 @@ def _nag_rows(path: Path, rel: str) -> list[str]:
             errors.append(f"{where}: non-compliant")
         elif row["Compliance"] == "Suppressed" and not _names_its_case(row["Exception Reason"], row["Resource ID"]):
             errors.append(f"{where}: the suppression names no seeded case (S3, S4, S5, S6, S8) and no "
-                          f"SPEC/01 §6 line (SPEC/03 §6 for the ingest stack). That is a finding, not a "
+                          f"SPEC/01 §6 line (SPEC/03 §6 for the ingest stack, SPEC/05 §6 for the security and audit "
+                          f"stacks). That is a finding, not a "
                           f"suppression.")  # fmt: skip
     return errors
 
@@ -357,10 +360,13 @@ def _names_its_case(reason: str, resource: str = "") -> bool:
     """`seed S3`, not `the S3 gateway endpoint`: the service name is not the seed.
 
     From M03 PR 2 a line of SPEC/03 §6 serves as SPEC/01 §6's does, on the ingest stack's rows only
-    (security-reviewer on 2e93d27): SPEC/03 §6 names that stack and no other.
+    (security-reviewer on 2e93d27): SPEC/03 §6 names that stack and no other. From M05 PR 2 a line
+    of SPEC/05 §6 does the same on the two stacks it names, the security account's and the audit
+    delivery's, and on no other.
     """
     ingest = resource.startswith("AgentkeelIngest/") and "SPEC/03 §6" in reason
-    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason or ingest)
+    containment = resource.startswith(("AgentkeelSecurity/", "AgentkeelAudit/")) and "SPEC/05 §6" in reason
+    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason or ingest or containment)
 
 
 THRESHOLDS = "thresholds.yaml"

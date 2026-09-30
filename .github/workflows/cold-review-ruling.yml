@@ -6,8 +6,14 @@
 # the PR's merge ref, which is main plus this PR, so a ruling on main and
 # a ruling carried by the PR both count.
 #
-# What this does not do: judge the ruling, or stop someone with write
-# access from editing this file. Nothing gates that until M02.
+# From M05 PR 2 (milestones/M05/open.md row 44) each ruling that names this
+# PR must also be ruled: its body carries a "Ruled by" line and no
+# "Drafted" line. #28 (M04 PR 4) merged with two rulings still drafts.
+#
+# What this does not do: judge the ruling, or tell who wrote the "Ruled
+# by" line: anyone with write access can type it. It holds the step the
+# skills already hold (`/close-milestone`), mechanically. Since M02 a change
+# to this file is a Security path under `ruling-cited`.
 name: cold-review-ruling
 
 on:
@@ -35,6 +41,7 @@ jobs:
           case "$PR" in ''|*[!0-9]*) echo "::error::no PR number"; exit 1 ;; esac
           repo_re=$(printf '%s' "$REPO" | sed 's/[.[\*^$+?(){}|]/\\&/g')
           found=0
+          unruled=0
           for f in milestones/*/rulings/*.md; do
             [ -f "$f" ] || continue
             # front matter only: the lines between the first two '---'
@@ -42,9 +49,23 @@ jobs:
               | grep -Eq "^pr:[[:space:]]*(#?${PR}|https://github\.com/${repo_re}/pull/${PR})[[:space:]]*$"; then
               echo "ruling for PR #${PR}: $f"
               found=1
+              # M05 PR 2 (milestones/M05/open.md row 44): a ruling a seat has not ruled is a draft,
+              # and a draft does not merge. The body, after the front matter, must carry the seat's
+              # "Ruled by" line and no "Drafted" line. #28 merged with two drafts; this is why.
+              body=$(awk '/^---[[:space:]]*$/ { n++; next } n >= 2' "$f")
+              if ! printf '%s\n' "$body" | grep -Eq '^Ruled by '; then
+                echo "::error file=$f::not ruled: no 'Ruled by' line; a seat rules it before the merge"
+                unruled=1
+              elif printf '%s\n' "$body" | grep -Eq '^Drafted '; then
+                echo "::error file=$f::still says 'Drafted' beside its 'Ruled by' line"
+                unruled=1
+              fi
             fi
           done
           if [ "$found" -ne 1 ]; then
             echo "::error::no file under milestones/*/rulings/ has 'pr: ${PR}' in its front matter"
+            exit 1
+          fi
+          if [ "$unruled" -ne 0 ]; then
             exit 1
           fi
