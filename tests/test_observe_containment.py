@@ -297,3 +297,23 @@ def test_no_invocation_near_its_time_is_unrecorded():
     (attempt,) = observer.observe([s4_run(session, AT)], s3)["seeds"][0]["attempts"]
     assert attempt["records"] == [] and attempt["matched_by"] is None
 
+
+def test_a_call_that_returned_under_another_session_never_stands_in_for_a_refused_one():
+    """Second cold read on M05 PR 3, F1: S4's own record missing, and a returned call by the same caller inside
+    the window. The returned call names its own session, so it is not S4's: S4 reads unrecorded."""
+    s3, session = FakeS3(), "s4-" + "g" * 40
+    trail_file(s3, AGENT, "us-west-2", [invocation("REQ-OTHER", AT + timedelta(seconds=30), observer.CALLER, "other")],
+               AT + timedelta(minutes=5), 1)  # fmt: skip
+    (attempt,) = observer.observe([s4_run(session, AT)], s3)["seeds"][0]["attempts"]
+    assert attempt["records"] == [] and attempt["matched_by"] is None
+
+
+def test_an_entry_with_no_session_id_is_not_found_by_time_alone():
+    s3 = FakeS3()
+    trail_file(s3, AGENT, "us-west-2", [invocation("REQ-S4", AT + timedelta(seconds=10), observer.CALLER, None, "E")],
+               AT + timedelta(minutes=5), 1)  # fmt: skip
+    run = s4_run("x", AT)
+    run["observed"][0].pop("session_id")
+    (attempt,) = observer.observe([run], s3)["seeds"][0]["attempts"]
+    assert attempt["records"] == []
+

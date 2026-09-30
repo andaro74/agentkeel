@@ -150,13 +150,20 @@ class Trails:
         return sorted(out, key=lambda r: r["last_modified"])
 
     def invocations_near(self, caller: str, at: datetime) -> list[dict[str, Any]]:
-        """refagent's runtime invoked by `caller` within NEAR of `at`, one record per event."""
-        out = {}
-        for record, key, modified in self.records:
+        """refagent's runtime invoked by `caller` within NEAR of `at` and refused, with no session id recorded.
+
+        Only a call with an error and no session id in either field: a call that returned names its own session,
+        so it is some other session's, never this attempt's (second cold read on M05 PR 3, F1). One record per
+        event, the earliest delivered copy, as `matching` and `by_role` keep."""
+        out: dict[Any, dict[str, Any]] = {}
+        for record, key, modified in sorted(self.records, key=lambda item: item[2]):
+            fields = {**(record.get("responseElements") or {}), **(record.get("requestParameters") or {})}
             if (record.get("eventName") == "InvokeAgentRuntime" and principal(record) == caller
+                    and record.get("errorCode") and not fields.get("runtimeSessionId")
                     and any(r.get("ARN") == RUNTIME for r in record.get("resources") or [])
                     and abs(parse_time(record["eventTime"]) - at) <= NEAR):  # fmt: skip
-                out.setdefault(record.get("eventID"), shaped(record, key, modified))
+                ident = record.get("eventID") or (record.get("requestID"), record.get("eventTime"))
+                out.setdefault(ident, shaped(record, key, modified))
         return sorted(out.values(), key=lambda r: r["event_time"])
 
     def by_role(self, role_fragment: str, event_names: Iterable[str], start: datetime, end: datetime) -> list[dict]:
@@ -229,7 +236,7 @@ def session_attempt(attempt: dict[str, Any], entry: dict[str, Any], trails: Trai
     session = entry.get("session_id")
     invoke = trails.matching(session=session, event_name="InvokeAgentRuntime") if session else []
     matched_by = "session id" if invoke else None
-    if not invoke and entry.get("at"):
+    if not invoke and session and entry.get("at"):
         # A call the runtime answered with an error carries no session id in its record (S4's 403): found as the
         # one invocation of refagent's runtime by the caller near the run file's `at`. The time read is still the
         # record's own; two such calls are not told apart, and none is unrecorded.
