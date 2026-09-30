@@ -123,7 +123,12 @@ SEEDS_M05: dict[str, tuple[str, str, str]] = {
 # PR 1, one seed per commit. S1a, S1b and S4 are fixtures read in a worktree
 # of HEAD by `validate` (S4 also by `build`); S2 and S3 are run files the
 # human fills, read by the observer that lands at M06 PR 2 and made after its
-# merge (SPEC/06 section 5.1). Listing them reads nothing and gates nothing.
+# merge (SPEC/06 section 5.1). S1a's and S1b's reader is a check added to a
+# folder already in the tree (src/validate/), so `make plants` says "in the
+# tree" beside them, as it did for M03's and M04's: the strict markers, not
+# this list, say whether a seed is read. S4 names two readers in one string,
+# which `make plants` looks up as one path and reports as not in the tree.
+# Listing them reads nothing and gates nothing.
 SEEDS_M06: dict[str, tuple[str, str, str]] = {
     "S1a": ("F6.1", "tests/fixtures/m06/s1a-unassigned-seat/", "src/validate/"),
     "S1b": ("F6.1", "tests/fixtures/m06/s1b-no-goldens/", "src/validate/"),
