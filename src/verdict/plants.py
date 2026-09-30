@@ -119,6 +119,15 @@ SEEDS_M05: dict[str, tuple[str, str, str]] = {
     "S7": ("F5.4", "milestones/M05/runs/f5_7_quarantine.yaml", "infra/audit/"),
 }
 
+# Claim 6's seeded cases (SPEC/06 section 5), the same shape. Listed at M06
+# PR 1, one seed per commit. S1a, S1b and S4 are fixtures read in a worktree
+# of HEAD by `validate` (S4 also by `build`); S2 and S3 are run files the
+# human fills, read by the observer that lands at M06 PR 2 and made after its
+# merge (SPEC/06 section 5.1). Listing them reads nothing and gates nothing.
+SEEDS_M06: dict[str, tuple[str, str, str]] = {
+    "S1a": ("F6.1", "tests/fixtures/m06/s1a-unassigned-seat/", "src/validate/"),
+}
+
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
 SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/01 section 5", SEEDS),
@@ -126,6 +135,7 @@ SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/03 section 5", SEEDS_M03),
     ("SPEC/04 section 5", SEEDS_M04),
     ("SPEC/05 section 5", SEEDS_M05),
+    ("SPEC/06 section 5", SEEDS_M06),
 ]
 
 

@@ -1,0 +1,11 @@
+id: g-001
+kind: ordinary
+question: Can the premiere of Lantern Harbor be screened in the east hall on 2026-11-06?
+expected:
+  table_row: pd-001
+  clause_id: PD-1.1
+  answer_fields:
+    available: true
+seat: data-owner
+added: M06
+retired: null

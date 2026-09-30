@@ -1,0 +1,40 @@
+# Seed S1a (SPEC/06 section 5, F6.1): an agent folder as the template ships
+# it, the one fault planted: every seat null. Its goldens are at the
+# minimum (one ordinary, one trap), so an unassigned seat is the only thing
+# a reader can refuse. `premiere-desk` is fictional, as the slate is.
+name: premiere-desk
+version: 1.0.0
+model:
+  id: anthropic.claude-sonnet-4-6
+  version: null
+  profile: us.anthropic.claude-sonnet-4-6
+  region: us-west-2
+judge_model_id: null
+guardrail: null
+endpoint_allowlist:
+  - bedrock-runtime
+  - ecr.api
+  - ecr.dkr
+  - logs
+seats:
+  product: null
+  rule-owner: null
+  data-owner: null
+  tool-owner: null
+  threshold-owner: null
+  security: null
+  engineering: null
+may_call: []
+may_be_called_by: []
+ceilings:
+  concurrency: 2
+  rps_per_edge: 1
+  depth: 2
+  fan_out: 3
+max_tokens_per_session: 4000
+daily_usd: 1
+memory: null
+data_class: internal
+deprecated_after: null
+rollout: all-at-once
+platform_version: m05

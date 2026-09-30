@@ -195,3 +195,22 @@ tests. One name, recorded: S6's run file lists the lock's action as
 `s3:PutObjectLockConfiguration`, the API's name; the IAM action a policy
 names is `s3:PutBucketObjectLockConfiguration`, and that is the one the
 audit bucket's policy denies (`infra/security/app.py`).
+
+## M06 (SPEC/06 section 5)
+
+Committed at M06 PR 1, one commit per seed, each with its test in
+`tests/test_m06_seeds.py`, before any code that reads them. Each test is
+`xfail(strict=True, raises=...)` until its reader lands or its attempt is
+made, asserts the planted reason, and was run once with `--runxfail` and
+its message read. Nothing here reaches `evals/history/`, calls AWS, calls a
+model or calls GitHub.
+
+The code seeds are agent folders and panel data for a fictional agent,
+`premiere-desk`, which each test copies into a worktree of HEAD. The
+attempt seeds are run files under `milestones/M06/runs/`, each the attempt
+to make with `observed: null`, made after M06 PR 2 merges (SPEC/06
+section 5.1).
+
+| Seed | File | What is wrong with it |
+|---|---|---|
+| S1a | `m06/s1a-unassigned-seat/` | an agent folder as the template ships it: `manifest.yaml` schema-valid with all seven seats `null`, and one ordinary and one trap golden citing the agent's own `data/`. Placed at `agents/premiere-desk/`, `validate` over the tree is green: no check reads a seat's value |

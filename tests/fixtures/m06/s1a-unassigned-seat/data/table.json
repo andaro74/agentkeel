@@ -1,0 +1,4 @@
+[
+  {"table_row": "pd-001", "title": "Lantern Harbor", "hall": "east", "date": "2026-11-06", "available": true},
+  {"table_row": "pd-002", "title": "Lantern Harbor", "hall": "east", "date": "2026-11-07", "available": false, "note": "held for a press screening"}
+]
