@@ -164,8 +164,36 @@ BLOCK: 3 · FINDING: 16 · NOTE: 4
 
 ## 2. Rulings on the report
 
-Pending but for NOTE 23. Each BLOCK is ruled, with its seat, before the PR
-opens and before any seed.
+Pending but for BLOCKs 2 and 3 and NOTE 23. Each BLOCK is ruled, with its
+seat, before the PR opens and before any seed.
+
+- **BLOCK 1, Security's read (2026-09-30), ruling pending.** The human
+  ruled "as proposed": option (b), a hash-pinned copy of the platform
+  workflow in a repository of the organisation, falling back to (c), F6.2
+  with no reader, if the free organisation plan has no `workflows` rule.
+  The read: GitHub's rules page for Free, Pro and Team
+  (`docs.github.com/en/repositories/.../available-rules-for-rulesets`)
+  has no section on requiring workflows; the Enterprise Cloud version of
+  the same page (`docs.github.com/en/enterprise-cloud@latest/...`) has
+  one: "Ruleset workflows can be configured at the organization or
+  enterprise level to require workflows to pass before merging pull
+  requests", with the workflow in a repository whose visibility matches,
+  on `pull_request`, `pull_request_target` or `merge_group` only. Read as:
+  not on a free organisation. This is the documentation, not an attempt;
+  the organisation's ruleset API answering for a `workflows` rule would
+  settle it. Before (c) is written, a fourth option is put to the human,
+  since (c) leaves F6.2 unmeasured and row 6 cannot then be GREEN.
+- **BLOCK 2, ruled by the human as Security and Product, 2026-09-30, as
+  proposed.** F6.2 reads: a pull request in an agent repository merged
+  without the platform's workflow having run on it and passed. S2's
+  planted reason is a job of the required check's name, defined in the
+  pull request's own workflow file, standing in for the platform's.
+  Deleting the `uses:` line alone is not the attack: it refuses nothing.
+- **BLOCK 3, ruled by the human as Engineering and Product,
+  2026-09-30, as proposed.** `scripts/observe_template.py` writes two raw
+  lists, panel 1's rows as Grafana's API returns them and a registry
+  scan, with the time each was read; `verdict.build` compares them by
+  agent name and writes `checks.F6_4`. The observer rules nothing (P5).
 
 - **NOTE 23, ruled by the human as Product and Security, 2026-09-30.** The
   risk is accepted: the second developer's account is a second free
