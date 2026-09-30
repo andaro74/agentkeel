@@ -28,8 +28,7 @@ pr: 31
 
 # Ruling: M05 PR 2, Engineering, with the cold review
 
-Drafted by the session; the human rules as Engineering before the merge,
-after this PR's run has recorded S1, S2 and S6 (cold review F3).
+Ruled by andaro74 as Engineering, 2026-09-30, as written, after run 36652834144 on 388dbcf.
 
 ## What was read
 

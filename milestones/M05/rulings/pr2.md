@@ -24,7 +24,7 @@ pr: 31
 
 # Ruling: M05 PR 2, Product
 
-Drafted by the session; the human rules as Product before the merge.
+Ruled by andaro74 as Product, 2026-09-30, as written.
 
 ## What this PR is
 

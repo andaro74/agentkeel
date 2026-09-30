@@ -15,7 +15,7 @@ pr: 31
 
 # Ruling: M05 PR 2, Threshold Owner
 
-Drafted by the session; the human rules as Threshold Owner before the merge.
+Ruled by andaro74 as Threshold Owner, 2026-09-30, as written.
 
 ## N
 

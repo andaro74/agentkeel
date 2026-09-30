@@ -28,7 +28,7 @@ pr: 31
 
 # Ruling: M05 PR 2, Security
 
-Drafted by the session; the human rules as Security before the merge.
+Ruled by andaro74 as Security, 2026-09-30, as written.
 
 ## 1. The security account, and the role deleted after its deploy
 
