@@ -37,6 +37,11 @@ STANDIN = ":role/agentkeel/agents/agentkeel-refagent-standin"
 # pattern would admit a role an admin names to match). A redeploy that replaces the role changes the name,
 # and then its events are refused and read as unrecorded: closed, not open.
 REFAGENT = ":role/agentkeel/agents/agentkeel-refagent-RefagentRole5888DB41-i9IqTXU6NVSL"
+# The same role by its unique id (`iam get-role`, read 2026-09-30). The security account's copy of a cross-account
+# record names the caller as "<role id>:<session>", with no ARN (Unsure I on M05 PR 2), and S4's refusal event is
+# put cross-account, so one of its two writers is named that way (M05 PR 3's first run, 5a5fe1e). A replaced role
+# has a new id and a new name: its events read as another writer, closed, not open.
+REFAGENT_ID = "AROAYOUV2Q4IB5XHNMPGI"
 AGENT_ACCOUNT = "581208540944"
 AGENT_ROLES = ":role/agentkeel/"
 OBJECT_LOCK_ACTIONS = ("DeleteObject", "PutObjectRetention")  # S6's two object actions, by CloudTrail event
@@ -60,6 +65,11 @@ def earliest(records: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 def timing(of: str, event_time: str | None, delivered: str | None) -> dict[str, Any]:
     return {"of": of, "event_time": event_time, "delivered": delivered, "latency_s": seconds(event_time, delivered)}
+
+
+def is_refagent(principal: str) -> bool:
+    """refagent's own role, by its ARN or by its unique id with a session: nothing else."""
+    return REFAGENT in principal or principal.startswith(f"{REFAGENT_ID}:")
 
 
 def denied(records: list[dict[str, Any]], phrase: str, principal: str | None) -> list[str]:
@@ -139,7 +149,7 @@ def read_attempt(seed: str, attempt: dict[str, Any], whole: dict[str, Any]) -> d
             base["why"].append("no refusal event for the session")
         else:
             writers = event.get("writers") or []
-            if not writers or not all(REFAGENT in w for w in writers):
+            if not writers or not all(is_refagent(w) for w in writers):
                 base["why"].append(f"the refusal event's writer is not refagent's role: {writers}")
             if first:
                 base["timings"].append(timing("refusal event", first.get("event_time"), event.get("last_modified")))
