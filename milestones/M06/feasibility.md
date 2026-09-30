@@ -364,15 +364,18 @@ Each test was run once with `--runxfail` and its message read:
 
 | Seed | Commit | `--runxfail` message |
 |---|---|---|
-| S1a | `672fc1d` | `seed S1a: no check refused the unassigned seats ([])` |
-| S1b | `1a576f4` | `seed S1b: no check refused an agent with no goldens ([])` |
+| S1a | `672fc1d` | `seed S1a: no check that reads seats refused the unassigned seats` |
+| S1b | `1a576f4` | `seed S1b: no check that reads an agent's goldens refused an agent with none` |
 | S2 | `0f3b977` | `seed S2: the attempt has not been made` |
 | S3 | `b4eb959` | `seed S3: the attempt has not been made` |
-| S4 | `06c485a` | `seed S4: no check refused a panel 1 query that names a second source`; `seed S4: nothing compares panel 1's rows with the registry` |
+| S4 | `06c485a` | `seed S4: no check that reads panel 1's query refused a second source`; `seed S4: nothing compares panel 1's rows with the registry` |
 
-The empty lists in S1a's and S1b's messages are every error that
-fourteen of `validate`'s sixteen checks returned about
-`agents/premiere-desk/` with the fixture placed: none. The two not run are
+The messages are as read after the cold review's F1 repair (`df084ef`): a seed counts as refused only by a check added since the
+base (`BASE_CHECKS`, `validate`'s sixteen names at `0b96da4`) whose name
+says what it reads, and a base check refusing a fixture is `SeedBroken`.
+Before the repair S1a's and S1b's messages ended `([])`: every error that
+fourteen of the sixteen checks returned about `agents/premiere-desk/`
+with the fixture placed, none. The two not run are
 the cdk-nag synth (minutes, reads no manifest) and the live ruleset (the
 GitHub API); CODEOWNERS' logins are looked up through a stand-in, so no
 test calls GitHub. `git show <seed> --stat` shows each seed with its test,
