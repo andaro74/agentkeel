@@ -65,15 +65,14 @@ def made(run: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     return list(zip(run["attempts"], observed, strict=True))
 
 
-# What the caller is answered for a refusal: S3 and IAM say AccessDenied; the JSON-protocol APIs (CloudWatch Logs
-# for S3) say AccessDeniedException for the same refusal, which the trail records as AccessDenied (M05 PR 3).
-REFUSED = ("AccessDenied", "AccessDeniedException")
+def denied(entry: dict[str, Any], *, by: str, codes: tuple[str, ...] = ("AccessDenied",)) -> bool:
+    """AWS refused it with one of `codes`, with a request id, and its message names the control `by` names.
 
-
-def denied(entry: dict[str, Any], *, by: str) -> bool:
-    """AWS refused it, with a request id, and its message names the control `by` names."""
+    S3's REST API and IAM answer AccessDenied. CloudWatch Logs, a JSON-protocol API, answers the same refusal
+    AccessDeniedException, so seed S3's test passes that code, and no other seed's does (M05 PR 3; cold review
+    F2: widening every seed would let an S2 or S6 entry carry an answer its API never gives)."""
     message = (entry.get("message") or "").lower()
-    return entry.get("result") in REFUSED and bool(entry.get("request_id")) and by in message
+    return entry.get("result") in codes and bool(entry.get("request_id")) and by in message
 
 
 # --- S1: curl to the internet -------------------------------------------------
@@ -119,7 +118,7 @@ def test_s3_deleting_its_own_log_stream_was_refused():
     "refused and recorded", and the record in the security account is what is new (SPEC/05 §3.8)."""
     run = run_file("f5_3_logs.yaml", "S3")
     for attempt, entry in made(run):
-        assert denied(entry, by="explicit deny"), f"{attempt['what']}: {entry}"
+        assert denied(entry, by="explicit deny", codes=("AccessDeniedException",)), f"{attempt['what']}: {entry}"
 
 
 # --- S4: a call chain at depth 3 ----------------------------------------------
