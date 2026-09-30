@@ -25,6 +25,12 @@
 # (the runtime's answer, verbatim). Amended at M05 PR 2, before the attempt:
 # the call is found in the trail by its session id, which the trail records
 # and the runtime is handed, not by a request id the CLI does not print.
+# Corrected at M05 PR 3, on its first run and the audit bucket's record: the
+# trail records the session id only in `responseElements`, and a call the
+# runtime refused has none. S4's record (02:07:06Z, RuntimeClientError,
+# request 342eefbc-499f-4983-8dbf-78878a941d15) carries no session id; the
+# observer finds it as the one invocation by the caller within two minutes
+# of `at`. The runtime was handed the id: the refusal event is keyed by it.
 seed: S4
 falsifiers: [F5.1, F5.2]
 principal: the human, with InvokeAgentRuntime on refagent's runtime
