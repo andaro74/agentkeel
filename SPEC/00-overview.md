@@ -768,7 +768,7 @@ finding on camera is the point.
 | 03 | It can't get worse quietly | A test that used to pass and now fails stops the change from merging; every attack we planted must be caught, or the change stops; a contract nobody signed never reaches the documents the agent will be given to read. |
 | 04 | Changing the model is tested, or it's blocked | When a team switches the agent to a different model, the switch is tested on its own proposal before it can go in; if a test that used to pass now fails, or answers get much slower, it can't go in. |
 | 05 | The agent stays in its box | An agent is stopped from reaching the internet, writing to another agent's files, or deleting its own logs, and each attempt is recorded in a separate account it cannot change. |
-| 06 | A team can do this in a day | One developer creates an agent from the template and ships it in a day, without touching the safety pipeline. (Amended at M06 PR 1; it read "Marketing creates a governed agent from the template, without touching the safety pipeline.") |
+| 06 | A team can do this in a day | One developer creates an agent from the template and ships it in a day, without touching the safety pipeline. |
 | 07 | Upgrades come to you | A new platform version, a new model, or a retirement arrives as a PR; the team never edits the pipeline. |
 | 08 | We rehearsed the bad day | A hostile agent tried six things; all six were stopped, recorded, and recovered from. |
 
