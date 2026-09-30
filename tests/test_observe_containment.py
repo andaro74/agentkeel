@@ -241,3 +241,79 @@ def test_an_attempt_is_found_by_its_request_id_whatever_cloudtrail_names_it():
            "observed": [{"event_name": "PutObjectLockConfiguration", "request_id": "DSHB2N47998KBX7K", "at": AT.isoformat()}]}
     (attempt,) = observer.observe([run], s3)["seeds"][0]["attempts"]
     assert attempt["records"][0]["event_name"] == "PutBucketObjectLockConfiguration"
+
+
+def invocation(request_id: str, when: datetime, who: str, session: str | None, error: str | None = None) -> dict[str, Any]:
+    """InvokeAgentRuntime as CloudTrail records it (M05 PR 3, read in the audit bucket): requestParameters null; the
+    session id only in responseElements, and only when the call returned; the runtime among the resources."""
+    body = record("InvokeAgentRuntime", request_id, when, who, error)
+    body["requestParameters"] = None
+    body["responseElements"] = None if error else {"runtimeSessionId": session, "statusCode": 200}
+    body["resources"] = [{"type": "AWS::BedrockAgentCore::Runtime", "ARN": observer.RUNTIME}]
+    return body
+
+
+def s4_run(session: str, at: datetime) -> dict[str, Any]:
+    return {"seed": "S4", "attempts": [{"what": "invoke", "event_name": "InvokeAgentRuntime"}],
+            "observed": [{"event_name": "InvokeAgentRuntime", "session_id": session, "at": at.isoformat()}]}
+
+
+def test_an_invocation_that_returned_is_found_by_the_session_id_in_its_response():
+    s3, session = FakeS3(), "s7-" + "c" * 40
+    trail_file(s3, AGENT, "us-west-2", [invocation("REQ-OK", AT + timedelta(seconds=10), observer.CALLER, session),
+                                        invocation("REQ-OTHER", AT + timedelta(seconds=20), observer.CALLER, "another")],
+               AT + timedelta(minutes=5), 1)  # fmt: skip
+    (attempt,) = observer.observe([s4_run(session, AT)], s3)["seeds"][0]["attempts"]
+    assert [r["request_id"] for r in attempt["records"]] == ["REQ-OK"] and attempt["matched_by"] == "session id"
+
+
+def test_an_invocation_the_runtime_refused_is_the_one_by_the_caller_near_its_time():
+    s3, session = FakeS3(), "s4-" + "d" * 40
+    trail_file(s3, AGENT, "us-west-2", [
+        invocation("REQ-S4", AT + timedelta(seconds=10), observer.CALLER, None, "RuntimeClientError"),
+        invocation("REQ-CI", AT + timedelta(seconds=15), f"arn:aws:iam::{AGENT}:role/agentkeel-deploy", "ci-session"),
+        invocation("REQ-LATER", AT + timedelta(minutes=9), observer.CALLER, None, "RuntimeClientError"),
+    ], AT + timedelta(minutes=5), 1)  # fmt: skip
+    (attempt,) = observer.observe([s4_run(session, AT)], s3)["seeds"][0]["attempts"]
+    assert [r["request_id"] for r in attempt["records"]] == ["REQ-S4"]
+    assert attempt["records"][0]["event_time"] == "2026-09-29T18:00:10Z"  # the record's time, not the run file's
+    assert attempt["matched_by"] == "the one invocation by the caller near `at`"
+
+
+def test_two_invocations_by_the_caller_near_its_time_are_not_told_apart():
+    s3, session = FakeS3(), "s4-" + "e" * 40
+    trail_file(s3, AGENT, "us-west-2", [
+        invocation("REQ-1", AT + timedelta(seconds=10), observer.CALLER, None, "RuntimeClientError"),
+        invocation("REQ-2", AT + timedelta(seconds=50), observer.CALLER, None, "RuntimeClientError"),
+    ], AT + timedelta(minutes=5), 1)  # fmt: skip
+    (attempt,) = observer.observe([s4_run(session, AT)], s3)["seeds"][0]["attempts"]
+    assert "2 invocations" in attempt["mismatch"]
+
+
+def test_no_invocation_near_its_time_is_unrecorded():
+    s3, session = FakeS3(), "s4-" + "f" * 40
+    trail_file(s3, AGENT, "us-west-2", [invocation("REQ-OLD", AT - timedelta(minutes=5), observer.CALLER, None, "E")],
+               AT + timedelta(minutes=5), 1)  # fmt: skip
+    (attempt,) = observer.observe([s4_run(session, AT)], s3)["seeds"][0]["attempts"]
+    assert attempt["records"] == [] and attempt["matched_by"] is None
+
+
+def test_a_call_that_returned_under_another_session_never_stands_in_for_a_refused_one():
+    """Second cold read on M05 PR 3, F1: S4's own record missing, and a returned call by the same caller inside
+    the window. The returned call names its own session, so it is not S4's: S4 reads unrecorded."""
+    s3, session = FakeS3(), "s4-" + "g" * 40
+    trail_file(s3, AGENT, "us-west-2", [invocation("REQ-OTHER", AT + timedelta(seconds=30), observer.CALLER, "other")],
+               AT + timedelta(minutes=5), 1)  # fmt: skip
+    (attempt,) = observer.observe([s4_run(session, AT)], s3)["seeds"][0]["attempts"]
+    assert attempt["records"] == [] and attempt["matched_by"] is None
+
+
+def test_an_entry_with_no_session_id_is_not_found_by_time_alone():
+    s3 = FakeS3()
+    trail_file(s3, AGENT, "us-west-2", [invocation("REQ-S4", AT + timedelta(seconds=10), observer.CALLER, None, "E")],
+               AT + timedelta(minutes=5), 1)  # fmt: skip
+    run = s4_run("x", AT)
+    run["observed"][0].pop("session_id")
+    (attempt,) = observer.observe([run], s3)["seeds"][0]["attempts"]
+    assert attempt["records"] == []
+

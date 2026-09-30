@@ -29,7 +29,9 @@ What each seed's entry records (SPEC/05 §5):
   the code); for S2 whether an object is at the key, and for S6 the test
   object's versions and each one's retain-until date as they stand now;
 - S4: the trail's record of the `InvokeAgentRuntime` call (by the session
-  id the human passed), refagent's refusal event for that session and the
+  id the human passed, which CloudTrail records only in the response of a
+  call that returned; a refused call is the one invocation by the caller
+  within two minutes of the run file's `at`), refagent's refusal event for that session and the
   trail's record of who put it, and every model call refagent's role made
   in the minutes around it (SPEC/05 §2, self-reported);
 - S7: the attach, the invocation, the model calls refagent's role made
@@ -67,6 +69,11 @@ MODEL_EVENTS = ("Converse", "ConverseStream", "InvokeModel", "InvokeModelWithRes
 REFAGENT_ROLE = ":role/agentkeel/agents/agentkeel-refagent-RefagentRole5888DB41-i9IqTXU6NVSL"
 QUARANTINE = f"arn:aws:iam::{AGENT_ACCOUNT}:policy/agentkeel-quarantine"
 EVENTS_PREFIX = "agents/refagent/events/"
+RUNTIME = f"arn:aws:bedrock-agentcore:{REGION}:{AGENT_ACCOUNT}:runtime/refagent-Du2VJx6xWc"
+# Who makes S4's and S7's invocations: the human's admin user (infra/audit's ADMIN), as the run files say.
+CALLER = f"arn:aws:iam::{AGENT_ACCOUNT}:user/hector.acevedo"
+# How far from the run file's `at` a failed invocation is looked for, when its record carries no session id.
+NEAR = timedelta(minutes=2)
 
 
 def parse_time(value: Any) -> datetime:
@@ -125,10 +132,14 @@ class Trails:
                             self.records.append((record, obj["key"], obj["last_modified"]))
 
     def matching(self, **wanted: Any) -> list[dict[str, Any]]:
-        """Every record with these fields, earliest delivery first. `session` matches runtimeSessionId."""
+        """Every record with these fields, earliest delivery first. `session` matches runtimeSessionId.
+
+        CloudTrail records InvokeAgentRuntime's session id in `responseElements`, not in `requestParameters`
+        (null), and only when the call returned: a call the runtime answered with an error has neither (M05 PR
+        3, read in the audit bucket: S7's 200 carries it, S4's RuntimeClientError does not)."""
         out = []
         for record, key, modified in self.records:
-            params = record.get("requestParameters") or {}
+            params = {**(record.get("responseElements") or {}), **(record.get("requestParameters") or {})}
             if "request_id" in wanted and record.get("requestID") != wanted["request_id"]:
                 continue
             if "event_name" in wanted and record.get("eventName") != wanted["event_name"]:
@@ -137,6 +148,23 @@ class Trails:
                 continue
             out.append(shaped(record, key, modified))
         return sorted(out, key=lambda r: r["last_modified"])
+
+    def invocations_near(self, caller: str, at: datetime) -> list[dict[str, Any]]:
+        """refagent's runtime invoked by `caller` within NEAR of `at` and refused, with no session id recorded.
+
+        Only a call with an error and no session id in either field: a call that returned names its own session,
+        so it is some other session's, never this attempt's (second cold read on M05 PR 3, F1). One record per
+        event, the earliest delivered copy, as `matching` and `by_role` keep."""
+        out: dict[Any, dict[str, Any]] = {}
+        for record, key, modified in sorted(self.records, key=lambda item: item[2]):
+            fields = {**(record.get("responseElements") or {}), **(record.get("requestParameters") or {})}
+            if (record.get("eventName") == "InvokeAgentRuntime" and principal(record) == caller
+                    and record.get("errorCode") and not fields.get("runtimeSessionId")
+                    and any(r.get("ARN") == RUNTIME for r in record.get("resources") or [])
+                    and abs(parse_time(record["eventTime"]) - at) <= NEAR):  # fmt: skip
+                ident = record.get("eventID") or (record.get("requestID"), record.get("eventTime"))
+                out.setdefault(ident, shaped(record, key, modified))
+        return sorted(out.values(), key=lambda r: r["event_time"])
 
     def by_role(self, role_fragment: str, event_names: Iterable[str], start: datetime, end: datetime) -> list[dict]:
         names = set(event_names)
@@ -207,10 +235,21 @@ def session_attempt(attempt: dict[str, Any], entry: dict[str, Any], trails: Trai
     """An InvokeAgentRuntime call, by its session id, and the model calls refagent's role made around it."""
     session = entry.get("session_id")
     invoke = trails.matching(session=session, event_name="InvokeAgentRuntime") if session else []
+    matched_by = "session id" if invoke else None
+    if not invoke and session and entry.get("at"):
+        # A call the runtime answered with an error carries no session id in its record (S4's 403): found as the
+        # one invocation of refagent's runtime by the caller near the run file's `at`. The time read is still the
+        # record's own; two such calls are not told apart, and none is unrecorded.
+        near = trails.invocations_near(CALLER, parse_time(entry["at"]))
+        if len(near) > 1:
+            return {"what": attempt["what"], "mismatch": f"{len(near)} invocations by {CALLER} within {NEAR} of "
+                                                         f"{entry['at']} and none names session {session}"}
+        invoke, matched_by = near, ("the one invocation by the caller near `at`" if near else None)
     around = parse_time(invoke[0]["event_time"]) if invoke else parse_time(entry["at"])
     models = trails.by_role(REFAGENT_ROLE, MODEL_EVENTS, around - timedelta(minutes=1),
                             until or around + timedelta(minutes=2))  # fmt: skip
     return {"what": attempt["what"], "event_name": "InvokeAgentRuntime", "session_id": session, "records": invoke,
+            "matched_by": matched_by,
             "model_calls": models, "human_said": {"result": entry.get("result")}}  # fmt: skip
 
 

@@ -65,10 +65,14 @@ def made(run: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     return list(zip(run["attempts"], observed, strict=True))
 
 
-def denied(entry: dict[str, Any], *, by: str) -> bool:
-    """AWS answered AccessDenied, with a request id, and its message names the control `by` names."""
+def denied(entry: dict[str, Any], *, by: str, codes: tuple[str, ...] = ("AccessDenied",)) -> bool:
+    """AWS refused it with one of `codes`, with a request id, and its message names the control `by` names.
+
+    S3's REST API and IAM answer AccessDenied. CloudWatch Logs, a JSON-protocol API, answers the same refusal
+    AccessDeniedException, so seed S3's test passes that code, and no other seed's does (M05 PR 3; cold review
+    F2: widening every seed would let an S2 or S6 entry carry an answer its API never gives)."""
     message = (entry.get("message") or "").lower()
-    return entry.get("result") == "AccessDenied" and bool(entry.get("request_id")) and by in message
+    return entry.get("result") in codes and bool(entry.get("request_id")) and by in message
 
 
 # --- S1: curl to the internet -------------------------------------------------
@@ -108,15 +112,13 @@ def test_s2_a_write_to_another_agents_prefix_was_refused():
 # --- S3: logs:DeleteLogStream --------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S3 is attempted after M05 PR 2's merge deploy, read at PR 3 (SPEC/05 §5.1)")  # fmt: skip
 def test_s3_deleting_its_own_log_stream_was_refused():
     """As refagent's stand-in, `logs:DeleteLogStream` on the runtime's own log stream. The boundary
     denies `logs:Delete*` today and PR 2 adds the role's own deny; both are explicit, so this reads
     "refused and recorded", and the record in the security account is what is new (SPEC/05 §3.8)."""
     run = run_file("f5_3_logs.yaml", "S3")
     for attempt, entry in made(run):
-        assert denied(entry, by="explicit deny"), f"{attempt['what']}: {entry}"
+        assert denied(entry, by="explicit deny", codes=("AccessDeniedException",)), f"{attempt['what']}: {entry}"
 
 
 # --- S4: a call chain at depth 3 ----------------------------------------------
@@ -248,7 +250,9 @@ AGENT_ROLE_PATH = ":role/agentkeel/agents/"  # refagent's own role, by the path 
 
 
 @pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S7 is attempted after M05 PR 2's merge deploy, read at PR 3 (SPEC/05 §5.1)")  # fmt: skip
+                   reason="S7 was attempted at M05 PR 3 and refagent never reached its model: the deny-all refuses "
+                          "the table read first, so no model call is recorded (stated before the attempt, "
+                          "runs/f5_7_quarantine.yaml). The marker stays: the finding, not a seed read")  # fmt: skip
 def test_s7_after_the_quarantine_the_agents_own_role_cannot_call_its_model():
     """Quarantine refagent, then invoke its runtime: the model call refagent's OWN role makes must be
     refused by the quarantine's deny (F5.4 as restated at M05 PR 1; SPEC/05 §4). The entry records

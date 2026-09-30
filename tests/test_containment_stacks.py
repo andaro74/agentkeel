@@ -119,17 +119,12 @@ def test_the_read_role_reads_three_prefixes_and_the_put_role_trusts_main_only(se
     assert all(r.get("PermissionsBoundary") for r in both.values())
 
 
-def test_the_standin_is_assumed_with_mfa_and_carries_the_constructs_denies(audit):
-    from infra.construct.governed_agent import AGENT_DENIES
-
-    (standin,) = [r for r in roles(audit).values() if r["RoleName"] == "agentkeel-refagent-standin"]
-    trust = standin["AssumeRolePolicyDocument"]["Statement"][0]
-    assert trust["Principal"] == {"AWS": f"arn:aws:iam::{AGENT}:user/hector.acevedo"}
-    assert trust["Condition"] == {"Bool": {"aws:MultiFactorAuthPresent": "true"}}
-    assert standin["Path"] == "/agentkeel/agents/"
-    (policy,) = [p for p in of_type(audit, "AWS::IAM::Policy") if "Standin" in json.dumps(p["Roles"])]
-    (deny,) = [s for s in policy["PolicyDocument"]["Statement"] if s["Effect"] == "Deny"]
-    assert set(deny["Action"]) == set(AGENT_DENIES), "infra/audit/ repeats the construct's list; the two must agree"
+def test_the_standin_is_gone_once_s2_and_s3_are_read(audit):
+    """Security's constraint on M05 PR 2: the stand-in is deleted once S2 and S3 are read. S3 was read at M05 PR 3
+    (5a5fe1e), so the stack makes no stand-in role and no policy for one. Until then this test held its MFA trust
+    and that its denies equal the construct's (M05 PR 2, cold review F4); git log -p shows that version."""
+    assert not [r for r in roles(audit).values() if r["RoleName"] == "agentkeel-refagent-standin"]
+    assert not [p for p in of_type(audit, "AWS::IAM::Policy") if "Standin" in json.dumps(p.get("Roles"))]
 
 
 def test_the_quarantine_denies_everything_and_is_attached_to_nothing(audit):

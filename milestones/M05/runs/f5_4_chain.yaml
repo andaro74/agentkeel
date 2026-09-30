@@ -25,6 +25,12 @@
 # (the runtime's answer, verbatim). Amended at M05 PR 2, before the attempt:
 # the call is found in the trail by its session id, which the trail records
 # and the runtime is handed, not by a request id the CLI does not print.
+# Corrected at M05 PR 3, on its first run and the audit bucket's record: the
+# trail records the session id only in `responseElements`, and a call the
+# runtime refused has none. S4's record (02:07:06Z, RuntimeClientError,
+# request 342eefbc-499f-4983-8dbf-78878a941d15) carries no session id; the
+# observer finds it as the one invocation by the caller within two minutes
+# of `at`. The runtime was handed the id: the refusal event is keyed by it.
 seed: S4
 falsifiers: [F5.1, F5.2]
 principal: the human, with InvokeAgentRuntime on refagent's runtime
@@ -34,4 +40,17 @@ attempts:
     command: aws bedrock-agentcore invoke-agent-runtime --agent-runtime-arn <refagent runtime> --runtime-session-id <session id> --payload fileb://tests/fixtures/m05/s4-depth3-request.json out.json
     refused_when: the answer is a refusal naming the depth, and the agent role made no model call for it
     recorded_when: the trail's InvokeAgentRuntime record and refagent's refusal event, each an object in the audit bucket within N of the call's eventTime
-observed: null
+observed:
+  # Made 2026-09-30 by the human (hector.acevedo, admin), after M05 PR 2's merge deploy (run 36657429406; runtime
+  # version 6, AGENTKEEL_CEILING_DEPTH 2). AgentCore passes the container's 403 to the caller as a
+  # RuntimeClientError and drops its body, so the caller never sees the refusal's `recorded` field; no out file
+  # was written. refagent's log (stream 9d4cae76-af77-4b5c-b379-6e2f7213a3ed) has "POST /invocations HTTP/1.1"
+  # 403 at 02:07:06.801Z and no other invocation near it; the agent account's event history has no Converse by any
+  # principal from 02:00Z (read 2026-09-30). Whether the refusal event reached the audit bucket is PR 3's run's
+  # reading (Unsure F with it).
+  - what: invoke refagent's runtime with a chain of two callers before it
+    event_name: InvokeAgentRuntime
+    session_id: m05-s4-20260930T020652Z-863984448da3
+    at: '2026-09-30T02:06:56Z'
+    result: 'An error occurred (RuntimeClientError) when calling the InvokeAgentRuntime operation: Received error (403) from runtime. Please check your CloudWatch logs for more information.'
+    runtime_log: '"POST /invocations HTTP/1.1" 403 at 2026-09-30T02:07:06.801Z'

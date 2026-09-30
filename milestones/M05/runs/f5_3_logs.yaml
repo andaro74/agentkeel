@@ -27,4 +27,18 @@ attempts:
     command: aws logs delete-log-stream --log-group-name /aws/bedrock-agentcore/runtimes/<refagent runtime>-DEFAULT --log-stream-name <a stream>
     refused_when: AccessDenied with an explicit deny, and the stream still there
     recorded_when: the trail's DeleteLogStream record for the request id is an object in the audit bucket within N of its eventTime
-observed: null
+observed:
+  # Made 2026-09-30 by the human as the stand-in (profile agentkeel-standin, MFA), after M05 PR 2's merge
+  # deploy (run 36657429406). The stream was still there afterwards (describe-log-streams, same name).
+  # The CLI answers with the Logs API's JSON code, AccessDeniedException. The session read the same request
+  # id in the agent account's CloudTrail event history on 2026-09-30: errorCode AccessDenied, the stand-in's
+  # role, the same message. The audit bucket's copy, which is what counts, is PR 3's run's reading.
+  - what: delete refagent's runtime log stream
+    event_name: DeleteLogStream
+    request_id: 84d28ed5-0fbc-44fd-88d2-f61198549a77
+    at: '2026-09-30T02:04:35Z'
+    log_stream: /aws/bedrock-agentcore/runtimes/refagent-Du2VJx6xWc-DEFAULT 2026/09/30/[runtime-logs]9d4cae76-af77-4b5c-b379-6e2f7213a3ed
+    principal: arn:aws:sts::581208540944:assumed-role/agentkeel-refagent-standin/botocore-session-1790733845
+    result: AccessDeniedException
+    message: 'User: arn:aws:sts::581208540944:assumed-role/agentkeel-refagent-standin/botocore-session-1790733845 is not authorized to perform: logs:DeleteLogStream on resource: arn:aws:logs:us-west-2:581208540944:log-group:/aws/bedrock-agentcore/runtimes/refagent-Du2VJx6xWc-DEFAULT:log-stream:2026/09/30/[runtime-logs]9d4cae76-af77-4b5c-b379-6e2f7213a3ed with an explicit deny in an identity-based policy'
+    stream_still_there: true

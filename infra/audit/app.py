@@ -31,7 +31,8 @@ What it makes, each named in SPEC/05 §6 before this file:
   human's admin user with MFA and by nothing else. It is not refagent: it
   carries refagent's denies, not refagent's grants, neither of which either
   attempt uses (SPEC/05 §8). Removed after S2 and S3 are read (`STANDIN`
-  below; Security's constraint on PR 2);
+  below; Security's constraint on PR 2): no longer made from M05 PR 3, and
+  deleted by the redeploy that follows it;
 - **the quarantine** (seed S7): `agentkeel-quarantine`, a policy that
   denies everything, attached to nothing. The human attaches it to
   refagent's own role with the one command `README.md` names, and detaches
@@ -77,9 +78,9 @@ BOUNDARY_NAME = "agentkeel-boundary"  # the agent plane's, the bootstrap stack's
 STANDIN_NAME = "agentkeel-refagent-standin"  # the security account's bucket policy names this role
 # Who may become the stand-in: the human's admin user in this account, with MFA (Unsure G on M05 PR 1).
 ADMIN = f"arn:aws:iam::{AGENT_ACCOUNT}:user/hector.acevedo"
-# True until seeds S2 and S3 are read (S3 after M05 PR 2's merge deploy, read at PR 3). The PR that
-# reads S3 sets it False and the human redeploys this stack, which deletes the role.
-STANDIN = True
+# True until seeds S2 and S3 were read: S2 by M05 PR 2's run (388dbcf), S3 by PR 3's (5a5fe1e, refused, 199 s).
+# False from M05 PR 3; the human redeploys this stack, which deletes the role and its policy (Security's constraint).
+STANDIN = False
 QUARANTINE_NAME = "agentkeel-quarantine"
 # Seed S1's origin (M05 PR 2): tried at 13:54:22Z, 2026-09-29, and removed once it had shown that no flow record
 # of S1 can exist in a VPC with no route out (rulings/pr2.md ruling 9). False deletes the function and its role.
@@ -235,6 +236,8 @@ SUPPRESSIONS = {
 for path, (rule, reason) in SUPPRESSIONS.items():
     if path.startswith("SeedS1Role/") and not S1_ORIGIN:
         continue  # the seed's role is not made once S1 is read
+    if path.startswith("Standin/") and not STANDIN:
+        continue  # nor the stand-in, once S2 and S3 are read (M05 PR 3)
     NagSuppressions.add_resource_suppressions_by_path(stack, f"AgentkeelAudit/{path}", [{"id": rule, "reason": reason}])
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

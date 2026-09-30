@@ -97,3 +97,24 @@ ENI's flow record, not from anything the shell prints. The environment was
 deleted and its ENI is gone. It is recreated for the real S1 attempt, and
 the new ENI id is recorded in `f5_1_curl.yaml`. refagent's runtime ENIs are
 10.20.0.190 and 10.20.1.157.
+
+## The stand-in deleted (M05 PR 3; Security's constraint on PR 2)
+
+S2 was read by M05 PR 2's run (`388dbcf`) and S3 by PR 3's first run
+(`5a5fe1e`), so `STANDIN = False` (`b465e09`). The human redeployed
+`infra/audit/` as `hector.acevedo` on 2026-09-30, after reading `cdk diff`.
+The diff showed exactly what `infra/audit/README.md` lists and nothing
+else: the stand-in's trust, its Deny `RefagentsExplicitDenies` and its two
+seed Allows removed; `[-]` the role `Standin5CE34DD4` and the policy
+`StandinDefaultPolicyCB21F6E8`; `[-]` the output `StandinRoleArn`.
+
+- The deploy started at 03:57:52Z. The policy was deleted at 03:57:59Z,
+  the role at 03:58:11Z, and the stack reached `UPDATE_COMPLETE` at
+  03:58:11Z. The outputs left are `FlowLogId`, `QuarantinePolicyArn` and
+  `TrailArn`.
+- At 03:58:19Z, `aws iam get-role --role-name agentkeel-refagent-standin`
+  answered `NoSuchEntity`.
+- Still in the security account's bucket policy: the Allow for the
+  stand-in's ARN under `agents/refagent/standin/*`, matched by name.
+  Carried to M06 (Security's ruling on PR 3, `security-reviewer` F2), from
+  this date.
