@@ -16,7 +16,9 @@ ADR-0002 (the baseline is frozen at tag `m00`; M00 PR 3) · ADR-0005
 it is committed in the next milestone's PR 1; M01 PR 1) · ADR-0006
 (the platform VPC has gateway endpoints for S3 and DynamoDB as well as
 interface endpoints; §8 M01; M01 PR 2) · Amended at M05 PR 1 (R5, §8
-M05, §10.3 row 05; `milestones/M05/rulings/pr1.md`)
+M05, §10.3 row 05; `milestones/M05/rulings/pr1.md`) · Amended at M06 PR 1
+(§5 R1's `validate` list, §6 seats, §8 M06 and M07, §10.3 row 06;
+`milestones/M06/rulings/pr1.md`)
 
 ## 1. What this is
 
@@ -136,7 +138,8 @@ approval. The mechanical gates are, exhaustively:
   immutable id format, `kind` enum) and ruling front matter (the §6
   fields present, `authorises` paths exist in the tree). From M01 PR 1,
   when their inputs exist: manifest schema, seats assigned to real
-  groups, CODEOWNERS ↔ manifest, edges two-sided, no cycles, ceilings
+  GitHub logins (amended at M06 PR 1 from "real groups": there is no IdP;
+  the check was never built before M06, SPEC/06 §3.3), CODEOWNERS ↔ manifest, edges two-sided, no cycles, ceilings
   within bounds, cdk-nag, workflow file hash unchanged;
 - `signature` — bundle cosign-verified, digest matches manifest;
 - `ruling-cited` — a PR touching a seat-owned path cites a ruling in
@@ -222,7 +225,8 @@ by hand; M00 itself opens and closes without them.
 ## 6. Artifacts
 
 - **Manifest** (`manifest.yaml`): model id + version, guardrail id +
-  version, judge model id, seats → IdP groups, `may_call`,
+  version, judge model id, seats → GitHub logins (amended at M06 PR 1
+  from IdP groups; SPEC/06 §2), `may_call`,
   `may_be_called_by`, endpoint allowlist, ceilings (concurrency, per-edge
   rps, depth 2, fan-out 3), `max_tokens_per_session`, `daily_usd`,
   memory (retention, ttl, per_user), `data_class` (informational in the
@@ -487,6 +491,18 @@ the cached-answer seed, F3.5's second half ("or changes an answer") and
 `g-014` counted as a plant; the FRAGILE state. The knowledge base has
 moved twice (M01, M03 open, M04 open); moving it again is an amendment
 here, not a cut.
+Amended at M06 PR 1 (`milestones/M06/rulings/pr1.md`; SPEC/06 §9, §10;
+`milestones/M06/feasibility.md` §2). **The knowledge base, with the
+cached-answer seed, F3.5's second half and `g-014` as a plant, moves to
+M07: its fourth move** (M01 → M03, M03 → M04, M04 → M06, M06 → M07; the
+sentence above counts three moves as "twice"). A finding, not a cut: it
+feeds no M06 falsifier. **FRAGILE moves to M07** with the judge. The
+required workflow is a required status check bound to a platform-owned
+GitHub App (`integration_id`), since GitHub documents the `workflows`
+rule for Enterprise Cloud only; F6.1 reads "mergeable", F6.2 "merged
+without the platform's check having run and passed". A third cut, after
+Act 3: `docs/developer/manifest.md`, `goldens.md` and `edges.md` to
+M07.
 
 ### M07 — Upgrade, retire, surfaces
 Build: `make upgrade` / `agent upgrade`; `platform-upgrade` draft PRs on
@@ -513,6 +529,10 @@ Bedrock Evaluations judge pinned in the manifest, its rubric, the
 graded-examples set it must reproduce and `model-watch` over it (R6);
 `admitted_false_fails.json`; the Braintrust mirror with its divergence
 check and redaction before upload; the cheaper swap's run if M04 cut it.
+Received at M06 PR 1 (`milestones/M06/rulings/pr1.md`): the Bedrock
+Knowledge Base and refagent's retrieval, the cached-answer seed, F3.5's
+second half and `g-014` as a plant (the knowledge base's fourth move, a
+finding); FRAGILE; and, if M06 takes them, its cuts (SPEC/06 §9).
 
 ### M08 — Game-day drill
 Claim 8 above. **Zero new code paths** (ADR ruling at PR 1); any needed
@@ -748,7 +768,7 @@ finding on camera is the point.
 | 03 | It can't get worse quietly | A test that used to pass and now fails stops the change from merging; every attack we planted must be caught, or the change stops; a contract nobody signed never reaches the documents the agent will be given to read. |
 | 04 | Changing the model is tested, or it's blocked | When a team switches the agent to a different model, the switch is tested on its own proposal before it can go in; if a test that used to pass now fails, or answers get much slower, it can't go in. |
 | 05 | The agent stays in its box | An agent is stopped from reaching the internet, writing to another agent's files, or deleting its own logs, and each attempt is recorded in a separate account it cannot change. |
-| 06 | A team can do this in a day | Marketing creates a governed agent from the template, without touching the safety pipeline. |
+| 06 | A team can do this in a day | One developer creates an agent from the template and ships it in a day, without touching the safety pipeline. (Amended at M06 PR 1; it read "Marketing creates a governed agent from the template, without touching the safety pipeline.") |
 | 07 | Upgrades come to you | A new platform version, a new model, or a retirement arrives as a PR; the team never edits the pipeline. |
 | 08 | We rehearsed the bad day | A hostile agent tried six things; all six were stopped, recorded, and recovered from. |
 
