@@ -119,6 +119,24 @@ SEEDS_M05: dict[str, tuple[str, str, str]] = {
     "S7": ("F5.4", "milestones/M05/runs/f5_7_quarantine.yaml", "infra/audit/"),
 }
 
+# Claim 6's seeded cases (SPEC/06 section 5), the same shape. Listed at M06
+# PR 1, one seed per commit. S1a, S1b and S4 are fixtures read in a worktree
+# of HEAD by `validate` (S4 also by `build`); S2 and S3 are run files the
+# human fills, read by the observer that lands at M06 PR 2 and made after its
+# merge (SPEC/06 section 5.1). S1a's and S1b's reader is a check added to a
+# folder already in the tree (src/validate/), so `make plants` says "in the
+# tree" beside them, as it did for M03's and M04's: the strict markers, not
+# this list, say whether a seed is read. S4 names two readers in one string,
+# which `make plants` looks up as one path and reports as not in the tree.
+# Listing them reads nothing and gates nothing.
+SEEDS_M06: dict[str, tuple[str, str, str]] = {
+    "S1a": ("F6.1", "tests/fixtures/m06/s1a-unassigned-seat/", "src/validate/"),
+    "S1b": ("F6.1", "tests/fixtures/m06/s1b-no-goldens/", "src/validate/"),
+    "S2": ("F6.2", "milestones/M06/runs/f6_2_standin.yaml", "scripts/observe_template.py"),
+    "S3": ("F6.1, F6.3", "milestones/M06/runs/f6_3_quickstart.yaml", "scripts/observe_template.py"),
+    "S4": ("F6.4", "tests/fixtures/m06/s4-panel1/", "src/validate/, src/verdict/build.py"),
+}
+
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
 SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/01 section 5", SEEDS),
@@ -126,6 +144,7 @@ SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/03 section 5", SEEDS_M03),
     ("SPEC/04 section 5", SEEDS_M04),
     ("SPEC/05 section 5", SEEDS_M05),
+    ("SPEC/06 section 5", SEEDS_M06),
 ]
 
 

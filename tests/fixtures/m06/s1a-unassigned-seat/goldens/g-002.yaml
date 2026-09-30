@@ -1,0 +1,11 @@
+id: g-002
+kind: trap
+question: The east hall is free on 2026-11-07; can Lantern Harbor's second screening go there?
+expected:
+  table_row: pd-002
+  clause_id: PD-1.2
+  answer_fields:
+    available: false
+seat: data-owner
+added: M06
+retired: null

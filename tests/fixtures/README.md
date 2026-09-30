@@ -195,3 +195,26 @@ tests. One name, recorded: S6's run file lists the lock's action as
 `s3:PutObjectLockConfiguration`, the API's name; the IAM action a policy
 names is `s3:PutBucketObjectLockConfiguration`, and that is the one the
 audit bucket's policy denies (`infra/security/app.py`).
+
+## M06 (SPEC/06 section 5)
+
+Committed at M06 PR 1, one commit per seed, each with its test in
+`tests/test_m06_seeds.py`, before any code that reads them. Each test is
+`xfail(strict=True, raises=...)` until its reader lands or its attempt is
+made, asserts the planted reason, and was run once with `--runxfail` and
+its message read. Nothing here reaches `evals/history/`, calls AWS, calls a
+model or calls GitHub.
+
+The code seeds are agent folders and panel data for a fictional agent,
+`premiere-desk`, which each test copies into a worktree of HEAD. The
+attempt seeds are run files under `milestones/M06/runs/`, each the attempt
+to make with `observed: null`, made after M06 PR 2 merges (SPEC/06
+section 5.1).
+
+| Seed | File | What is wrong with it |
+|---|---|---|
+| S1a | `m06/s1a-unassigned-seat/` | an agent folder as the template ships it: `manifest.yaml` schema-valid with all seven seats `null`, and one ordinary and one trap golden citing the agent's own `data/`. Placed at `agents/premiere-desk/`, `validate` over the tree is green: no check reads a seat's value |
+| S1b | `m06/s1b-no-goldens/` | the same agent folder with every seat `andaro74` and an empty `goldens/` (a `.gitkeep` only, since Git keeps no empty folder). Placed at `agents/premiere-desk/`, `validate` over the tree is green: nothing asks an agent to bring goldens |
+| S2 | `milestones/M06/runs/f6_2_standin.yaml` | a pull request in an agent repository whose own workflow adds a job named as the platform check and drops the request to `agentkeel`, not yet attempted. There is no agent repository; in `agentkeel` today the same shape is answered by the pull request's own files (`infra/ruleset/main.json` requires checks by name, no `integration_id`) |
+| S3 | `milestones/M06/runs/f6_3_quickstart.yaml` | the timed quickstart by `floresinnovations` (id 336113686), not yet made; its preparation recorded, the agent's name not yet stated. There is no template and no quickstart |
+| S4 | `m06/s4-panel1/` | `dashboard.json`, a dashboard whose panel 1 merges the registry with a static list naming `ghost-agent`; `frame.json`, panel 1's rows as Grafana's `/api/ds/query` returns them, naming `refagent` and `ghost-agent`; `registry.json`, a registry scan naming `refagent` only. Two tests, one per reader (finding 10's rule): placed at `infra/grafana/panel1.json` the dashboard passes `validate`, and `build` has no `panel_not_in_registry` to find `ghost-agent`. The data source types are placeholders until Security reads where Grafana runs (SPEC/06 section 11) |
