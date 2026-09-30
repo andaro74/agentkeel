@@ -180,3 +180,11 @@ opens and before any seed.
   email with command-line pushes that expose it blocked, and no token,
   SSH key or authorised app. Both go into S3's run file as preparation
   when S3 is planted.
+  **Amended the same day:** the human upgraded `andaro74` to GitHub Pro
+  on 2026-09-30, so the author holds one free account and one paid one,
+  which the terms' limit ("One person or legal entity may maintain no
+  more than one free Account", section B) does not forbid. The plan is
+  the human's word: `gh api user` returns no plan field to this token.
+  It must stay paid until M06 closes. The rest of the risk stands:
+  GitHub may still suspend an account under its other terms, with the
+  consequence above.
