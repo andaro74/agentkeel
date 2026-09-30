@@ -294,3 +294,48 @@ the report's):
   deferral), read the registry with a data source that is not a custom
   plugin, and at what cost against SPEC/00 §14. If any answer is no, F6.4's
   live half is recorded as unread and row 6 says so; panel 1 is not cut.
+
+**The remaining items, ruled by the human, 2026-09-30, "as proposed":**
+
+- **FINDING 6 (Product; Engineering).** F6.1 reads: the first pull request
+  in an agent repository is mergeable while a seat is unassigned or its
+  goldens are under the minimum. The observer records that pull request's
+  required checks and `mergeable_state`; `build` rules on them.
+- **FINDING 11 (Engineering).** S4 plants the panel's source as well: its
+  fixture carries a dashboard JSON whose panel 1 query names a second
+  source beside the registry. `validate` refuses a panel 1 query that
+  names anything but the registry (PR 2).
+- **FINDING 12 (Security).** PR 2 assigns the seats in both manifests,
+  refagent's and ratings-helper's; SPEC/06 §7 says so.
+- **FINDING 13 (Product).** SPEC/00 §10.3 row 06 is amended in this PR:
+  "One developer creates an agent from the template and ships it in a
+  day, without touching the safety pipeline." The title stays.
+- **FINDING 14 (Product).** Act 1 is recorded during S3's timed run; Act
+  2 at the close, against M02's pull requests. A third cut, after panel
+  2: the four `docs/developer/` pages other than the quickstart
+  (`manifest.md`, `goldens.md`, `edges.md`) to M07. `docs/refagent/` stays
+  never-cut.
+- **FINDING 15 (Product; Data Owner).** FRAGILE moves to M07 by a SPEC/00
+  §8 amendment in this PR, not a cut. Act 3 stays second in the order and
+  is taken only if the cap is threatened.
+- **FINDING 16 (Product; Security; Engineering).** The registry's write
+  step is Security's (`.github/workflows/`). The signing identity's
+  constant moves from `src/bundle/verify.py` to a Security-owned file
+  under `infra/` at PR 2. The dashboard is Security's, at
+  `infra/grafana/panel1.json` (`infra/**` is Security's in SPEC/00 §5).
+  The template's source lives in the template repository only; nothing
+  under a path with no seat in `agentkeel`.
+- **FINDING 17 (Security).** `open.md` row 8 closes for agent repositories
+  through BLOCK 1's App check and carries to M07 for `agentkeel` itself,
+  named in SPEC/06 §8 as a gap.
+- **FINDING 18 (Security).** The organisation-wide deploy trust and
+  `verify`'s second identity are listed in SPEC/06 §8 as controls with no
+  seeded case at M06; no seed is added (the cap, FINDING 14).
+- **NOTE 21 (Product).** The SPEC/00 §8 amendment counts the knowledge
+  base's moves correctly (four) and moves `open.md` rows 11, 18, 21, 22,
+  23 and 24 with it.
+- **NOTE 22 (Product).** SPEC/06 §5.1: PR 3 is the read of S2, S3 and S4's
+  live half and cannot be skipped, whatever PR 2's cold review finds.
+
+Every BLOCK, FINDING and NOTE of §1 is ruled. SPEC/06 is revised once on
+all of them (§2.5).
