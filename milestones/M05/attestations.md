@@ -40,7 +40,7 @@ twice to the records AWS wrote (PR 2: `388dbcf`; PR 3: `17675d6`,
 it, and none moved N or a falsifier. At the close the seed tests read 5
 passed and 2 xfailed, S1 and S7, each with its finding as its reason.
 
-Signed: ____________  Date: ________
+Signed: andaro74  Date: 2026-09-30
 
 ---
 
@@ -64,7 +64,7 @@ enabled when read on 2026-09-28, and nothing stops it being enabled); that
 the bucket policy no longer names the stand-in (it does, `M06/open.md` row
 2); and any control in SPEC/05 §8 that no seed attempted.
 
-Signed: ____________  Date: ________
+Signed: andaro74  Date: 2026-09-30
 
 ---
 
@@ -77,7 +77,7 @@ standard was not bent to fit, and no other kind of record stood in for the
 missing ones. The worst recorded latency at the reading was 307 s.
 Whether 600 s holds for flow logs is unread (`M06/open.md` row 41).
 
-Signed: ____________  Date: ________
+Signed: andaro74  Date: 2026-09-30
 
 ---
 
@@ -93,4 +93,4 @@ and Unsure item of M05 is closed, ruled, or in `milestones/M06/open.md`
 with a seat and a milestone. Nothing in this milestone is described as
 governed, secure or proven.
 
-Signed: ____________  Date: ________
+Signed: andaro74  Date: 2026-09-30

@@ -22,8 +22,7 @@ pr: 33
 
 # Cold review: M05 PR 4 (the close)
 
-Drafted by engineering-cold-reviewer and completed by the session for
-Engineering, 2026-09-30. Not ruled.
+Ruled by andaro74 as Engineering, 2026-09-30, as written.
 
 `engineering-cold-reviewer` read `git diff 78bf4ac...0c0f1ad` (8 files,
 six commits, none under `evals/history/`) and row 5, not the PR body or

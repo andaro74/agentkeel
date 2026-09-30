@@ -30,7 +30,7 @@ pr: 33
 
 # Ruling: M05 PR 4, Product
 
-Drafted by the session for Product, 2026-09-30. Not ruled.
+Ruled by andaro74 as Product, 2026-09-30, as written.
 
 ## 1. What this PR is
 
