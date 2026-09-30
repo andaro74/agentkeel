@@ -164,7 +164,7 @@ BLOCK: 3 · FINDING: 16 · NOTE: 4
 
 ## 2. Rulings on the report
 
-Pending but for BLOCKs 2 and 3 and NOTE 23. Each BLOCK is ruled, with its
+The three BLOCKs and NOTE 23 are ruled; the findings are pending. Each BLOCK is ruled, with its
 seat, before the PR opens and before any seed.
 
 - **BLOCK 1, Security's read (2026-09-30), ruling pending.** The human
@@ -183,6 +183,31 @@ seat, before the PR opens and before any seed.
   the organisation's ruleset API answering for a `workflows` rule would
   settle it. Before (c) is written, a fourth option is put to the human,
   since (c) leaves F6.2 unmeasured and row 6 cannot then be GREEN.
+  **Ruled by the human as Security and Product, 2026-09-30: option (d).**
+  Neither (b) nor (c), and no paid plan: a personal plan does not change
+  what an organisation can do, and Enterprise Cloud, the one plan the
+  rule is documented on, is a monthly cost against SPEC/00 §14's target
+  for as long as the control must hold (to M08). (d): each agent
+  repository's default branch carries a ruleset whose required status
+  check names an `integration_id`, a GitHub App the platform owns, so a
+  check of that name posted by the GitHub Actions app (any job in the
+  pull request's own workflow files) does not satisfy it. The check is
+  posted by a workflow in `agentkeel` that runs from `main`, evaluates the
+  pull request's head, and holds the App's key (Security). If the run is
+  never asked for, no check arrives and the pull request stays blocked.
+  Only an organisation owner edits the ruleset; the developer has write.
+  **Security's read of (d), 2026-09-30:** GitHub's REST reference for
+  repository rules (`docs.github.com/en/rest/repos/rules`) gives each
+  required status check an `integration_id`, "The optional integration
+  ID that this status check must originate from"; rulesets are available
+  "in public repositories with GitHub Free and GitHub Free for
+  organizations" (`about-rulesets`). The documentation, not an attempt:
+  the first ruleset made in PR 2 is exported and read back by `validate`,
+  as `main`'s is. What (d) adds to PR 2 (FINDING 14): the App, its key
+  in `agentkeel`'s secrets, and the trigger from an agent repository's
+  pull request to `agentkeel`'s workflow. It answers `open.md` row 8 for
+  agent repositories (the reader runs from `agentkeel`'s `main`), not for
+  `agentkeel` itself (FINDING 17).
 - **BLOCK 2, ruled by the human as Security and Product, 2026-09-30, as
   proposed.** F6.2 reads: a pull request in an agent repository merged
   without the platform's workflow having run on it and passed. S2's
