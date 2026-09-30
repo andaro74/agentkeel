@@ -176,3 +176,18 @@ def test_s2_a_stand_in_for_the_platform_check_was_refused():
     run = run_file("f6_2_standin.yaml", "S2")
     observed = made(run)
     assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
+
+
+# --- S3: the timed quickstart ----------------------------------------------------
+
+
+@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3 is timed after M06 PR 2 merges (SPEC/06 §5.1)")
+def test_s3_the_timed_quickstart_was_made():
+    """The second developer runs the quickstart once, from the repository's created_at to the last of
+    its four records (F6.3), with the first pull request refused on its planted reasons (F6.1's live
+    half). Read by PR 3's run from GitHub, AWS and Grafana, and ruled on by build, not by this test."""
+    run = run_file("f6_3_quickstart.yaml", "S3")
+    holds("336113686" in str(run.get("principal")), "S3 names the second developer's account by id")
+    observed = made(run)
+    assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
+    assert run.get("agent_name"), "seed S3: the agent's name was not stated before the run"

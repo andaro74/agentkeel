@@ -1,0 +1,41 @@
+# Seed S3 (SPEC/06 §5, F6.1's live half and F6.3): the timed quickstart.
+#
+# Planted at M06 PR 1 as the attempt to make, `observed: null`. It is made
+# once, after M06 PR 2 merges, after the owner has read that the template
+# works from a test repository of the owner's (SPEC/06 §2) and after S2,
+# and is read by PR 3's run (SPEC/06 §5.1). Act 1 is the unedited screen
+# capture of this run (finding 14).
+#
+# The clock (SPEC/06 §1; finding 8): from the agent repository's
+# `created_at` (the owner creates it from the template; finding 4) to the
+# last of four records: the first pull request's refusal and merge, the
+# platform's deploy run completed, the agent's answer to one of its own
+# goldens in an envelope `build` wrote, and the registry row with panel 1's
+# row. Every time is GitHub's or AWS's, never one written here. The bar is
+# `quickstart.max_seconds` (28,800 s, wall clock, breaks not subtracted),
+# in `thresholds.yaml` from PR 2.
+#
+# The human fills `observed` with the repository, the first pull request's
+# number and the agent's name. PR 3's run looks each record up
+# (`scripts/observe_template.py`); `build` rules on them. A human-written
+# file feeds no reading by itself (SPEC/06 §4). A repository deleted during
+# the attempt is recorded here, never replaced by a later one (finding 4).
+# A second timing is a second attempt, recorded beside the first; the first
+# is the measured value.
+seed: S3
+falsifiers: [F6.1, F6.3]
+principal: floresinnovations (id 336113686), write on the agent repository only, on a fresh Windows user profile with no AWS credentials
+# Preparation, before `created_at` and not timed (milestones/M06/feasibility.md
+# section 2, NOTE 23): the account, created 2026-09-30T14:09:05Z on the fresh
+# profile (GitHub's record); two-factor on, email private with command-line
+# pushes that expose it blocked, no token, SSH key or authorised app (the
+# human's word, 2026-09-30). Nothing else is prepared: not the template, the
+# quickstart, a manifest or a golden. What is installed on the profile is
+# listed and pushed before the run (open.md row 17).
+agent_name: null  # fictional; named by Product in a pushed commit before the run
+attempts:
+  - what: the quickstart end to end, as docs/developer/quickstart.md gives it
+    command: create from the template (the owner) -> fill the manifest -> the first pull request, refused on an unassigned seat and on goldens under the minimum -> assign the seats and add the goldens -> merged -> deployed by the platform -> the agent answers one of its own goldens -> the registry and panel 1 list it
+    refused_when: the first pull request is not mergeable while a seat is unassigned or the goldens are under the minimum (F6.1)
+    recorded_when: PR 3's run reads created_at and the last of the four records, and the difference is at most quickstart.max_seconds (F6.3)
+observed: null
