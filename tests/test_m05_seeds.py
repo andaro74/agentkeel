@@ -251,7 +251,9 @@ AGENT_ROLE_PATH = ":role/agentkeel/agents/"  # refagent's own role, by the path 
 
 
 @pytest.mark.xfail(strict=True, raises=AssertionError,
-                   reason="S7 is attempted after M05 PR 2's merge deploy, read at PR 3 (SPEC/05 §5.1)")  # fmt: skip
+                   reason="S7 was attempted at M05 PR 3 and refagent never reached its model: the deny-all refuses "
+                          "the table read first, so no model call is recorded (stated before the attempt, "
+                          "runs/f5_7_quarantine.yaml). The marker stays: the finding, not a seed read")  # fmt: skip
 def test_s7_after_the_quarantine_the_agents_own_role_cannot_call_its_model():
     """Quarantine refagent, then invoke its runtime: the model call refagent's OWN role makes must be
     refused by the quarantine's deny (F5.4 as restated at M05 PR 1; SPEC/05 §4). The entry records
