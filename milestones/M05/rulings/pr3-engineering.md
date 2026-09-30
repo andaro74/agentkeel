@@ -5,7 +5,12 @@
 ruling: pr3-engineering
 seat: Engineering
 authorises:
+  - src/verdict/containment.py
+  - scripts/observe_containment.py
   - tests/test_m05_seeds.py
+  - tests/test_m05_readers.py
+  - tests/test_observe_containment.py
+  - tests/test_containment_stacks.py
 evidence:
   - SPEC/00-overview.md#8-M05
   - SPEC/05-containment-and-evidence.md
@@ -27,7 +32,23 @@ Drafted by the session, 2026-09-30. Not ruled.
 answer CloudWatch Logs (a JSON-protocol API) gives for the refusal S3 and
 IAM call `AccessDenied`; no other seed's test does. S3's marker is off.
 S7's stays, with the finding as its reason (`rulings/pr3.md` ruling 1).
-`containment.py`, which reads the trail, is unchanged.
+That change reads the human's file only; `containment.py` reads the trail.
+
+After the first run (`5a5fe1e`), three repairs, each its own commit:
+
+- `src/verdict/containment.py` (`17675d6`): S4's refusal event is
+  refagent's when each writer is refagent's role by its ARN or by its
+  unique id with a session, `AROAYOUV2Q4IB5XHNMPGI:` (`iam get-role`,
+  2026-09-30). The stand-in's id and the id as a substring are refused
+  (tests).
+- `scripts/observe_containment.py` (`f50e493`): an invocation is found by
+  its session id in `requestParameters` or `responseElements`; failing
+  that, as the one `InvokeAgentRuntime` on refagent's runtime by the caller
+  within two minutes of the run file's `at`. Two is a mismatch, none is
+  unrecorded; the record's own time is read (tests, from the two real
+  records' shapes).
+- `tests/test_containment_stacks.py` (`d703c48`): the audit stack makes no
+  stand-in, with `STANDIN = False` (Security's `b465e09`).
 
 ## What was read
 
