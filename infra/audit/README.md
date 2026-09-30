@@ -45,5 +45,16 @@ that role from the trail before it reads anything else (SPEC/05 §6).
 
 ## Removing the stand-in
 
-Once seeds S2 and S3 are read, `STANDIN = False` in `app.py`, and the human
-redeploys this stack: the role is deleted.
+Once seeds S2 and S3 are read, `STANDIN = False` in `app.py` (M05 PR 3), and
+the human redeploys this stack: the role is deleted. `cdk diff` must show
+only these, all removed, and nothing else:
+
+- `[-] AWS::IAM::Role` Standin and `[-] AWS::IAM::Policy` StandinDefaultPolicy;
+- in the IAM statement changes: the trust (`hector.acevedo` with
+  `aws:MultiFactorAuthPresent`), the Deny `RefagentsExplicitDenies`, the
+  Allows `SeedS2PutAnywhereInTheAuditBucket` and `SeedS3DeleteARuntimeLogStream`;
+- `[-]` the output `StandinRoleArn`.
+
+A change to the trail, the flow log, the quarantine or any other stack is a
+stop. After the deploy, `aws iam get-role --role-name agentkeel-refagent-standin`
+answers `NoSuchEntity`, recorded in `milestones/M05/runs/`.

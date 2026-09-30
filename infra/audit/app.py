@@ -31,7 +31,8 @@ What it makes, each named in SPEC/05 §6 before this file:
   human's admin user with MFA and by nothing else. It is not refagent: it
   carries refagent's denies, not refagent's grants, neither of which either
   attempt uses (SPEC/05 §8). Removed after S2 and S3 are read (`STANDIN`
-  below; Security's constraint on PR 2);
+  below; Security's constraint on PR 2): no longer made from M05 PR 3, and
+  deleted by the redeploy that follows it;
 - **the quarantine** (seed S7): `agentkeel-quarantine`, a policy that
   denies everything, attached to nothing. The human attaches it to
   refagent's own role with the one command `README.md` names, and detaches
