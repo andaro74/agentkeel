@@ -126,5 +126,19 @@ Written at M05 PR 1 open. The row in `milestones/README.md` is the one
   `agentkeel-quarantine`; the event history shows no Converse from 02:10Z,
   and refagent's log has no line while the quarantine held. F5.4 as restated reads a model call; there
   is none, and no other call stands in for it. S7's marker stays, as S1's.
-- **This PR's run** reads S3, S4 and S7 in the audit bucket: pending.
+- **This PR's first run** (`5a5fe1e`) read S3 refused (199 s) and S7 as
+  stated, and misread S4 twice: its refusal event's writer named by
+  refagent's role id, and the call's record, which CloudTrail writes with
+  no session id when the runtime refuses the call. Both readers repaired
+  to the records AWS wrote (`17675d6`, `f50e493`, `01b40f5`); neither
+  moves a standard.
+- **This PR's second run** (`28634e9`, run 36666223908): refagent GREEN
+  in `mode: runtime`; S2, S3, S4 and S6 refused and recorded within N (S4
+  307 s, `alarm_latency_s` 307); S1 and S7 not shown refused and
+  unrecorded, each for the reason stated before it. Row 5 reads RED on S1
+  and S7 alone.
+- **The stand-in deleted** (`STANDIN = False`, `b465e09`): the human
+  redeployed `infra/audit/`, role gone at 03:58:11Z (`runs/security_account.md`).
+  Its grant by name in the security account's bucket policy is carried to
+  M06 (Security).
 
