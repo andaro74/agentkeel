@@ -164,5 +164,19 @@ BLOCK: 3 · FINDING: 16 · NOTE: 4
 
 ## 2. Rulings on the report
 
-Pending. Each BLOCK is ruled, with its seat, before the PR opens and
-before any seed.
+Pending but for NOTE 23. Each BLOCK is ruled, with its seat, before the PR
+opens and before any seed.
+
+- **NOTE 23, ruled by the human as Product and Security, 2026-09-30.** The
+  risk is accepted: the second developer's account is a second free
+  personal account held by the author, and GitHub may suspend it. If it is
+  suspended before S3 is made, F6.3 is unread and row 6 goes RED on it; no
+  other account is substituted without a new ruling. The account is
+  `floresinnovations`, id 336113686, `created_at` 2026-09-30T14:09:05Z,
+  created on the fresh Windows profile. Read from GitHub on 2026-09-30
+  (`gh api users/floresinnovations`): 0 public repositories, 0 gists, 0
+  public organisations, 0 public events. The human states, and GitHub's
+  public record cannot show, that the account has two-factor on, a private
+  email with command-line pushes that expose it blocked, and no token,
+  SSH key or authorised app. Both go into S3's run file as preparation
+  when S3 is planted.
