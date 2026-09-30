@@ -24,7 +24,7 @@ pr: 32
 
 # Ruling: M05 PR 3, Engineering, with the cold review
 
-Drafted by the session, 2026-09-30. Not ruled.
+Ruled by andaro74 as Engineering, 2026-09-30, as written.
 
 ## What changed
 
