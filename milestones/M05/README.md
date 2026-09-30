@@ -177,7 +177,8 @@ from the audit bucket at 03:53:18Z:
 S5 is a fixture: its reader, `build`, fails the answer that repeats the key
 (`F5_1`); its live half is cut 1, M06.
 
-**PR 3's findings, each a reader repaired to the record AWS wrote.**
+**PR 3's findings: two readers and one test, each repaired to the record
+AWS wrote.**
 CloudTrail records `InvokeAgentRuntime` with `requestParameters` null and
 the session id only in `responseElements` of a call that returned; the
 security account's copy of a cross-account record names the caller by role

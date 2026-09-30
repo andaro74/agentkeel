@@ -48,7 +48,9 @@ Signed: ____________  Date: ________
 account is one the agent account cannot change.**
 
 Only the human deployed by hand in M05, each time after reading
-`cdk diff`: `infra/security/` in 897698239547 (`CREATE_COMPLETE`), then
+`cdk diff` (the times are the human's reading of each stack's events,
+recorded in `milestones/M05/README.md`, PR 2 detail; only the stand-in's
+are in a run file): `infra/security/` in 897698239547 (`CREATE_COMPLETE`), then
 `OrganizationAccountAccessRole` deleted there (`NoSuchEntity`); the
 bootstrap (12:23:47Z, 2026-09-29; 49,613 of 51,200 bytes); `infra/audit/`
 (12:48:48Z), twice more for S1's Lambda and once to remove it (14:26:13Z),

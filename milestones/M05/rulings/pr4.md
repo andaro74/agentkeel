@@ -74,8 +74,9 @@ reads the same.)*
   model call, so no model call was made or recorded. F5.4 as restated reads
   a model call; no other call stands in for it. Not re-attempted:
   `milestones/M06/open.md` row 42, M08.
-- **PR 3's three readers**, each repaired to the record AWS wrote, none a
-  standard moved: CloudTrail's `InvokeAgentRuntime` record has
+- **PR 3's three repairs**, two readers and one test, each to the record
+  AWS wrote, none a standard moved (the first two found by PR 3's first
+  run, the third by the human's run file before it): CloudTrail's `InvokeAgentRuntime` record has
   `requestParameters` null and the session id only in `responseElements`
   of a call that returned; the security account's copy of a cross-account
   record names the caller by role id; the Logs API answers
@@ -123,6 +124,9 @@ and have one there:
 
 Every row of `milestones/M05/open.md` is closed in M05 (rows 1, 10, 13,
 18, 19, 20, 24, 42, 44) or carried, as `feasibility.md` §6 dated it.
+Row 16 is split: items a, c and d landed in `scripts/observe_containment.py`
+and `build`, item k in `ca0d07d`; item b, M03 row 14 and SPEC/01 §9's
+ceiling are `M06/open.md` rows 15, 12, 48 and 44.
 Row 18's copy under `envelopes/` began at PR 2's merge (the `archive`
 job; six objects at 01:55:59Z to 01:56:03Z on 2026-09-30).
 
