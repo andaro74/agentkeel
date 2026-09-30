@@ -390,6 +390,19 @@ registry)`, S4's comparison, and the dashboard's path,
 query are added to `src/validate/checks.CHECKS`, where the seed tests
 look.
 
+What the seed tests ask of PR 2's readers (cold review of PR 1, NOTE 7 and
+FINDING 4):
+
+- **Each is a new check** in `CHECKS`, not an extension of one of the
+  sixteen at `0b96da4` (`BASE_CHECKS`): a base check that refuses a
+  fixture makes the seed test raise `SeedBroken`.
+- **Its name holds the word it reads**, lower case: "seat" for S1a's,
+  "golden" for S1b's, "panel" for S4's query. Its error text names the
+  path it refuses (`agents/premiere-desk/` or `infra/grafana/panel1.json`).
+- **S1a's reader does not refuse S1b, and S1b's does not refuse S1a.**
+  PR 2 adds those two assertions when it takes the markers off; today no
+  check refuses either fixture, so they would test nothing.
+
 ## 5. Falsifiers, and what each would look like in the repo
 
 SPEC/06 §4. Test-only witnesses on every envelope from PR 2's merge:
