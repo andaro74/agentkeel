@@ -1,0 +1,7 @@
+{
+  "_comment": "Security (SPEC/06 section 6, R3; finding 16 on M06 PR 1). What the platform is, by identity, in one Security-owned file. deploy_identity and repository_id: the one signer verify accepts (moved from src/bundle/verify.py at M06 PR 2, unchanged: agentkeel's deploy.yml on main signs every agent's bundle, R3). organisation and platform_app_id: the GitHub organisation that holds the template and the agent repositories, and the App whose check each agent repository's ruleset requires (infra/ruleset/agent.json's integration_id, which must equal it). Null until the human makes them during M06 PR 2; the platform check posts nothing while either is null.",
+  "deploy_identity": "https://github.com/andaro74/agentkeel/.github/workflows/deploy.yml@refs/heads/main",
+  "repository_id": "1376369685",
+  "organisation": null,
+  "platform_app_id": null
+}
