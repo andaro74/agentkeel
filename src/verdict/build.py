@@ -74,6 +74,8 @@ from typing import Any
 import yaml
 
 from src.verdict import containment
+# M06 PR 2 (SPEC/06 §4, BLOCK 3): build is the comparer of panel 1's rows with the registry's.
+from src.verdict.template import panel_not_in_registry  # noqa: F401  (S4's reader, by this name)
 from src.verdict import (
     M04_READERS,
     ROOT,

@@ -263,7 +263,6 @@ def test_s4_a_panel_1_query_with_a_second_source_is_refused(worktree):
     assert refused, "seed S4: no check that reads panel 1's query refused a second source"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S4's comparison is build's, M06 PR 2 (SPEC/06 §4)")
 def test_s4_a_panel_row_with_no_registry_row_is_found_by_build():
     """Panel 1's rows as Grafana's /api/ds/query returns them name ghost-agent; the registry scan does
     not. The observer writes both lists raw, and `build` compares them by agent name (BLOCK 3):

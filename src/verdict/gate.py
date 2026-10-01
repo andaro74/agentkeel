@@ -901,7 +901,9 @@ def print_plants() -> int:
     for section, seeds in plants.SEEDS_BY_MILESTONE:
         print(f"seeded cases ({section}; not plants, not in plants_expected):")
         for seed, (falsifier, planted, reader) in seeds.items():
-            state = "in the tree" if (ROOT / reader).exists() else "not in the tree yet"
+            # A seed with two readers names both, comma-separated (M06 cold review F2).
+            paths = [part.strip() for part in reader.split(",") if part.strip()]
+            state = "in the tree" if paths and all((ROOT / part).exists() for part in paths) else "not in the tree yet"
             print(f"  {seed} {falsifier} {planted}")
             print(f"         reader {reader}: {state}")
     return 0
