@@ -59,7 +59,8 @@
 # the bytes, pushes the image to `agentkeel/<name>`, deploys `agentkeel-<name>`
 # through the execution role, loads the agent's own table, asks the deployed
 # agent its own goldens (`build answer`), writes the registry row, and puts
-# the answer record once in the security account (`agentkeel-envelope-put`).
+# the answer record once in the security account (`agentkeel-answer-put`, which
+# may put under `envelopes/agents/` and nothing else).
 # refagent's two jobs below are unchanged but for the registry row.
 name: deploy
 
@@ -271,18 +272,22 @@ jobs:
           COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
-          uv run python scripts/registry.py claim --name refagent --repository-id 1376369685
+          uv run python scripts/registry.py claim --name refagent --repository andaro74/agentkeel --repository-id 1376369685
           uv run python scripts/registry.py write --name refagent --repository andaro74/agentkeel \
             --repository-id 1376369685 --commit "$COMMIT" --run-id "$RUN_ID"
 
   # --- M06 PR 2: an agent from the template (SPEC/06 section 6, R3) -----------
 
+  # The deploy role here too, to read the registry and drop a commit already deployed before anything is
+  # signed (security-reviewer N5 on M06 PR 2: otherwise every agent is signed into Rekor every ten minutes).
+  # No agent repository's content is checked out in this job; it reads GitHub's API and the registry.
   find-agents:
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+      id-token: write # OIDC to AWS, as the deploy role, for the registry read
     outputs:
       agents: ${{ steps.find.outputs.agents }}
     steps:
@@ -295,13 +300,20 @@ jobs:
       - name: Install
         run: uv sync --frozen
 
-      - name: The heads the platform's App passed
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: agentkeel-find-agents-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+
+      - name: The heads the platform's App passed, less what the registry holds
         id: find
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          uv run python scripts/platform_check.py deployable --out "$RUNNER_TEMP/agents.json"
+          uv run python scripts/platform_check.py deployable --skip-deployed --out "$RUNNER_TEMP/agents.json"
           echo "agents=$(cat "$RUNNER_TEMP/agents.json")" >> "$GITHUB_OUTPUT"
 
   sign-agent:
@@ -381,9 +393,11 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  # always(): a leg of sign-agent that failed must not skip every other agent's deploy (security-reviewer F3
+  # on M06 PR 2). A leg whose signing failed has no artifact, and fails at its download alone.
   deploy-agent:
     needs: [find-agents, sign-agent]
-    if: needs.find-agents.outputs.agents != '[]' && needs.find-agents.outputs.agents != ''
+    if: always() && needs.find-agents.result == 'success' && needs.find-agents.outputs.agents != '[]' && needs.find-agents.outputs.agents != ''
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     permissions:
@@ -451,7 +465,7 @@ jobs:
           if uv run python scripts/registry.py deployed --name "$NAME" --commit "$COMMIT"; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            uv run python scripts/registry.py claim --name "$NAME" --repository-id "$REPOSITORY_ID"
+            uv run python scripts/registry.py claim --name "$NAME" --repository "$REPOSITORY" --repository-id "$REPOSITORY_ID"
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -526,7 +540,7 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         if: steps.registry.outputs.skip == 'false'
         with:
-          role-to-assume: ${{ vars.AWS_ENVELOPE_PUT_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ANSWER_PUT_ROLE_ARN }}
           role-session-name: agentkeel-answer-put-${{ github.run_id }}
           role-duration-seconds: 900
           aws-region: us-west-2

@@ -86,6 +86,9 @@ LOCK_DAYS = 1  # R5 as amended at M05 PR 1: one day through M05, two keys; seven
 BOUNDARY_NAME = "agentkeel-security-boundary"
 READ_ROLE = "agentkeel-audit-read"
 PUT_ROLE = "agentkeel-envelope-put"
+# M06 PR 2 (R7; security-reviewer F7): deploy.yml's own put role, under envelopes/agents/ and nothing else, so
+# the deploy, which handles an agent repository's data, can never write evals.yml's envelope keys first.
+ANSWER_PUT_ROLE = "agentkeel-answer-put"
 AGENT_TRAIL = f"arn:aws:cloudtrail:{REGION}:{AGENT_ACCOUNT}:trail/agentkeel-audit"  # infra/audit/
 OWN_TRAIL_NAME = "agentkeel-audit-bucket"
 OWN_TRAIL = f"arn:aws:cloudtrail:{REGION}:{SECURITY_ACCOUNT}:trail/{OWN_TRAIL_NAME}"
@@ -133,10 +136,12 @@ class SecurityStack(cdk.Stack):
         )  # fmt: skip
         read_role = self._read_role(provider)
         put_role = self._put_role(provider)
+        answer_role = self._answer_put_role(provider)
 
         cdk.CfnOutput(self, "AuditBucket", value=bucket.bucket_name)
         cdk.CfnOutput(self, "AuditReadRoleArn", value=read_role.role_arn)
         cdk.CfnOutput(self, "EnvelopePutRoleArn", value=put_role.role_arn)
+        cdk.CfnOutput(self, "AnswerPutRoleArn", value=answer_role.role_arn)
         cdk.CfnOutput(self, "TrailArn", value=trail.attr_arn)
 
     # --- the boundary ------------------------------------------------------
@@ -315,16 +320,26 @@ class SecurityStack(cdk.Stack):
         return role
 
     def _put_role(self, provider: iam.CfnOIDCProvider) -> iam.Role:
-        """evals.yml and deploy.yml on main, and only there: puts under envelopes/ (SPEC/05 section 6; SPEC/06 R7)."""
+        """evals.yml on main, and only there: the envelope put under envelopes/ (SPEC/05 section 6, finding 2)."""
         role = iam.Role(
             self, "PutRole", role_name=PUT_ROLE, max_session_duration=cdk.Duration.hours(1),
-            # M06 PR 2 (R7): and deploy.yml on main, for an agent from the template's answer record.
-            assumed_by=self._github(provider, [f"{SUBJECT}:ref:refs/heads/main"], [MAIN_EVALS, MAIN_DEPLOY],
-                                    exact=True),
-            description="agentkeel: evals.yml and deploy.yml on main put CI-written records under envelopes/ as this.",
+            assumed_by=self._github(provider, [f"{SUBJECT}:ref:refs/heads/main"], MAIN_EVALS, exact=True),
+            description="agentkeel: evals.yml on main puts each CI-written envelope under envelopes/ as this.",
         )  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="PutEnvelopesOnly", actions=["s3:PutObject"], resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/envelopes/*"]))
+        return role
+
+    def _answer_put_role(self, provider: iam.CfnOIDCProvider) -> iam.Role:
+        """deploy.yml on main, and only there: an agent from the template's answer record (SPEC/06 R7)."""
+        role = iam.Role(
+            self, "AnswerPutRole", role_name=ANSWER_PUT_ROLE, max_session_duration=cdk.Duration.hours(1),
+            assumed_by=self._github(provider, [f"{SUBJECT}:ref:refs/heads/main"], MAIN_DEPLOY, exact=True),
+            description="agentkeel: deploy.yml on main puts an agent's answer record under envelopes/agents/ as this.",
+        )  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="PutAnswerRecordsOnly", actions=["s3:PutObject"],
+            resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/envelopes/agents/*"]))
         return role
 
 
@@ -354,13 +369,29 @@ SUPPRESSIONS = {
         "test/* and, from M06 PR 2, envelopes/agents/* (an agent from the template's answer records, SPEC/06 R7) "
         "are those prefixes; the keys under them are written by AWS, by the agents and by deploy.yml at run time.",
     ),
+    "AnswerPutRole/DefaultPolicy/Resource": (
+        "AwsSolutions-IAM5",
+        "SPEC/05 §6's envelopes to the audit bucket from main, for an agent from the template's answer record "
+        "(SPEC/06 R7): envelopes/agents/* because each key is an agent repository's commit, which exists only "
+        "when deploy.yml writes it.",
+    ),
     "PutRole/DefaultPolicy/Resource": (
         "AwsSolutions-IAM5",
         "SPEC/05 §6: envelopes to the audit bucket from main (evals.yml, and from M06 PR 2 deploy.yml's answer "
         "records, SPEC/06 R7). envelopes/* because each key is a commit, which exists only when CI writes it.",
     ),
 }
+# Each IAM5 suppression names the findings it covers (open.md row 4; security-reviewer F10 on M06 PR 2).
+_OBJECTS = f"Resource::arn:aws:s3:::{AUDIT_BUCKET}/"
+APPLIES_TO = {
+    "Boundary/Resource": [f"{_OBJECTS}*"],
+    "ReadRole/DefaultPolicy/Resource": [f"{_OBJECTS}{p}*" for p in READ_PREFIXES],
+    "PutRole/DefaultPolicy/Resource": [f"{_OBJECTS}envelopes/*"],
+    "AnswerPutRole/DefaultPolicy/Resource": [f"{_OBJECTS}envelopes/agents/*"],
+}
 for path, (rule, reason) in SUPPRESSIONS.items():
-    NagSuppressions.add_resource_suppressions_by_path(stack, f"AgentkeelSecurity/{path}", [{"id": rule, "reason": reason}])
+    applies = {"appliesTo": APPLIES_TO[path]} if path in APPLIES_TO else {}
+    NagSuppressions.add_resource_suppressions_by_path(
+        stack, f"AgentkeelSecurity/{path}", [{"id": rule, "reason": reason, **applies}])
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

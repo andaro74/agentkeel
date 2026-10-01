@@ -57,11 +57,16 @@ WORKSPACE_ROLE = "agentkeel-grafana-workspace"
 # (`aws serverlessrepo get-application`): 2026.33.1, its parameters as used below.
 CONNECTOR_APP = "arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaDynamoDBConnector"
 CONNECTOR_VERSION = "2026.33.1"
+DEPLOY_BOUNDARY_NAME = "agentkeel-deploy-boundary"  # the bootstrap stack's; named, not imported
 
 
 class GrafanaStack(cdk.Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+        # Every role this stack makes carries the deploy plane's boundary, as the ingest stack's do
+        # (platform-architect BLOCK 1 on M06 PR 2; R3).
+        iam.PermissionsBoundary.of(self).apply(iam.ManagedPolicy.from_managed_policy_name(
+            self, "DeployBoundary", DEPLOY_BOUNDARY_NAME))
         bucket = s3.Bucket(
             self, "Scratch", bucket_name=f"agentkeel-grafana-{ACCOUNT}",
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL, enforce_ssl=True,
@@ -180,8 +185,18 @@ REASONS = {
         "results/* and spill/* are this stack's bucket's prefixes, whose keys Athena writes per query.",
     )],
 }
+# Each IAM5 suppression names the findings it covers (open.md row 4; security-reviewer F10 on M06 PR 2).
+_SCRATCH = "Resource::<ScratchF72D2ED6.Arn>"  # the scratch bucket by its logical id, as cdk-nag names it
+APPLIES_TO = {
+    "ConnectorRole/DefaultPolicy/Resource": [
+        "Resource::*", f"{_SCRATCH}/spill/*",
+        f"Resource::arn:aws:logs:{REGION}:{ACCOUNT}:log-group:/aws/lambda/{CONNECTOR}:*"],
+    "WorkspaceRole/DefaultPolicy/Resource": ["Resource::*", f"{_SCRATCH}/results/*", f"{_SCRATCH}/spill/*"],
+}
 for path, rules in REASONS.items():
     NagSuppressions.add_resource_suppressions_by_path(
-        stack, f"AgentkeelGrafana/{path}", [{"id": rule, "reason": reason} for rule, reason in rules])
+        stack, f"AgentkeelGrafana/{path}",
+        [{"id": rule, "reason": reason, **({"appliesTo": APPLIES_TO[path]} if path in APPLIES_TO else {})}
+         for rule, reason in rules])
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

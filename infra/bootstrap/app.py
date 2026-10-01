@@ -608,7 +608,9 @@ class BootstrapStack(cdk.Stack):
                      "bedrock-agentcore:CreateWorkloadIdentity", "bedrock-agentcore:DeleteWorkloadIdentity",
                      "bedrock-agentcore:TagResource", "bedrock-agentcore:UntagResource",
                      "bedrock-agentcore:ListTagsForResource"],
-            resources=[f"{agentcore}:runtime/*",
+            # refagent's runtime and an agent from the template's, not runtime/*: the account holds other
+            # projects' runtimes (platform-architect F4 on M06 PR 2).
+            resources=[f"{agentcore}:runtime/refagent*", f"{agentcore}:{TEMPLATE_RUNTIMES}",
                        f"{agentcore}:workload-identity-directory/default",
                        f"{agentcore}:workload-identity-directory/default/workload-identity/*"],
         ))  # fmt: skip
@@ -640,20 +642,34 @@ class BootstrapStack(cdk.Stack):
             resources=["*"],
         ))  # fmt: skip
         # M06 PR 2 (SPEC/06 section 6, item 5): an agent from the template brings its own key, made in
-        # its stack. Create, describe, rotate, tag and alias, and nothing that changes a key once it
-        # exists: the key's own policy denies this role PutKeyPolicy, CreateGrant, ScheduleKeyDeletion
-        # and DisableKey (R4), and so does the deploy boundary. CreateKey takes no resource-level permission.
+        # its stack and tagged agentkeel:agent. Create, describe, rotate, tag and alias, on keys that carry
+        # the tag and on no other key in this shared account (platform-architect F5, security-reviewer F4
+        # on M06 PR 2), and nothing that changes a key once it exists: the key's own policy denies this
+        # role PutKeyPolicy, CreateGrant, ScheduleKeyDeletion, DisableKey and the rest of R4's list, and
+        # so does the deploy boundary. CreateKey takes no resource-level permission; it is held to a key
+        # created with the tag. refagent's alias is the bootstrap's, and this role may never move it.
+        tagged_key = {"Null": {"aws:ResourceTag/agentkeel:agent": "false"}}
         role.add_to_policy(iam.PolicyStatement(
-            sid="MakeAnAgentsKey",
-            actions=["kms:CreateKey"],
+            sid="MakeAnAgentsKeyOnlyWithItsTag",
+            actions=["kms:CreateKey", "kms:TagResource"],
             resources=["*"],
+            conditions={"Null": {"aws:RequestTag/agentkeel:agent": "false"}},
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
-            sid="DescribeRotateTagAndAliasAnAgentsKey",
+            sid="DescribeRotateAndAliasATaggedKeyOnly",
             actions=["kms:DescribeKey", "kms:EnableKeyRotation", "kms:GetKeyRotationStatus", "kms:GetKeyPolicy",
-                     "kms:ListResourceTags", "kms:TagResource", "kms:CreateAlias", "kms:UpdateAlias"],
-            resources=[f"arn:aws:kms:{REGION}:{self.account}:key/*",
-                       f"arn:aws:kms:{REGION}:{self.account}:alias/agentkeel-*"],
+                     "kms:ListResourceTags", "kms:CreateAlias"],
+            resources=[f"arn:aws:kms:{REGION}:{self.account}:key/*"],
+            conditions=tagged_key,
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="AnAgentsAliasOnly", actions=["kms:CreateAlias"],
+            resources=[f"arn:aws:kms:{REGION}:{self.account}:alias/agentkeel-*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="NeverMoveRefagentsAlias", effect=iam.Effect.DENY,
+            actions=["kms:CreateAlias", "kms:UpdateAlias", "kms:DeleteAlias"],
+            resources=[f"arn:aws:kms:{REGION}:{self.account}:alias/agentkeel-refagent"],
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(sid="ListAliases", actions=["kms:ListAliases"], resources=["*"]))
         role.add_to_policy(iam.PolicyStatement(
@@ -993,6 +1009,17 @@ class BootstrapStack(cdk.Stack):
             resources=["*"],
             conditions={"ArnLike": {"aws:PrincipalArn": agent_roles}},
         ))  # fmt: skip
+        # M06 PR 2 (platform-architect F2, security-reviewer F5): an agent from the template's role, tagged
+        # with its own name, never uses refagent's key. refagent's role is tagged refagent from its next
+        # deploy and untagged before it, so neither is caught here.
+        key.add_to_resource_policy(iam.PolicyStatement(
+            sid="NoOtherAgentUsesRefagentsKey", effect=iam.Effect.DENY,
+            principals=[iam.AnyPrincipal()], actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=["*"],
+            conditions={"ArnLike": {"aws:PrincipalArn": agent_roles},
+                        "StringNotEquals": {"aws:PrincipalTag/agentkeel:agent": "refagent"},
+                        "Null": {"aws:PrincipalTag/agentkeel:agent": "false"}},
+        ))  # fmt: skip
         key.add_to_resource_policy(iam.PolicyStatement(
             sid="NoAgentReadsThisPolicy",  # seed S6: the refusal can only come from here
             effect=iam.Effect.DENY,
@@ -1264,12 +1291,16 @@ SUPPRESSIONS = {
         f"managing security-group/* is conditioned on ec2:Vpc being this stack's VPC, and creating one is held "
         f"by the VPC resource, because a new group has no ec2:Vpc yet; a new network-interface/* likewise, "
         f"held by its subnet and group; CreateAgentRuntime takes no resource-level permission and is held to "
-        f"this stack's subnets by bedrock-agentcore:subnets; runtime/*, application-inference-profile/* and "
-        f"the agent role path name resources whose ids AWS assigns at create; ec2:Describe* takes no "
+        f"this stack's subnets by bedrock-agentcore:subnets; runtime/refagent* and runtime/agentkeel_* (M06 "
+        f"PR 2: the platform's runtimes, not every runtime in this shared account), application-inference-"
+        f"profile/* and the agent role path name resources whose ids AWS assigns at create; ec2:Describe* takes no "
         f"resource-level permission; security-group-rule/* is the egress rule's own resource; the five "
         f"vpc-lattice actions are the Runtime create handler's VPC-mode calls, which name no resource "
         f"in advance. The action lists are CloudFormation's published handler permissions (describe-type). "
-        f"{CEILING}"
+        f"M06 PR 2 (SPEC/01 §6's key, for an agent from the template, SPEC/06 §6 item 5): kms:CreateKey and "
+        f"kms:TagResource take no resource and are held to a request tagged agentkeel:agent; key/* is held to a "
+        f"key carrying that tag; alias/agentkeel-* is an agent's alias, and refagent's is denied; ListAliases "
+        f"takes no resource. {CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "
@@ -1278,7 +1309,11 @@ SUPPRESSIONS = {
         "deploys; AWS appends the stack id suffix, which cannot be named in advance. BLOCK F: "
         "ecr:GetAuthorizationToken takes no resource; the push is on repository/agentkeel-*, the table load "
         "(put, scan, and the delete of rows the file lacks, M03 PR 2) on table/agentkeel-*-rights, and the load check's InvokeAgentRuntime on runtime/refagent*, the "
-        "versioned name AgentCore assigns at create."
+        "versioned name AgentCore assigns at create. M06 PR 2 (SPEC/01 §6's deploy, for an agent from the "
+        "template, SPEC/06 §6 items 4 and 7): the push and CreateRepository on repository/agentkeel/*, each "
+        "agent's image made on its first push; InvokeAgentRuntime on runtime/agentkeel_*, an agent from the "
+        "template's runtime, not runtime/*; ssm:PutParameter on /agentkeel/marker/*/rights-table-digest, each "
+        "agent's table marker."
     ),
     "DeveloperRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the developer role (§1), boundary on'. This is seed S4's principal. "
@@ -1298,9 +1333,38 @@ SUPPRESSIONS = {
         f"{CEILING}"
     ),
 }
+# Each suppression names the findings it covers (open.md row 4, M06 PR 2 for every stack PR 2 edits;
+# security-reviewer F10): a wildcard added later is a finding, not silenced by an old reason.
+_ARN = "arn:aws:{}:" + REGION + ":<AWS::AccountId>:{}"
+APPLIES_TO = {
+    "DeployBoundary/Resource": ["Action::*", "Resource::*"],
+    "Boundary/Resource": ["Action::bedrock-agentcore:*", "Action::bedrock:Invoke*", "Action::cloudformation:Describe*",
+                          "Resource::*", f"Resource::arn:aws:s3:::{AUDIT_BUCKET}/agents/*"],
+    "ExecutionRole/DefaultPolicy/Resource": ["Resource::*"] + [f"Resource::{_ARN.format(service, rest)}" for service, rest in (
+        ("bedrock-agentcore", "runtime/agentkeel_*"), ("bedrock-agentcore", "runtime/refagent*"),
+        ("bedrock-agentcore", "workload-identity-directory/default/workload-identity/*"),
+        ("bedrock", "application-inference-profile/*"), ("dynamodb", "table/agentkeel-*-rights"),
+        ("ec2", "network-interface/*"), ("ec2", "security-group-rule/*"), ("ec2", "security-group/*"),
+        ("ec2", "subnet/*"), ("kms", "alias/agentkeel-*"), ("kms", "key/*"),
+        ("ssm", "parameter/agentkeel/security/*"))] + [
+        "Resource::arn:aws:iam::<AWS::AccountId>:role/agentkeel/agents/*",
+        "Resource::arn:aws:iam::<AWS::AccountId>:role/aws-service-role/network.bedrock-agentcore.amazonaws.com/*"],
+    "DeployRole/DefaultPolicy/Resource": ["Action::cloudformation:Describe*", "Resource::*"] + [
+        f"Resource::{_ARN.format(service, rest)}" for service, rest in (
+            ("bedrock-agentcore", "runtime/agentkeel_*"), ("bedrock-agentcore", "runtime/refagent*"),
+            ("cloudformation", "stack/agentkeel-*/*"), ("dynamodb", "table/agentkeel-*-rights"),
+            ("ecr", "repository/agentkeel-*"), ("ecr", "repository/agentkeel/*"),
+            ("ssm", "parameter/agentkeel/marker/*/rights-table-digest"))],
+    "DeveloperRole/DefaultPolicy/Resource": ["Action::bedrock:List*", "Action::cloudformation:Describe*",
+                                             "Action::logs:Describe*", "Action::logs:Get*", "Resource::*"],
+    "EvalRole/DefaultPolicy/Resource": ["Resource::*", "Resource::<RefagentGuardrail.GuardrailArn>:*"] + [
+        f"Resource::{_ARN.format(service, rest)}" for service, rest in (
+            ("bedrock-agentcore", "runtime/refagent*"), ("cloudformation", "stack/agentkeel-refagent/*"))],
+}
 for path, reason in SUPPRESSIONS.items():
     NagSuppressions.add_resource_suppressions_by_path(
-        stack, f"AgentkeelBootstrap/{path}", [{"id": "AwsSolutions-IAM5", "reason": reason}])
+        stack, f"AgentkeelBootstrap/{path}",
+        [{"id": "AwsSolutions-IAM5", "reason": reason, "appliesTo": APPLIES_TO[path]}])
 # Not an IAM wildcard: cdk-nag cannot resolve these rules at all. They are
 # CDK's own endpoint security groups, and their source is the VPC's CIDR,
 # an intrinsic function at synth.

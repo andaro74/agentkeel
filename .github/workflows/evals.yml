@@ -109,9 +109,12 @@
 # (TEMPLATE_OBS), which rules it into `template`; the gate rules nothing on
 # it, and only the ledger's row 6 reading reads it. A part that cannot be
 # read is written as unread; it never fails the job. F6_1 and F6_4 are read
-# from the seed tests (the Makefile). The Grafana token is in this job's
-# environment beside the pull request's own code, as the ruleset token is
-# (`open.md` row 8): it is a viewer's, and reads panel 1 and nothing else.
+# from the seed tests (the Makefile). Panel 1 is read in a step of its own,
+# curl and jq only, which posts panel 1's query with the workspace's token and
+# writes the frame to a file the observer reads, as the ruleset is fetched
+# (security-reviewer F9 on M06 PR 2): the token is a viewer's, and a viewer
+# may post any query the workspace's data source answers, which through the
+# connector is the registry.
 #
 # What this does not do:
 # - stop someone with write access from editing this file, or from adding
@@ -404,12 +407,24 @@ jobs:
           unset-current-credentials: true
 
       # M06 PR 2 (SPEC/06 section 4): the registry as the eval role, then GitHub and Grafana.
+      # The workspace's token in this step alone, beside no code of the pull request's but this file's.
+      - name: Read panel 1 as the workspace's viewer
+        if: steps.current.outputs.measured_at == '' && vars.AGENTKEEL_GRAFANA_URL != ''
+        continue-on-error: true
+        env:
+          GRAFANA_URL: ${{ vars.AGENTKEEL_GRAFANA_URL }}
+          GRAFANA_TOKEN: ${{ secrets.AGENTKEEL_GRAFANA_TOKEN }}
+        run: |
+          set -euo pipefail
+          body=$(jq -c '{queries: (.panels[] | select(.id == 1) | .targets), from: "now-1h", to: "now"}' infra/grafana/panel1.json)
+          curl -sS --fail-with-body -X POST -H "Authorization: Bearer $GRAFANA_TOKEN" -H "Content-Type: application/json" \
+            -d "$body" "${GRAFANA_URL%/}/api/ds/query" -o "$RUNNER_TEMP/panel1-frame.json"
+
       - name: Look up claim 6's registry, pull requests and panel 1
         if: steps.current.outputs.measured_at == ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          AGENTKEEL_GRAFANA_URL: ${{ vars.AGENTKEEL_GRAFANA_URL }}
-          AGENTKEEL_GRAFANA_TOKEN: ${{ secrets.AGENTKEEL_GRAFANA_TOKEN }}
+          AGENTKEEL_PANEL_FILE: ${{ runner.temp }}/panel1-frame.json
         run: |
           set -euo pipefail
           uv run python scripts/observe_template.py --read registry --out "$RUNNER_TEMP/template.json"
