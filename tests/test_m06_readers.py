@@ -355,3 +355,34 @@ def test_the_observer_writes_what_github_returned_and_build_rules_on_it(monkeypa
     reading = shipped.record(observation, 28800.0)
     assert reading["F6_1"] == {"read": True, "held": True, "reasons": [], "faulty_commits": 1}
     assert reading["F6_3"]["read"] is False  # no deploy, answer or registry row read in this part
+
+
+# --- the template, as scripts/make_template.py writes it --------------------------
+
+from scripts import make_template  # noqa: E402
+
+
+def test_the_template_as_shipped_is_refused_for_its_seats_and_its_goldens_and_nothing_else(tmp_path):
+    """SPEC/06 section 2: every seat null, an empty goldens folder, the platform's guardrail, no workflow.
+    The first pull request of the timed run is refused on exactly the two planted reasons (F6.1)."""
+    repo = tmp_path / "template"
+    make_template.write(repo, "example-agent")
+    assert not (repo / ".github").exists()
+    assert "from . import agent" in (repo / "server.py").read_text(encoding="utf-8")
+    assert refused(platform.evaluate(repo, "org/example-agent", lookup=owner)) == [
+        "an agent's goldens: one ordinary and one trap at least, citing its own data",
+        "seats assigned, each a login with access"]
+
+
+def test_the_template_with_seats_and_two_goldens_passes_the_platform_check(tmp_path):
+    repo = tmp_path / "template"
+    make_template.write(repo, "example-agent")
+    doc = yaml.safe_load((repo / "manifest.yaml").read_text(encoding="utf-8"))
+    doc["seats"] = {s: "andaro74" for s in shipped.SEAT_SLUGS}
+    (repo / "manifest.yaml").write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
+    for golden_id, kind, row in (("g-001", "ordinary", "r-019"), ("g-002", "trap", "r-001")):
+        (repo / "goldens" / f"{golden_id}.yaml").write_text(yaml.safe_dump({
+            "id": golden_id, "kind": kind, "question": "Can we publish it?",
+            "expected": {"table_row": row, "clause_id": "ML-2.1", "answer_fields": {"available": kind == "ordinary"}},
+            "seat": "Data Owner", "added": "M06", "retired": None}), encoding="utf-8")  # fmt: skip
+    assert refused(platform.evaluate(repo, "org/example-agent", lookup=owner)) == []
