@@ -313,3 +313,45 @@ def test_an_answer_record_is_read_in_the_runtime_only():
     agent = FIXTURES / "s1a-unassigned-seat"
     with pytest.raises(build.Refused, match="deployed runtime only"):
         build.compose_answer(raw_answers(mode="runner"), agent, "org/x", "f" * 40, "https://run")
+
+
+# --- the observer writes raw lists (scripts/observe_template.py) ----------------
+
+from scripts import observe_template as observer  # noqa: E402
+
+
+def test_the_observer_writes_what_github_returned_and_build_rules_on_it(monkeypatch):
+    """S3's first pull request through a stand-in GitHub: the observer copies seats, golden kinds and check
+    runs per commit; it decides nothing, and build's F6_1 is held on that alone (BLOCK 3)."""
+    runs_by_name = {
+        "f6_2_standin.yaml": {"observed": None},
+        "f6_3_quickstart.yaml": {"agent_name": "premiere-desk",
+                                 "observed": [{"repository": "org/premiere-desk", "pull_request": 1}]},
+    }  # fmt: skip
+    monkeypatch.setattr(observer, "run_file", lambda name: runs_by_name[name])
+    null_seats = yaml.safe_dump({"seats": {s: None for s in shipped.SEAT_SLUGS}})
+    full_seats = yaml.safe_dump({"seats": {s: "andaro74" for s in shipped.SEAT_SLUGS}})
+    pages = {
+        "/repos/org/premiere-desk": {"created_at": "2026-10-01T09:00:00Z"},
+        "/repos/org/premiere-desk/pulls/1": {"merged": True, "merged_at": "2026-10-01T11:00:00Z", "head": {"sha": "b" * 40}},
+        "/repos/org/premiere-desk/pulls/1/commits?per_page=100": [{"sha": "a" * 40}, {"sha": "b" * 40}],
+        f"/repos/org/premiere-desk/contents/manifest.yaml?ref={'a' * 40}": null_seats,
+        f"/repos/org/premiere-desk/contents/manifest.yaml?ref={'b' * 40}": full_seats,
+        f"/repos/org/premiere-desk/contents/goldens?ref={'a' * 40}": [],
+        f"/repos/org/premiere-desk/contents/goldens?ref={'b' * 40}": [{"type": "file", "name": "g-001.yaml"},
+                                                                      {"type": "file", "name": "g-002.yaml"}],
+        f"/repos/org/premiere-desk/contents/goldens/g-001.yaml?ref={'b' * 40}": "kind: ordinary\nretired: null\n",
+        f"/repos/org/premiere-desk/contents/goldens/g-002.yaml?ref={'b' * 40}": "kind: trap\nretired: null\n",
+        f"/repos/org/premiere-desk/commits/{'a' * 40}/check-runs?per_page=100":
+            {"check_runs": [{"name": "platform-check", "app": {"id": APP, "slug": "p"}, "conclusion": "failure"}]},
+        f"/repos/org/premiere-desk/commits/{'b' * 40}/check-runs?per_page=100":
+            {"check_runs": [{"name": "platform-check", "app": {"id": APP, "slug": "p"}, "conclusion": "success"}]},
+    }  # fmt: skip
+    monkeypatch.setattr(observer, "gh", lambda path, raw=False: pages[path])
+    observation = observer.observe(["github"], {**observer.blank(), "platform_app_id": APP})
+    commits = observation["s3"]["first_pr"]["commits"]
+    assert [c["seats"]["product"] for c in commits] == [None, "andaro74"]
+    assert [g["kind"] for g in commits[1]["goldens"]] == ["ordinary", "trap"]
+    reading = shipped.record(observation, 28800.0)
+    assert reading["F6_1"] == {"read": True, "held": True, "reasons": [], "faulty_commits": 1}
+    assert reading["F6_3"]["read"] is False  # no deploy, answer or registry row read in this part
