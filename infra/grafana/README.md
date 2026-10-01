@@ -50,10 +50,17 @@ Then the workspace, in the console (Amazon Managed Grafana, us-west-2):
 2. In IAM Identity Center, create the user `andaro74` and assign it to the
    workspace as **Admin**.
 3. Sign in to the workspace. Add the data source **Amazon Athena**, with
-   **uid `registry`** (Connections, then Data sources; set the uid through
-   the API if the form hides it): authentication "Workspace IAM role",
-   region us-west-2, data catalog `agentkeel_registry`, database `default`,
-   workgroup `agentkeel-grafana`. Save and test.
+   **uid `registry`**: authentication "Workspace IAM role", region
+   us-west-2, data catalog `agentkeel_registry`, database `default`,
+   workgroup `agentkeel-grafana`. Save and test. As done on 2026-10-01:
+   - The form gives a new data source a random uid, so it is made through
+     the API with a temporary Admin service account's token (one day),
+     deleted after step 5:
+     `POST /api/datasources` with `{"name":"registry","uid":"registry","type":"grafana-athena-datasource","access":"proxy","jsonData":{"authType":"ec2_iam_role","defaultRegion":"us-west-2","catalog":"agentkeel_registry","database":"default","workgroup":"agentkeel-grafana"}}`.
+   - The Athena plugin is not installed in a new workspace: the data source
+     is saved but its page reads "Data source not found" until **Amazon
+     Athena** is installed (Administration, Plugins; plugin management on
+     in the workspace's configuration options).
 4. Import `infra/grafana/panel1.json` as a dashboard. Panel 1 lists
    `refagent` once refagent's deploy at PR 2's merge has written its row.
 5. Create a service account `agentkeel-observer`, role **Viewer**, and a
