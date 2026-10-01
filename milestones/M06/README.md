@@ -12,7 +12,7 @@ Written at M06 PR 1 open. The row in `milestones/README.md` is the one
 | Seeded commit | `672fc1d` (S1a an unassigned seat); `1a576f4` (S1b goldens under the minimum); `0f3b977` (S2 a stand-in for the platform check); `b4eb959` (S3 the timed quickstart); `06c485a` (S4 panel 1 against the registry, two tests, one per reader), each its own commit before any reader (SPEC/06 §5). S2 and S3 are attempts to make, `observed: null`; S1a, S1b and S4 are fixtures |
 | Expected gate output | PR 1: refagent's envelope as at M05; it says nothing about claim 6. `make plants` lists S1a, S1b, S2, S3 and S4 (seeded cases, not golden plants); `tests/test_m06_seeds.py` shows 6 expected failures. PR 2, on the PR: S1a, S1b and S4 refused by their readers for their planted reasons (`validate` refuses the null seats, the missing goldens and a panel 1 query with a second source; `build.panel_not_in_registry` finds `ghost-agent`); both manifests' seats assigned. From PR 2's merge the gate requires `F6_1` and `F6_4` on every agent envelope, **from the seed tests alone: test-only witnesses**. F6.1's and F6.4's live halves, F6.2 and F6.3 are **recorded in the envelope's `template` and read by this row's cell, not gated** (SPEC/06 §4, ruled at open): the observer writes raw observations only and `build` rules on them. **A named P3 exception (SPEC/06 §5.1):** the platform check posts from `agentkeel`'s `main`, the deploy role trusts `main` only and the template is published from what PR 2 merges, so after PR 2's merge the owner reads that the template works from a test repository, S2 is attempted, S3 is timed once by the second developer (`floresinnovations`, write only), and **PR 3's run records them**; PR 3 is that read and cannot be skipped, and the repair. Stated before, and pushed before each attempt: the first pull request not mergeable on its planted reasons; S2 not mergeable, the stand-in's check run a success on its head and none from the App (amended at PR 2: the App reaches S2 too, so S2 carries one null seat); S3 under 28,800 s with all four records read; panel 1's rows equal to the registry's. refagent otherwise as at M05: ordinary 9/9, traps 2/2, guardrail 2/3, red team 5/5, golden plants 7/7. RED if a first pull request is mergeable with a seat unassigned or goldens under the minimum; if S2 can merge; if S3 is over the bar or a record is unread; if panel 1 shows an agent the registry does not; if a seed's test passes but by its reader; if PR 3's run cannot read S2 and S3; or if `make ledger` stops matching rows 0 to 5 |
 | Measured | — |
-| PRs used / cap | 1 / 4 |
+| PRs used / cap | 2 / 4 |
 | State | OPEN |
 
 ### Open detail (PR 1, 2026-09-30)
@@ -62,3 +62,37 @@ Written at M06 PR 1 open. The row in `milestones/README.md` is the one
 - **Also in this PR:** M05's video (`open.md` row 1, `eb5dcec`); rows 2, 3,
   17 and 48 ruled at open (`runs/security_account.md`, `rulings/pr1.md`);
   every `open.md` row placed in `feasibility.md` §6.
+
+### PR 2 detail (the measure, 2026-09-30)
+
+- **The reads SPEC/06 §11 owed, then the rulings** (`feasibility.md` §8,
+  R1 to R9), before the first commit (`86eb01a`): Managed Grafana over
+  Athena (Identity Center was already on in the agent account); the
+  platform check from `agentkeel`'s `main` on a schedule, with nothing to
+  forge; `agentkeel`'s own deploy for every agent, so no trust widened.
+- **The readers, each marker off in its own commit:** S1a (`4d961cd`,
+  after the seats in `1dc781b`), S1b (`95e3824`), S4's query (`2a9e793`,
+  after `panel1.json` in `9eff4bc`), S4's comparison (`6435f5c`). Cold
+  review F4's cross-assertions land with S1a's and S1b's; F2's reader
+  field with S4's. `F6_1` and `F6_4` from the seed tests, required from
+  `c2a15d0`; `template` and row 6's reading of it in the same commit.
+- **Built for PR 3's read:** the observer, `build answer`, the platform
+  check (`platform-check.yml`, `src/validate/agent.py`,
+  `scripts/platform_check.py`), the agent deploy (`deploy.yml`'s three new
+  jobs, `infra/construct/agent.Dockerfile`, `scripts/registry.py`), the
+  bootstrap's registry and image template, the security account's answer
+  role and tag-keyed prefix, the Grafana stack, the template's source
+  (`scripts/make_template.py`), the quickstart and `docs/refagent/`.
+- **Changed from the plan, and said so:** S2 carries one null seat (the
+  App reaches it too); a seat needs admin; template images are
+  `agentkeel/<name>`; F6.3 times GitHub's and AWS's records only, and reads
+  the registry row and panel 1's row untimed; cut 3 taken.
+- **Reviewed:** five seat reports and two cold reads, every BLOCK and
+  FINDING repaired in this PR or named in SPEC/06 §8 (`rulings/pr2-*.md`).
+- **Still the human's, during this PR, before the merge:** the
+  organisation, the App and its key, `platform_identity.json` and
+  `agent.json` filled with them, the `platform-app` environment, the
+  bootstrap, security and Grafana deploys after reading each `cdk diff`,
+  the workspace and its data source, and the repository variables. After
+  the merge: the template from `scripts/make_template.py`, the owner's
+  test repository, then S2, then S3, read by PR 3's run.
