@@ -97,6 +97,38 @@ def live_rulesets(repository: str) -> list[dict[str, Any]]:
     return [gh(f"/repos/{repository}/rulesets/{r['id']}") for r in listed]
 
 
+def app_token(app_id: int, org: str, private_key_pem: str) -> str:
+    """The App's installation token for the organisation, minted here so it never leaves this process.
+
+    A JWT the App's key signs (RS256, ten minutes), then the organisation's installation's token. No
+    third-party action holds the key (SPEC/06 section 6: the key is in the `platform-app` environment)."""
+    import base64
+    import time
+
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+
+    def b64(data: bytes) -> str:
+        return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+    now = int(time.time())
+    head = b64(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
+    body = b64(json.dumps({"iat": now - 60, "exp": now + 540, "iss": str(app_id)}).encode())
+    key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
+    signature = b64(key.sign(f"{head}.{body}".encode(), padding.PKCS1v15(), hashes.SHA256()))  # type: ignore[union-attr]
+    jwt = f"{head}.{body}.{signature}"
+    saved = os.environ.get("GITHUB_TOKEN")
+    os.environ["GITHUB_TOKEN"] = jwt
+    try:
+        installation = gh(f"/orgs/{org}/installation")
+        return gh(f"/app/installations/{installation['id']}/access_tokens", method="POST", body={})["token"]
+    finally:
+        if saved is None:
+            os.environ.pop("GITHUB_TOKEN", None)
+        else:
+            os.environ["GITHUB_TOKEN"] = saved
+
+
 def post(results: Path, app_id: int) -> int:
     from src.validate import agent as platform
     from src.validate import seats
@@ -165,6 +197,11 @@ def main(argv: list[str] | None = None) -> int:
             args.out.write_text("[]\n", encoding="utf-8")
         return 0
     if args.what == "post":
+        key = os.environ.pop("AGENTKEEL_APP_PRIVATE_KEY", None)
+        if not key:
+            print("no AGENTKEEL_APP_PRIVATE_KEY: the posting job runs in the platform-app environment only")
+            return 1
+        os.environ["GITHUB_TOKEN"] = app_token(app_id, org, key)
         print(f"posted {post(args.results, app_id)} check runs")
         return 0
     found = find(org, app_id) if args.what == "find" else deployable(org, app_id)

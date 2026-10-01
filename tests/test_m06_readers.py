@@ -484,3 +484,31 @@ def test_a_name_belongs_to_the_first_repository_deployed_under_it():
     assert code == 3 and "held by repository 111" in said
     assert registry.write(table, "premiere-desk", "org/b", "222", "b" * 40, "8")[0] == 3
     assert table.items["premiere-desk"]["repository"]["S"] == "org/a"
+
+
+def test_the_app_token_is_minted_from_a_jwt_the_apps_key_signs(monkeypatch):
+    import base64
+
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                            serialization.NoEncryption()).decode()  # fmt: skip
+    seen: list[str] = []
+
+    def gh(path, *, method="GET", body=None, raw=False):
+        seen.append(os.environ["GITHUB_TOKEN"])
+        return {"id": 77} if path == "/orgs/org/installation" else {"token": "ghs_installation"}
+
+    import os
+
+    monkeypatch.setattr(platform_check, "gh", gh)
+    monkeypatch.setenv("GITHUB_TOKEN", "before")
+    assert platform_check.app_token(APP, "org", pem) == "ghs_installation"
+    assert os.environ["GITHUB_TOKEN"] == "before"  # the JWT never outlives the call
+    head, body, signature = seen[0].split(".")
+    pad = lambda s: s + "=" * (-len(s) % 4)  # noqa: E731
+    assert json.loads(base64.urlsafe_b64decode(pad(body)))["iss"] == str(APP)
+    key.public_key().verify(base64.urlsafe_b64decode(pad(signature)), f"{head}.{body}".encode(),
+                            padding.PKCS1v15(), hashes.SHA256())  # fmt: skip

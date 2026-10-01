@@ -1,5 +1,6 @@
 """The registry's one writer: deploy.yml on main, as the deploy role (SPEC/06 section 2, section 6, item 9).
 
+    python scripts/registry.py deployed --name NAME --commit SHA             # exit 0 if that commit is deployed
     python scripts/registry.py claim --name NAME --repository-id ID          # before the stack is touched
     python scripts/registry.py write --name NAME --repository ORG/REPO --repository-id ID \
         --commit SHA --run-id RUN                                             # after the agent answered
@@ -35,6 +36,13 @@ def holder(dynamodb: Any, name: str) -> str | None:
     return None if item is None else item["repository_id"]["S"]
 
 
+def deployed(dynamodb: Any, name: str, commit: str) -> tuple[int, str]:
+    """0 when the registry already holds `commit` for `name`, so the deploy has nothing to do; 1 otherwise."""
+    item = dynamodb.get_item(TableName=TABLE, Key={"name": {"S": name}}, ConsistentRead=True).get("Item")
+    held = None if item is None else item["commit_sha"]["S"]
+    return (0, f"{name}@{commit[:12]} is deployed") if held == commit else (1, f"{name}: registry holds {held}")
+
+
 def claim(dynamodb: Any, name: str, repository_id: str) -> tuple[int, str]:
     held = holder(dynamodb, name)
     if held is not None and held != repository_id:
@@ -65,6 +73,9 @@ def write(dynamodb: Any, name: str, repository: str, repository_id: str, commit:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="what", required=True)
+    zero = sub.add_parser("deployed")
+    zero.add_argument("--name", required=True)
+    zero.add_argument("--commit", required=True)
     one = sub.add_parser("claim")
     one.add_argument("--name", required=True)
     one.add_argument("--repository-id", required=True)
@@ -72,6 +83,10 @@ def main(argv: list[str] | None = None) -> int:
     for flag in ("--name", "--repository", "--repository-id", "--commit", "--run-id"):
         two.add_argument(flag, required=True)
     args = parser.parse_args(argv)
+    if args.what == "deployed":
+        code, said = deployed(client(), args.name, args.commit)
+        print(said)
+        return code
     if args.what == "claim":
         code, said = claim(client(), args.name, args.repository_id)
     else:
