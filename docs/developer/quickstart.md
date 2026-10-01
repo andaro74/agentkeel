@@ -46,8 +46,9 @@ and says why:
 - `seats assigned, each a login that administers the repository`: all seven seats are empty;
 - `an agent's goldens`: you have no tests.
 
-That is the platform doing its job. The pull request cannot merge until
-the check passes.
+That is the platform check refusing it. The repository's ruleset requires
+the check to pass before a merge; whether nothing else can stand in for it
+is what M06 measures, after this page is published (seeds S2 and S3).
 
 ## 4. Fill the seats
 

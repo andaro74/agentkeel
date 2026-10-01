@@ -36,6 +36,6 @@ agent_name: null  # fictional; named by Product in a pushed commit before the ru
 attempts:
   - what: the quickstart end to end, as docs/developer/quickstart.md gives it
     command: create from the template (the owner) -> fill the manifest -> the first pull request, refused on an unassigned seat and on goldens under the minimum -> assign the seats and add the goldens -> merged -> deployed by the platform -> the agent answers one of its own goldens -> the registry and panel 1 list it
-    refused_when: the first pull request is not mergeable while a seat is unassigned or the goldens are under the minimum (F6.1)
+    refused_when: the first pull request is not mergeable while a seat is unassigned or the goldens are under the minimum (F6.1); it must carry the template's empty seats or empty goldens at its first commit, as the quickstart's step 3 says, or nothing was refused and F6.1's live half reads not held (cold review N2 on M06 PR 2)
     recorded_when: PR 3's run reads created_at and the last of the four records, and the difference is at most quickstart.max_seconds (F6.3)
 observed: null
