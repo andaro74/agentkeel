@@ -433,6 +433,15 @@ SPEC/00 §10.5: no document describes these as working.
 - Anything the example agent does beyond refagent's M05 controls: its
   containment is M05's, reached through the construct, and is not
   re-measured here.
+- **Panel 1's columns live in the account's shared Glue database**
+  (`default`.`agentkeel-registry`, added at PR 2 when the connector, with no
+  row to infer from, knew only `name`). Any principal in the account that
+  may write Glue tables can change what panel 1 shows until the next
+  deploy of `infra/grafana/`. F6.4 compares panel 1 with a direct registry
+  scan, so such an edit reads as fired or unread, not held; no seeded case
+  attempts it (security-reviewer N2 on the post-review delta).
+- A private agent repository is refused by the App and not deployed, but
+  no seeded case has made one (security-reviewer F1 on the delta).
 - The registry's row for an agent that is retired (M07) or deleted.
 - Panel 2 (§9 cut 1), and any panel reading an envelope (M07, F7.4).
 

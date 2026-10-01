@@ -89,6 +89,25 @@ tree): verbatim in the PR body.
 | security-reviewer N5, N6 (Rekor every ten minutes; the App token unscoped) | Repaired: the registry is read before signing; the token is minted per repository with four permissions |
 | platform-architect N13, N14, N15 (`agentkeel_` prefix unreserved; base image by tag; workspace trust) | Named in SPEC/06 §8 (N13, N15); N14 carried to M07 with refagent's own image pin |
 
+## The post-review delta (`053dcb0...5ffc1f5`, read by security-reviewer as the diff)
+
+Made while the human set up the platform, 2026-09-30 to 10-01: the
+organisation and App ids; the connector's memory, 3008 MB (at 512 it ran
+out of Metaspace on panel 1's first query); the registry's six columns as a
+Glue table, `default`.`agentkeel-registry`, with `glue:GetTable` on that
+table alone (with no row, the connector inferred only `name`). Panel 1's
+query then returned HTTP 200 with its four fields, read with the observer's
+token as `evals.yml` sends it.
+
+| # | Status |
+|---|---|
+| F1 (nothing reads that an agent repository is public; GitHub Free enforces a ruleset nowhere else) | Repaired (`a22154d`): `post` refuses a private repository, `deployable` skips one; unseeded, named in SPEC/06 §8 |
+| N2 (the Glue table sits in the shared `default` database; any Glue writer in the account can edit it, and CloudFormation restores it only at the next deploy) | Stands for Security's ruling: an edit can make panel 1 wrong or unread, which F6.4 reads as fired against a direct registry scan, never as held. A dedicated database would let a deny be scoped, at the cost of panel 1's query; named in SPEC/06 §8 |
+| N3 (5144253 is the App's id only by the human's word) | Settled by the first `post`'s check run showing `app.id` 5144253 |
+| N4 (the App key's environment) | Made 2026-10-01: `platform-app`, `main` only, the key there and not at repository level (read through the API) |
+| N5 (the temporary Admin token's deletion) | The human deleted `setup-temp`; recorded in the close attestations from Grafana's list |
+| N1, N6, N7, N8 | Recorded: the grant is minimal; cost only; no suppression added; the test is sound |
+
 ## What a reader can run
 
 ```
