@@ -165,18 +165,18 @@ stack = GrafanaStack(
 REASONS = {
     "Scratch/Resource": [(
         "AwsSolutions-S1",
-        "SPEC/06 section 6 (R1): a scratch bucket for the connector's spill and Athena's results, each kept one "
+        "SPEC/06 §6 (R1): a scratch bucket for the connector's spill and Athena's results, each kept one "
         "day; nothing in it is evidence, and server access logs would need a second bucket that nothing reads.",
     )],
     "ConnectorRole/DefaultPolicy/Resource": [(
         "AwsSolutions-IAM5",
-        "SPEC/06 section 6 (R1): dynamodb:ListTables takes no resource-level permission; the spill is "
+        "SPEC/06 §6 (R1): dynamodb:ListTables takes no resource-level permission; the spill is "
         "spill/* in this stack's own bucket, whose keys the connector writes per query; the log group's "
         "streams are named by Lambda. The table grant is agentkeel-registry by ARN.",
     )],
     "WorkspaceRole/DefaultPolicy/Resource": [(
         "AwsSolutions-IAM5",
-        "SPEC/06 section 6 (R1): ListWorkGroups and ListDataCatalogs take no resource-level permission; "
+        "SPEC/06 §6 (R1): ListWorkGroups and ListDataCatalogs take no resource-level permission; "
         "results/* and spill/* are this stack's bucket's prefixes, whose keys Athena writes per query.",
     )],
 }
