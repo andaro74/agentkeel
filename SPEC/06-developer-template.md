@@ -161,7 +161,7 @@ reader can look at.
 | Id | Fires when | What it looks like in the repo |
 |---|---|---|
 | F6.1 | a first pull request is mergeable with an unassigned seat or goldens under the minimum (finding 6) | S1a's or S1b's fixture passed by its reader in a copy of the tree (`checks.F6_1: fail` from the seed tests); live: the timed run's first pull request with `mergeable_state` `clean` (or merged) while a seat is null or the goldens are under the minimum, read from GitHub by the observer and ruled on by `build` |
-| F6.2 | a pull request in an agent repository merges without the platform's check having run on it and passed (BLOCK 2) | S2's pull request merged, or `mergeable_state` `clean`, with no check run from the platform's App on its head |
+| F6.2 | a pull request in an agent repository merges without the platform's check having run on it and passed (BLOCK 2) | S2's pull request merged, or the platform's App passing its head; S2 carries a stand-in job of the check's name and one null seat, so the App, which reaches every pull request (R2), refuses it (amended at PR 2) |
 | F6.3 | the timed quickstart exceeds one working day | S3's elapsed time (§1) over `quickstart.max_seconds`, or any of its five records unread |
 | F6.4 | Grafana panel 1 shows an agent the registry does not | S4's fixture passed by its reader (`checks.F6_4: fail`); live: panel 1's rows, read through Grafana's API, name an agent with no registry row, or either list is unread |
 
@@ -294,7 +294,7 @@ lists below are written from the reads §11 owed, ruled by the human on
   | 1 | The repository's ruleset | Timed: the owner applies `infra/ruleset/agent.json`; the platform check fails while the live ruleset differs |
   | 2 | The App on the repository; the developer's write | Automatic (installed on all repositories); timed (the owner, seconds) |
   | 3 | The deploy role's and the eval role's trust; `verify`'s identity | **None.** `agentkeel`'s `deploy.yml` on `main` deploys every agent (R3); `verify`'s identity and repository id move to `infra/platform_identity.json` (Security) and do not widen |
-  | 4 | The image repository `agentkeel-<name>` | Automatic: an ECR repository creation template for the prefix `agentkeel-` (immutable tags, scan on push), and `ecr:CreateRepository` on `repository/agentkeel-*` for the deploy role |
+  | 4 | The image repository | Automatic: `agentkeel/<name>`, made on the first push from an ECR repository creation template for the namespace `agentkeel` (immutable tags, AES-256; a template matches a namespace, not a name prefix, so not `agentkeel-<name>`), and `ecr:CreateRepository` on `repository/agentkeel/*` for the deploy role |
   | 5 | The agent's key `alias/agentkeel-<name>` | Automatic: made in the agent's own stack, its policy denying every platform role the actions R4 names (refagent's key stays in the bootstrap) |
   | 6 | The guardrail | None at M06: an agent from the template pins the platform's guardrail, refagent's, by id and version (Rule Owner); a guardrail per agent is M07's |
   | 7 | The rights table, inference profile and runtime | Automatic (the construct). An agent other than refagent gets the runtime name `agentkeel_<name>`; the deploy role may call `runtime/agentkeel_*` and refagent's; the table marker parameter is `/agentkeel/marker/<name>/rights-table-digest` |
@@ -347,8 +347,9 @@ lists below are written from the reads §11 owed, ruled by the human on
   traps 2/2, guardrail 2/3, red team 5/5, golden plants 7/7.
 - **PR 3's run, stated before it.** The timed run's first pull request not
   mergeable while a seat was null or the goldens were under the minimum;
-  S2's pull request not mergeable, with no check run from the App on its
-  head; S3's elapsed time under 28,800 s with all five records read;
+  S2's pull request not mergeable, the stand-in's check run a success on
+  its head and none from the App (amended at PR 2: S2 carries one null
+  seat, since the App reaches it too); S3's elapsed time under 28,800 s with all five records read;
   panel 1's rows equal to the registry's.
 - **The row goes RED** if a first pull request is mergeable with a seat
   unassigned or goldens under the minimum; if S2's pull request can merge;

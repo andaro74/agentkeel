@@ -86,6 +86,8 @@ reported.
 You may change `data/table.json` and `data/clauses.json` to your agent's
 own rows and clauses. Every golden must cite a row and a clause that are
 there.
+If you change the titles, change the slate in `prompt.txt` too: the
+agent finds a title's id there, and the tool finds the row by that id.
 
 ## 6. Push, wait for the check, merge
 

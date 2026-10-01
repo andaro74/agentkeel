@@ -516,3 +516,20 @@ tokens, `regressed` empty. It says nothing about claim 6.
 | R7 | Engineering | **Item 4's envelope:** `build` writes it in the deploy run, keyed to the agent repository's commit, and it is put once (If-None-Match) under `envelopes/agents/<name>/<commit>.json` in the security account's bucket; the put role trusts `deploy.yml` on `main` as well. PR 3's observer reads it and records its key and sha256 in `template`. Not `evals/history/`: `main` takes no direct push |
 | R8 | Engineering | S4's query check reads `infra/grafana/panel1.json` in `agentkeel` only |
 | R9 | Product | PR 2's list as R1 to R8 change it: no trust change, no caller workflow in the template |
+
+**Two consequences found while building, each Product's to confirm in
+`rulings/pr2.md`:**
+
+- **S2 carries one null seat** (from R2). The App's schedule reaches every
+  open pull request, S2's included. S2 as planted (a stand-in job alone) is
+  then passed by the App if its content is valid, and merges with the
+  platform's check run and passed: F6.2 does not fire, and the attempt
+  tests nothing. So S2 also sets one seat to null, and its stated reading
+  becomes: not mergeable, the stand-in's check run a success on its head,
+  and none from the App. Row 6's expected output, SPEC/06 §4 and §7 and the
+  run file are amended to say so; the falsifier's wording is unchanged.
+- **An agent from the template's image is `agentkeel/<name>`** (R4 row 4).
+  An ECR repository creation template matches a namespace, not a name
+  prefix (CloudFormation refused `agentkeel-` at synth), so an agent other
+  than refagent pushes under `agentkeel/`. refagent keeps
+  `agentkeel-refagent`.
