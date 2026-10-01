@@ -2,7 +2,7 @@
 # P3 exception): made once, after M06 PR 2's merge (39031e7) and before S2
 # and S3, from a test repository the owner creates from the template. It is
 # not a seed and plants nothing; it is the read S3's run file waits for.
-# PR 3's run records it beside S2 and S3. Every time and result below is
+# PR 4's run records it beside S2 and S3 (amended at PR 3, below). Every time and result below is
 # GitHub's or AWS's, looked up, never written here.
 #
 # Stated before, and pushed before the attempt (open.md row 17). The
@@ -23,4 +23,9 @@ steps:
   - what: the merged default-branch head, left to the schedules (platform-check every 5 minutes, deploy every 10)
     expected: the App's success on the merge commit; deploy.yml's find-agents lists owner-check, then sign-agent and deploy-agent succeed; stack agentkeel-owner-check and runtime agentkeel_owner_check exist; one answer record under envelopes/agents/owner-check/ in the audit bucket; the registry row owner-check with repository agentkeel-studio/owner-check and the merge commit; panel 1 lists refagent and owner-check, and nothing the registry does not
 red_when: the first pull request is mergeable, or refused for a reason other than the seats and the goldens; the fixed head is refused; the merge is not deployed within an hour of the merge; or panel 1 and the registry differ
+# Amended at PR 3, before step 2: the repository and its ruleset were made
+# (2026-10-01T13:05:37Z; ruleset 24310403), and the ruleset read back
+# differed from the export, so the App would refuse every head for a reason
+# the expected readings exclude. Steps 2 to 4 wait for PR 3's merge, which
+# carries the export in GitHub's form; step 1 stands as made.
 observed: null

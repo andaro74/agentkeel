@@ -18,7 +18,9 @@ it is committed in the next milestone's PR 1; M01 PR 1) · ADR-0006
 interface endpoints; §8 M01; M01 PR 2) · Amended at M05 PR 1 (R5, §8
 M05, §10.3 row 05; `milestones/M05/rulings/pr1.md`) · Amended at M06 PR 1
 (§5 R1's `validate` list, §6 seats, §8 M06 and M07, §10.3 row 06;
-`milestones/M06/rulings/pr1.md`)
+`milestones/M06/rulings/pr1.md`) · Amended at M06 PR 3 (§10.5: the
+quickstart is timed after PR 3's merge and read by PR 4's run;
+`milestones/M06/rulings/pr3.md`)
 
 ## 1. What this is
 
@@ -792,8 +794,8 @@ not check recordings.
 
 ### 10.5 Rulings on documentation
 - No document describes a control that has not fired on its seeded case.
-- `quickstart.md` is timed on a clean account by the author at M06 PR 3;
-  the elapsed time is the measured value for claim 6, not an estimate.
+- `quickstart.md` is timed on a clean account by the author after M06 PR 3
+  merges, and read by PR 4's run (amended at M06 PR 3); the elapsed time is the measured value for claim 6, not an estimate.
 - Recordings are evidence, not marketing: no cuts, no retakes of a failed
   step. A failure on camera is kept and explained in the act's README
   entry.
