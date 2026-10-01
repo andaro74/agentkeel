@@ -13,7 +13,7 @@ pr: 35
 
 # Ruling: M06 PR 2, Threshold Owner
 
-DRAFT for andaro74 as Threshold Owner. Not ruled until this line reads "Ruled by".
+Ruled by andaro74 as Threshold Owner, 2026-10-01, as written.
 
 ## What this authorises
 
