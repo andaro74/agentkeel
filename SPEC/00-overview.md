@@ -20,7 +20,9 @@ M05, §10.3 row 05; `milestones/M05/rulings/pr1.md`) · Amended at M06 PR 1
 (§5 R1's `validate` list, §6 seats, §8 M06 and M07, §10.3 row 06;
 `milestones/M06/rulings/pr1.md`) · Amended at M06 PR 3 (§10.5: the
 quickstart is timed after PR 3's merge and read by PR 4's run;
-`milestones/M06/rulings/pr3.md`)
+`milestones/M06/rulings/pr3.md`) · Amended at M06 PR 4 (§8 M06, §10.1
+cut 3, §10.2 Acts 1 to 3, §10.5: row 6 closed RED and S3 moves to M07;
+`milestones/M06/rulings/pr4.md`)
 
 ## 1. What this is
 
@@ -505,6 +507,11 @@ rule for Enterprise Cloud only; F6.1 reads "mergeable", F6.2 "merged
 without the platform's check having run and passed". A third cut, after
 Act 3: `docs/developer/manifest.md`, `goldens.md` and `edges.md` to
 M07.
+Amended at M06 PR 4 (`milestones/M06/rulings/pr4.md`). Row 6 closed
+RED: the platform's App could not read an agent repository's ruleset, so
+every head was refused. **S3 and Acts 1 and 2 move to M07, not cut**,
+with the App's repair (`milestones/M07/open.md` rows 2, 4, 30). Cuts 1
+and 2 (panel 2, Act 3) were taken.
 
 ### M07 — Upgrade, retire, surfaces
 Build: `make upgrade` / `agent upgrade`; `platform-upgrade` draft PRs on
@@ -713,9 +720,9 @@ it does, what you do, what stops you.
 | `docs/platform/overview.md` | everyone | the one sentence (§1), the threats (§3), the seats table, what is enforced vs routed (R1), the envelope, the lifecycle of a PR | M02 |
 | `docs/platform/controls.md` | developers, auditors | one row per control: what it enforces, where it lives, the seeded case that proves it, the evidence path; rows added at the milestone that measured them | M01 → M08 |
 | `docs/developer/quickstart.md` | developers | create from template → fill manifest → assign seats → first PR fails on purpose → make it green → deploy; timed | M06 |
-| `docs/developer/manifest.md` | developers | every manifest field, its owner seat, its default, what changes its semver bump; `data_class` marked informational | M06 |
-| `docs/developer/goldens.md` | Data Owner | how to write a golden, a trap, a plant; immutable ids; the regression bar; FRAGILE and admitted false fails; local runs are not evidence | M06 |
-| `docs/developer/edges.md` | Tool Owner | declaring `may_call` both sides, schemas, ceilings, budget headers, what the graph diff flags | M06 |
+| `docs/developer/manifest.md` | developers | every manifest field, its owner seat, its default, what changes its semver bump; `data_class` marked informational | M07 (cut 3 at M06; amended at M06 PR 4) |
+| `docs/developer/goldens.md` | Data Owner | how to write a golden, a trap, a plant; immutable ids; the regression bar; FRAGILE and admitted false fails; local runs are not evidence | M07 (cut 3 at M06; amended at M06 PR 4) |
+| `docs/developer/edges.md` | Tool Owner | declaring `may_call` both sides, schemas, ceilings, budget headers, what the graph diff flags | M07 (cut 3 at M06; amended at M06 PR 4) |
 | `docs/refagent/README.md` | developers | the title-availability agent end to end: question, rights table, corpus, tool contract, HITL rule, the `ratings-helper` edge, every golden and why it exists, the hostile copy | M06 |
 | `docs/refagent/walkthrough.md` | developers | one request traced: prompt → guardrail → tool → table row → clause → judge → envelope, with the actual trace and envelope pasted in | M06 |
 | `docs/developer/upgrade.md` | developers | `make upgrade`, computed semver, platform-upgrade PRs, model-watch PRs, rollback, retirement | M07 |
@@ -725,9 +732,9 @@ it does, what you do, what stops you.
 ### 10.2 Recordings (`docs/video/`, mp4, ≤ 8 minutes each, unedited screen capture with narration)
 | Act | Title | Shows | Milestone |
 |---|---|---|---|
-| 1 | The platform in one PR | a developer creates an agent from the template, first PR fails on unassigned seat and empty goldens, assigns seats, adds goldens, PR goes green, agent deploys, registry panel updates | M06 |
-| 2 | Three doors | a relaxation without a ruling blocked; the same change with a ruling merged; the owner attempting bypass blocked — on real PRs | M06 (recorded against M02's PRs) |
-| 3 | The reference agent | refagent answering an ordinary question, then a trap, then a guardrail plant, then a HITL refusal; each answer's `table_row` and `clause_id` shown; the envelope and the Braintrust trace | M06 |
+| 1 | The platform in one PR | a developer creates an agent from the template, first PR fails on unassigned seat and empty goldens, assigns seats, adds goldens, PR goes green, agent deploys, registry panel updates | M07, recorded during S3 (moved at M06 PR 4, not cut) |
+| 2 | Three doors | a relaxation without a ruling blocked; the same change with a ruling merged; the owner attempting bypass blocked — on real PRs | M07 (recorded against M02's PRs; moved at M06 PR 4, not cut) |
+| 3 | The reference agent | refagent answering an ordinary question, then a trap, then a guardrail plant, then a HITL refusal; each answer's `table_row` and `clause_id` shown; the envelope and the Braintrust trace | M07 (cut 2 at M06) |
 | 4 | A model swap | `model-watch` opens the draft PR; the breaking swap RED with the failing goldens; the equivalent swap GREEN; A-vs-A | M07 (against M04's PRs) |
 | 5 | Game day | M08 run 1 live: six attempts, six denials, quarantine, the six events in the security account, Grafana during the run | M08 |
 | 6 | Upgrade and retire | `make upgrade` on refagent, the platform major bump PR, a retired agent's target disappearing | M07 |
@@ -794,8 +801,11 @@ not check recordings.
 
 ### 10.5 Rulings on documentation
 - No document describes a control that has not fired on its seeded case.
-- `quickstart.md` is timed on a clean account by the author after M06 PR 3
-  merges, and read by PR 4's run (amended at M06 PR 3); the elapsed time is the measured value for claim 6, not an estimate.
+- `quickstart.md` is timed on a clean account by the author, as the
+  write-only account `floresinnovations` (one person, R1), at M07, and
+  read by the run that milestone names (amended at M06 PR 3, and at M06
+  PR 4: not attempted at M06); the elapsed time is the measured value for
+  claim 6, not an estimate.
 - Recordings are evidence, not marketing: no cuts, no retakes of a failed
   step. A failure on camera is kept and explained in the act's README
   entry.
