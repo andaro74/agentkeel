@@ -462,3 +462,57 @@ human's read-only reads recorded in `runs/security_account.md`, and no
 call to GitHub but reads. No organisation, App, template or registry is
 made. No seat is assigned in either manifest: that is PR 2's, beside
 S1a's reader, or PR 2's own `validate` would refuse `main` (finding 12).
+
+## 8. The reads SPEC/06 §11 owed, and their rulings (PR 2)
+
+Read on 2026-09-30, before PR 2's first commit, read-only: AWS as
+`hector.acevedo` in the agent account, GitHub's and AWS's documentation.
+Each read was put to the human with a recommendation, and **ruled by the
+human on 2026-09-30, "go ahead with your recommendations"**, in the seats
+named. Where the read offered two options without a recommendation (R4
+rows 5 and 8), the automatic one was taken and is named in PR 2's
+**Unsure** list. PR 1's envelope (`evals/history/827ee8b…json`, written by
+CI on the merge's last commit) is cited here first: GREEN, runtime,
+ordinary 9/9, traps 2/2, guardrail 2/3, red team 5/5, plants 7/7, 48,667
+tokens, `regressed` empty. It says nothing about claim 6.
+
+**Facts read that SPEC/06 did not have.**
+
+- IAM Identity Center is **already active** in the agent account
+  (581208540944), the organisation's management account: an organisation
+  instance created 2024-07-23, with 0 permission sets, 0 users, no
+  delegated administrator (`sso-admin list-instances`,
+  `list-permission-sets`, `identitystore list-users`). The organisation:
+  581208540944 (management, invited) and 897698239547 (security, created).
+  Managed Grafana adds one user and one application assignment; it does
+  not enable Identity Center. `open.md` row 48's exposure already includes
+  this instance: an admin can give a permission set in the security
+  account today.
+- **The agent account is shared.** It holds 11 AgentCore runtimes that are
+  not agentkeel's (`showrunnerAgentcore_*`, `pipelineops_*`, `asdp_*`)
+  and about 25 stacks. No grant may be `runtime/*`.
+- **No organisation rulesets on a free organisation** (Team or Enterprise
+  only; "Creating rulesets for repositories in your organization"). Each
+  agent repository carries its own repository ruleset.
+- **A secret in an agent repository is the developer's.** GitHub withholds
+  secrets only from pull requests from forks; a write developer's branch
+  can carry a workflow that prints any secret.
+- **Managed Grafana has no core DynamoDB data source.** DynamoDB is a
+  Grafana Enterprise plugin, $45 per active user per month on top of the
+  licence. Managed Grafana: $9 per active editor, $5 per active viewer or
+  API user, per month; at least one editor; a 90-day trial for up to five
+  users per account (whether this account still has it is unread).
+
+**Rulings.**
+
+| # | Seat | Ruled |
+|---|---|---|
+| R1 | Security | **Grafana:** Amazon Managed Grafana in the agent account (us-west-2), Identity Center authentication (one user, `andaro74`), reading the registry through **Athena** (an AWS data source) and Athena's AWS-published **DynamoDB connector**. Not a custom plugin; SPEC/00 §1 already says "Grafana over CloudWatch and Athena". About $9 to $14 a month while it runs, Athena about $0. Panel 1's query names the registry through the connector's catalog and nothing else |
+| R2 | Security | **The trigger:** a scheduled workflow in `agentkeel` on `main` (every 5 minutes; GitHub may delay it at busy times) lists the organisation's open pull requests and default-branch heads with the App's token, evaluates each head it has not checked, and posts the platform check on that head as the App. **Nothing comes from the agent repository, so there is no request to forge.** The template ships no caller workflow; S2 is the stand-in job alone. The evaluation job parses only (no code from the head runs; a symlink is refused) and holds no key; a second job, in an environment limited to `main`, holds the App's key and posts. The App: checks write, pull requests read, contents read, administration read, installed on all of the organisation's repositories. Rejected: a dispatch token in the agent repository (the developer can read it, and it writes to `agentkeel`). Not taken: the App's webhook to a Lambda (more to build) |
+| R3 | Security | **The deploy:** `agentkeel`'s own deploy on `main` checks out an agent repository's merged commit as data, packs, signs, verifies and deploys it, building the image from a Dockerfile `agentkeel` owns in a job with no AWS credentials. The deploy role's trust, the eval role's trust and `verify`'s identity **stay exact**; finding 18's widening does not happen. `verify`'s constants move to a Security file under `infra/` (finding 16) |
+| R4 | Security | **The per-agent list**, SPEC/06 §6 |
+| R5 | Data Owner | **An agent's goldens:** the repository's root is the agent folder (S1a's fixture): `manifest.yaml`, `goldens/g-NNN.yaml`, `data/table.json` (rows keyed by `table_row`), `data/clauses.json`. Ordinary and trap only, SPEC/00 §6's shape, each citing a row and a clause in its own `data/`; ids scoped to the agent; `seat` names the Data Owner in either spelling (S1a's fixture writes `data-owner`) |
+| R6 | Engineering | **The checks in an agent repository**, SPEC/06 §6 |
+| R7 | Engineering | **Item 4's envelope:** `build` writes it in the deploy run, keyed to the agent repository's commit, and it is put once (If-None-Match) under `envelopes/agents/<name>/<commit>.json` in the security account's bucket; the put role trusts `deploy.yml` on `main` as well. PR 3's observer reads it and records its key and sha256 in `template`. Not `evals/history/`: `main` takes no direct push |
+| R8 | Engineering | S4's query check reads `infra/grafana/panel1.json` in `agentkeel` only |
+| R9 | Product | PR 2's list as R1 to R8 change it: no trust change, no caller workflow in the template |

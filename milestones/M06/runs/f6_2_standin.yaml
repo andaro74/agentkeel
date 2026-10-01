@@ -8,10 +8,10 @@
 # before S3 is timed, and is read by PR 3's run.
 #
 # The attack (BLOCK 2): the pull request's own workflow file adds a job
-# carrying the platform check's name that echoes success, and deletes the
-# caller's request to `agentkeel`, so the platform's check never runs on
-# the pull request. Deleting the request alone refuses nothing; the
-# stand-in job is what tries to answer to the required check.
+# carrying the platform check's name that echoes success. Amended at M06
+# PR 2 (feasibility.md section 8, R2): the template ships no caller
+# workflow, since agentkeel's main finds every pull request on a schedule,
+# so there is no request to delete; the stand-in job is the whole attack.
 #
 # The human fills `observed` with the repository and the pull request's
 # number. PR 3's run looks both up in GitHub (`scripts/observe_template.py`):
@@ -25,8 +25,8 @@ seed: S2
 falsifiers: [F6.2]
 principal: floresinnovations (id 336113686), write on the agent repository only
 attempts:
-  - what: a job named as the platform check in the pull request's own workflow, and no request to agentkeel
-    command: in the agent repository, a branch whose caller workflow drops the request to agentkeel and adds a job of the platform check's name that runs `echo ok`; open a pull request to the default branch
+  - what: a job named as the platform check in the pull request's own workflow
+    command: in the agent repository, a branch that adds a workflow with a job of the platform check's name that runs `echo ok`; open a pull request to the default branch
     refused_when: the pull request is not mergeable, and none of its check runs on its head was posted by the platform's App
     recorded_when: PR 3's run reads the pull request's check runs and merge state from GitHub
 observed: null
