@@ -19,6 +19,11 @@ What this stack makes:
   `LambdaRole` so that its own role is never made: the published role reads
   every DynamoDB table in the account, and this account holds other
   projects' tables. This one scans and describes `agentkeel-registry` alone;
+- **the registry's schema** in Glue, the table `default`.`agentkeel-registry`
+  with the registry's six string columns: without it the connector infers
+  the columns from the rows, and with no row yet it knows only `name`
+  (COLUMN_NOT_FOUND on panel 1, read 2026-10-01). The connector may read
+  that one Glue table;
 - **the connector** (`AthenaDynamoDBConnector`, a pinned version) as
   `agentkeel-registry-connector`, and the Athena data catalog
   `agentkeel_registry` that names it;
@@ -40,6 +45,7 @@ from pathlib import Path
 
 import aws_cdk as cdk
 from aws_cdk import aws_athena as athena
+from aws_cdk import aws_glue as glue
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_sam as sam
@@ -51,6 +57,9 @@ ACCOUNT = "581208540944"
 REGISTRY_TABLE = "agentkeel-registry"  # infra/bootstrap/app.py, REGISTRY_TABLE
 CONNECTOR = "agentkeel-registry-connector"
 CATALOG = "agentkeel_registry"  # panel1.json's connectionArgs.catalog
+GLUE_DATABASE = "default"  # the account's existing Glue database, and panel1.json's connectionArgs.database
+# The registry's attributes, every one a string (scripts/registry.py).
+REGISTRY_COLUMNS = ("name", "repository", "repository_id", "commit_sha", "deploy_run_id", "deployed_at")
 WORKGROUP = "agentkeel-grafana"
 WORKSPACE_ROLE = "agentkeel-grafana-workspace"
 # AWS's published connector, pinned. Read from the Serverless Application Repository on 2026-09-30
@@ -87,6 +96,24 @@ class GrafanaStack(cdk.Stack):
             actions=["dynamodb:DescribeTable", "dynamodb:Scan", "dynamodb:Query", "dynamodb:PartiQLSelect"],
             resources=[registry],
         ))  # fmt: skip
+        glue_table = f"arn:aws:glue:{REGION}:{ACCOUNT}:table/{GLUE_DATABASE}/{REGISTRY_TABLE}"
+        connector_role.add_to_policy(iam.PolicyStatement(
+            sid="TheRegistrysSchemaOnly", actions=["glue:GetTable"],
+            resources=[f"arn:aws:glue:{REGION}:{ACCOUNT}:catalog",
+                       f"arn:aws:glue:{REGION}:{ACCOUNT}:database/{GLUE_DATABASE}", glue_table],
+        ))  # fmt: skip
+        glue.CfnTable(
+            self, "RegistrySchema", catalog_id=ACCOUNT, database_name=GLUE_DATABASE,
+            table_input=glue.CfnTable.TableInputProperty(
+                name=REGISTRY_TABLE, table_type="EXTERNAL_TABLE",
+                description="agentkeel: the registry's columns, for Athena's DynamoDB connector (panel 1).",
+                parameters={"classification": "dynamodb", "sourceTable": REGISTRY_TABLE},
+                storage_descriptor=glue.CfnTable.StorageDescriptorProperty(
+                    location=registry,
+                    columns=[glue.CfnTable.ColumnProperty(name=c, type="string") for c in REGISTRY_COLUMNS],
+                ),
+            ),
+        )  # fmt: skip
         connector_role.add_to_policy(iam.PolicyStatement(
             sid="ListTablesTakesNoResource", actions=["dynamodb:ListTables"], resources=["*"]))
         connector_role.add_to_policy(iam.PolicyStatement(
