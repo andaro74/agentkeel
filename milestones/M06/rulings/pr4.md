@@ -6,6 +6,7 @@ ruling: pr4
 seat: Product
 authorises:
   - SPEC/00-overview.md
+  - SPEC/06-developer-template.md
   - milestones/README.md
   - milestones/M06/README.md
   - milestones/M06/attestations.md
@@ -46,7 +47,7 @@ first); the owner test's step 2 miss; row 6's Measured cell from `make
 ledger`'s reading of the envelope for `245eb9b` (CI run 36886530498, bot
 commit `3ca05dd`), State RED, 4 / 4; `validate` at `m06` in the ledger
 header; `make ledger-plain`; the close detail; the explainer's "What
-happened"; `attestations.md`; SPEC/00's amendments; this file and
+happened"; `attestations.md`; SPEC/00's amendments and SPEC/06 §5.1's note; this file and
 Engineering's; and `milestones/M07/open.md`. It builds no reader and
 changes nothing under `agents/`, `src/`, `infra/`, `scripts/`,
 `.github/`, `thresholds.yaml`, `evals/goldens/` or `data/`. Its one
@@ -98,7 +99,10 @@ the attempt for M07 instead of spending it.
    since `pr2.md` ruling 4, data-owner N10); Acts 1 and 2 to M07, moved
    with S3 and not cut; Act 3 to M07 as cut 2; cuts 1 and 2 recorded as
    taken (neither was built in M06). Act 2 was due at this close and was
-   not recorded: a finding, `milestones/M07/open.md` row 30.
+   not recorded: a finding, `milestones/M07/open.md` row 30. **SPEC/06
+   §5.1** gets an amendment note saying the same, and that its bullets
+   stand as M06's plan (cold review F3); SPEC/00 §8 M07's build list is
+   left for SPEC/07 (`milestones/M07/open.md` row 31; cold review N4).
 3. **"Governed"**: row 6's claim keeps its wording, since a claim is not
    rewritten at its close. The close, the explainer and the attestations
    do not repeat the word, or "secure" or "proven", about F6.1 to F6.3
