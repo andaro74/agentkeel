@@ -347,7 +347,7 @@ def test_the_repositorys_ruleset_must_be_the_export_with_no_bypass():
 
 
 def test_the_rulesets_app_is_the_platforms_app():
-    """agent.json's integration_id and platform_identity.json's platform_app_id are one number (both null until made)."""
+    """agent.json's integration_id and platform_identity.json's platform_app_id are one number (5144253 from 2026-09-30)."""
     export = json.loads((build.ROOT / platform.EXPORT).read_text(encoding="utf-8"))
     identity = json.loads((build.ROOT / "infra" / "platform_identity.json").read_text(encoding="utf-8"))
     checks = [r for r in export["rules"] if r["type"] == "required_status_checks"]

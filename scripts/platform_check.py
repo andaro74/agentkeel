@@ -7,8 +7,8 @@
 Nothing comes from an agent repository but what GitHub's API says about
 it. The organisation and the App are `infra/platform_identity.json`'s; while
 either is null every subcommand writes an empty list and says so, and no
-check is posted (the ruleset export's `integration_id` is null too, so no
-agent repository can require one yet).
+check is posted (the ruleset export's `integration_id` must equal the App's
+id, `tests/test_m06_readers.py`).
 
 - `find`: every open pull request's head, and every default-branch head, in
   the organisation's repositories, that has no `platform-check` run from the

@@ -33,7 +33,9 @@ DRAFT for andaro74 as Security. Not ruled until this line reads "Ruled by".
   schedule; the agent repositories' ruleset export `infra/ruleset/agent.json`;
   `infra/platform_identity.json`, which carries verify's signer and repository
   id unchanged (moved from `src/bundle/verify.py`, finding 16) and the
-  organisation and App, null until made.
+  organisation `agentkeel-studio` (GitHub Free, so its repositories are
+  public: a ruleset is enforced only there) and the App 5144253, made by the
+  human on 2026-09-30.
 - **The agent deploy** (R3): `deploy.yml`'s `find-agents`, `sign-agent` and
   `deploy-agent`, from `main`, with the platform's
   `infra/construct/agent.Dockerfile`; refagent's jobs unchanged but for its

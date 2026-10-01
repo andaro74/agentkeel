@@ -61,9 +61,11 @@ gh api --method POST repos/<org>/<repo>/rulesets --input infra/ruleset/agent.jso
 
 It requires one status check, `platform-check`, **from the platform's App**
 (`integration_id`, which must equal `platform_app_id` in
-`infra/platform_identity.json`; both are null until the human makes the
-App during M06 PR 2, and the platform check posts nothing while it is
-null). A job named `platform-check` in a pull request's own workflow runs
+`infra/platform_identity.json`; both are 5144253, the App `agentkeel-platform`
+made on 2026-09-30, and the platform check posts nothing while either is
+null). The organisation `agentkeel-studio` is on GitHub Free, which enforces
+a ruleset only on a public repository: the template and every agent
+repository are public. A job named `platform-check` in a pull request's own workflow runs
 as the GitHub Actions app and does not satisfy it (S2). Branches must be
 up to date before merge, a pull request is required, merges are merge
 commits, and `bypass_actors` is `[]`.
