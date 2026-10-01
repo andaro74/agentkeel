@@ -346,24 +346,18 @@ def test_the_repositorys_ruleset_must_be_the_export_with_no_bypass():
     assert "not shown" in platform.ruleset_errors([hidden])[0]
 
 
-# agentkeel-studio/owner-check's ruleset 24310403 as GitHub returned it, 2026-10-01 (M06 PR 3).
-LIVE_ORGANISATION_RULESET = {
-    "id": 24310403, "name": "platform", "target": "branch", "source_type": "Repository", "enforcement": "active",
-    "conditions": {"ref_name": {"exclude": [], "include": ["~DEFAULT_BRANCH"]}},
-    "rules": [
-        {"type": "deletion"},
-        {"type": "non_fast_forward"},
-        {"type": "pull_request", "parameters": {
-            "required_approving_review_count": 0, "dismiss_stale_reviews_on_push": False, "required_reviewers": [],
-            "require_code_owner_review": False, "dismissal_restriction": {"enabled": False, "allowed_actors": []},
-            "require_last_push_approval": False, "required_review_thread_resolution": False,
-            "require_extra_approval_for_unattributed_changes": True, "allowed_merge_methods": ["merge"]}},
-        {"type": "required_status_checks", "parameters": {
-            "strict_required_status_checks_policy": True, "do_not_enforce_on_create": False,
-            "required_status_checks": [{"context": "platform-check", "integration_id": 5144253}]}},
-    ],
-    "bypass_actors": [],
-}  # fmt: skip
+# agentkeel-studio/owner-check's ruleset 24310403, GitHub's response as `gh api` saved it, 2026-10-01 (M06 PR 3).
+LIVE_ORGANISATION_RULESET = json.loads(
+    (build.ROOT / "milestones" / "M06" / "runs" / "owner_check_ruleset_24310403.json").read_text(encoding="utf-8"))
+GITHUBS_OWN = {"dismissal_restriction": {"enabled": False, "allowed_actors": []},
+               "require_extra_approval_for_unattributed_changes": True}
+
+
+def _with_pull_request(ruleset: dict, change) -> dict:
+    out = copy.deepcopy(ruleset)
+    rule = next(r for r in out["rules"] if r["type"] == "pull_request")
+    rule["parameters"] = change(dict(rule["parameters"]))
+    return out
 
 
 def test_the_export_is_the_form_github_returns_for_an_organisation_repository():
@@ -371,11 +365,24 @@ def test_the_export_is_the_form_github_returns_for_an_organisation_repository():
     organisation repository's pull request rule. An export without them read as different from every live
     ruleset, so the App would have refused every head of every agent repository (M06 PR 3, before S2 and S3)."""
     assert platform.ruleset_errors([LIVE_ORGANISATION_RULESET]) == []
-    pull_request = next(r for r in LIVE_ORGANISATION_RULESET["rules"] if r["type"] == "pull_request")
-    without = copy.deepcopy(LIVE_ORGANISATION_RULESET)
-    next(r for r in without["rules"] if r["type"] == "pull_request")["parameters"] = {
-        k: v for k, v in pull_request["parameters"].items() if k != "dismissal_restriction"}
-    assert platform.ruleset_errors([without]) == [f"{platform.EXPORT}: rules differs from live ruleset 24310403"]
+    without = _with_pull_request(LIVE_ORGANISATION_RULESET, lambda p: {k: v for k, v in p.items()
+                                                                       if k != "dismissal_restriction"})
+    assert platform.ruleset_errors([without]) == [
+        f"{platform.EXPORT}: rules differs from live ruleset 24310403 (pull_request: dismissal_restriction)"]
+    # The weaker live ruleset an admin could make is refused too (security-reviewer F2 on PR 3).
+    weaker = _with_pull_request(LIVE_ORGANISATION_RULESET,
+                                lambda p: {**p, "require_extra_approval_for_unattributed_changes": False})
+    assert platform.ruleset_errors([weaker]) == [f"{platform.EXPORT}: rules differs from live ruleset 24310403 "
+                                                 "(pull_request: require_extra_approval_for_unattributed_changes)"]
+
+
+def test_the_post_body_is_the_export_without_githubs_own_fields():
+    """`agent.post.json` is what the owner POSTs: the form GitHub accepted for ruleset 24310403, to which it
+    added the two fields itself. With them added it is the export, field for field."""
+    body = json.loads((build.ROOT / "infra" / "ruleset" / "agent.post.json").read_text(encoding="utf-8"))
+    export = json.loads((build.ROOT / platform.EXPORT).read_text(encoding="utf-8"))
+    assert _with_pull_request(body, lambda p: {**p, **GITHUBS_OWN}) == export
+    assert not set(GITHUBS_OWN) & set(next(r for r in body["rules"] if r["type"] == "pull_request")["parameters"])
 
 
 def test_the_rulesets_app_is_the_platforms_app():
