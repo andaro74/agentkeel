@@ -386,3 +386,66 @@ def test_the_template_with_seats_and_two_goldens_passes_the_platform_check(tmp_p
             "expected": {"table_row": row, "clause_id": "ML-2.1", "answer_fields": {"available": kind == "ordinary"}},
             "seat": "Data Owner", "added": "M06", "retired": None}), encoding="utf-8")  # fmt: skip
     assert refused(platform.evaluate(repo, "org/example-agent", lookup=owner)) == []
+
+
+# --- the platform check's two halves (scripts/platform_check.py) ------------------
+
+from scripts import platform_check  # noqa: E402
+
+
+@pytest.fixture
+def github(monkeypatch):
+    """A stand-in GitHub: GET answers from `pages`, POSTs are recorded."""
+    state: dict[str, Any] = {"pages": {}, "posted": []}
+
+    def gh(path, *, method="GET", body=None, raw=False):
+        if method == "POST":
+            state["posted"].append((path, body))
+            return {}
+        return state["pages"][path]
+
+    monkeypatch.setattr(platform_check, "gh", gh)
+    return state
+
+
+def test_find_lists_open_heads_the_app_has_not_checked(github):
+    github["pages"].update({
+        "/orgs/org/repos?per_page=100&type=all": [{"full_name": "org/a", "archived": False, "is_template": False},
+                                                   {"full_name": "org/template", "archived": False, "is_template": True}],
+        "/repos/org/a/pulls?state=open&per_page=100": [{"number": 1, "head": {"sha": "1" * 40}},
+                                                       {"number": 2, "head": {"sha": "2" * 40}}],
+        f"/repos/org/a/commits/{'1' * 40}/check-runs?check_name=platform-check&app_id={APP}&per_page=100":
+            {"check_runs": [{"app": {"id": APP}, "conclusion": "failure"}]},
+        f"/repos/org/a/commits/{'2' * 40}/check-runs?check_name=platform-check&app_id={APP}&per_page=100":
+            {"check_runs": [{"app": {"id": 15368}, "conclusion": "success"}]},  # the stand-in's, not the App's
+    })  # fmt: skip
+    assert platform_check.find("org", APP) == [{"repository": "org/a", "number": 2, "head": "2" * 40}]
+
+
+def test_post_checks_seats_and_the_ruleset_then_posts_one_check_on_the_head(github, tmp_path, monkeypatch):
+    export = json.loads((build.ROOT / platform.EXPORT).read_text(encoding="utf-8"))
+    github["pages"].update({"/repos/org/a/rulesets?includes_parents=false&per_page=100": [{"id": 9}],
+                            "/repos/org/a/rulesets/9": {**export, "id": 9}})  # fmt: skip
+    monkeypatch.setattr(seats, "login_has_access", type("L", (), {
+        "__call__": staticmethod(lambda login: (login == "andaro74", "stand-in")),
+        "cache_clear": staticmethod(lambda: None)})())  # fmt: skip
+    (tmp_path / "1").mkdir()
+    result = {"repository": "org/a", "head": "2" * 40, "errors": {"manifest schema": []}, "seat_logins": ["andaro74"]}
+    (tmp_path / "1" / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    assert platform_check.post(tmp_path, APP) == 1
+    (path, body), = github["posted"]
+    assert path == "/repos/org/a/check-runs" and body["head_sha"] == "2" * 40
+    assert body["name"] == "platform-check" and body["conclusion"] == "success"
+
+    github["posted"].clear()
+    result["seat_logins"] = ["floresinnovations"]
+    (tmp_path / "1" / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    platform_check.post(tmp_path, APP)
+    assert github["posted"][0][1]["conclusion"] == "failure"
+    assert "floresinnovations has no access" in github["posted"][0][1]["output"]["summary"]
+
+
+def test_nothing_is_read_or_posted_while_the_organisation_or_the_app_is_unnamed(tmp_path, github):
+    out = tmp_path / "heads.json"
+    assert platform_check.main(["find", "--out", str(out)]) == 0
+    assert json.loads(out.read_text(encoding="utf-8")) == [] and github["posted"] == []

@@ -164,15 +164,24 @@ def main(argv: list[str] | None = None) -> int:
     one.add_argument("--repository", required=True)
     one.add_argument("--head", required=True)
     one.add_argument("--out", required=True, type=Path)
+    # The evaluating job holds no token that may ask an organisation repository about its collaborators:
+    # a seat that names a login passes here, and the posting job checks each login's access with the App's.
+    one.add_argument("--defer-seat-access", action="store_true")
     two = sub.add_parser("ruleset")
     two.add_argument("--live", required=True, type=Path)
     two.add_argument("--out", required=True, type=Path)
     args = parser.parse_args(argv)
 
     if args.what == "evaluate":
-        errors = evaluate(args.agent, args.repository)
+        logins: list[str] = []
+
+        def deferred(login: str) -> tuple[bool, str]:
+            logins.append(login)
+            return True, "deferred to the posting job"
+
+        errors = evaluate(args.agent, args.repository, lookup=deferred if args.defer_seat_access else None)
         result = {"repository": args.repository, "head": args.head, "errors": errors,
-                  "passed": not any(errors.values())}  # fmt: skip
+                  "seat_logins": sorted(set(logins)), "passed": not any(errors.values())}  # fmt: skip
     else:
         live = json.loads(args.live.read_text(encoding="utf-8"))
         problems = ruleset_errors(live if isinstance(live, list) else [])
