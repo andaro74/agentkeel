@@ -295,6 +295,7 @@ STACKS = {
     "AgentkeelIngest": "infra/ingest",  # M03 PR 2
     "AgentkeelSecurity": "infra/security",  # M05 PR 2: the security account's stack
     "AgentkeelAudit": "infra/audit",  # M05 PR 2: delivery from the agent account
+    "AgentkeelGrafana": "infra/grafana",  # M06 PR 2: panel 1 through Athena (SPEC/06 section 6, R1)
 }
 NAG_REPORT = "AwsSolutions--{stack}-NagReport.csv"
 
