@@ -88,6 +88,16 @@ SWAPS_RULED = $(SWAPS_OBS:.json=-ruled.json)
 # the envelope has no containment, and row 5 reads it as not read.
 F5_1_CASES := test_s4_a_chain_at_depth_3_is_refused_before_the_model,test_s5_an_answer_that_repeats_a_credential_from_a_tool_result_does_not_pass
 CONTAINMENT_OBS ?=
+# M06 PR 2 (SPEC/06 section 4). F6_1: seeds S1a and S1b refused by their own
+# readers and neither by the other's; F6_4: seed S4 refused by the panel query
+# reader and found by build's comparison. Test-only witnesses, the only claim 6
+# checks on an envelope. The live records are TEMPLATE_OBS,
+# scripts/observe_template.py's reading of GitHub, AWS and Grafana: build rules
+# them into `template`, and only the ledger's row 6 reading reads it. Empty,
+# the envelope has no template, and row 6 reads it as not read.
+F6_1_CASES := test_s1a_an_unassigned_seat_is_refused,test_s1a_reader_does_not_refuse_s1b,test_s1b_goldens_under_the_minimum_are_refused,test_s1b_reader_does_not_refuse_s1a
+F6_4_CASES := test_s4_a_panel_1_query_with_a_second_source_is_refused,test_s4_a_panel_row_with_no_registry_row_is_found_by_build
+TEMPLATE_OBS ?=
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \
           $(if $(F0_3_OBS),--check-pr F0_3 "$(F0_3_OBS)") \
           $(if $(JUNIT),--check-cases F1_1 "$(F1_1_CASES)" "$(JUNIT)") \
@@ -108,6 +118,8 @@ CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)")
           $(if $(and $(JUNIT),$(A_VS_A)),--check-cases F4_3 "$(F4_3_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F4_4 "$(F4_4_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F5_1 "$(F5_1_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F6_1 "$(F6_1_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F6_4 "$(F6_4_CASES)" "$(JUNIT)") \
           $(if $(RUN_URL),--run-url "$(RUN_URL)")
 # CI passes a file path; the gate's exit code is written there, so a REJECTED
 # envelope (exit 2) is told from a RED one and is not recorded (M01 item 9).
@@ -140,7 +152,7 @@ define chain
 	$(if $(A_VS_A),-uv run python -m src.agent.run --out $(1)/$(2).agent-raw-b.json --recheck-runtime)
 	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json $(A_VS_A_RUNS)
 	$(if $(SWAPS_OBS),uv run python scripts/rule_swaps.py "$(SWAPS_OBS)" --out "$(SWAPS_RULED)")
-	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)")
+	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)") $(if $(TEMPLATE_OBS),--template "$(TEMPLATE_OBS)")
 	uv run python -m src.verdict.gate $(1)/$(2).json; code=$$?; $(if $(GATE_EXIT),echo $$code > "$(GATE_EXIT)";) exit $$code
 endef
 else

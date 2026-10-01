@@ -39,6 +39,13 @@ From M04 PR 2 (SPEC/04 §2, §6) an agent envelope also carries:
   diff. The control's diff, given `--a-vs-a-control`, is recorded and not
   gated (ADR-0004; Finding F0.4).
 
+From M06 PR 2, with `--template`, `template`: claim 6's live readings,
+ruled here (src/verdict/template.py) on what `scripts/observe_template.py`
+read, against `quickstart.max_seconds`. Recorded, never gated (SPEC/06 §4).
+And `build answer` writes item 4's record for an agent from the template:
+its deployed runtime's answers to its own goldens, scored against its own
+data, keyed to the agent repository's commit (SPEC/06 §6, R7).
+
 From M04 PR 3, with `--swaps`, `swaps`: what `scripts/rule_swaps.py` wrote,
 the gate's verdict on each swap PR's own envelope beside GitHub's record of
 the pull. Copied, not read: build rules on no envelope (P5), and nothing
@@ -73,7 +80,7 @@ from typing import Any
 
 import yaml
 
-from src.verdict import containment
+from src.verdict import containment, template
 # M06 PR 2 (SPEC/06 §4, BLOCK 3): build is the comparer of panel 1's rows with the registry's.
 from src.verdict.template import panel_not_in_registry  # noqa: F401  (S4's reader, by this name)
 from src.verdict import (
@@ -683,6 +690,22 @@ def containment_record(path: Path, thresholds: dict[str, Any]) -> tuple[dict[str
         raise Refused(f"{path}: {exc}") from exc
 
 
+def quickstart_bar(thresholds: dict[str, Any]) -> float:
+    """`quickstart.max_seconds` (SPEC/06 section 1): refused when it is absent, as N is."""
+    bar = (thresholds.get("quickstart") or {}).get("max_seconds")
+    if not isinstance(bar, (int, float)) or isinstance(bar, bool) or bar <= 0:
+        raise Refused(f"thresholds.yaml quickstart.max_seconds must be a positive number, got {bar!r}")
+    return float(bar)
+
+
+def template_record(path: Path, thresholds: dict[str, Any]) -> dict[str, Any]:
+    """scripts/observe_template.py's observation, ruled into `template` (SPEC/06 §4)."""
+    try:
+        return template.record(load_json(path), quickstart_bar(thresholds))
+    except template.Unreadable as exc:
+        raise Refused(f"{path}: {exc}") from exc
+
+
 def compose_envelope(
     raw: dict[str, Any],
     results: dict[str, dict[str, Any]],
@@ -704,6 +727,7 @@ def compose_envelope(
     control_second: tuple[dict[str, Any], list[str]] | None = None,
     swaps: list[dict[str, Any]] | None = None,
     containment: tuple[dict[str, Any], float | None] | None = None,
+    template_reading: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """`bars` and `incumbent` (its runs, and where the pin was read) give F4_4; `second`, the
     agent's second raw and its scores, gives A-vs-A and F4_3; `control_second`, the control's
@@ -784,6 +808,9 @@ def compose_envelope(
     # M05 PR 2 (SPEC/05 section 4): the live attempts, recorded and gated by nothing; row 5's cell reads them.
     if gated and containment is not None:
         one_subject["containment"] = containment[0]
+    # M06 PR 2 (SPEC/06 section 4): claim 6's live readings, recorded and gated by nothing; row 6 reads them.
+    if gated and template_reading is not None:
+        one_subject["template"] = template_reading
     return {
         "commit": raw["commit"],
         "tag": tag,
@@ -879,6 +906,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--swaps", type=Path, metavar="RULED")
     # M05 PR 2 (SPEC/05 §4): the attempts, as scripts/observe_containment.py read them. Recorded only.
     parser.add_argument("--containment", type=Path, metavar="OBSERVATION")
+    # M06 PR 2 (SPEC/06 §4): the template's live records, as scripts/observe_template.py read them. Recorded only.
+    parser.add_argument("--template", type=Path, metavar="OBSERVATION")
     parser.add_argument("--run-url")
     parser.add_argument("--allow-dirty", action="store_true")
     args = parser.parse_args(argv)
@@ -978,6 +1007,7 @@ def main(argv: list[str] | None = None) -> int:
                     control_second=control_second,
                     swaps=swaps_record(args.swaps) if args.swaps else None,
                     containment=containment_record(args.containment, thresholds) if args.containment else None,
+                    template_reading=template_record(args.template, thresholds) if args.template else None,
                 )
             emit(envelope, args.out, envelope=True)
     except Refused as refusal:

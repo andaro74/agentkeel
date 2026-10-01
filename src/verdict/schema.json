@@ -461,6 +461,71 @@
         }
       }
     },
+    "template": {
+      "description": "From M06 PR 2 (SPEC/06 section 4). Claim 6's live readings as scripts/observe_template.py read GitHub, AWS and Grafana and verdict.build (src/verdict/template.py) ruled on them: F6.1's live half, F6.2, F6.3 and F6.4's live half, each read or not, held or not, with its reasons. Recorded, never gated; the ledger's row 6 reading reads it. Optional, so no envelope before it becomes invalid.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["looked_up_at", "max_seconds", "platform_app_id", "F6_1", "F6_2", "F6_3", "F6_4"],
+      "properties": {
+        "looked_up_at": {"type": ["string", "null"]},
+        "max_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "platform_app_id": {"type": ["integer", "null"]},
+        "F6_1": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "faulty_commits": {"type": "integer", "minimum": 0}
+          }
+        },
+        "F6_2": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "F6_3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "elapsed_s", "records"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "elapsed_s": {"type": ["number", "null"]},
+            "records": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "created_at": {"type": ["string", "null"]},
+                "merged_at": {"type": ["string", "null"]},
+                "deployed_at": {"type": ["string", "null"]},
+                "answered_at": {"type": ["string", "null"]},
+                "registered_at": {"type": ["string", "null"]}
+              }
+            }
+          }
+        },
+        "F6_4": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "not_in_registry"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "not_in_registry": {"type": ["array", "null"], "items": {"type": "string"}}
+          }
+        }
+      }
+    },
     "swaps": {
       "description": "From M04 PR 3 (SPEC/04 §4). The M04 swap PRs as scripts/rule_swaps.py read them: GitHub's record of each pull and the gate's verdict on that pull's own envelope. Recorded, never gated (Product, M04 PR 3). Optional, so no envelope before it becomes invalid.",
       "type": "array",
