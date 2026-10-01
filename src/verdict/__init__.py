@@ -193,6 +193,10 @@ M04_READERS = "15047b4"
 # requires it from here. On PR 2's branch, and main keeps it because pull
 # requests land as merge commits (ADR-0004 amendment 1).
 M05_READERS = "2c88265"
+# The commit that wired claim 6's two checks, F6_1 from the S1a and S1b seed tests and F6_4 from S4's,
+# into the Makefile (M06 PR 2; SPEC/06 section 4). The gate requires them from here. Named in the
+# commit after it, as M05's was.
+M06_READERS = "c2a15d0"
 
 
 def descends_from(commit: str, anchor: str, root: Path = ROOT) -> bool:

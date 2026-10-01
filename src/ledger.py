@@ -129,12 +129,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"\nlatest CI-written envelope reads:\n    {gate.measured_at(path, args.history_dir)}")
             # The line a close copies must be the row's reading, not the envelope's
             # alone: for a row read in the runtime they differ (M01 PR 4).
-            # So is a row read from the swap PRs (M04 PR 4), and one read from the live attempts (M05 PR 2).
+            # So is a row read from the swap PRs (M04 PR 4), one read from the live attempts (M05 PR 2),
+            # and one read from the template's live records (M06 PR 2).
             # A swap row's line is printed only for an envelope that recorded swaps: row 4 is read from its
             # own envelope, which check_measured holds above, and a later envelope has none to read (cold
             # review N2 on M05 PR 1).
             has_swaps = bool(gate.read(path).get("swaps"))
-            for milestone in sorted(gate.READ_IN_THE_RUNTIME | gate.READ_THE_SWAPS | gate.READ_THE_CONTAINMENT):
+            for milestone in sorted(gate.READ_IN_THE_RUNTIME | gate.READ_THE_SWAPS | gate.READ_THE_CONTAINMENT
+                                    | gate.READ_THE_TEMPLATE):
                 if milestone in gate.READ_THE_SWAPS and not has_swaps:
                     continue
                 print(f"as row {milestone} reads it:\n    "

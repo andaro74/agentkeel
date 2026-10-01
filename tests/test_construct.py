@@ -242,7 +242,8 @@ def test_the_role_pulls_its_own_image_read_only(template):
 def test_the_role_makes_its_log_group_under_agentcores_prefix_only(template):
     groups = [s for s in agent_statements(template) if "logs:CreateLogGroup" in s["Action"]]
     assert len(groups) == 1
-    assert ":log-group:/aws/bedrock-agentcore/runtimes/*" in json.dumps(groups[0]["Resource"])
+    # Its own runtime's, by name (platform-architect F3 on M06 PR 2), not every runtime's in the account.
+    assert ":log-group:/aws/bedrock-agentcore/runtimes/refagent-*" in json.dumps(groups[0]["Resource"])
 
 
 def test_no_action_the_role_names_is_one_iam_does_not_have(template):
@@ -255,7 +256,7 @@ def test_the_roles_logs_and_key_are_its_own_not_the_accounts(template):
     """PR 3 security-reviewer F6: both were on `*`, which reached any key whose policy delegates to IAM."""
     stmts = {s.get("Sid"): s for s in agent_statements(template)}
     streams = stmts["ItsOwnLogStreams"]
-    assert ":log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*" in json.dumps(streams["Resource"])
+    assert ":log-group:/aws/bedrock-agentcore/runtimes/refagent-*:log-stream:*" in json.dumps(streams["Resource"])
     key = stmts["ItsOwnKeyByAlias"]
     assert key["Condition"] == {"ForAnyValue:StringEquals": {"kms:ResourceAliases": "alias/agentkeel-refagent"}}
     assert not [s for s in agent_statements(template) if s["Resource"] == "*"
@@ -339,3 +340,58 @@ def test_a_given_role_is_held_to_the_same_denies_and_record_as_the_constructs_ow
     denies = [s for s in statements if s["Effect"] == "Deny"]
     assert len(denies) == 1 and set(denies[0]["Action"]) == AGENT_DENIES
     assert any(s.get("Sid") == "ItsOwnRecordInTheAuditBucket" for s in statements)
+
+
+def test_an_agent_from_the_template_brings_its_own_key_and_a_platform_runtime_name(tmp_path):
+    """M06 PR 2 (SPEC/06 section 6, items 4, 5, 7, 8): its key, every platform role denied its administration
+    (R4) and agents denied its policy (S6's control, by path); runtime agentkeel_<name>; image under the
+    agentkeel/ namespace; its role tagged with its name, which the audit bucket's policy reads."""
+    agents = tmp_path / "agents" / "premiere-desk"
+    agents.mkdir(parents=True)
+    manifest = yaml.safe_load((ROOT / "tests" / "fixtures" / "m06" / "s1a-unassigned-seat" / "manifest.yaml")
+                              .read_text(encoding="utf-8"))  # fmt: skip
+    manifest["guardrail"] = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))["guardrail"]
+    (agents / "manifest.yaml").write_text(yaml.safe_dump(manifest), encoding="utf-8")
+    out = tmp_path / "out"
+    script = tmp_path / "agent_app.py"
+    script.write_text(
+        "from pathlib import Path\n"
+        "import aws_cdk as cdk\n"
+        "import infra.construct.governed_agent as g\n"
+        f"g.ROOT = Path({str(tmp_path)!r})\n"
+        f"app = cdk.App(outdir={str(out)!r})\n"
+        'stack = cdk.Stack(app, "T", env=cdk.Environment(region="us-west-2"))\n'
+        'g.GovernedAgent(stack, "A", bundle="agents/premiere-desk")\n'
+        "app.synth()\n",
+        encoding="utf-8",
+    )
+    done = subprocess.run([sys.executable, str(script)], cwd=ROOT, capture_output=True, text=True, check=False,
+                          env={**os.environ, "PYTHONPATH": str(ROOT)})  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    resources = json.loads((out / "T.template.json").read_text(encoding="utf-8"))["Resources"]
+    of = lambda kind: [r for r in resources.values() if r["Type"] == kind]  # noqa: E731
+    (key,) = of("AWS::KMS::Key")
+    (alias,) = of("AWS::KMS::Alias")
+    (runtime,) = of("AWS::BedrockAgentCore::Runtime")
+    (role,) = of("AWS::IAM::Role")
+    role_policy = [s for policy in of("AWS::IAM::Policy") for s in policy["Properties"]["PolicyDocument"]["Statement"]]
+    assert key["DeletionPolicy"] == "Retain" and key["Properties"]["EnableKeyRotation"] is True
+    statements = {s["Sid"]: s for s in key["Properties"]["KeyPolicy"]["Statement"]}
+    denied = json.dumps(statements["NoPlatformRoleChangesThisKey"]["Condition"])
+    assert all(name in denied for name in ("agentkeel-deploy", "agentkeel-cfn-exec", "agentkeel-evals", "/agentkeel/agents/"))
+    assert set(statements["NoPlatformRoleChangesThisKey"]["Action"]) == {
+        "kms:PutKeyPolicy", "kms:CreateGrant", "kms:ScheduleKeyDeletion", "kms:DisableKey",
+        # and what else changes a key once made (security-reviewer F4 on M06 PR 2)
+        "kms:UpdateAlias", "kms:DeleteAlias", "kms:UntagResource", "kms:DisableKeyRotation",
+        "kms:RevokeGrant", "kms:RetireGrant"}
+    # Its own agent's role only (platform-architect F2): the tag the platform sets, not every agent role.
+    use = statements["ItsAgentUsesTheKeyAndNeverReadsItsPolicy"]["Condition"]["StringEquals"]
+    assert use["aws:PrincipalTag/agentkeel:agent"] == "premiere-desk"
+    assert {"Key": "agentkeel:agent", "Value": "premiere-desk"} in key["Properties"]["Tags"]
+    logs = [s for s in role_policy if "logs:CreateLogGroup" in json.dumps(s["Action"])]
+    assert "runtimes/agentkeel_premiere_desk-*" in json.dumps(logs)
+    assert statements["NoAgentReadsThisPolicy"]["Effect"] == "Deny"
+    assert alias["Properties"]["AliasName"] == "alias/agentkeel-premiere-desk"
+    assert runtime["Properties"]["AgentRuntimeName"] == "agentkeel_premiere_desk"
+    assert "agentkeel/premiere-desk@" in json.dumps(runtime["Properties"]["AgentRuntimeArtifact"])
+    assert {"Key": "agentkeel:agent", "Value": "premiere-desk"} in role["Properties"]["Tags"]

@@ -86,6 +86,23 @@ relative:
 detection:
   max_seconds: 600
 
+# Threshold Owner (M06 PR 2; SPEC/06 section 1, finding 8 on M06 PR 1):
+# claim 6's bar. The timed quickstart's elapsed time, from the agent
+# repository's created_at to the last of its timed records (the first pull
+# request refused then merged, the platform's deploy run that wrote the
+# agent's first answer, that answer to one of its own goldens), every time
+# GitHub's or AWS's. The registry row must hold the agent and panel 1 must
+# list it; neither is timed: the row's time is a runner's clock, and the
+# panel is read when asked (threshold-owner F2, N8 on M06 PR 2). One working
+# day, wall clock, breaks not subtracted. Absolute, not relative: it is not
+# a quality bar and has no incumbent to be relative to (SPEC/00 section 8
+# M04: one policy is about quality bars; threshold-owner F1 on M06 PR 2).
+# Read by build into `template` and by row 6's reading of it; gates no pull
+# request. Added before S3 is timed; adding a bar is not a relaxation
+# (ADR-0009). Relaxes upward.
+quickstart:
+  max_seconds: 28800
+
 # Threshold Owner (M02 PR 2): which direction relaxes each bar, read by
 # `two-key` (src/gates/two_key.py) instead of the comments above. A bar is a
 # numeric leaf under the mappings in this file; `baseline_card` is a pin,
@@ -101,3 +118,4 @@ relaxes:
   relative.p95_ratio_max: up
   relative.agent_tokens_ratio_max: up
   detection.max_seconds: up
+  quickstart.max_seconds: up

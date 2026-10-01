@@ -620,7 +620,11 @@ def test_the_deploy_role_makes_the_table_the_file(template):
     assert {"dynamodb:Scan", "dynamodb:DeleteItem", "dynamodb:PutItem", "ssm:PutParameter"} <= granted
     marker = [s for s in role_statements(template, "DeployRole") if "ssm:PutParameter" in actions(s)]
     assert len(marker) == 1 and actions(marker[0]) == {"ssm:PutParameter"}
-    assert json.dumps(marker[0]["Resource"]).endswith(':parameter/agentkeel/marker/refagent/rights-table-digest"]]}')
+    # refagent's marker, and from M06 PR 2 each agent from the template's, under /agentkeel/marker/ only.
+    resources = [json.dumps(r) for r in marker[0]["Resource"]]
+    assert len(resources) == 2
+    assert resources[0].endswith(':parameter/agentkeel/marker/refagent/rights-table-digest"]]}')
+    assert resources[1].endswith(':parameter/agentkeel/marker/*/rights-table-digest"]]}')
 
 
 # --- the guardrail deny, narrowed (M03 PR 2, SPEC/03 §6) ------------------------
@@ -680,11 +684,15 @@ def test_no_agent_role_can_read_the_table_marker(template):
     assert not any(a.startswith("ssm:") for a in allowed(named(template, "agentkeel-boundary")))
 
 
-def test_the_deploy_role_calls_refagents_runtime_and_no_other(template):
+def test_the_deploy_role_calls_the_platforms_runtimes_and_no_other(template):
+    """refagent's, and from M06 PR 2 an agent from the template's (agentkeel_<name>, R7). Never runtime/*:
+    the account holds other projects' runtimes (milestones/M06/feasibility.md section 8)."""
     invoke = [s for s in role_statements(template, "DeployRole")
               if "bedrock-agentcore:InvokeAgentRuntime" in actions(s)]  # fmt: skip
     assert len(invoke) == 1
-    assert json.dumps(invoke[0]["Resource"]).endswith(':runtime/refagent*"]]}')
+    resources = [json.dumps(r) for r in invoke[0]["Resource"]]
+    assert len(resources) == 2
+    assert resources[0].endswith(':runtime/refagent*"]]}') and resources[1].endswith(':runtime/agentkeel_*"]]}')
 
 
 def stack_names(workflow: str) -> list[str]:

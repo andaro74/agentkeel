@@ -57,8 +57,8 @@ claim 6 (SPEC/00 §8 M06, F6.3).
 - **The template.** A GitHub template repository in the organisation.
   It ships refagent as the example (SPEC/00 §8 M06), a manifest with every
   seat null, an empty goldens folder, a README that points at the
-  quickstart, and the one caller workflow that asks `agentkeel` for the
-  platform check. Its source lives there only; nothing of it sits under a
+  quickstart, and no workflow: the platform check is `agentkeel`'s, run
+  from its `main` on a schedule (§6), and nothing in the template asks for it. Its source lives there only; nothing of it sits under a
   path with no seat in `agentkeel` (finding 16).
 - **The organisation.** A GitHub organisation on the Free plan, owned by
   `andaro74`, holding the template and the agent repositories, all
@@ -73,20 +73,22 @@ claim 6 (SPEC/00 §8 M06, F6.3).
   `integration_id`: a GitHub App the platform owns. GitHub accepts that
   check only from that App ("The optional integration ID that this status
   check must originate from", REST reference for repository rules). The
-  check is posted by a workflow in `agentkeel` that runs from `main`,
-  evaluates the pull request's head with the platform's code, and holds
-  the App's key (Security). A job of the same name in the pull request's
+  check is posted by a workflow in `agentkeel` that runs from `main` on a
+  schedule, evaluates the pull request's head with the platform's code,
+  and holds the App's key (Security; §6). A job of the same name in the pull request's
   own workflow files runs as the GitHub Actions app and does not satisfy
-  it. If `agentkeel`'s run is never asked for, no check arrives and the
-  pull request stays blocked. GitHub documents the `workflows` rule, the
+  it. If `agentkeel`'s run never reaches the pull request, no check
+  arrives and the pull request stays blocked. GitHub documents the `workflows` rule, the
   first-party form of this, for Enterprise Cloud only (read 2026-09-30),
   so M06 does not use it.
 - **Seat assigned** (NOTE 20, Q3). A manifest seat whose value is a real
-  GitHub login with access to the repository, checked as M02 checks
-  CODEOWNERS logins. Null, empty, or a login GitHub does not answer for is
-  unassigned. SPEC/00 R1 and §6 are amended at this PR from "IdP groups".
-  Under R1 every seat is `andaro74`; the second developer's login holds
-  none.
+  GitHub login that **administers** the repository, checked as M02 checks
+  CODEOWNERS logins. Null, empty, a string that is not a login, or a login
+  with write alone is unassigned (amended at PR 2, security-reviewer F11:
+  "with access" let the write developer fill every seat). SPEC/00 R1 and §6
+  are amended at this PR from "IdP groups". Under R1 every seat is
+  `andaro74`; the second developer's login holds none, and the check now
+  says so.
 - **Goldens, for an agent repository** (finding 7, Q4). The repository's
   own golden files in SPEC/00 §6's shape: at least **one ordinary and one
   trap**. For an agent that is not refagent, `table_row` and `clause_id`
@@ -161,7 +163,7 @@ reader can look at.
 | Id | Fires when | What it looks like in the repo |
 |---|---|---|
 | F6.1 | a first pull request is mergeable with an unassigned seat or goldens under the minimum (finding 6) | S1a's or S1b's fixture passed by its reader in a copy of the tree (`checks.F6_1: fail` from the seed tests); live: the timed run's first pull request with `mergeable_state` `clean` (or merged) while a seat is null or the goldens are under the minimum, read from GitHub by the observer and ruled on by `build` |
-| F6.2 | a pull request in an agent repository merges without the platform's check having run on it and passed (BLOCK 2) | S2's pull request merged, or `mergeable_state` `clean`, with no check run from the platform's App on its head |
+| F6.2 | a pull request in an agent repository merges without the platform's check having run on it and passed (BLOCK 2) | S2's pull request merged, or the platform's App passing its head; S2 carries a stand-in job of the check's name and one null seat, so the App, which reaches every pull request (R2), refuses it (amended at PR 2) |
 | F6.3 | the timed quickstart exceeds one working day | S3's elapsed time (§1) over `quickstart.max_seconds`, or any of its five records unread |
 | F6.4 | Grafana panel 1 shows an agent the registry does not | S4's fixture passed by its reader (`checks.F6_4: fail`); live: panel 1's rows, read through Grafana's API, name an agent with no registry row, or either list is unread |
 
@@ -246,48 +248,91 @@ template that is on a branch. So:
 
 ## 6. The code that reads the answer (PR 2)
 
-None of it is in PR 1. Each with one seat and one path (finding 16).
+None of it is in PR 1. Each with one seat and one path (finding 16). The
+lists below are written from the reads §11 owed, ruled by the human on
+2026-09-30 (`milestones/M06/feasibility.md` §8, R1 to R9).
 
 - **The bar** (`thresholds.yaml`, Threshold Owner): `quickstart.max_seconds:
   28800`, `relaxes: up`.
 - **The organisation, the App and each agent repository's ruleset**
-  (Security; by hand, each ruleset exported under `infra/ruleset/` so
-  `validate` compares the live one with its export, as for `main`):
-  member repository creation off; the platform check required with the
-  App's `integration_id`; `bypass_actors: []`.
-- **The platform check's workflow** (`.github/workflows/`, Security): runs
-  from `main`, is asked for by an agent repository's pull request,
-  evaluates its head with the platform's code, and posts the check as the
-  App. Its hash in `infra/workflows.sha256`.
-- **Every per-agent platform change, each automatic or timed** (finding 5;
-  Security lists them here before PR 2): the deploy role's and the eval
-  role's trust for the organisation's repositories; `verify`'s accepted
-  caller repositories and the second signing identity, whose constants
-  move from `src/bundle/verify.py` to a Security-owned file under `infra/`;
-  the construct's per-agent resources, with the agent's own table; the
-  audit bucket's policy for the agent's prefix (`open.md` row 29). A change
-  that needs a Security pull request per agent is made inside the timed
-  run and counts.
-- **The template** (the template repository; Security for its caller
-  workflow, Engineering for the example agent, Product for its README).
-- **Three `validate` checks** (`src/validate/`, Engineering): S1a's, S1b's
-  and S4's query readers. Engineering names here, before PR 2, which of
-  the sixteen checks run in an agent repository.
-- **The registry** (`infra/`, Security; its write step in the platform's
-  deploy path, `.github/workflows/`, Security).
-- **Grafana panel 1** (`infra/grafana/panel1.json`, Security; the workspace,
-  Security, §11).
+  (Security; by hand): member repository creation off; the App owned by
+  the organisation, installed on all its repositories, with checks write,
+  pull requests read, contents read and administration read. A free
+  organisation has no organisation rulesets, so each agent repository
+  carries a repository ruleset equal to `infra/ruleset/agent.json`: the
+  platform check required with the App's `integration_id`, branches up to
+  date before merge, a pull request required, `bypass_actors: []`. The
+  owner applies it from the export when creating the repository.
+- **The platform check** (`.github/workflows/platform-check.yml`,
+  Security; R2). Scheduled on `agentkeel`'s `main`, every 5 minutes, and
+  by hand. One job, holding no secret, lists the organisation's open pull
+  requests, checks out each unchecked head **as data** beside a checkout
+  of `main`, and runs `python -m src.validate.agent` over it; a second
+  job, in the environment `platform-app` (deployment branch `main` only),
+  holds the App's key and posts the check on the head it was given. The
+  check also fails when the repository's live ruleset is not the export.
+  No request comes from an agent repository. Its hash in
+  `infra/workflows.sha256`.
+- **The checks in an agent repository** (`src/validate/agent.py`,
+  Engineering; R6). The agent folder is placed at `agents/<name>/` in a
+  checkout of `main`, as the seed tests place it, and these run: manifest
+  schema; edges two-sided, no cycle, ceilings within bounds;
+  `deprecated_after`; **seats assigned** (S1a's reader); **an agent's
+  goldens** (S1b's reader: shape, at least one ordinary and one trap, each
+  citing its own `data/`); **the agent's name** (`refagent`, a name held by
+  another agent in the tree, or one that is not lower-case letters, digits
+  and hyphens is refused; a name held in the registry by another
+  repository is refused at deploy, item 9 below). Not run, because they
+  read files only `agentkeel` has: golden front matter and citations over
+  `evals/goldens/v1/`, ruling front matter, the workflow hashes, cdk-nag,
+  CODEOWNERS, `relaxes:`, golden ids against `origin/main`, computed
+  semver, the live `main` ruleset, plant controls, golden/corpus overlap
+  and the corpus.
+- **The per-agent platform changes** (Security; finding 5, R3, R4). Each is
+  automatic from `main` once PR 2 builds it, or a step of the timed run:
+
+  | # | Change | How |
+  |---|---|---|
+  | 1 | The repository's ruleset | Timed: the owner applies `infra/ruleset/agent.json`; the platform check fails while the live ruleset differs |
+  | 2 | The App on the repository; the developer's write | Automatic (installed on all repositories); timed (the owner, seconds) |
+  | 3 | The deploy role's and the eval role's trust; `verify`'s identity | **None.** `agentkeel`'s `deploy.yml` on `main` deploys every agent (R3); `verify`'s identity and repository id move to `infra/platform_identity.json` (Security) and do not widen |
+  | 4 | The image repository | Automatic: `agentkeel/<name>`, made on the first push from an ECR repository creation template for the namespace `agentkeel` (immutable tags, AES-256; a template matches a namespace, not a name prefix, so not `agentkeel-<name>`), and `ecr:CreateRepository` on `repository/agentkeel/*` for the deploy role |
+  | 5 | The agent's key `alias/agentkeel-<name>` | Automatic: made in the agent's own stack, its policy denying every platform role the actions R4 names (refagent's key stays in the bootstrap) |
+  | 6 | The guardrail | None at M06: an agent from the template pins the platform's guardrail, refagent's, by id and version (Rule Owner); a guardrail per agent is M07's |
+  | 7 | The rights table, inference profile and runtime | Automatic (the construct). An agent other than refagent gets the runtime name `agentkeel_<name>`; the deploy role may call `runtime/agentkeel_*` and refagent's; the table marker parameter is `/agentkeel/marker/<name>/rights-table-digest` |
+  | 8 | The audit bucket's policy (`open.md` row 29) | Automatic: one statement for agent roles under `/agentkeel/agents/` other than refagent's, on `agents/${aws:PrincipalTag/agentkeel:agent}/*`; refagent's statements stay by exact ARN |
+  | 9 | The registry row | Automatic: the deploy writes it, refusing a name already held by another repository |
+  | 10 | Spend | None: the account's Bedrock budget stops the eval role only; a budget per agent is M07's (`open.md` row 34) |
+
+- **The registry** (`infra/bootstrap/`, Security): the DynamoDB table
+  `agentkeel-registry`, key `name`, written by the deploy with the
+  repository, its id, the commit deployed and the time.
+- **Grafana** (Security; R1): `infra/grafana/` (a stack: Athena's DynamoDB
+  connector, its spill bucket, the workgroup, the workspace's role) and
+  `infra/grafana/panel1.json`, whose panel 1 query names the registry and
+  nothing else. The workspace is made by hand.
+- **Three `validate` checks in `agentkeel`** (`src/validate/`, Engineering):
+  S1a's and S1b's readers over every `agents/*/`, and S4's query reader over
+  `infra/grafana/panel1.json` (R8).
 - **`scripts/observe_template.py`** (Engineering): raw observations only.
 - **`template`**, `CLAIM_6_CHECKS` (`F6_1`, `F6_4`), `build`'s comparisons
   and row 6's reading of `template` (`src/verdict/`, `src/ledger.py`,
-  Engineering); the step in `evals.yml` (Security). Where item 4's
-  envelope is written is named here by Engineering before PR 2.
+  Engineering); the step in `evals.yml` (Security). **Item 4's envelope**
+  (R7): `build` writes it in the deploy run, keyed to the agent
+  repository's commit, put once under `envelopes/agents/<name>/<commit>.json`
+  in the security account's bucket; the observer records its key and
+  sha256.
 - **The seats** (the manifests' `seats`, Security): refagent's and
   ratings-helper's, both assigned in PR 2, since S1a's reader reads every
   manifest (finding 12).
+- **The template** (the template repository, made by hand from files PR 2
+  hands the owner; Engineering for the example agent, Product for its
+  README). Nothing of it is under a path in `agentkeel` with no seat. It
+  ships refagent as the example agent at the repository's root, every seat
+  null, an empty `goldens/`, and no workflow.
 - **The documents** (Product): `docs/developer/quickstart.md`,
-  `manifest.md`, `goldens.md`, `edges.md`, `docs/refagent/README.md` and
-  `walkthrough.md`. Each says what is not built (SPEC/00 §10.5): no
+  `manifest.md`, `goldens.md`, `edges.md` (§9 cut 3), `docs/refagent/README.md`
+  and `walkthrough.md`. Each says what is not built (SPEC/00 §10.5): no
   judge, no HITL, no knowledge base, no edge in use, no FRAGILE.
 
 ## 7. Expected on the plant (row 6)
@@ -304,8 +349,9 @@ None of it is in PR 1. Each with one seat and one path (finding 16).
   traps 2/2, guardrail 2/3, red team 5/5, golden plants 7/7.
 - **PR 3's run, stated before it.** The timed run's first pull request not
   mergeable while a seat was null or the goldens were under the minimum;
-  S2's pull request not mergeable, with no check run from the App on its
-  head; S3's elapsed time under 28,800 s with all five records read;
+  S2's pull request not mergeable, the stand-in's check run a success on
+  its head and none from the App (amended at PR 2: S2 carries one null
+  seat, since the App reaches it too); S3's elapsed time under 28,800 s with all five records read;
   panel 1's rows equal to the registry's.
 - **The row goes RED** if a first pull request is mergeable with a seat
   unassigned or goldens under the minimum; if S2's pull request can merge;
@@ -327,16 +373,75 @@ SPEC/00 §10.5: no document describes these as working.
   a job of a required check's name, in a pull request's own workflow
   file, still answers to it; and a same-repository pull request there can
   change the workflow that holds the App's key. Carried to M07.
-- **The widened trust** (finding 18). The deploy and eval roles trusting
-  the organisation's repositories, and `verify` accepting a second
-  identity and a list of callers: no M06 seed attempts a deploy from a
-  repository outside the organisation, or a caller not on the list.
+- **What `deploy.yml` on `main` now deploys** (finding 18, as R3 changed
+  it; platform-architect F7 on PR 2). The deploy and eval roles' trust and
+  `verify`'s identity did not widen. What widened: `deploy.yml` on `main`
+  builds and deploys the content of any organisation repository whose
+  default-branch head the App passed, and its own role puts under
+  `envelopes/agents/`. No seed attempts a repository outside the
+  organisation, or a head the App did not pass.
+- **The App key's protection is a setting nothing reads back**
+  (security-reviewer F12 on PR 2). The environment `platform-app`, its
+  deployment branch (`main` only) and the key's being in that environment
+  rather than at repository level are GitHub settings; `validate` reads
+  none of them. An App result is also final for its commit: a head passed
+  before `main`'s rules changed stays passed.
+- **The new per-agent controls** (platform-architect F8 on PR 2): an agent
+  from the template's key policy (its own role only; no platform role
+  alters it), the tag-keyed audit prefix, the deploy role's
+  `runtime/agentkeel_*`, the image repository template's tag immutability,
+  the connector reading the registry alone, and the platform's Dockerfile
+  in place of the agent's. M05's seeds read refagent's exact-ARN
+  statements and refagent's bootstrap key, not these.
+- **What an agent repository's own pull requests are not asked**
+  (feasibility §8, R6): no ruling file, no `ruling-cited`, no `two-key` on a
+  retired golden, no golden-id or semver check against its default branch.
+  The seats are named in its manifest; nothing proves the seat holder read
+  a change. M07, with the CLI.
+- **One guardrail for every agent** (R4 row 6): an agent from the template
+  pins refagent's, whose denied topics are about title availability; an
+  agent moved to another subject is checked against them. And the agent's
+  own code decides what the input topics see: it builds the request, and
+  `topics_apply_to: input` checks only what it puts in `guardContent`
+  (rule-owner on PR 2). No golden in an agent repository may be a
+  guardrail or red-team case, so nothing checks the guardrail on a template
+  agent's runtime. A guardrail per agent, and a check outside the agent's
+  code, are M07's.
+- **The registry's name binding** (R4 row 9) is written before a stack is
+  touched; no seed attempts a second repository claiming a name.
+- **What nothing checks in an agent repository's goldens** (data-owner F5
+  on PR 2): their answers gate nothing (they are run after merge and
+  recorded); a change to `expected` needs no ruling; nothing reads that
+  `answer_fields` follow from the cited row, that a trap is a trap, that
+  the titles are fictional, or a golden/corpus overlap (the agent has no
+  corpus at M06). The shipped tool reads refagent's row fields and clause
+  ids only.
+- **The agent account is shared with other projects** (feasibility §8;
+  platform-architect F6 on PR 2). Their runtimes and stacks sit beside the
+  platform's, and an admin of the account reaches all of them (`open.md`
+  row 48). It is also the organisation's management account, which reaches
+  the security account through Organizations and holds the Identity Center
+  instance that can give a permission set there, so R3's second account is
+  not independent of the first. Any principal in it that may create or tag
+  a role under `/agentkeel/agents/` can write under a template agent's
+  audit prefix, which is bound by tag where refagent's is bound by ARN.
+  Nothing reserves the `agentkeel_` runtime prefix. The Grafana workspace
+  role trusts any workspace in the account until the workspace exists.
 - An agent repository in another organisation (SPEC/00 §12).
 - An organisation owner removing a ruleset or the App: `bypass_actors: []`
   binds the owner at merge, not at the settings page (as M02 for `main`).
 - Anything the example agent does beyond refagent's M05 controls: its
   containment is M05's, reached through the construct, and is not
   re-measured here.
+- **Panel 1's columns live in the account's shared Glue database**
+  (`default`.`agentkeel-registry`, added at PR 2 when the connector, with no
+  row to infer from, knew only `name`). Any principal in the account that
+  may write Glue tables can change what panel 1 shows until the next
+  deploy of `infra/grafana/`. F6.4 compares panel 1 with a direct registry
+  scan, so such an edit reads as fired or unread, not held; no seeded case
+  attempts it (security-reviewer N2 on the post-review delta).
+- A private agent repository is refused by the App and not deployed, but
+  no seeded case has made one (security-reviewer F1 on the delta).
 - The registry's row for an agent that is retired (M07) or deleted.
 - Panel 2 (§9 cut 1), and any panel reading an envelope (M07, F7.4).
 
@@ -380,16 +485,10 @@ Also not in M06:
 
 ## 11. Read before PR 2
 
-Ruled, and still to be read by their seats before PR 2's first commit:
-
-- **Where Grafana runs** (Security; finding 19). Whether Amazon Managed
-  Grafana can run in the agent account (IAM Identity Center in the
-  management account, against `open.md` row 48's deferral), read the
-  registry with a data source that is not a custom plugin, and at what
-  cost against SPEC/00 §14. If any answer is no, F6.4's live half is
-  recorded as unread and row 6 says so; panel 1 is not cut.
-- **The per-agent change list** (Security; finding 5), into §6.
-- **The `validate` checks that run in an agent repository, and where item
-  4's envelope is written** (Engineering; finding 7), into §6.
-- **The golden files for an agent that is not refagent** (Data Owner;
-  finding 7).
+Read by their seats on 2026-09-30, read-only, and ruled by the human the
+same day (`milestones/M06/feasibility.md` §8): Grafana (R1: Managed Grafana
+over Athena; Identity Center was already active in the agent account), the
+trigger (R2: a schedule on `main`, nothing to forge), the deploy (R3:
+`agentkeel`'s own, trust unchanged), the per-agent list (R4, §6), the
+golden files (R5), the checks in an agent repository (R6, §6) and item 4's
+envelope (R7, §6).

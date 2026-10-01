@@ -45,11 +45,17 @@ from cryptography import x509
 from src.bundle.pack import ARCHIVE_NAME, BUNDLE_NAME, digest, pack
 
 ISSUER = "https://token.actions.githubusercontent.com"
-DEPLOY_IDENTITY = "https://github.com/andaro74/agentkeel/.github/workflows/deploy.yml@refs/heads/main"
+# The signer and its repository id are Security's (finding 16 on M06 PR 1): they live in
+# infra/platform_identity.json from M06 PR 2, unchanged. Every agent's bundle, refagent's and one
+# from an agent repository alike, is signed by agentkeel's deploy.yml on main (SPEC/06 section 6, R3),
+# so the identity does not widen.
+IDENTITY_FILE = Path(__file__).resolve().parents[2] / "infra" / "platform_identity.json"
+_IDENTITY = json.loads(IDENTITY_FILE.read_text(encoding="utf-8"))
+DEPLOY_IDENTITY = _IDENTITY["deploy_identity"]
 # Fulcio's Source Repository Identifier. The repo id does not change when the
 # repo is renamed, and a new repo of the same name does not inherit it.
 REPOSITORY_ID_OID = "1.3.6.1.4.1.57264.1.15"
-REPOSITORY_ID = "1376369685"
+REPOSITORY_ID = _IDENTITY["repository_id"]
 
 
 class Refused(Exception):

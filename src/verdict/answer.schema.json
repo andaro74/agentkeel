@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-answer.schema.json",
+  "title": "An agent from the template answering its own goldens (SPEC/06 section 1, item 4; R7)",
+  "description": "Written by verdict.build answer only, in agentkeel's deploy.yml on main, after the platform deployed an agent repository's commit. Keyed to that commit. Put once under envelopes/agents/<name>/<commit>.json in the security account's bucket; scripts/observe_template.py reads it for F6.3's answer record. Not gated.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["what", "repository", "agent", "commit", "platform_commit", "runtime_arn", "model_id", "region", "goldens", "errors", "tokens_in", "tokens_out", "run_url", "verdict"],
+  "properties": {
+    "what": {"const": "agent answer"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"},
+    "agent": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,30}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "platform_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "runtime_arn": {"type": "string", "minLength": 1},
+    "model_id": {"type": "string"},
+    "region": {"type": "string"},
+    "goldens": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "score", "cites", "pass"],
+        "properties": {
+          "kind": {"enum": ["ordinary", "trap"]},
+          "score": {"type": "boolean"},
+          "cites": {"type": ["boolean", "null"]},
+          "pass": {"type": "boolean"}
+        }
+      }
+    },
+    "errors": {"type": "integer", "minimum": 0},
+    "tokens_in": {"type": "integer", "minimum": 0},
+    "tokens_out": {"type": "integer", "minimum": 0},
+    "run_url": {"type": "string", "minLength": 1},
+    "verdict": {"enum": ["GREEN", "RED", "UNMEASURED"]}
+  }
+}

@@ -80,7 +80,7 @@ from typing import Any
 import yaml
 
 from src.verdict import M04_READERS as verdict_m04_readers
-from src.verdict import M05_READERS
+from src.verdict import M05_READERS, M06_READERS
 from src.verdict import (
     ROOT,
     canonical_sha256,
@@ -141,6 +141,11 @@ M04_READERS = verdict_m04_readers  # 15047b4, defined beside `descends_from` in 
 # read from `containment` by row 5 (READ_THE_CONTAINMENT), never required here: a failed attempt must
 # not make every later pull request's `evals` red. Held from M05_READERS (2c88265), which wired it.
 CLAIM_5_CHECKS = ("F5_1",)
+# What an agent envelope must carry from M06 PR 2 (SPEC/06 section 4): F6_1 from the S1a and S1b seed tests
+# and F6_4 from S4's two, test-only witnesses. F6.1's and F6.4's live halves, F6.2 and F6.3 are read from
+# `template` by row 6 (READ_THE_TEMPLATE), never required here, as row 5's attempts are not. Held from
+# M06_READERS (c2a15d0), which wired them.
+CLAIM_6_CHECKS = ("F6_1", "F6_4")
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -174,6 +179,11 @@ READ_THE_CONTAINMENT = {"M05"}
 # The seeds row 5 reads (SPEC/05 §4): the five attempts but S5, a fixture only at M05 (§9 cut 1), with
 # S6 (F5.3) and S7 (F5.4) beside them.
 CONTAINMENT_SEEDS = ("S1", "S2", "S3", "S4", "S6", "S7")
+# Rows whose claim is read from the template's live records an envelope keeps in `template` (SPEC/06 §4):
+# F6.1's live half, F6.2, F6.3 and F6.4's live half. Gated by nothing, but a falsifier unread or not held
+# makes the row's reading RED whatever the run's own verdict, as READ_THE_CONTAINMENT does for row 5.
+READ_THE_TEMPLATE = {"M06"}
+TEMPLATE_READINGS = ("F6_1", "F6_2", "F6_3", "F6_4")
 
 
 class Rejected(Exception):
@@ -324,7 +334,8 @@ def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
     if from_m04_readers(commit, root):
         claim_4 = CLAIM_4_CHECKS + (("F4_3",) if pin_moved(commit, AGENT_BUNDLE, root) else ())
     claim_5 = CLAIM_5_CHECKS if descends_from(commit, M05_READERS, root) else ()
-    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5
+    claim_6 = CLAIM_6_CHECKS if descends_from(commit, M06_READERS, root) else ()
+    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6
 
 
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:
@@ -591,7 +602,8 @@ def tallies(label: str, results: dict[str, dict[str, Any]]) -> str:
 
 def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any] | None = None,
              *, in_the_runtime: bool = False, read_the_swaps: bool = False,
-             detection: tuple[float | None, str] | None = None) -> str:
+             detection: tuple[float | None, str] | None = None,
+             quickstart: tuple[float | None, str] | None = None) -> str:
     """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's.
 
     An M00 envelope: its control tallies. From M01: the agent's tallies, then
@@ -611,6 +623,10 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     `detection` is N and where it was read, for a row whose claim is read
     from the live attempts (`READ_THE_CONTAINMENT`): each seed's reading and
     each miss are named, and a GREEN run reads RED (M05 PR 2).
+
+    `quickstart` is `quickstart.max_seconds` and where it was read, for a row
+    whose claim is read from `template` (`READ_THE_TEMPLATE`): each falsifier's
+    reading and each miss are named, and a GREEN run reads RED (M06 PR 2).
     """
     results = envelope["goldens"]
     agent = {g: r for g, r in results.items() if r["scope"] == "agent"}
@@ -629,7 +645,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         verdict = "UNMEASURED"
     misses = swap_misses(envelope.get("swaps") or []) if read_the_swaps and agent else []
     held = containment_misses(envelope, *detection) if detection is not None and agent else []
-    if (misses or held) and verdict == "GREEN":
+    shipped = template_misses(envelope, *quickstart) if quickstart is not None and agent else []
+    if (misses or held or shipped) and verdict == "GREEN":
         verdict = "RED"
     parts = [
         *heads,
@@ -641,6 +658,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         *misses,
         *(containment_reading(envelope) if detection is not None and agent else []),
         *held,
+        *(template_reading(envelope) if quickstart is not None and agent else []),
+        *shipped,
         verdict,
         f"envelope `{envelope['commit']}`",
     ]
@@ -782,6 +801,53 @@ def containment_reading(envelope: dict[str, Any]) -> list[str]:
     return [*parts, f"alarm_latency_s {envelope.get('alarm_latency_s')}"]
 
 
+def quickstart_at(commit: str, root: Path = ROOT) -> tuple[float | None, str]:
+    """`quickstart.max_seconds` as it stood at the envelope's commit, and where it was read (SPEC/06 §1)."""
+    bars, where = thresholds_at(commit, root)
+    bar = (bars.get("quickstart") or {}).get("max_seconds")
+    return (float(bar) if isinstance(bar, (int, float)) and not isinstance(bar, bool) and bar > 0 else None), where
+
+
+def template_misses(envelope: dict[str, Any], bar: float | None, where: str) -> list[str]:
+    """What row 6 finds wrong with the template's live records; [] if nothing (SPEC/06 §4, §7).
+
+    build ruled each falsifier on GitHub's, AWS's and Grafana's records; this holds the elapsed time
+    again to the bar read at the envelope's commit, not to the one build was given."""
+    reading = envelope.get("template")
+    if reading is None:
+        return ["template not read: the envelope records no live attempt"]
+    misses = []
+    if bar is None:
+        misses.append(f"no quickstart.max_seconds in thresholds.yaml at {where}: the bar cannot be read")
+    elif reading.get("max_seconds") != bar:
+        misses.append(f"template was read against {reading.get('max_seconds')} s, the commit's bar is {bar:.0f} s ({where})")
+    for name in TEMPLATE_READINGS:
+        one = reading[name]
+        if not one["read"]:
+            misses.append(f"{name} unread: {'; '.join(one['reasons'][:2]) or 'no reason recorded'}")
+        elif one["held"] is not True:
+            misses.append(f"{name} not held: {'; '.join(one['reasons'][:3]) or 'no reason recorded'}")
+    elapsed = reading["F6_3"].get("elapsed_s")
+    if bar is not None and elapsed is not None and elapsed > bar and reading["F6_3"]["held"] is True:
+        misses.append(f"F6_3: build held {elapsed:.0f} s, over the commit's bar {bar:.0f} s")
+    return misses
+
+
+def template_reading(envelope: dict[str, Any]) -> list[str]:
+    """Each live falsifier in the Measured cell, as the envelope recorded it: printed; the misses decide."""
+    reading = envelope.get("template")
+    if reading is None:
+        return []
+    parts = []
+    for name in TEMPLATE_READINGS:
+        one = reading[name]
+        state = "unread" if not one["read"] else ("held" if one["held"] else "not held")
+        if name == "F6_3" and one.get("elapsed_s") is not None:
+            state += f" {one['elapsed_s']:.0f} s"
+        parts.append(f"{name} {state}")
+    return parts
+
+
 def latest(history_dir: Path = HISTORY) -> Path | None:
     """The envelope for the nearest commit at or behind HEAD."""
     have = {p.stem: p for p in replay_history.envelope_paths(history_dir)}
@@ -862,7 +928,8 @@ def measured_at(path: Path, history_dir: Path = HISTORY, *, milestone: str | Non
     return measured(envelope, verdict, control_card_of(envelope, path),
                     in_the_runtime=milestone in READ_IN_THE_RUNTIME,
                     read_the_swaps=milestone in READ_THE_SWAPS,
-                    detection=detection_at(envelope["commit"]) if milestone in READ_THE_CONTAINMENT else None)  # fmt: skip
+                    detection=detection_at(envelope["commit"]) if milestone in READ_THE_CONTAINMENT else None,
+                    quickstart=quickstart_at(envelope["commit"]) if milestone in READ_THE_TEMPLATE else None)  # fmt: skip
 
 
 def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> str | None:
@@ -901,7 +968,9 @@ def print_plants() -> int:
     for section, seeds in plants.SEEDS_BY_MILESTONE:
         print(f"seeded cases ({section}; not plants, not in plants_expected):")
         for seed, (falsifier, planted, reader) in seeds.items():
-            state = "in the tree" if (ROOT / reader).exists() else "not in the tree yet"
+            # A seed with two readers names both, comma-separated (M06 cold review F2).
+            paths = [part.strip() for part in reader.split(",") if part.strip()]
+            state = "in the tree" if paths and all((ROOT / part).exists() for part in paths) else "not in the tree yet"
             print(f"  {seed} {falsifier} {planted}")
             print(f"         reader {reader}: {state}")
     return 0

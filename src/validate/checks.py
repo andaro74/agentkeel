@@ -29,6 +29,7 @@ import yaml
 from src.gates import pattern_regex, two_key
 from src.gates import pr_number as two_key_pr
 from src.validate import (
+    agent_goldens,
     codeowners,
     controls,
     corpus,
@@ -36,7 +37,9 @@ from src.validate import (
     golden_ids,
     lifecycle,
     overlap,
+    panel,
     ruleset,
+    seats,
     semver,
 )
 
@@ -292,6 +295,7 @@ STACKS = {
     "AgentkeelIngest": "infra/ingest",  # M03 PR 2
     "AgentkeelSecurity": "infra/security",  # M05 PR 2: the security account's stack
     "AgentkeelAudit": "infra/audit",  # M05 PR 2: delivery from the agent account
+    "AgentkeelGrafana": "infra/grafana",  # M06 PR 2: panel 1 through Athena (SPEC/06 section 6, R1)
 }
 NAG_REPORT = "AwsSolutions--{stack}-NagReport.csv"
 
@@ -362,11 +366,13 @@ def _names_its_case(reason: str, resource: str = "") -> bool:
     From M03 PR 2 a line of SPEC/03 §6 serves as SPEC/01 §6's does, on the ingest stack's rows only
     (security-reviewer on 2e93d27): SPEC/03 §6 names that stack and no other. From M05 PR 2 a line
     of SPEC/05 §6 does the same on the two stacks it names, the security account's and the audit
-    delivery's, and on no other.
+    delivery's, and on no other. From M06 PR 2 a line of SPEC/06 §6 does the same on the Grafana stack
+    (infra/grafana/), which it names, and on no other.
     """
     ingest = resource.startswith("AgentkeelIngest/") and "SPEC/03 §6" in reason
+    grafana = resource.startswith("AgentkeelGrafana/") and "SPEC/06 §6" in reason
     containment = resource.startswith(("AgentkeelSecurity/", "AgentkeelAudit/")) and "SPEC/05 §6" in reason
-    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason or ingest or containment)
+    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason or ingest or containment or grafana)
 
 
 THRESHOLDS = "thresholds.yaml"
@@ -417,4 +423,10 @@ CHECKS = {
     "admitted.yaml is the corpus, byte for byte, under a Data Owner ruling": corpus.check,
     # M04 PR 2 (SPEC/04 section 5, seed S5)
     "deprecated_after more than 30 days away, or null": lifecycle.check,
+    # M06 PR 2 (SPEC/06 section 6): S1a's reader
+    "seats assigned, each a login that administers the repository": seats.check,
+    # M06 PR 2: S1b's reader
+    "an agent's goldens: one ordinary and one trap at least, citing its own data": agent_goldens.check,
+    # M06 PR 2: S4's query reader (finding 11)
+    "panel 1 queries the registry and nothing else": panel.check,
 }

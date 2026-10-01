@@ -138,7 +138,6 @@ def with_agent(tree: Path, fixture: str) -> Path:
 # --- S1a: an unassigned seat -------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1a's reader is M06 PR 2's (SPEC/06 §6)")
 def test_s1a_an_unassigned_seat_is_refused(worktree):
     """The template's manifest with all seven seats null, beside one ordinary and one trap golden:
     a first PR adding it must not be mergeable (F6.1). Today `validate` over the tree with it is
@@ -153,10 +152,21 @@ def test_s1a_an_unassigned_seat_is_refused(worktree):
     assert refused, "seed S1a: no check that reads seats refused the unassigned seats"
 
 
+def test_s1a_reader_does_not_refuse_s1b(worktree):
+    """Cold review F4 on PR 1: a seat check that refused every new agent folder would pass S1a. S1b's
+    seats are assigned, so S1a's reader must not refuse it."""
+    tree = worktree()
+    with_agent(tree, "s1b-no-goldens")
+    errors = validate_over(tree)
+    seat_checks = [name for name in errors if name not in BASE_CHECKS and "seat" in name]
+    holds(bool(seat_checks), "S1a's reader is in validate")
+    refusing = [n for n in seat_checks if any(f"agents/{AGENT}/" in e.replace("\\", "/") for e in errors[n])]
+    assert not refusing, f"S1a's reader refused S1b, whose seats are assigned: {refusing}"
+
+
 # --- S1b: goldens under the minimum --------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1b's reader is M06 PR 2's (SPEC/06 §6)")
 def test_s1b_goldens_under_the_minimum_are_refused(worktree):
     """The same agent folder with every seat assigned and an empty goldens folder: a first PR adding
     it must not be mergeable (F6.1). Today `validate` over the tree with it is green: goldens are
@@ -168,6 +178,18 @@ def test_s1b_goldens_under_the_minimum_are_refused(worktree):
     holds((agent / "goldens").is_dir() and not list((agent / "goldens").glob("g-*.yaml")), "S1b has no goldens")
     refused = refused_by(validate_over(tree), f"agents/{AGENT}/", "golden")
     assert refused, "seed S1b: no check that reads an agent's goldens refused an agent with none"
+
+
+def test_s1b_reader_does_not_refuse_s1a(worktree):
+    """Cold review F4 on PR 1, the other half: S1a's goldens are at the minimum and cite its own data,
+    so S1b's reader must not refuse it. Each seed is refused by its own reader alone."""
+    tree = worktree()
+    with_agent(tree, "s1a-unassigned-seat")
+    errors = validate_over(tree)
+    golden_checks = [name for name in errors if name not in BASE_CHECKS and "golden" in name]
+    holds(bool(golden_checks), "S1b's reader is in validate")
+    refusing = [n for n in golden_checks if any(f"agents/{AGENT}/" in e.replace("\\", "/") for e in errors[n])]
+    assert not refusing, f"S1b's reader refused S1a, whose goldens are at the minimum: {refusing}"
 
 
 # --- The attempt seeds' run files (S2, S3) -----------------------------------
@@ -223,7 +245,6 @@ def test_s3_the_timed_quickstart_was_made():
 PANEL = "infra/grafana/panel1.json"  # the dashboard's path from PR 2 (finding 16: Security's)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S4's query reader is M06 PR 2's (SPEC/06 §6)")
 def test_s4_a_panel_1_query_with_a_second_source_is_refused(worktree):
     """Panel 1 of S4's dashboard reads the registry and a static list naming ghost-agent. `validate`
     must refuse a panel 1 query that names anything but the registry (finding 11). Today nothing
@@ -242,7 +263,6 @@ def test_s4_a_panel_1_query_with_a_second_source_is_refused(worktree):
     assert refused, "seed S4: no check that reads panel 1's query refused a second source"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S4's comparison is build's, M06 PR 2 (SPEC/06 §4)")
 def test_s4_a_panel_row_with_no_registry_row_is_found_by_build():
     """Panel 1's rows as Grafana's /api/ds/query returns them name ghost-agent; the registry scan does
     not. The observer writes both lists raw, and `build` compares them by agent name (BLOCK 3):

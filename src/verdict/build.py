@@ -39,6 +39,13 @@ From M04 PR 2 (SPEC/04 §2, §6) an agent envelope also carries:
   diff. The control's diff, given `--a-vs-a-control`, is recorded and not
   gated (ADR-0004; Finding F0.4).
 
+From M06 PR 2, with `--template`, `template`: claim 6's live readings,
+ruled here (src/verdict/template.py) on what `scripts/observe_template.py`
+read, against `quickstart.max_seconds`. Recorded, never gated (SPEC/06 §4).
+And `build answer` writes item 4's record for an agent from the template:
+its deployed runtime's answers to its own goldens, scored against its own
+data, keyed to the agent repository's commit (SPEC/06 §6, R7).
+
 From M04 PR 3, with `--swaps`, `swaps`: what `scripts/rule_swaps.py` wrote,
 the gate's verdict on each swap PR's own envelope beside GitHub's record of
 the pull. Copied, not read: build rules on no envelope (P5), and nothing
@@ -73,7 +80,9 @@ from typing import Any
 
 import yaml
 
-from src.verdict import containment
+from src.verdict import containment, template
+# M06 PR 2 (SPEC/06 §4, BLOCK 3): build is the comparer of panel 1's rows with the registry's.
+from src.verdict.template import panel_not_in_registry  # noqa: F401  (S4's reader, by this name)
 from src.verdict import (
     M04_READERS,
     ROOT,
@@ -681,6 +690,22 @@ def containment_record(path: Path, thresholds: dict[str, Any]) -> tuple[dict[str
         raise Refused(f"{path}: {exc}") from exc
 
 
+def quickstart_bar(thresholds: dict[str, Any]) -> float:
+    """`quickstart.max_seconds` (SPEC/06 section 1): refused when it is absent, as N is."""
+    bar = (thresholds.get("quickstart") or {}).get("max_seconds")
+    if not isinstance(bar, (int, float)) or isinstance(bar, bool) or bar <= 0:
+        raise Refused(f"thresholds.yaml quickstart.max_seconds must be a positive number, got {bar!r}")
+    return float(bar)
+
+
+def template_record(path: Path, thresholds: dict[str, Any]) -> dict[str, Any]:
+    """scripts/observe_template.py's observation, ruled into `template` (SPEC/06 §4)."""
+    try:
+        return template.record(load_json(path), quickstart_bar(thresholds))
+    except template.Unreadable as exc:
+        raise Refused(f"{path}: {exc}") from exc
+
+
 def compose_envelope(
     raw: dict[str, Any],
     results: dict[str, dict[str, Any]],
@@ -702,6 +727,7 @@ def compose_envelope(
     control_second: tuple[dict[str, Any], list[str]] | None = None,
     swaps: list[dict[str, Any]] | None = None,
     containment: tuple[dict[str, Any], float | None] | None = None,
+    template_reading: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """`bars` and `incumbent` (its runs, and where the pin was read) give F4_4; `second`, the
     agent's second raw and its scores, gives A-vs-A and F4_3; `control_second`, the control's
@@ -782,6 +808,9 @@ def compose_envelope(
     # M05 PR 2 (SPEC/05 section 4): the live attempts, recorded and gated by nothing; row 5's cell reads them.
     if gated and containment is not None:
         one_subject["containment"] = containment[0]
+    # M06 PR 2 (SPEC/06 section 4): claim 6's live readings, recorded and gated by nothing; row 6 reads them.
+    if gated and template_reading is not None:
+        one_subject["template"] = template_reading
     return {
         "commit": raw["commit"],
         "tag": tag,
@@ -809,6 +838,59 @@ def compose_envelope(
         "verdict": verdict,
         **subject(raw, scope),
     }
+
+
+ANSWER_SCHEMA = Path(__file__).with_name("answer.schema.json")
+
+
+def compose_answer(raw: dict[str, Any], agent_dir: Path, repository: str, platform_commit: str,
+                   run_url: str | None) -> dict[str, Any]:  # fmt: skip
+    """Item 4's record (SPEC/06 §1, R7): an agent from the template, in its deployed runtime, on its own goldens.
+
+    Scored as an agent is (grounded, citing, no credential), against the agent's own data: its rows
+    in `data/table.json`, its clauses in `data/clauses.json`. GREEN when every call answered and at
+    least one golden passed; RED when none did; UNMEASURED when a call failed. Gated by nothing."""
+    if not run_url:
+        raise Refused("an answer record needs the CI run URL (--run-url)")
+    if raw.get("mode") != "runtime" or not raw.get("runtime_arn"):
+        raise Refused("an answer record is read in the deployed runtime only (mode runtime, with its ARN)")
+    if raw.get("dirty"):
+        raise Refused("the tree was dirty when the runner ran; the commits do not name what ran")
+    if sum(o.get("usage", {}).get("cacheReadInputTokens", 0) for o in raw["observations"]):
+        raise Refused("a reply was read from a prompt cache")
+    goldens = load_goldens(agent_dir / "goldens")
+    table = load_json(agent_dir / "data" / "table.json")
+    rows = {r["table_row"] for r in table}
+    clauses = set(load_json(agent_dir / "data" / "clauses.json"))
+    results = as_the_agent_is_scored(score_all(raw, goldens, rows, clauses))
+    errors = sum("error" in o for o in raw["observations"])
+    usage = [o.get("usage", {}) for o in raw["observations"]]
+    passed = any(r["pass"] for r in results.values())
+    manifest = yaml.safe_load((agent_dir / "manifest.yaml").read_text(encoding="utf-8"))
+    return {
+        "what": "agent answer",
+        "repository": repository,
+        "agent": manifest["name"],
+        "commit": raw["commit"],
+        "platform_commit": platform_commit,
+        "runtime_arn": raw["runtime_arn"],
+        "model_id": raw["model_id"],
+        "region": raw["region"],
+        "goldens": {g: {k: r[k] for k in ("kind", "score", "cites", "pass")} for g, r in results.items()},
+        "errors": errors,
+        "tokens_in": sum(u.get("inputTokens", 0) for u in usage),
+        "tokens_out": sum(u.get("outputTokens", 0) for u in usage),
+        "run_url": run_url,
+        "verdict": "UNMEASURED" if errors else ("GREEN" if passed else "RED"),
+    }
+
+
+def answer_errors(document: Any) -> list[str]:
+    from jsonschema import Draft202012Validator
+
+    schema = load_json(ANSWER_SCHEMA)
+    return sorted(f"{'/'.join(str(p) for p in e.absolute_path) or '<answer>'}: {e.message}"
+                  for e in Draft202012Validator(schema).iter_errors(document))  # fmt: skip
 
 
 def in_ci() -> bool:
@@ -844,7 +926,7 @@ def ref_path(path: Path) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("what", choices=["card", "envelope"])
+    parser.add_argument("what", choices=["card", "envelope", "answer"])
     parser.add_argument("--raw", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--control-card", type=Path)  # not `required`: refusing is build's job
@@ -877,9 +959,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--swaps", type=Path, metavar="RULED")
     # M05 PR 2 (SPEC/05 §4): the attempts, as scripts/observe_containment.py read them. Recorded only.
     parser.add_argument("--containment", type=Path, metavar="OBSERVATION")
+    # M06 PR 2 (SPEC/06 §4): the template's live records, as scripts/observe_template.py read them. Recorded only.
+    parser.add_argument("--template", type=Path, metavar="OBSERVATION")
     parser.add_argument("--run-url")
     parser.add_argument("--allow-dirty", action="store_true")
+    # M06 PR 2 (R7): `answer` reads an agent from the template, placed at --agent-dir, from --repository.
+    parser.add_argument("--agent-dir", type=Path)
+    parser.add_argument("--repository")
     args = parser.parse_args(argv)
+
+    if args.what == "answer":
+        try:
+            if not args.agent_dir or not args.repository:
+                raise Refused("answer needs --agent-dir and --repository")
+            document = compose_answer(load_json(args.raw), args.agent_dir, args.repository,
+                                      subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,
+                                                     text=True, check=True).stdout.strip(), args.run_url)  # fmt: skip
+            if errors := answer_errors(document):
+                raise Refused("the answer record does not validate: " + "; ".join(errors))
+            if HISTORY in args.out.resolve().parents:
+                raise Refused("an answer record is not an envelope of agentkeel's; it goes to the security account's bucket")
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
+        except Refused as refusal:
+            print(f"REFUSED: {refusal}", file=sys.stderr)
+            return 3
+        print(f"wrote {args.out}: {document['verdict']}")
+        return 0
 
     try:
         raw = load_json(args.raw)
@@ -976,6 +1082,7 @@ def main(argv: list[str] | None = None) -> int:
                     control_second=control_second,
                     swaps=swaps_record(args.swaps) if args.swaps else None,
                     containment=containment_record(args.containment, thresholds) if args.containment else None,
+                    template_reading=template_record(args.template, thresholds) if args.template else None,
                 )
             emit(envelope, args.out, envelope=True)
     except Refused as refusal:

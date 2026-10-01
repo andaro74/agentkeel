@@ -47,3 +47,34 @@ What this file does not do:
   unchanged", not §3's "edits a workflow". Carried to M02.
 - `current_user_can_bypass` in the export describes the account that ran
   the command, not every account.
+
+## `agent.json` (M06 PR 2)
+
+The repository ruleset every agent repository carries (SPEC/06 section 6,
+R2): a free organisation has no organisation rulesets, so the owner
+applies this one to each agent repository when creating it, from the
+template, inside the timed run:
+
+```
+gh api --method POST repos/<org>/<repo>/rulesets --input infra/ruleset/agent.json
+```
+
+It requires one status check, `platform-check`, **from the platform's App**
+(`integration_id`, which must equal `platform_app_id` in
+`infra/platform_identity.json`; both are 5144253, the App `agentkeel-platform`
+made on 2026-09-30, and the platform check posts nothing while either is
+null). The organisation `agentkeel-studio` is on GitHub Free, which enforces
+a ruleset only on a public repository: the template and every agent
+repository are public. A job named `platform-check` in a pull request's own workflow runs
+as the GitHub Actions app and does not satisfy it (S2). Branches must be
+up to date before merge, a pull request is required, merges are merge
+commits, and `bypass_actors` is `[]`.
+
+It has no `id`: each repository's ruleset gets its own. The platform
+check's posting job reads the repository's live rulesets with the App's
+token and fails the check unless one equals this file in `name`, `target`,
+`enforcement`, `conditions`, `rules` and `bypass_actors`
+(`src/validate/agent.py ruleset`). When the first ruleset is made, it is
+read back and this file is re-exported in the form GitHub returns
+(GitHub adds fields such as `require_extra_approval_for_unattributed_changes`
+to a pull request rule), so that the compare is with GitHub's own form.

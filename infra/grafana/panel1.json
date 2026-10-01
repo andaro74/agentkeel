@@ -1,0 +1,24 @@
+{
+  "title": "agentkeel",
+  "uid": "agentkeel-registry",
+  "description": "Security (SPEC/06 section 6, R1). Panel 1 is the registry: one row per agent, read through Athena's DynamoDB connector from the table agentkeel-registry and nothing else. validate refuses a panel 1 target on any other data source or table (src/validate/panel.py). Imported into the workspace by hand; the data source uid 'registry' is the Athena data source the workspace's README names.",
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Registry",
+      "type": "table",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "grafana-athena-datasource", "uid": "registry"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-athena-datasource", "uid": "registry"},
+          "format": 1,
+          "connectionArgs": {"region": "us-west-2", "catalog": "agentkeel_registry", "database": "default"},
+          "rawSQL": "SELECT name, repository, commit_sha, deployed_at FROM \"agentkeel_registry\".\"default\".\"agentkeel-registry\" ORDER BY name"
+        }
+      ]
+    }
+  ]
+}

@@ -139,3 +139,20 @@ def test_build_writes_no_claim_5_check_and_the_gate_requires_it(chain):
 def test_the_gate_requires_f5_1_from_m05s_readers_and_not_before():
     assert "F5_1" in gate.required_checks("HEAD")
     assert "F5_1" not in gate.required_checks("5a5720e")  # M05 PR 1's merge, before the readers
+
+
+def test_build_writes_no_claim_6_checks_and_the_gate_requires_them(chain):
+    """F6_1 and F6_4 from M06's readers: build says GREEN without them, the gate does not (SPEC/06 section 4)."""
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    assert envelope["verdict"] == "GREEN"
+    required = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_6_CHECKS
+    verdict, reasons = gate.judge(envelope, load_golden_kinds(GOLDENS_DIR), {}, [], required=required)
+    assert verdict == "RED"
+    for name in ("F6_1", "F6_4"):
+        assert f"checks.{name} is missing from an agent envelope" in reasons
+
+
+def test_the_gate_requires_f6_1_and_f6_4_from_m06s_readers_and_not_before():
+    assert {"F6_1", "F6_4"} <= set(gate.required_checks("HEAD"))
+    assert "F6_1" not in gate.required_checks("ef7e48e")  # M06 PR 1's merge, before the readers
