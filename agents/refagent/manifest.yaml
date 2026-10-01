@@ -66,8 +66,9 @@ guardrail:
 # The agent's security group egress allows these and nothing else; anything
 # outside the enum is refused at synth. Arbitrary hostnames are M05.
 # bedrock-runtime: Converse. dynamodb: the rights table. kms: the agent's
-# key. logs: its own log group. s3: the gateway endpoint, for nothing at M01
-# but the runtime's own image layers. ecr.api, ecr.dkr: the image pull itself
+# key. logs: its own log group. s3: the gateway endpoint, for the runtime's own
+# image layers and, from M05 PR 2, the audit put to the security account's
+# bucket (open.md row 5, carried to M06 PR 2). ecr.api, ecr.dkr: the image pull itself
 # (ruling d, amended at M01 PR 3); the construct refuses a manifest without
 # them.
 endpoint_allowlist:
@@ -79,16 +80,18 @@ endpoint_allowlist:
   - logs
   - s3
 
-# Security: seat -> IdP group. No IdP groups exist yet; validate checks them
-# against real groups from M02 (SPEC/00 §5).
+# Security: seat -> GitHub login (SPEC/00 R1 and section 6, amended at M06
+# PR 1). Assigned at M06 PR 2: under R1 every seat is the author. validate
+# refuses a seat that is null or not a login with access to the repository
+# (SPEC/06 section 2, S1a's reader).
 seats:
-  product: null
-  rule-owner: null
-  data-owner: null
-  tool-owner: null
-  threshold-owner: null
-  security: null
-  engineering: null
+  product: andaro74
+  rule-owner: andaro74
+  data-owner: andaro74
+  tool-owner: andaro74
+  threshold-owner: andaro74
+  security: andaro74
+  engineering: andaro74
 
 # Tool Owner: edges. Empty at M01. `ratings-helper` is cut to M02 with the
 # two-sided edge check (SPEC/01 §10, ruling SCOPE).
