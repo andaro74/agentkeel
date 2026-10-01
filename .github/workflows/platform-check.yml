@@ -1,0 +1,147 @@
+# platform-check (SPEC/06 section 6, R2; M06 PR 2). Security seat.
+# Authorised by SPEC/00-overview.md#8-M06 and milestones/M06/rulings/pr2-security.md.
+# Its hash is listed in infra/workflows.sha256, which `make validate` reads.
+#
+# The check every agent repository's ruleset requires (infra/ruleset/agent.json):
+# `platform-check`, accepted by GitHub only from the platform's App, by its
+# integration_id. A job of that name in a pull request's own workflow runs as
+# the GitHub Actions app and does not count (seed S2).
+#
+# **Nothing comes from an agent repository.** This runs on agentkeel's main,
+# on a schedule (and by hand), finds every open pull request in the
+# organisation whose head the App has not checked, and checks each head with
+# agentkeel's code. There is no request to forge (R2). If the schedule never
+# reaches a pull request, no check arrives and it stays blocked.
+#
+# Two jobs, so the key and the head are never in one place:
+#
+# 1. `find` and `evaluate` hold no secret. `evaluate` checks the agent
+#    repository out **as data**, beside a checkout of main, and parses it:
+#    nothing from it is imported, installed or run, and a symbolic link in it
+#    is refused before anything is read (src/validate/agent.py).
+# 2. `post` runs in the environment `platform-app`, whose deployment branch
+#    is main only and which holds the App's key. It runs agentkeel's code
+#    only: the seats' access to the repository, the repository's live
+#    ruleset against the export, then one check run on the head `evaluate`
+#    was given (scripts/platform_check.py).
+#
+# What this does not do: run any test an agent repository brings, or the
+# agent itself; deploy (deploy.yml does, from main, after a merge); stop the
+# organisation's owner from removing the ruleset or the App (SPEC/06 section 8).
+# GitHub may delay a scheduled run at busy times; the timed run counts that.
+name: platform-check
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: platform-check
+  cancel-in-progress: false
+
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      heads: ${{ steps.find.outputs.heads }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: The heads the App has not checked
+        id: find
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          uv run python scripts/platform_check.py find --out "$RUNNER_TEMP/heads.json"
+          echo "heads=$(cat "$RUNNER_TEMP/heads.json")" >> "$GITHUB_OUTPUT"
+
+  evaluate:
+    needs: find
+    if: needs.find.outputs.heads != '[]' && needs.find.outputs.heads != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJSON(needs.find.outputs.heads) }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      # The agent repository, as data, at the head the App will be asked to pass.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.head }}
+          path: agent-src
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      # Never fails the job: the result file is what `post` reads, refused or not.
+      - name: Check the head with agentkeel's code
+        env:
+          REPOSITORY: ${{ matrix.repository }}
+          HEAD_SHA: ${{ matrix.head }}
+        run: |
+          set -uo pipefail
+          mkdir -p "$RUNNER_TEMP/result"
+          uv run python -m src.validate.agent evaluate --agent agent-src --repository "$REPOSITORY" \
+            --head "$HEAD_SHA" --defer-seat-access --out "$RUNNER_TEMP/result/result.json" || true
+          test -s "$RUNNER_TEMP/result/result.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: result-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/result/result.json
+          if-no-files-found: error
+          retention-days: 7
+
+  post:
+    needs: evaluate
+    if: needs.evaluate.result == 'success' || needs.evaluate.result == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: platform-app
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: result-*
+          path: ${{ runner.temp }}/results
+
+      - name: Seats, the ruleset, and the check, as the App
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
+        run: uv run python scripts/platform_check.py post --results "$RUNNER_TEMP/results"

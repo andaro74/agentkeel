@@ -45,6 +45,22 @@
 # at synth, S4 and S6 against the deployed bootstrap stack (SPEC/01 §5).
 # Until a run of this file is in the record, nothing here has fired on a
 # seeded case, and no prose may call it proven (SPEC/00 §10.5).
+#
+# **From M06 PR 2 it also deploys every agent from the template** (SPEC/06
+# section 6, R3), on a schedule from main, so the deploy role's trust, the
+# eval role's and `verify`'s identity stay exactly as they were: an agent
+# repository can assume nothing and sign nothing. `find-agents` (no secret)
+# lists each organisation repository whose default-branch head the platform's
+# App passed. `sign-agent` (no AWS credentials) checks that head out **as
+# data**, checks it again with agentkeel's code, packs and signs it as this
+# file on main, and builds its image from `infra/construct/agent.Dockerfile`,
+# never the agent's own. `deploy-agent` (the deploy role) skips a commit the
+# registry already holds, refuses a name another repository holds, verifies
+# the bytes, pushes the image to `agentkeel/<name>`, deploys `agentkeel-<name>`
+# through the execution role, loads the agent's own table, asks the deployed
+# agent its own goldens (`build answer`), writes the registry row, and puts
+# the answer record once in the security account (`agentkeel-envelope-put`).
+# refagent's two jobs below are unchanged but for the registry row.
 name: deploy
 
 on:
@@ -58,11 +74,15 @@ on:
       # alone reloads it, so the runtime answers from the table on main.
       # load_rights_table.py sets the marker the runtime match reads.
       - data/rights_table.json
+  # M06 PR 2: an agent from the template, deployed from main (R3).
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
 
 permissions: {}
 
 concurrency:
-  group: deploy-refagent
+  group: deploy-${{ github.event_name == 'push' && 'refagent' || 'agents' }}
   cancel-in-progress: false
 
 env:
@@ -73,6 +93,7 @@ env:
 
 jobs:
   sign:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -242,3 +263,278 @@ jobs:
           AGENTKEEL_RUNTIME_ARN="$arn" uv run python -m src.agent.run --out "$RUNNER_TEMP/after-deploy.json" \
             --goldens evals/goldens/v1
           echo "deployed and answered: $arn" >> "$GITHUB_STEP_SUMMARY"
+
+      # M06 PR 2 (SPEC/06 section 6, item 9): refagent's row in the registry, held by this repository.
+      - name: refagent's row in the registry
+        env:
+          RUN_ID: ${{ github.run_id }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          uv run python scripts/registry.py claim --name refagent --repository-id 1376369685
+          uv run python scripts/registry.py write --name refagent --repository andaro74/agentkeel \
+            --repository-id 1376369685 --commit "$COMMIT" --run-id "$RUN_ID"
+
+  # --- M06 PR 2: an agent from the template (SPEC/06 section 6, R3) -----------
+
+  find-agents:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      agents: ${{ steps.find.outputs.agents }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: The heads the platform's App passed
+        id: find
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          uv run python scripts/platform_check.py deployable --out "$RUNNER_TEMP/agents.json"
+          echo "agents=$(cat "$RUNNER_TEMP/agents.json")" >> "$GITHUB_OUTPUT"
+
+  sign-agent:
+    needs: find-agents
+    if: needs.find-agents.outputs.agents != '[]' && needs.find-agents.outputs.agents != ''
+    runs-on: ubuntu-24.04-arm # the image is arm64, as refagent's
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # OIDC to Fulcio, keyless: the identity is this file on main
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include: ${{ fromJSON(needs.find-agents.outputs.agents) }}
+    env:
+      NAME: ${{ matrix.name }}
+      REPOSITORY: ${{ matrix.repository }}
+      COMMIT: ${{ matrix.commit }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.commit }}
+          path: agent-src
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      # Again, at the commit being deployed: the App passed it, and this is agentkeel's code saying so here.
+      # The seats' access was read with the App's token when it passed, and is not read again here.
+      - name: The head is still what the platform check passed
+        run: >-
+          uv run python -m src.validate.agent evaluate --agent agent-src --repository "$REPOSITORY"
+          --head "$COMMIT" --defer-seat-access --out "$RUNNER_TEMP/check.json"
+
+      - name: Place the agent at agents/<name>, without its git or workflow files
+        run: |
+          set -euo pipefail
+          mkdir -p "agents/$NAME"
+          rsync -a --exclude .git --exclude .github agent-src/ "agents/$NAME/"
+
+      - name: Pack the bundle
+        run: uv run python -m src.bundle.pack "agents/$NAME" --out "agents/$NAME/dist"
+
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+
+      - name: Sign the archive, keyless, as this file on main
+        run: cosign sign-blob --yes --bundle "agents/$NAME/bundle.cosign.json" "agents/$NAME/dist/bundle.tar"
+
+      - name: Verify what was just signed
+        run: uv run python -m src.bundle.verify "agents/$NAME"
+
+      # The platform's Dockerfile, with no AWS credentials in this job: nothing of the agent's runs here.
+      - name: Build the image
+        run: |
+          set -euo pipefail
+          docker build -f infra/construct/agent.Dockerfile --build-arg "AGENT=$NAME" -t "agent:$COMMIT" .
+          arch=$(docker inspect --format='{{.Architecture}}' "agent:$COMMIT")
+          test "$arch" = arm64 || { echo "::error::the image is $arch; AgentCore Runtime runs arm64 only"; exit 1; }
+          docker save "agent:$COMMIT" -o "$RUNNER_TEMP/image.tar"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: agent-${{ strategy.job-index }}
+          path: |
+            agents/${{ matrix.name }}/bundle.cosign.json
+            agents/${{ matrix.name }}/dist/bundle.tar
+            ${{ runner.temp }}/image.tar
+          if-no-files-found: error
+          retention-days: 30
+
+  deploy-agent:
+    needs: [find-agents, sign-agent]
+    if: needs.find-agents.outputs.agents != '[]' && needs.find-agents.outputs.agents != ''
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write # OIDC to AWS, as the deploy role, then as the envelope put role
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include: ${{ fromJSON(needs.find-agents.outputs.agents) }}
+    env:
+      NAME: ${{ matrix.name }}
+      REPOSITORY: ${{ matrix.repository }}
+      REPOSITORY_ID: ${{ matrix.repository_id }}
+      COMMIT: ${{ matrix.commit }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.commit }}
+          path: agent-src
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Place the agent at agents/<name>
+        run: |
+          set -euo pipefail
+          mkdir -p "agents/$NAME"
+          rsync -a --exclude .git --exclude .github agent-src/ "agents/$NAME/"
+          rm -rf agent-src
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: agent-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/signed
+
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+
+      # The bytes this job holds, against the signature made in sign-agent.
+      - name: Verify the bytes this job deploys
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/signed/agents/$NAME/bundle.cosign.json" "agents/$NAME/"
+          uv run python -m src.bundle.verify "agents/$NAME"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: agentkeel-deploy-agent-${{ github.run_id }}
+          role-duration-seconds: 3600
+          aws-region: us-west-2
+
+      - name: Already deployed, or a name another repository holds
+        id: registry
+        run: |
+          set -euo pipefail
+          if uv run python scripts/registry.py deployed --name "$NAME" --commit "$COMMIT"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            uv run python scripts/registry.py claim --name "$NAME" --repository-id "$REPOSITORY_ID"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        if: steps.registry.outputs.skip == 'false'
+        id: ecr
+
+      - name: Push the image to agentkeel/<name>
+        if: steps.registry.outputs.skip == 'false'
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          tag=$(uv run python -c 'import sys; from src.bundle.pack import digest; print(digest(__import__("pathlib").Path(sys.argv[1])))' "$RUNNER_TEMP/signed/agents/$NAME/dist/bundle.tar")
+          docker load -i "$RUNNER_TEMP/signed/image.tar"
+          docker tag "agent:$COMMIT" "$REGISTRY/agentkeel/$NAME:$tag"
+          existing=$(aws ecr batch-get-image --repository-name "agentkeel/$NAME" --image-ids imageTag="$tag" \
+            --query 'images[0].imageId.imageDigest' --output text 2>/dev/null || true)
+          if [ -n "$existing" ] && [ "$existing" != "None" ]; then
+            digest="$existing"
+          else
+            docker push "$REGISTRY/agentkeel/$NAME:$tag"
+            digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$REGISTRY/agentkeel/$NAME:$tag" | cut -d@ -f2)
+          fi
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image $REGISTRY/agentkeel/$NAME@$digest" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy agentkeel-<name>
+        if: steps.registry.outputs.skip == 'false'
+        env:
+          AGENTKEEL_IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          AGENTKEEL_BUNDLE="agents/$NAME" uv run python -m infra.construct.app
+          aws cloudformation deploy \
+            --stack-name agentkeel-"$NAME" \
+            --template-file "infra/construct/cdk.out/AgentkeelAgent.template.json" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --role-arn "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/agentkeel-cfn-exec" \
+            --no-fail-on-empty-changeset
+
+      - name: Load the agent's own table
+        if: steps.registry.outputs.skip == 'false'
+        run: >-
+          uv run python scripts/load_rights_table.py --table "agentkeel-$NAME-rights"
+          --rights "agents/$NAME/data/table.json" --marker "/agentkeel/marker/$NAME/rights-table-digest"
+
+      # Item 4 (R7): the deployed agent, asked its own goldens in its runtime, scored by build.
+      - name: The agent answers its own goldens
+        if: steps.registry.outputs.skip == 'false'
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          arn=$(aws cloudformation describe-stacks --stack-name agentkeel-"$NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='RuntimeArn'].OutputValue" --output text)
+          AGENTKEEL_RUNTIME_ARN="$arn" uv run python -m src.agent.run --bundle "agents/$NAME" --commit "$COMMIT" \
+            --goldens "agents/$NAME/goldens" --out "$RUNNER_TEMP/answer-raw.json" || true
+          uv run python -m src.verdict.build answer --raw "$RUNNER_TEMP/answer-raw.json" --agent-dir "agents/$NAME" \
+            --repository "$REPOSITORY" --run-url "$RUN_URL" --out "$RUNNER_TEMP/answer.json"
+          echo "deployed $arn; $(uv run python -c 'import json,sys; print(json.load(open(sys.argv[1]))["verdict"])' "$RUNNER_TEMP/answer.json")" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: The agent's row in the registry
+        if: steps.registry.outputs.skip == 'false'
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: >-
+          uv run python scripts/registry.py write --name "$NAME" --repository "$REPOSITORY"
+          --repository-id "$REPOSITORY_ID" --commit "$COMMIT" --run-id "$RUN_ID"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: steps.registry.outputs.skip == 'false'
+        with:
+          role-to-assume: ${{ vars.AWS_ENVELOPE_PUT_ROLE_ARN }}
+          role-session-name: agentkeel-answer-put-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+          unset-current-credentials: true
+
+      # Once: the bucket refuses a put under envelopes/ without If-None-Match (infra/security/).
+      - name: Put the answer record in the security account, once
+        if: steps.registry.outputs.skip == 'false'
+        run: >-
+          aws s3api put-object --bucket agentkeel-audit-897698239547
+          --key "envelopes/agents/$NAME/$COMMIT.json" --body "$RUNNER_TEMP/answer.json" --if-none-match '*'

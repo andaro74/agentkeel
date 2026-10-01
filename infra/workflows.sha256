@@ -29,8 +29,11 @@
 # Rewritten at M05 PR 1 when evals.yml stopped looking up the swap PRs (milestones/M05/open.md row 1).
 # Rewritten at M05 PR 2: evals.yml reads the attempts in the security account and archives envelopes there;
 # cold-review-ruling.yml refuses a ruling for the PR that is not ruled (milestones/M05/open.md row 44).
+# Rewritten at M06 PR 2: platform-check.yml added (the App's check, from main on a schedule, R2); deploy.yml
+# deploys an agent from the template from main (R3) and writes the registry; evals.yml observes claim 6.
 bedf184401fe99b3e2e3d893c3e7e3569f7dc6eecc689d8585b12fd5ffb98d48  .github/workflows/cold-review-ruling.yml
-084903a2fc9104a22e7a4dd6bd216e625c75d9ef702b374bba9f71a2024e2ca2  .github/workflows/deploy.yml
-2ff490b78f77e0d9618f760760d8a4f76a9f0769872ec24efd7bc240eaf61f44  .github/workflows/evals.yml
+8200ca15f2edc84646db886c65a4c7e23e40c3cc5440c4bed01bbc36d66b65e2  .github/workflows/deploy.yml
+5c720469097f9fa66ca15163bb9ff59b2b4e8f88bd241390a50d4ba8b84f86c6  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
+7559bd27b1f8aa2e3ae632355a2e6cfb593ef2ce733c82be56e72416146c3b50  .github/workflows/platform-check.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml
