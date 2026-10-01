@@ -143,7 +143,8 @@ M04_READERS = verdict_m04_readers  # 15047b4, defined beside `descends_from` in 
 CLAIM_5_CHECKS = ("F5_1",)
 # What an agent envelope must carry from M06 PR 2 (SPEC/06 section 4): F6_1 from the S1a and S1b seed tests
 # and F6_4 from S4's two, test-only witnesses. F6.1's and F6.4's live halves, F6.2 and F6.3 are read from
-# `template` by row 6 (READ_THE_TEMPLATE), never required here, as row 5's attempts are not.
+# `template` by row 6 (READ_THE_TEMPLATE), never required here, as row 5's attempts are not. Held from
+# M06_READERS (c2a15d0), which wired them.
 CLAIM_6_CHECKS = ("F6_1", "F6_4")
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"

@@ -151,3 +151,8 @@ def test_build_writes_no_claim_6_checks_and_the_gate_requires_them(chain):
     assert verdict == "RED"
     for name in ("F6_1", "F6_4"):
         assert f"checks.{name} is missing from an agent envelope" in reasons
+
+
+def test_the_gate_requires_f6_1_and_f6_4_from_m06s_readers_and_not_before():
+    assert {"F6_1", "F6_4"} <= set(gate.required_checks("HEAD"))
+    assert "F6_1" not in gate.required_checks("ef7e48e")  # M06 PR 1's merge, before the readers
