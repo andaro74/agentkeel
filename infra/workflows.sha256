@@ -33,8 +33,9 @@
 # deploys an agent from the template from main (R3) and writes the registry; evals.yml observes claim 6.
 # Rewritten again at M06 PR 2 after the seat reviews: deploy.yml reads the registry before signing and
 # claims a name first; evals.yml reads panel 1 in a step of its own (security-reviewer F2, F3, F7, F9, N5).
+# And after the cold review: deploy.yml puts the answer before it writes the registry row (F8).
 bedf184401fe99b3e2e3d893c3e7e3569f7dc6eecc689d8585b12fd5ffb98d48  .github/workflows/cold-review-ruling.yml
-d769133a1b452787f4b3a238d4dd456eae1599d2b2e71169eb28f3e7ab519cbc  .github/workflows/deploy.yml
+6b30ef9f9e5735f1027c1534cbdb31528740c7c7cbbebb30c7d75f6fe2d1bcfb  .github/workflows/deploy.yml
 9eb11372c30a50eb4457b04d8cdd5c5ff1ee04a3b13c1c2b514408df14b0eadf  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 7559bd27b1f8aa2e3ae632355a2e6cfb593ef2ce733c82be56e72416146c3b50  .github/workflows/platform-check.yml

@@ -529,14 +529,6 @@ jobs:
             --repository "$REPOSITORY" --run-url "$RUN_URL" --out "$RUNNER_TEMP/answer.json"
           echo "deployed $arn; $(uv run python -c 'import json,sys; print(json.load(open(sys.argv[1]))["verdict"])' "$RUNNER_TEMP/answer.json")" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: The agent's row in the registry
-        if: steps.registry.outputs.skip == 'false'
-        env:
-          RUN_ID: ${{ github.run_id }}
-        run: >-
-          uv run python scripts/registry.py write --name "$NAME" --repository "$REPOSITORY"
-          --repository-id "$REPOSITORY_ID" --commit "$COMMIT" --run-id "$RUN_ID"
-
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         if: steps.registry.outputs.skip == 'false'
         with:
@@ -552,3 +544,22 @@ jobs:
         run: >-
           aws s3api put-object --bucket agentkeel-audit-897698239547
           --key "envelopes/agents/$NAME/$COMMIT.json" --body "$RUNNER_TEMP/answer.json" --if-none-match '*'
+
+      # The registry row last, as the deploy role again: a put that failed leaves the commit undeployed in the
+      # registry, so the next run asks again (cold review F8 on M06 PR 2).
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: steps.registry.outputs.skip == 'false'
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: agentkeel-deploy-agent-row-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+          unset-current-credentials: true
+
+      - name: The agent's row in the registry
+        if: steps.registry.outputs.skip == 'false'
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: >-
+          uv run python scripts/registry.py write --name "$NAME" --repository "$REPOSITORY"
+          --repository-id "$REPOSITORY_ID" --commit "$COMMIT" --run-id "$RUN_ID"
