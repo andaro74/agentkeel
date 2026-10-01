@@ -82,11 +82,13 @@ claim 6 (SPEC/00 §8 M06, F6.3).
   first-party form of this, for Enterprise Cloud only (read 2026-09-30),
   so M06 does not use it.
 - **Seat assigned** (NOTE 20, Q3). A manifest seat whose value is a real
-  GitHub login with access to the repository, checked as M02 checks
-  CODEOWNERS logins. Null, empty, or a login GitHub does not answer for is
-  unassigned. SPEC/00 R1 and §6 are amended at this PR from "IdP groups".
-  Under R1 every seat is `andaro74`; the second developer's login holds
-  none.
+  GitHub login that **administers** the repository, checked as M02 checks
+  CODEOWNERS logins. Null, empty, a string that is not a login, or a login
+  with write alone is unassigned (amended at PR 2, security-reviewer F11:
+  "with access" let the write developer fill every seat). SPEC/00 R1 and §6
+  are amended at this PR from "IdP groups". Under R1 every seat is
+  `andaro74`; the second developer's login holds none, and the check now
+  says so.
 - **Goldens, for an agent repository** (finding 7, Q4). The repository's
   own golden files in SPEC/00 §6's shape: at least **one ordinary and one
   trap**. For an agent that is not refagent, `table_row` and `clause_id`
@@ -371,22 +373,60 @@ SPEC/00 §10.5: no document describes these as working.
   a job of a required check's name, in a pull request's own workflow
   file, still answers to it; and a same-repository pull request there can
   change the workflow that holds the App's key. Carried to M07.
-- **The widened trust** (finding 18). The deploy and eval roles trusting
-  the organisation's repositories, and `verify` accepting a second
-  identity and a list of callers: no M06 seed attempts a deploy from a
-  repository outside the organisation, or a caller not on the list.
+- **What `deploy.yml` on `main` now deploys** (finding 18, as R3 changed
+  it; platform-architect F7 on PR 2). The deploy and eval roles' trust and
+  `verify`'s identity did not widen. What widened: `deploy.yml` on `main`
+  builds and deploys the content of any organisation repository whose
+  default-branch head the App passed, and its own role puts under
+  `envelopes/agents/`. No seed attempts a repository outside the
+  organisation, or a head the App did not pass.
+- **The App key's protection is a setting nothing reads back**
+  (security-reviewer F12 on PR 2). The environment `platform-app`, its
+  deployment branch (`main` only) and the key's being in that environment
+  rather than at repository level are GitHub settings; `validate` reads
+  none of them. An App result is also final for its commit: a head passed
+  before `main`'s rules changed stays passed.
+- **The new per-agent controls** (platform-architect F8 on PR 2): an agent
+  from the template's key policy (its own role only; no platform role
+  alters it), the tag-keyed audit prefix, the deploy role's
+  `runtime/agentkeel_*`, the image repository template's tag immutability,
+  the connector reading the registry alone, and the platform's Dockerfile
+  in place of the agent's. M05's seeds read refagent's exact-ARN
+  statements and refagent's bootstrap key, not these.
 - **What an agent repository's own pull requests are not asked**
   (feasibility §8, R6): no ruling file, no `ruling-cited`, no `two-key` on a
   retired golden, no golden-id or semver check against its default branch.
   The seats are named in its manifest; nothing proves the seat holder read
   a change. M07, with the CLI.
 - **One guardrail for every agent** (R4 row 6): an agent from the template
-  pins refagent's. A guardrail per agent is M07's.
-- **The registry's name binding** (R4 row 9) is checked at deploy; no seed
-  attempts a second repository claiming a name.
-- **The agent account is shared with other projects** (feasibility §8):
-  their runtimes and stacks sit beside the platform's, and an admin of the
-  account reaches all of them (`open.md` row 48).
+  pins refagent's, whose denied topics are about title availability; an
+  agent moved to another subject is checked against them. And the agent's
+  own code decides what the input topics see: it builds the request, and
+  `topics_apply_to: input` checks only what it puts in `guardContent`
+  (rule-owner on PR 2). No golden in an agent repository may be a
+  guardrail or red-team case, so nothing checks the guardrail on a template
+  agent's runtime. A guardrail per agent, and a check outside the agent's
+  code, are M07's.
+- **The registry's name binding** (R4 row 9) is written before a stack is
+  touched; no seed attempts a second repository claiming a name.
+- **What nothing checks in an agent repository's goldens** (data-owner F5
+  on PR 2): their answers gate nothing (they are run after merge and
+  recorded); a change to `expected` needs no ruling; nothing reads that
+  `answer_fields` follow from the cited row, that a trap is a trap, that
+  the titles are fictional, or a golden/corpus overlap (the agent has no
+  corpus at M06). The shipped tool reads refagent's row fields and clause
+  ids only.
+- **The agent account is shared with other projects** (feasibility §8;
+  platform-architect F6 on PR 2). Their runtimes and stacks sit beside the
+  platform's, and an admin of the account reaches all of them (`open.md`
+  row 48). It is also the organisation's management account, which reaches
+  the security account through Organizations and holds the Identity Center
+  instance that can give a permission set there, so R3's second account is
+  not independent of the first. Any principal in it that may create or tag
+  a role under `/agentkeel/agents/` can write under a template agent's
+  audit prefix, which is bound by tag where refagent's is bound by ARN.
+  Nothing reserves the `agentkeel_` runtime prefix. The Grafana workspace
+  role trusts any workspace in the account until the workspace exists.
 - An agent repository in another organisation (SPEC/00 §12).
 - An organisation owner removing a ruleset or the App: `bypass_actors: []`
   binds the owner at merge, not at the settings page (as M02 for `main`).

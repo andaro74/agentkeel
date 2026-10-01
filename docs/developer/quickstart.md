@@ -43,7 +43,7 @@ five minutes (sometimes longer at the top of the hour) agentkeel posts a
 check named `platform-check` on it. On the template as shipped it **fails**,
 and says why:
 
-- `seats assigned, each a login with access`: all seven seats are empty;
+- `seats assigned, each a login that administers the repository`: all seven seats are empty;
 - `an agent's goldens`: you have no tests.
 
 That is the platform doing its job. The pull request cannot merge until
@@ -54,9 +54,10 @@ the check passes.
 Each of the seven seats in `manifest.yaml` (`product`, `rule-owner`,
 `data-owner`, `tool-owner`, `threshold-owner`, `security`, `engineering`)
 names the GitHub login of the person who owns that kind of decision for
-this agent. Each must have access to this repository. On this project one
-person holds every seat, so ask the owner which login to use. Your own
-login is not one of them.
+this agent. Each must **administer** this repository: write is not
+enough, so your own login is refused. On this project one person holds
+every seat; ask the owner which login to use. At M06 the agent's
+`rule-owner` decides nothing here: the guardrail is the platform's.
 
 ## 5. Write your tests (goldens)
 
@@ -77,17 +78,26 @@ added: M06
 retired: null
 ```
 
-An ordinary golden asks something the table answers plainly. A trap asks
-something that looks like yes and is no, because of a row's detail (a
-holdback, an embargo, a window that ends the day before). The file name
-is the id. A test that has never passed does not block anything; it is
-reported.
+An ordinary golden asks something the table answers plainly. A trap
+tempts a conclusion the row contradicts: the question carries a misleading
+premise (a moved date, a "usually", a near title), and the row's detail (a
+holdback, an embargo, a window that ends the day before) decides it. The
+answer may be yes or no; a trap whose answer is always "no" is passed by a
+guess. The question never states the row's own fact. The file name is the
+id; an id is never renamed or reused: a golden that is wrong is retired
+(`retired: M06`) and a new one written.
 
-You may change `data/table.json` and `data/clauses.json` to your agent's
-own rows and clauses. Every golden must cite a row and a clause that are
-there.
-If you change the titles, change the slate in `prompt.txt` too: the
-agent finds a title's id there, and the tool finds the row by that id.
+Your goldens are run against your deployed agent after the merge, and the
+result is recorded. At M06 a failing one blocks nothing.
+
+You may change the rows in `data/table.json` and the clauses in
+`data/clauses.json`. Every golden must cite a row and a clause that are
+there. Keep the row fields (`table_row`, `title_id`, `territory`,
+`platform`, the window and the holdback fields) and refagent's clause ids:
+the shipped tool reads those and no others until M07. If you change the
+titles, change the slate in `prompt.txt` too: the agent finds a title's id
+there, and the tool finds the row by that id. Titles, people and deals are
+fictional, always.
 
 ## 6. Push, wait for the check, merge
 
@@ -121,6 +131,7 @@ have shipped.
 |---|---|
 | No `platform-check` after 30 minutes | agentkeel's schedule has not reached it. Push an empty commit, or tell the owner. |
 | `the agent's name` | The name is malformed, agentkeel's own, or taken. |
-| `the platform's guardrail` | `guardrail` was changed. Put it back. |
+| `the platform's guardrail` | `guardrail` differs from the platform's: changed here, or the platform moved it. Set it to the platform's (refagent's manifest in agentkeel). |
+| `the files the platform's image copies` | A file the image needs is missing: `__init__.py`, `agent.py`, `server.py`, `prompt.txt`, `manifest.yaml` or `tools/`. |
 | `the repository's ruleset is the export` | The repository's settings were changed. Only the owner can fix this. |
 | The deploy run fails at the registry | Another repository already deployed under your agent's name. Rename it. |

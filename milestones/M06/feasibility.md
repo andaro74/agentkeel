@@ -533,3 +533,15 @@ tokens, `regressed` empty. It says nothing about claim 6.
   prefix (CloudFormation refused `agentkeel-` at synth), so an agent other
   than refagent pushes under `agentkeel/`. refagent keeps
   `agentkeel-refagent`.
+- **A seat is held by a login that administers the repository**, not one
+  with access (security-reviewer F11 on PR 2). The developer has write, so
+  "access" let them name themselves in all seven seats and pass S1a's
+  reader; R1's "the second developer's login holds none" held by nothing.
+  SPEC/06 §2's definition is amended; the reader asks GitHub for the
+  login's permission and accepts `admin` only.
+
+**The seat reviews of PR 2** (reports in the PR body): security-reviewer
+0 BLOCK, 12 FINDING; platform-architect 1 BLOCK, 8 FINDING; threshold-owner
+0 BLOCK, 2 FINDING; rule-owner 0 BLOCK, 3 FINDING; data-owner 0 BLOCK,
+6 FINDING. What each changed, and what each leaves named in SPEC/06 §8, is
+in `rulings/pr2-security.md` and `rulings/pr2-engineering.md`.

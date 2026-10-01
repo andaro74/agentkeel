@@ -23,4 +23,6 @@ What you cannot change from here:
   repository can post a check with that name, but GitHub does not count it.
 - **The deploy.** agentkeel deploys this agent from its own pipeline after
   a merge. Nothing in this repository holds a cloud credential.
-- **The guardrail.** Every agent from the template uses the platform's.
+- **The guardrail.** Every agent from the template uses the platform's,
+  built from agentkeel's `agents/refagent/rules/`. A `rules/` folder here
+  is not read.
