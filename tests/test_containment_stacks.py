@@ -64,8 +64,28 @@ def test_s2s_control_is_an_explicit_deny_naming_both_roles_by_their_whole_arn(se
     assert deny["Condition"] == {"ArnEquals": {"aws:PrincipalArn": [REFAGENT, STANDIN]}}
     assert "NotResource" in deny and "agents/refagent/*" in json.dumps(deny["NotResource"])
     assert statements["RefagentPutsUnderItsOwnPrefix"]["Condition"] == {"ArnEquals": {"aws:PrincipalArn": REFAGENT}}
-    assert "ArnLike" not in json.dumps([s for s in statements.values() if "PrincipalArn" in json.dumps(s)])
+    # M06 PR 2 (SPEC/06 section 6, item 8): the only pattern on a principal is an agent from the template's,
+    # each statement holding the account as a fixed value (so S3 does not read it as public) and the tag. The
+    # look-alike role it would admit is one the agent account's admin or the execution role makes and tags.
+    patterned = {sid for sid, s in statements.items() if "aws:PrincipalArn" in json.dumps((s.get("Condition") or {}).get("ArnLike"))}
+    assert patterned == {"AnAgentFromTheTemplatePutsUnderItsOwnPrefix", "NoAgentFromTheTemplatePutsOutsideItsOwnPrefix"}
+    for sid in patterned:
+        assert statements[sid]["Condition"]["StringEquals"]["aws:PrincipalAccount"] == "581208540944"
+        assert statements[sid]["Condition"]["Null"] == {"aws:PrincipalTag/agentkeel:agent": "false"}
+    assert "${aws:PrincipalTag/agentkeel:agent}" in json.dumps(statements["AnAgentFromTheTemplatePutsUnderItsOwnPrefix"]["Resource"])
+    assert statements["AnAgentFromTheTemplatePutsUnderItsOwnPrefix"]["Condition"]["StringNotEquals"] == {
+        "aws:PrincipalTag/agentkeel:agent": "refagent"}
     assert statements["TheStandinNeverWritesARefusalEvent"]["Effect"] == "Deny"
+
+
+def test_the_standins_allow_is_gone_and_its_two_denies_stay(security):
+    """M06 open.md row 2, ruled at M06 open: the Allow that named the deleted stand-in is removed."""
+    statements = bucket_policy(security)
+    assert "TheStandinPutsUnderItsOwnCornerOfIt" not in statements
+    assert STANDIN in json.dumps(statements["NoAgentPutsOutsideItsOwnPrefix"])
+    assert STANDIN in json.dumps(statements["TheStandinNeverWritesARefusalEvent"])
+    allows = [s for s in statements.values() if s["Effect"] == "Allow"]
+    assert STANDIN not in json.dumps(allows)
 
 
 def test_s6s_grant_is_on_test_only_and_the_lock_is_turned_off_by_nobody_outside(security):
@@ -107,15 +127,18 @@ def roles(template: dict[str, Any]) -> dict[str, dict[str, Any]]:
             if r["Type"] == "AWS::IAM::Role" and "RoleName" in r["Properties"]}  # fmt: skip
 
 
-def test_the_read_role_reads_three_prefixes_and_the_put_role_trusts_main_only(security):
+def test_the_read_role_reads_its_prefixes_and_the_put_role_trusts_main_only(security):
     both = roles(security)
     put = both["agentkeel-envelope-put"]["AssumeRolePolicyDocument"]["Statement"][0]["Condition"]["StringEquals"]
     assert put["token.actions.githubusercontent.com:sub"] == ["repo:andaro74@3157440/agentkeel@1376369685:ref:refs/heads/main"]
-    assert put["token.actions.githubusercontent.com:job_workflow_ref"] == "andaro74/agentkeel/.github/workflows/evals.yml@refs/heads/main"
+    # evals.yml, and from M06 PR 2 deploy.yml (an agent from the template's answer record, SPEC/06 R7), on main.
+    assert put["token.actions.githubusercontent.com:job_workflow_ref"] == [
+        "andaro74/agentkeel/.github/workflows/evals.yml@refs/heads/main",
+        "andaro74/agentkeel/.github/workflows/deploy.yml@refs/heads/main"]
     policies = {json.dumps(p["Roles"]): p for p in of_type(security, "AWS::IAM::Policy")}
     read = next(p for k, p in policies.items() if "ReadRole" in k)["PolicyDocument"]["Statement"]
     listed = next(s for s in read if "s3:ListBucket" in s["Action"])
-    assert listed["Condition"] == {"StringLike": {"s3:prefix": ["AWSLogs/*", "agents/*", "test/*"]}}
+    assert listed["Condition"] == {"StringLike": {"s3:prefix": ["AWSLogs/*", "agents/*", "test/*", "envelopes/agents/*"]}}
     assert all(r.get("PermissionsBoundary") for r in both.values())
 
 
