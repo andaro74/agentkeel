@@ -19,10 +19,17 @@ What it makes, each named in SPEC/05 §6 before this file:
     and flow-log delivery under `AWSLogs/<agent account>/` for the agent
     account's flow logs, each with the confused-deputy conditions AWS
     documents;
-  - refagent's role puts under `agents/refagent/`, and refagent's stand-in
-    under `agents/refagent/standin/` only, each named by role ARN in
+  - refagent's role puts under `agents/refagent/`, named by role ARN in
     `aws:PrincipalArn` (a principal named directly must exist when the
-    policy is put, and the stand-in is made after this stack);
+    policy is put). The stand-in's Allow under `agents/refagent/standin/`
+    was removed at M06 PR 2 (`milestones/M06/open.md` row 2): the stand-in
+    was deleted on 2026-09-30, and a role recreated with its name would have
+    had the grant back. The two Denies that name it stay;
+  - from M06 PR 2 (SPEC/06 section 6, item 8; `open.md` row 29), an agent
+    from the template puts under `agents/<its agentkeel:agent tag>/` and
+    nowhere else: one Allow and one Deny for every role under the agent
+    path in the agent account, by the tag CloudFormation sets from the
+    manifest's name on `main`. refagent's own grant stays by exact ARN;
   - an explicit Deny on either of them putting anywhere outside
     `agents/refagent/` (**seed S2's control**), and on the stand-in putting
     under `agents/refagent/events/`, where refagent's refusal events go;
@@ -97,11 +104,15 @@ GITHUB = "token.actions.githubusercontent.com"
 EVAL_WORKFLOWS = [f"{REPO}/.github/workflows/evals.yml@refs/pull/*/merge",
                   f"{REPO}/.github/workflows/evals.yml@refs/heads/main"]
 MAIN_EVALS = f"{REPO}/.github/workflows/evals.yml@refs/heads/main"
+# M06 PR 2 (SPEC/06 section 6, R7): deploy.yml on main puts an agent from the template's answer record.
+MAIN_DEPLOY = f"{REPO}/.github/workflows/deploy.yml@refs/heads/main"
+# The tag an agent role carries (infra/construct/governed_agent.py, AGENT_TAG), as a policy variable.
+OWN_PREFIX = "agents/${aws:PrincipalTag/agentkeel:agent}/*"
 # GitHub's two published intermediate thumbprints. IAM no longer checks them for GitHub, and
 # CloudFormation still takes the list.
 THUMBPRINTS = ["6938fd4d98bab03faadb97b34396831e3780aea1", "1c58a3a8518e8759bf075b76b750d4f2df264fcd"]
 # What the observer reads (scripts/observe_containment.py), and nothing else.
-READ_PREFIXES = ["AWSLogs/", "agents/", "test/"]
+READ_PREFIXES = ["AWSLogs/", "agents/", "test/", "envelopes/agents/"]  # the last from M06 PR 2: item 4's records
 # The object events this account's trail logs: the attempts and the evidence, not the delivery.
 LOGGED_PREFIXES = ["agents/", "test/", "envelopes/"]
 # Seed S6's two object actions, granted on test/ so that the lock is what refuses them.
@@ -196,10 +207,24 @@ class SecurityStack(cdk.Stack):
             sid="RefagentPutsUnderItsOwnPrefix", principals=[iam.AnyPrincipal()], actions=["s3:PutObject"],
             resources=[objects("agents/refagent/*")], conditions={"ArnEquals": {"aws:PrincipalArn": REFAGENT_ROLE}},
         ))  # fmt: skip
+        # M06 PR 2 (SPEC/06 section 6, item 8): an agent from the template, under its own prefix, by its tag.
+        # The account is named as a fixed value, so S3 does not read the policy as public; the path and the
+        # tag are what the platform sets, from main, through the execution role (no agent role may tag).
+        # refagent is left to its exact-ARN grant above.
+        template_agents = {"StringEquals": {"aws:PrincipalAccount": AGENT_ACCOUNT},
+                           "ArnLike": {"aws:PrincipalArn": f"{AGENT_ROLES}*"}}  # fmt: skip
         bucket.add_to_resource_policy(iam.PolicyStatement(
-            sid="TheStandinPutsUnderItsOwnCornerOfIt", principals=[iam.AnyPrincipal()], actions=["s3:PutObject"],
-            resources=[objects("agents/refagent/standin/*")],
-            conditions={"ArnEquals": {"aws:PrincipalArn": STANDIN_ROLE}},
+            sid="AnAgentFromTheTemplatePutsUnderItsOwnPrefix", principals=[iam.AnyPrincipal()],
+            actions=["s3:PutObject"], resources=[objects(OWN_PREFIX)],
+            conditions={**template_agents, "StringNotEquals": {"aws:PrincipalTag/agentkeel:agent": "refagent"},
+                        "Null": {"aws:PrincipalTag/agentkeel:agent": "false"}},
+        ))  # fmt: skip
+        bucket.add_to_resource_policy(iam.PolicyStatement(
+            sid="NoAgentFromTheTemplatePutsOutsideItsOwnPrefix", effect=iam.Effect.DENY,
+            principals=[iam.AnyPrincipal()], actions=["s3:PutObject"], not_resources=[objects(OWN_PREFIX)],
+            # Tagged roles only: an untagged one has no Allow here either, and refagent's role carries no tag
+            # until its next deploy, when its own exact-ARN Deny above still holds it.
+            conditions={**template_agents, "Null": {"aws:PrincipalTag/agentkeel:agent": "false"}},
         ))  # fmt: skip
         # Seed S2's control: the refusal of another agent's prefix, explicit and named.
         bucket.add_to_resource_policy(iam.PolicyStatement(
@@ -290,11 +315,13 @@ class SecurityStack(cdk.Stack):
         return role
 
     def _put_role(self, provider: iam.CfnOIDCProvider) -> iam.Role:
-        """evals.yml on main, and only there: the envelope put under envelopes/ (SPEC/05 section 6, finding 2)."""
+        """evals.yml and deploy.yml on main, and only there: puts under envelopes/ (SPEC/05 section 6; SPEC/06 R7)."""
         role = iam.Role(
             self, "PutRole", role_name=PUT_ROLE, max_session_duration=cdk.Duration.hours(1),
-            assumed_by=self._github(provider, [f"{SUBJECT}:ref:refs/heads/main"], MAIN_EVALS, exact=True),
-            description="agentkeel: evals.yml on main puts each CI-written envelope under envelopes/ as this.",
+            # M06 PR 2 (R7): and deploy.yml on main, for an agent from the template's answer record.
+            assumed_by=self._github(provider, [f"{SUBJECT}:ref:refs/heads/main"], [MAIN_EVALS, MAIN_DEPLOY],
+                                    exact=True),
+            description="agentkeel: evals.yml and deploy.yml on main put CI-written records under envelopes/ as this.",
         )  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="PutEnvelopesOnly", actions=["s3:PutObject"], resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/envelopes/*"]))
@@ -323,13 +350,14 @@ SUPPRESSIONS = {
     ),
     "ReadRole/DefaultPolicy/Resource": (
         "AwsSolutions-IAM5",
-        "SPEC/05 §6: 'the read-only role reads the prefixes the observer needs and not *'. AWSLogs/*, agents/* "
-        "and test/* are those prefixes; the keys under them are written by AWS and by the agents at run time.",
+        "SPEC/05 §6: 'the read-only role reads the prefixes the observer needs and not *'. AWSLogs/*, agents/*, "
+        "test/* and, from M06 PR 2, envelopes/agents/* (an agent from the template's answer records, SPEC/06 R7) "
+        "are those prefixes; the keys under them are written by AWS, by the agents and by deploy.yml at run time.",
     ),
     "PutRole/DefaultPolicy/Resource": (
         "AwsSolutions-IAM5",
-        "SPEC/05 §6: envelopes to the audit bucket from main. envelopes/* because each key is an envelope's "
-        "commit, which exists only when CI writes it.",
+        "SPEC/05 §6: envelopes to the audit bucket from main (evals.yml, and from M06 PR 2 deploy.yml's answer "
+        "records, SPEC/06 R7). envelopes/* because each key is a commit, which exists only when CI writes it.",
     ),
 }
 for path, (rule, reason) in SUPPRESSIONS.items():
