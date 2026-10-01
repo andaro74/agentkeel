@@ -449,3 +449,38 @@ def test_nothing_is_read_or_posted_while_the_organisation_or_the_app_is_unnamed(
     out = tmp_path / "heads.json"
     assert platform_check.main(["find", "--out", str(out)]) == 0
     assert json.loads(out.read_text(encoding="utf-8")) == [] and github["posted"] == []
+
+
+# --- the registry's writer (scripts/registry.py) ----------------------------------
+
+from scripts import registry  # noqa: E402
+
+
+class FakeTable:
+    """DynamoDB's get_item and conditional put_item on one key, as the registry uses them."""
+
+    def __init__(self) -> None:
+        self.items: dict[str, dict[str, Any]] = {}
+
+    def get_item(self, TableName, Key, ConsistentRead):  # noqa: N803 - boto3's names
+        item = self.items.get(Key["name"]["S"])
+        return {"Item": item} if item else {}
+
+    def put_item(self, TableName, Item, ConditionExpression, ExpressionAttributeNames, ExpressionAttributeValues):  # noqa: N803
+        from botocore.exceptions import ClientError
+
+        held = self.items.get(Item["name"]["S"])
+        if held and held["repository_id"] != ExpressionAttributeValues[":id"]:
+            raise ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
+        self.items[Item["name"]["S"]] = Item
+
+
+def test_a_name_belongs_to_the_first_repository_deployed_under_it():
+    table = FakeTable()
+    assert registry.claim(table, "premiere-desk", "111")[0] == 0
+    assert registry.write(table, "premiere-desk", "org/a", "111", "a" * 40, "7")[0] == 0
+    assert registry.claim(table, "premiere-desk", "111")[0] == 0  # the same repository redeploys
+    code, said = registry.claim(table, "premiere-desk", "222")
+    assert code == 3 and "held by repository 111" in said
+    assert registry.write(table, "premiere-desk", "org/b", "222", "b" * 40, "8")[0] == 3
+    assert table.items["premiere-desk"]["repository"]["S"] == "org/a"
