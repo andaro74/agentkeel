@@ -152,7 +152,8 @@ def mutated(change) -> dict[str, Any]:
 @pytest.mark.parametrize(("name", "change", "miss"), [
     ("F6_1", lambda o: o["s3"]["first_pr"]["commits"][0].update(check_runs=runs("success")),
      "passed the platform check with seats unassigned"),
-    ("F6_1", lambda o: o["s3"]["first_pr"]["commits"].pop(0), "never carried a planted fault"),
+    ("F6_1", lambda o: o["s3"]["first_pr"]["commits"].pop(0), "first commit carried no planted fault"),
+    ("F6_1", lambda o: o["s3"]["first_pr"]["commits"][0].update(check_runs=[]), "it was never refused"),
     ("F6_1", lambda o: o["s3"]["first_pr"].update(merged=False), "was not merged"),
     ("F6_2", lambda o: o["s2"].update(merged=True), "S2's pull request merged"),
     ("F6_2", lambda o: o["s2"].update(check_runs=runs("success", stand_in=True)), "passed S2's head"),
@@ -167,7 +168,9 @@ def mutated(change) -> dict[str, Any]:
     ("F6_3", lambda o: o["panel"]["frame"]["results"]["A"]["frames"][0]["data"].update(
         values=[["refagent"], ["andaro74/agentkeel"]]), "unread: panel 1's row"),
     # cold review F3: mergeable is not refused, and a refusal by an unbound check is not this control's
-    ("F6_2", lambda o: o["s2"].update(mergeable_state="clean"), "is mergeable"),
+    ("F6_2", lambda o: o["s2"].update(mergeable_state="clean"), "mergeable_state is 'clean'"),
+    ("F6_2", lambda o: o["s2"].update(mergeable_state="unstable"), "mergeable_state is 'unstable'"),
+    ("F6_2", lambda o: o["s2"].update(mergeable_state="unknown"), "unread: S2's mergeable_state is 'unknown'"),
     ("F6_2", lambda o: o["s2"].update(required_checks=[{"context": "platform-check", "integration_id": None}]),
      "does not require platform-check from the platform's App"),
     ("F6_1", lambda o: o["s3"].update(required_checks=None), "does not require platform-check"),
@@ -634,3 +637,16 @@ def test_a_malformed_panel_target_is_refused_not_a_crash(tmp_path):
     (tmp_path / "infra" / "grafana").mkdir(parents=True)
     (tmp_path / panel.PANEL).write_text(json.dumps(dashboard), encoding="utf-8")
     assert len(panel.check(tmp_path)) == 2
+
+
+def test_the_observer_reads_a_missing_file_as_a_fact_and_a_refused_read_as_an_error(monkeypatch):
+    """F5's split (second cold read, N4): a 404 is the commit's; a 403 is the read's, and is recorded."""
+    import urllib.error
+
+    def gh(path, *, raw=False):
+        code = 404 if "manifest.yaml" in path else 403
+        raise urllib.error.HTTPError(path, code, "x", {}, None)
+
+    monkeypatch.setattr(observer, "gh", gh)
+    folder = observer.folder_at("org/a", "a" * 40)
+    assert folder["seats"] is None and folder["read_error"] == "goldens/: 403"

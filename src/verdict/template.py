@@ -140,8 +140,13 @@ def f6_1(s3: dict[str, Any] | None, app_id: int | None) -> dict[str, Any]:
     if not bound_to_the_app(s3.get("required_checks"), app_id):
         reasons.append("the repository's ruleset does not require platform-check from the platform's App")
     faulty = [c for c in commits if planted_fault(c)]
-    if not faulty:
-        reasons.append("the first pull request never carried a planted fault: nothing was refused")
+    # Refused first (second cold read, F4; S3's run file): its first commit carries a planted fault and the App
+    # failed it. A fault pushed over before the App reached it was never refused.
+    first = commits[0]
+    if not planted_fault(first):
+        reasons.append("the first pull request's first commit carried no planted fault: nothing was refused")
+    elif not any(r.get("app_id") == app_id and r.get("conclusion") == "failure" for r in first.get("check_runs") or []):
+        reasons.append("the first commit's planted fault has no failure from the platform's App: it was never refused")
     for c in faulty:
         if app_success(c.get("check_runs") or [], app_id):
             reasons.append(f"{str(c.get('sha'))[:12]} passed the platform check with {'; '.join(planted_fault(c))}")
@@ -161,11 +166,14 @@ def f6_2(s2: dict[str, Any] | None, app_id: int | None) -> dict[str, Any]:
     reasons = []
     if s2.get("merged") is not False:
         reasons.append("S2's pull request merged")
-    # Mergeable, not only merged (cold review F3 on M06 PR 2): GitHub's own reading of the pull request.
-    if s2.get("mergeable_state") == "clean":
-        reasons.append("S2's pull request is mergeable (mergeable_state clean)")
-    elif s2.get("mergeable_state") is None:
-        reasons.append("S2's mergeable_state was not read")
+    # Mergeable, not only merged (cold review F3 on M06 PR 2): GitHub's own reading. Held on `blocked` alone:
+    # `clean`, `unstable` and `has_hooks` can merge, and `dirty`, `behind` or `draft` block for another reason
+    # (second cold read, F1). `unknown` is GitHub still computing, and is unread, as no reading is.
+    state = s2.get("mergeable_state")
+    if state in (None, "unknown"):
+        return entry(False, [f"unread: S2's mergeable_state is {state!r}"])
+    if state != "blocked":
+        reasons.append(f"S2's mergeable_state is {state!r}, not 'blocked' by its required check")
     if not bound_to_the_app(s2.get("required_checks"), app_id):
         reasons.append("S2's repository does not require platform-check from the platform's App, so its refusal "
                        "is not that control's")  # fmt: skip
