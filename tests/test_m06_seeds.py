@@ -245,7 +245,6 @@ def test_s3_the_timed_quickstart_was_made():
 PANEL = "infra/grafana/panel1.json"  # the dashboard's path from PR 2 (finding 16: Security's)
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S4's query reader is M06 PR 2's (SPEC/06 §6)")
 def test_s4_a_panel_1_query_with_a_second_source_is_refused(worktree):
     """Panel 1 of S4's dashboard reads the registry and a static list naming ghost-agent. `validate`
     must refuse a panel 1 query that names anything but the registry (finding 11). Today nothing

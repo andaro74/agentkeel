@@ -37,6 +37,7 @@ from src.validate import (
     golden_ids,
     lifecycle,
     overlap,
+    panel,
     ruleset,
     seats,
     semver,
@@ -423,4 +424,6 @@ CHECKS = {
     "seats assigned, each a login with access": seats.check,
     # M06 PR 2: S1b's reader
     "an agent's goldens: one ordinary and one trap at least, citing its own data": agent_goldens.check,
+    # M06 PR 2: S4's query reader (finding 11)
+    "panel 1 queries the registry and nothing else": panel.check,
 }
