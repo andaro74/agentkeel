@@ -298,7 +298,7 @@ lists below are written from the reads §11 owed, ruled by the human on
 
   | # | Change | How |
   |---|---|---|
-  | 1 | The repository's ruleset | Timed: the owner applies `infra/ruleset/agent.json`; the platform check fails while the live ruleset differs |
+  | 1 | The repository's ruleset | Timed: the owner applies `infra/ruleset/agent.post.json`, and the live ruleset must equal `infra/ruleset/agent.json`, GitHub's form of it (amended at PR 3); the platform check fails while it differs |
   | 2 | The App on the repository; the developer's write | Automatic (installed on all repositories); timed (the owner, seconds) |
   | 3 | The deploy role's and the eval role's trust; `verify`'s identity | **None.** `agentkeel`'s `deploy.yml` on `main` deploys every agent (R3); `verify`'s identity and repository id move to `infra/platform_identity.json` (Security) and do not widen |
   | 4 | The image repository | Automatic: `agentkeel/<name>`, made on the first push from an ECR repository creation template for the namespace `agentkeel` (immutable tags, AES-256; a template matches a namespace, not a name prefix, so not `agentkeel-<name>`), and `ecr:CreateRepository` on `repository/agentkeel/*` for the deploy role |
