@@ -537,7 +537,9 @@ def test_post_checks_seats_and_the_ruleset_then_posts_one_check_on_the_head(gith
     assert "floresinnovations is not a holder" in github["posted"][0][1]["output"]["summary"]
 
 
-def test_nothing_is_read_or_posted_while_the_organisation_or_the_app_is_unnamed(tmp_path, github):
+@pytest.mark.parametrize("named", [(None, None), ("agentkeel-studio", None), (None, 5144253)])
+def test_nothing_is_read_or_posted_while_the_organisation_or_the_app_is_unnamed(tmp_path, github, monkeypatch, named):
+    monkeypatch.setattr(platform_check, "identity", lambda: named)
     out = tmp_path / "heads.json"
     assert platform_check.main(["find", "--out", str(out)]) == 0
     assert json.loads(out.read_text(encoding="utf-8")) == [] and github["posted"] == []
