@@ -538,12 +538,21 @@ jobs:
           aws-region: us-west-2
           unset-current-credentials: true
 
-      # Once: the bucket refuses a put under envelopes/ without If-None-Match (infra/security/).
+      # Once: the bucket refuses a put under envelopes/ without If-None-Match (infra/security/). A 412 is a
+      # record already put by an earlier run whose registry write failed; the run goes on to the row
+      # (second cold read, F2 on M06 PR 2). The first record stands; this run's answer is in its summary.
       - name: Put the answer record in the security account, once
         if: steps.registry.outputs.skip == 'false'
-        run: >-
-          aws s3api put-object --bucket agentkeel-audit-897698239547
-          --key "envelopes/agents/$NAME/$COMMIT.json" --body "$RUNNER_TEMP/answer.json" --if-none-match '*'
+        run: |
+          set -uo pipefail
+          out=$(aws s3api put-object --bucket agentkeel-audit-897698239547 \
+            --key "envelopes/agents/$NAME/$COMMIT.json" --body "$RUNNER_TEMP/answer.json" --if-none-match '*' 2>&1) && exit 0
+          if echo "$out" | grep -q "PreconditionFailed"; then
+            echo "envelopes/agents/$NAME/$COMMIT.json was already put; the first record stands" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "$out"
+          exit 1
 
       # The registry row last, as the deploy role again: a put that failed leaves the commit undeployed in the
       # registry, so the next run asks again (cold review F8 on M06 PR 2).
