@@ -73,6 +73,7 @@ import yaml
 import aws_cdk as cdk
 from aws_cdk import aws_bedrock as bedrock
 from aws_cdk import aws_budgets as budgets
+from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_ecr as ecr
 from aws_cdk import aws_iam as iam
@@ -140,6 +141,13 @@ DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", *GUARDRAIL_DENIED, "s3:PutBuc
 # Not under /agentkeel/security/, which the execution role reads, and no
 # agent role can read it: the agent boundary allows no ssm action.
 TABLE_MARKER_PARAM = "/agentkeel/marker/refagent/rights-table-digest"
+# M06 PR 2 (SPEC/06 section 6, items 4, 7, 9). An agent from the template is deployed by deploy.yml on
+# main too (R3): its marker is /agentkeel/marker/<name>/rights-table-digest, its runtime is named
+# agentkeel_<name> (the construct), its image repository is made on its first push from the creation
+# template below, and the registry holds one row per agent, written by the deploy.
+AGENT_MARKERS = "/agentkeel/marker/*/rights-table-digest"
+TEMPLATE_RUNTIMES = "runtime/agentkeel_*"
+REGISTRY_TABLE = "agentkeel-registry"
 # The Rule Owner's files the guardrail is built from (SPEC/03 §6). Read at
 # synth; a change to either is a change to this stack, and a new version.
 RULES_DIR = Path(__file__).resolve().parents[2] / "agents" / "refagent" / "rules"
@@ -248,6 +256,8 @@ class BootstrapStack(cdk.Stack):
         self._budget(eval_role)
 
         self._image_repository()
+        self._image_repository_template()
+        self._registry()
         self._parameters(boundary, vpc)
 
         cdk.CfnOutput(self, "ExecutionRoleArn", value=execution_role.role_arn)
@@ -629,6 +639,23 @@ class BootstrapStack(cdk.Stack):
                      "vpc-lattice:ListServiceNetworkResourceAssociations", "vpc-lattice:AssociateViaAWSService"],
             resources=["*"],
         ))  # fmt: skip
+        # M06 PR 2 (SPEC/06 section 6, item 5): an agent from the template brings its own key, made in
+        # its stack. Create, describe, rotate, tag and alias, and nothing that changes a key once it
+        # exists: the key's own policy denies this role PutKeyPolicy, CreateGrant, ScheduleKeyDeletion
+        # and DisableKey (R4), and so does the deploy boundary. CreateKey takes no resource-level permission.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="MakeAnAgentsKey",
+            actions=["kms:CreateKey"],
+            resources=["*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="DescribeRotateTagAndAliasAnAgentsKey",
+            actions=["kms:DescribeKey", "kms:EnableKeyRotation", "kms:GetKeyRotationStatus", "kms:GetKeyPolicy",
+                     "kms:ListResourceTags", "kms:TagResource", "kms:CreateAlias", "kms:UpdateAlias"],
+            resources=[f"arn:aws:kms:{REGION}:{self.account}:key/*",
+                       f"arn:aws:kms:{REGION}:{self.account}:alias/agentkeel-*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(sid="ListAliases", actions=["kms:ListAliases"], resources=["*"]))
         role.add_to_policy(iam.PolicyStatement(
             sid="NeverTouchTheBoundaryOrAKeyPolicy",
             effect=iam.Effect.DENY,
@@ -702,7 +729,8 @@ class BootstrapStack(cdk.Stack):
             actions=["ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
                      "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:BatchGetImage",
                      "ecr:GetDownloadUrlForLayer"],
-            resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel-*"],
+            resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel-*",
+                       f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel/*"],  # M06 PR 2: item 4
         ))  # fmt: skip
         # `scripts/load_rights_table.py`: put_item per row, then describe_table.
         # Not BatchWriteItem, which it does not call. From M03 PR 2 (S1's
@@ -722,14 +750,34 @@ class BootstrapStack(cdk.Stack):
         role.add_to_policy(iam.PolicyStatement(
             sid="SetTheRightsTableMarker",
             actions=["ssm:PutParameter"],
-            resources=[f"arn:aws:ssm:{REGION}:{self.account}:parameter{TABLE_MARKER_PARAM}"],
+            # refagent's, and from M06 PR 2 each agent's from the template, under /agentkeel/marker/ only.
+            resources=[f"arn:aws:ssm:{REGION}:{self.account}:parameter{TABLE_MARKER_PARAM}",
+                       f"arn:aws:ssm:{REGION}:{self.account}:parameter{AGENT_MARKERS}"],
+        ))  # fmt: skip
+        # M06 PR 2 (SPEC/06 section 6, item 4): an agent from the template gets its image repository on
+        # its first push, from the creation template below (immutable tags), as agentkeel/<name> only: a
+        # creation template matches a namespace, not a name prefix.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="MakeAnAgentsImageRepositoryOnItsFirstPush",
+            actions=["ecr:CreateRepository"],
+            resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel/*"],
+        ))  # fmt: skip
+        # Item 9: the registry row, one per agent. Read first, so a name another repository holds is
+        # refused before the stack is touched; written with a condition that says the same.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadAndWriteTheRegistry",
+            actions=["dynamodb:GetItem", "dynamodb:PutItem"],
+            resources=[f"arn:aws:dynamodb:{REGION}:{self.account}:table/{REGISTRY_TABLE}"],
         ))  # fmt: skip
         # The load check: `src.agent.run` calls the runtime it just deployed,
         # once per golden. refagent's runtime, as the eval role's grant is.
         role.add_to_policy(iam.PolicyStatement(
             sid="CallTheRuntimeItJustDeployed",
             actions=["bedrock-agentcore:InvokeAgentRuntime"],
-            resources=[f"arn:aws:bedrock-agentcore:{REGION}:{self.account}:runtime/refagent*"],
+            # refagent's, and from M06 PR 2 an agent from the template's (item 4's answer, R7). Not
+            # runtime/*: the account holds other projects' runtimes (milestones/M06/feasibility.md section 8).
+            resources=[f"arn:aws:bedrock-agentcore:{REGION}:{self.account}:runtime/refagent*",
+                       f"arn:aws:bedrock-agentcore:{REGION}:{self.account}:{TEMPLATE_RUNTIMES}"],
         ))  # fmt: skip
         return role
 
@@ -819,6 +867,12 @@ class BootstrapStack(cdk.Stack):
         ))  # fmt: skip
         # M03 PR 2 (S1's reader): and which rights table the runtime answers
         # from. Read only; unreadable or "loading" means the run is in the runner.
+        # M06 PR 2 (SPEC/06 section 4): scripts/observe_template.py scans the registry, read only.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ScanTheRegistry",
+            actions=["dynamodb:Scan"],
+            resources=[f"arn:aws:dynamodb:{REGION}:{self.account}:table/{REGISTRY_TABLE}"],
+        ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="ReadTheRightsTableMarker",
             actions=["ssm:GetParameter"],
@@ -1097,6 +1151,38 @@ class BootstrapStack(cdk.Stack):
             image_tag_mutability=ecr.TagMutability.IMMUTABLE,
             image_scan_on_push=True,
             encryption=ecr.RepositoryEncryption.AES_256,
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )  # fmt: skip
+
+    def _image_repository_template(self) -> ecr.CfnRepositoryCreationTemplate:
+        """M06 PR 2 (SPEC/06 section 6, item 4): an agent from the template's repository, `agentkeel/<name>`, made on first push.
+
+        Tag-immutable and AES-256, as refagent's. Scan on push is a registry setting, not a template's;
+        refagent's repository keeps its own flag."""
+        return ecr.CfnRepositoryCreationTemplate(
+            self, "AgentImageTemplate",
+            prefix="agentkeel",  # a namespace: it applies to agentkeel/<name>, and to no other repository
+            applied_for=["CREATE_ON_PUSH"],
+            description="agentkeel: an agent from the template's image repository (SPEC/06 section 6, item 4).",
+            image_tag_mutability="IMMUTABLE",
+            encryption_configuration=ecr.CfnRepositoryCreationTemplate.EncryptionConfigurationProperty(
+                encryption_type="AES256"),
+        )  # fmt: skip
+
+    def _registry(self) -> dynamodb.Table:
+        """M06 PR 2 (SPEC/06 section 2, section 6, item 9): one row per agent, written by deploy.yml on main.
+
+        Key `name`. Each row: the repository and its id, the commit deployed, the deploy run and the time.
+        The deploy writes a row only when the name is free or already the same repository's, so a second
+        repository cannot take an agent's name. Panel 1 reads it through Athena (infra/grafana/)."""
+        return dynamodb.Table(
+            self, "Registry",
+            table_name=REGISTRY_TABLE,
+            partition_key=dynamodb.Attribute(name="name", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            encryption=dynamodb.TableEncryption.DEFAULT,
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True),
             removal_policy=cdk.RemovalPolicy.RETAIN,
         )  # fmt: skip
 

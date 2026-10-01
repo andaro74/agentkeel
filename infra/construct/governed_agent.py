@@ -15,6 +15,7 @@ from aws_cdk import aws_bedrockagentcore as agentcore
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kms as kms
 from aws_cdk import aws_ssm as ssm
 from constructs import Construct, IValidation
 
@@ -65,6 +66,16 @@ AGENT_DENIES = ["iam:*", *GUARDRAIL_DENIED, "logs:Delete*", "sts:AssumeRole", "s
 # not a pullable image, so a deploy of it fails at the runtime.
 UNPINNED = "sha256:" + "0" * 64
 
+# M06 PR 2 (SPEC/06 section 6, items 5, 7, 8). refagent is the platform's own agent: its key is the
+# bootstrap stack's and its runtime keeps the name it was deployed under. An agent from the template
+# makes its own key here, and its runtime is named `agentkeel_<name>`, so the deploy role's grant on
+# `runtime/agentkeel_*` reaches the platform's agents and none of the other runtimes in the account.
+PLATFORM_AGENT = "refagent"
+AGENT_TAG = "agentkeel:agent"  # on the agent's role; the audit bucket's policy reads it as aws:PrincipalTag
+# The roles no key policy here lets alter, grant on, disable or delete the key (R4), as the bootstrap
+# stack's key policy names them, plus every agent role by path.
+PLATFORM_ROLES = ("agentkeel-deploy", "agentkeel-cfn-exec", "agentkeel-evals", "agentkeel-developer")
+
 
 class GovernedAgent(Construct):
     """One agent: its role, its security group, its inference profile, its runtime.
@@ -102,6 +113,10 @@ class GovernedAgent(Construct):
 
         self.manifest = manifest_module.load(ROOT / bundle / "manifest.yaml")
         self.agent_name: str = self.manifest["name"]
+        # refagent's repository is the bootstrap's; an agent from the template's is made on its first push
+        # under the agentkeel/ namespace, which the creation template matches (SPEC/06 section 6, item 4).
+        self.image_repository = (f"agentkeel-{self.agent_name}" if self.agent_name == PLATFORM_AGENT
+                                 else f"agentkeel/{self.agent_name}")
         self.bundle = bundle
 
         if gateway is not None:
@@ -117,6 +132,8 @@ class GovernedAgent(Construct):
         self.rights_table = self._rights_table()
         self.profile = self._inference_profile()  # before the role: the role names its ARN
         self.role = self._role(role, rules)
+        # An agent from the template brings its own key (SPEC/06 section 6, item 5); refagent's is the bootstrap's.
+        self.key = None if self.agent_name == PLATFORM_AGENT else self._agent_key()
         self.runtime = self._runtime(image_digest or UNPINNED)
 
     # --- the network -------------------------------------------------------
@@ -245,7 +262,7 @@ class GovernedAgent(Construct):
         role.add_to_policy(iam.PolicyStatement(
             sid="PullItsOwnImageOnly",
             actions=["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
-            resources=[f"arn:aws:ecr:{stack.region}:{stack.account}:repository/agentkeel-{self.agent_name}"],
+            resources=[f"arn:aws:ecr:{stack.region}:{stack.account}:repository/{self.image_repository}"],
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="ItsOwnLogGroup",
@@ -274,8 +291,49 @@ class GovernedAgent(Construct):
             conditions={"ForAnyValue:StringEquals": {"kms:ResourceAliases": f"alias/agentkeel-{self.agent_name}"}},
         ))  # fmt: skip
         self._contain(role)
+        # The audit bucket's policy holds an agent from the template to agents/<this tag>/ (SPEC/06 section 6,
+        # item 8). The tag is the manifest's name, set here by CloudFormation from main; no agent role may tag.
+        cdk.Tags.of(role).add(AGENT_TAG, self.agent_name)
         rules.own_role(role, self.boundary_arn, given=False)
         return role
+
+    def _agent_key(self) -> kms.CfnKey:
+        """An agent from the template's own key (SPEC/06 section 6, item 5; R4).
+
+        The bootstrap's key policy for refagent, repeated: agent roles use the key and never read its
+        policy (seed S6's control, by path); no platform role, the execution role that creates this
+        included, may alter, grant on, disable or delete it. The account's admin can (the landing zone's,
+        SPEC/01 section 1). Because the creating role is denied PutKeyPolicy by the policy it creates,
+        KMS's lockout check is bypassed: the account principal still administers the key. Retained."""
+        stack = cdk.Stack.of(self)
+        account = f"arn:aws:iam::{stack.account}"
+        agent_roles = f"{account}:role{AGENT_ROLE_PATH}*"
+        policy = {"Version": "2012-10-17", "Statement": [
+            {"Sid": "TheAccountAdministersIt", "Effect": "Allow", "Principal": {"AWS": f"{account}:root"},
+             "Action": "kms:*", "Resource": "*"},
+            {"Sid": "AgentsUseTheKeyAndNeverReadItsPolicy", "Effect": "Allow", "Principal": {"AWS": "*"},
+             "Action": ["kms:Decrypt", "kms:GenerateDataKey"], "Resource": "*",
+             "Condition": {"ArnLike": {"aws:PrincipalArn": agent_roles},
+                           "StringEquals": {"aws:PrincipalAccount": stack.account}}},
+            {"Sid": "NoAgentReadsThisPolicy", "Effect": "Deny", "Principal": {"AWS": "*"},
+             "Action": ["kms:GetKeyPolicy", "kms:ListKeyPolicies"], "Resource": "*",
+             "Condition": {"ArnLike": {"aws:PrincipalArn": agent_roles}}},
+            {"Sid": "NoPlatformRoleChangesThisKey", "Effect": "Deny", "Principal": {"AWS": "*"},
+             "Action": ["kms:PutKeyPolicy", "kms:CreateGrant", "kms:ScheduleKeyDeletion", "kms:DisableKey"],
+             "Resource": "*",
+             "Condition": {"ArnLike": {"aws:PrincipalArn": [agent_roles, *(f"{account}:role/{r}" for r in PLATFORM_ROLES)]}}},
+        ]}  # fmt: skip
+        key = kms.CfnKey(
+            self, "Key",
+            description=f"agentkeel: {self.agent_name}'s key. No role the platform creates may administer it (R4).",
+            enable_key_rotation=True,
+            key_policy=policy,
+            bypass_policy_lockout_safety_check=True,
+        )  # fmt: skip
+        key.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+        alias = kms.CfnAlias(self, "KeyAlias", alias_name=f"alias/agentkeel-{self.agent_name}", target_key_id=key.ref)
+        alias.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+        return key
 
     def _contain(self, role: iam.IRole) -> None:
         """M05 PR 2 (SPEC/05 §6): its own record in the security account, and its own explicit denies.
@@ -331,10 +389,11 @@ class GovernedAgent(Construct):
         stack = cdk.Stack.of(self)
         subnets = ssm.StringListParameter.value_for_typed_list_parameter(self, SUBNETS_PARAM)
         image = (f"{stack.account}.dkr.ecr.{stack.region}.amazonaws.com/"
-                 f"agentkeel-{self.agent_name}@{image_digest}")  # fmt: skip
+                 f"{self.image_repository}@{image_digest}")  # fmt: skip
         return agentcore.CfnRuntime(
             self, "Runtime",
-            agent_runtime_name=self.agent_name.replace("-", "_"),
+            agent_runtime_name=(self.agent_name if self.agent_name == PLATFORM_AGENT
+                                else f"agentkeel_{self.agent_name}").replace("-", "_"),
             role_arn=self.role.role_arn,
             description=f"agentkeel {self.agent_name}, from the bundle {self.bundle}.",
             agent_runtime_artifact=agentcore.CfnRuntime.AgentRuntimeArtifactProperty(

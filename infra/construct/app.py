@@ -7,6 +7,11 @@ against: each seed is this stack with one thing added or taken away.
 
     cd infra/construct && npx cdk diff && npx cdk deploy
 
+From M06 PR 2 (SPEC/06 section 6, R3) the same file synthesises an agent from
+the template: `AGENTKEEL_BUNDLE=agents/<name>` (deploy.yml places the agent
+repository's folder there) gives the stack `AgentkeelAgent`, deployed as
+`agentkeel-<name>`. Unset, it is refagent's, exactly as before.
+
 The image digest comes from the deploy, not from here:
 `AGENTKEEL_IMAGE_DIGEST` is the digest of the image `deploy.yml` pushed in
 the same run. Without it the stack synthesises against a digest that
@@ -31,14 +36,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from infra.construct.governed_agent import GovernedAgent  # noqa: E402
 
 REGION = "us-west-2"
+BUNDLE = os.environ.get("AGENTKEEL_BUNDLE", "agents/refagent").rstrip("/")
+REFAGENT = BUNDLE == "agents/refagent"
+# refagent's ids are the ones it was deployed under, so its resources are not replaced.
+STACK_ID, AGENT_ID = ("AgentkeelRefagent", "Refagent") if REFAGENT else ("AgentkeelAgent", "Agent")
 
 
 class RefagentStack(cdk.Stack):
     def __init__(self, scope: cdk.App, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         self.agent = GovernedAgent(
-            self, "Refagent",
-            bundle="agents/refagent",
+            self, AGENT_ID,
+            bundle=BUNDLE,
             image_digest=os.environ.get("AGENTKEEL_IMAGE_DIGEST"),
         )  # fmt: skip
         cdk.CfnOutput(self, "RuntimeArn", value=self.agent.runtime.attr_agent_runtime_arn)
@@ -49,7 +58,7 @@ class RefagentStack(cdk.Stack):
 # synth it just ran. The cdk CLI sets CDK_OUTDIR; a plain python run does not.
 app = cdk.App(outdir=os.environ.get("CDK_OUTDIR") or str(Path(__file__).parent / "cdk.out"))
 stack = RefagentStack(
-    app, "AgentkeelRefagent",
+    app, STACK_ID,
     env=cdk.Environment(region=REGION),  # account comes from the deployer's credentials
     description="agentkeel M01: refagent, as an instance of GovernedAgent. Security seat.",
     synthesizer=cdk.LegacyStackSynthesizer(),  # the account is not CDK-bootstrapped in us-west-2
@@ -86,14 +95,14 @@ WILDCARDS = {
         "numbered versions, and every model invoke is conditioned on bedrock:GuardrailIdentifier at the pinned "
         "version. The boundary (seed S5) caps it."
     ),
-    "Resource::arn:aws:s3:::agentkeel-audit-897698239547/agents/refagent/*": (
+    f"Resource::arn:aws:s3:::agentkeel-audit-897698239547/agents/{stack.agent.agent_name}/*": (
         "SPEC/01 §6's boundary (seed S5) as widened at M05 PR 2: PutObject under this agent's own prefix in the "
         "security account's audit bucket, whose keys the agent writes at run time (SPEC/05 §6). The bucket's "
         "policy refuses any other prefix."
     ),
 }
 NagSuppressions.add_resource_suppressions_by_path(
-    stack, "AgentkeelRefagent/Refagent/Role/DefaultPolicy/Resource",
+    stack, f"{STACK_ID}/{AGENT_ID}/Role/DefaultPolicy/Resource",
     [{"id": "AwsSolutions-IAM5", "reason": reason, "appliesTo": [finding]} for finding, reason in WILDCARDS.items()],
 )
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
