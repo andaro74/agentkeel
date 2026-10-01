@@ -22,8 +22,14 @@ envelope could not tell the two apart. From ADR-0007 it can: this raw file
 carries `mode`, `runtime_arn` and `bundle`, and `verdict.build` copies them
 into the envelope. Construct tenancy is read at M01 PR 4's run (ledger row 1).
 
+From M06 PR 2 (SPEC/06 section 6, R7) it also runs an agent from the
+template: `--bundle agents/<name>` with that agent's goldens, in the deployed
+runtime only (its code is not refagent's, so there is no runner mode for it),
+and `--commit`, the agent repository's commit, which the raw file names
+instead of agentkeel's. `build answer` scores it.
+
 The model id, the profile and the region come from
-`agents/refagent/manifest.yaml`, not from here: the Threshold Owner owns
+the bundle's `manifest.yaml` (refagent's by default), not from here: the Threshold Owner owns
 them and a runner that carried its own copy could measure a model the
 manifest does not name.
 """
@@ -55,7 +61,7 @@ def git(*args: str) -> str:
     return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
 
 
-def dirty() -> bool:
+def dirty(*also_excluded: str) -> bool:
     """Is the tree other than what this commit names?
 
     `evals/history/` and `evals/local/` are excluded, and they have to be:
@@ -68,7 +74,8 @@ def dirty() -> bool:
     has no such line because nothing writes there before it, and it is
     frozen at tag m00 either way.
     """
-    return bool(git("status", "--porcelain", "--", ".", ":(exclude)evals/history", ":(exclude)evals/local"))
+    excluded = [f":(exclude){path}" for path in ("evals/history", "evals/local", *also_excluded)]
+    return bool(git("status", "--porcelain", "--", ".", *excluded))
 
 
 def invoke_deployed(client: Any, runtime_arn: str, question: str) -> dict[str, Any]:
@@ -100,9 +107,14 @@ def main(argv: list[str] | None = None) -> int:
     # read it again. deploy.yml's check at load does not: the deploy role may not read the
     # runtime's image or the table marker, and it has just set both.
     parser.add_argument("--recheck-runtime", action="store_true")
+    # M06 PR 2 (R7): an agent from the template, placed at agents/<name>/ by deploy.yml, and its repository's commit.
+    parser.add_argument("--bundle", default=BUNDLE)
+    parser.add_argument("--commit", help="the agent repository's commit, for a bundle that is not agentkeel's own")
     args = parser.parse_args(argv)
+    bundle = args.bundle.rstrip("/")
+    own = bundle == BUNDLE
 
-    manifest = manifest_module.load(ROOT / BUNDLE / "manifest.yaml")
+    manifest = manifest_module.load(ROOT / bundle / "manifest.yaml")
     model_id, region = manifest["model"]["profile"], manifest["model"]["region"]
     guardrail = manifest["guardrail"]  # the pin both calls carry (M03 PR 2); None before M03
     runtime_arn = os.environ.get("AGENTKEEL_RUNTIME_ARN")
@@ -112,6 +124,9 @@ def main(argv: list[str] | None = None) -> int:
     # silent, and a silent fallback is how "refagent in the runner" and
     # "refagent in the construct" became the same envelope.
     print(f"mode: runtime {runtime_arn}" if runtime_arn else "mode: runner (AGENTKEEL_RUNTIME_ARN unset)")
+    if not own and (not runtime_arn or not args.commit):
+        print(f"{bundle} is not refagent: it is asked in its deployed runtime only, with --commit naming its repository's commit")
+        return 2
 
     if runtime_arn:
         client: Any = boto3.client("bedrock-agentcore", region_name=region)
@@ -160,13 +175,15 @@ def main(argv: list[str] | None = None) -> int:
     result = {
         "what": "raw observations from refagent; not an envelope; scores nothing",
         "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "commit": git("rev-parse", "HEAD"),
-        "dirty": dirty(),
+        "commit": git("rev-parse", "HEAD") if own else args.commit,
+        "dirty": dirty() if own else dirty(bundle),
         "model_id": model_id,
         "region": region,  # the request region, the profile ARN's (item 23)
         "inference_config": agent.INFERENCE_CONFIG,
-        "prompt_sha256": hashlib.sha256(agent.PROMPT.encode("utf-8")).hexdigest(),
-        "tools": [agent.CONTRACT["name"] + "@" + agent.CONTRACT["version"]],
+        "prompt_sha256": hashlib.sha256(agent.PROMPT.encode("utf-8")).hexdigest() if own else (
+            hashlib.sha256((ROOT / bundle / "prompt.txt").read_bytes()).hexdigest()
+            if (ROOT / bundle / "prompt.txt").is_file() else None),
+        "tools": [agent.CONTRACT["name"] + "@" + agent.CONTRACT["version"]] if own else None,
         # The pin, as the envelope's guardrail_version: "<id>:<version>" (M03 PR 2).
         "guardrail": f"{guardrail['id']}:{guardrail['version']}" if guardrail else None,
         "retrieval": None,  # the knowledge base is cut to M03 (SPEC/01 §10, cut 3)
@@ -175,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
         # then checks for pairing and against the bundle's manifest pin.
         "mode": "runtime" if runtime_arn else "runner",
         "runtime_arn": runtime_arn or None,
-        "bundle": BUNDLE,
+        "bundle": bundle,
         "rights_table": source,
         "observations": observations,
     }

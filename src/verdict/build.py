@@ -840,6 +840,59 @@ def compose_envelope(
     }
 
 
+ANSWER_SCHEMA = Path(__file__).with_name("answer.schema.json")
+
+
+def compose_answer(raw: dict[str, Any], agent_dir: Path, repository: str, platform_commit: str,
+                   run_url: str | None) -> dict[str, Any]:  # fmt: skip
+    """Item 4's record (SPEC/06 §1, R7): an agent from the template, in its deployed runtime, on its own goldens.
+
+    Scored as an agent is (grounded, citing, no credential), against the agent's own data: its rows
+    in `data/table.json`, its clauses in `data/clauses.json`. GREEN when every call answered and at
+    least one golden passed; RED when none did; UNMEASURED when a call failed. Gated by nothing."""
+    if not run_url:
+        raise Refused("an answer record needs the CI run URL (--run-url)")
+    if raw.get("mode") != "runtime" or not raw.get("runtime_arn"):
+        raise Refused("an answer record is read in the deployed runtime only (mode runtime, with its ARN)")
+    if raw.get("dirty"):
+        raise Refused("the tree was dirty when the runner ran; the commits do not name what ran")
+    if sum(o.get("usage", {}).get("cacheReadInputTokens", 0) for o in raw["observations"]):
+        raise Refused("a reply was read from a prompt cache")
+    goldens = load_goldens(agent_dir / "goldens")
+    table = load_json(agent_dir / "data" / "table.json")
+    rows = {r["table_row"] for r in table}
+    clauses = set(load_json(agent_dir / "data" / "clauses.json"))
+    results = as_the_agent_is_scored(score_all(raw, goldens, rows, clauses))
+    errors = sum("error" in o for o in raw["observations"])
+    usage = [o.get("usage", {}) for o in raw["observations"]]
+    passed = any(r["pass"] for r in results.values())
+    manifest = yaml.safe_load((agent_dir / "manifest.yaml").read_text(encoding="utf-8"))
+    return {
+        "what": "agent answer",
+        "repository": repository,
+        "agent": manifest["name"],
+        "commit": raw["commit"],
+        "platform_commit": platform_commit,
+        "runtime_arn": raw["runtime_arn"],
+        "model_id": raw["model_id"],
+        "region": raw["region"],
+        "goldens": {g: {k: r[k] for k in ("kind", "score", "cites", "pass")} for g, r in results.items()},
+        "errors": errors,
+        "tokens_in": sum(u.get("inputTokens", 0) for u in usage),
+        "tokens_out": sum(u.get("outputTokens", 0) for u in usage),
+        "run_url": run_url,
+        "verdict": "UNMEASURED" if errors else ("GREEN" if passed else "RED"),
+    }
+
+
+def answer_errors(document: Any) -> list[str]:
+    from jsonschema import Draft202012Validator
+
+    schema = load_json(ANSWER_SCHEMA)
+    return sorted(f"{'/'.join(str(p) for p in e.absolute_path) or '<answer>'}: {e.message}"
+                  for e in Draft202012Validator(schema).iter_errors(document))  # fmt: skip
+
+
 def in_ci() -> bool:
     return os.environ.get("GITHUB_ACTIONS") == "true"
 
@@ -873,7 +926,7 @@ def ref_path(path: Path) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("what", choices=["card", "envelope"])
+    parser.add_argument("what", choices=["card", "envelope", "answer"])
     parser.add_argument("--raw", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--control-card", type=Path)  # not `required`: refusing is build's job
@@ -910,7 +963,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--template", type=Path, metavar="OBSERVATION")
     parser.add_argument("--run-url")
     parser.add_argument("--allow-dirty", action="store_true")
+    # M06 PR 2 (R7): `answer` reads an agent from the template, placed at --agent-dir, from --repository.
+    parser.add_argument("--agent-dir", type=Path)
+    parser.add_argument("--repository")
     args = parser.parse_args(argv)
+
+    if args.what == "answer":
+        try:
+            if not args.agent_dir or not args.repository:
+                raise Refused("answer needs --agent-dir and --repository")
+            document = compose_answer(load_json(args.raw), args.agent_dir, args.repository,
+                                      subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,
+                                                     text=True, check=True).stdout.strip(), args.run_url)  # fmt: skip
+            if errors := answer_errors(document):
+                raise Refused("the answer record does not validate: " + "; ".join(errors))
+            if HISTORY in args.out.resolve().parents:
+                raise Refused("an answer record is not an envelope of agentkeel's; it goes to the security account's bucket")
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8", newline="\n")
+        except Refused as refusal:
+            print(f"REFUSED: {refusal}", file=sys.stderr)
+            return 3
+        print(f"wrote {args.out}: {document['verdict']}")
+        return 0
 
     try:
         raw = load_json(args.raw)

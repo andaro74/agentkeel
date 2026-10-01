@@ -274,3 +274,42 @@ def test_the_rulesets_app_is_the_platforms_app():
     assert required["context"] == shipped.PLATFORM_CHECK
     assert required["integration_id"] == identity["platform_app_id"]
     assert export["bypass_actors"] == []
+
+
+# --- item 4's record: build answer (R7) -----------------------------------------
+
+
+def answered(golden_id: str, row: str, clause: str, available: bool) -> dict[str, Any]:
+    """An observation as refagent's runtime returns one, grounded by its tool call."""
+    parsed = {"table_row": row, "clause_id": clause, "available": available}
+    call = {"name": "check_availability", "status": "success",
+            "output": {"found": True, "row": {"table_row": row}, "clause_candidates": [clause]}}  # fmt: skip
+    return {"id": golden_id, "kind": "ordinary", "parsed": parsed, "tool_calls": [call], "stop_reason": "end_turn",
+            "usage": {"inputTokens": 100, "outputTokens": 20}}  # fmt: skip
+
+
+def raw_answers(*observations: dict[str, Any], **override: Any) -> dict[str, Any]:
+    return {"commit": "d" * 40, "dirty": False, "model_id": "us.anthropic.claude-sonnet-4-6", "region": "us-west-2",
+            "mode": "runtime", "runtime_arn": "arn:aws:bedrock-agentcore:us-west-2:1:runtime/agentkeel_premiere_desk-x",
+            "bundle": "agents/premiere-desk", "observations": list(observations), **override}  # fmt: skip
+
+
+def test_an_agent_that_answers_one_of_its_own_goldens_is_green_against_its_own_data():
+    agent = FIXTURES / "s1a-unassigned-seat"
+    raw = raw_answers(answered("g-001", "pd-001", "PD-1.1", True), {**answered("g-002", "pd-002", "PD-1.2", True), "kind": "trap"})
+    document = build.compose_answer(raw, agent, "org/premiere-desk", "f" * 40, "https://run")
+    assert build.answer_errors(document) == []
+    assert document["verdict"] == "GREEN" and document["goldens"]["g-001"]["pass"] is True
+    assert document["goldens"]["g-002"]["pass"] is False  # available: true where the table says false
+
+
+def test_an_answer_citing_a_row_its_own_data_lacks_does_not_pass():
+    agent = FIXTURES / "s1a-unassigned-seat"
+    raw = raw_answers(answered("g-001", "r-019", "ML-2.1", True), {**answered("g-002", "pd-002", "PD-1.2", True), "kind": "trap"})
+    assert build.compose_answer(raw, agent, "org/premiere-desk", "f" * 40, "https://run")["verdict"] == "RED"
+
+
+def test_an_answer_record_is_read_in_the_runtime_only():
+    agent = FIXTURES / "s1a-unassigned-seat"
+    with pytest.raises(build.Refused, match="deployed runtime only"):
+        build.compose_answer(raw_answers(mode="runner"), agent, "org/x", "f" * 40, "https://run")
