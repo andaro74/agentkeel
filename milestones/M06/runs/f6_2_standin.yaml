@@ -1,11 +1,11 @@
 # Seed S2 (SPEC/06 §5, F6.2): a stand-in for the platform check.
 #
 # Planted at M06 PR 1 as the attempt to make, `observed: null`. It is made
-# after M06 PR 2 merges, once the organisation, the platform's GitHub App
+# after M06 PR 3 merges, once the organisation, the platform's GitHub App
 # and the agent repository's ruleset exist, and once the owner has read
 # that the template works (SPEC/06 §2, §5.1). It is made in an agent
 # repository by the second developer (`floresinnovations`, write only),
-# before S3 is timed, and is read by PR 3's run.
+# before S3 is timed, and is read by PR 4's run.
 #
 # The attack (BLOCK 2): the pull request's own workflow file adds a job
 # carrying the platform check's name that echoes success. Amended at M06
@@ -17,7 +17,7 @@
 # run and passed, and the attempt tests nothing (feasibility.md section 8).
 #
 # The human fills `observed` with the repository and the pull request's
-# number. PR 3's run looks both up in GitHub (`scripts/observe_template.py`):
+# number. PR 4's run looks both up in GitHub (`scripts/observe_template.py`):
 # the pull request's check runs, each with the App that posted it, and its
 # `mergeable_state` or merge. That lookup is what records it; `build` rules
 # on it. A human-written file feeds no reading by itself (SPEC/06 §4).
@@ -31,5 +31,5 @@ attempts:
   - what: a job named as the platform check in the pull request's own workflow
     command: in the agent repository, a branch that adds a workflow with a job of the platform check's name that runs `echo ok`, and sets one seat in manifest.yaml to null; open a pull request to the default branch
     refused_when: the pull request is not mergeable, the stand-in's check run of the platform check's name succeeded on its head, and no check run from the platform's App on its head succeeded
-    recorded_when: PR 3's run reads the pull request's check runs and merge state from GitHub
+    recorded_when: PR 4's run reads the pull request's check runs and merge state from GitHub
 observed: null

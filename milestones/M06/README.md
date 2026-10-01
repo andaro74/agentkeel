@@ -10,9 +10,9 @@ Written at M06 PR 1 open. The row in `milestones/README.md` is the one
 | Claim | A developer ships a governed agent from the template in under one day |
 | Falsifiers | F6.1 a first pull request in an agent repository is mergeable while a seat is unassigned (not a real GitHub login with access) or its goldens are under the minimum (one ordinary, one trap). F6.2 a pull request in an agent repository merges without the platform's check (a required status check bound to the platform's GitHub App by `integration_id`) having run on it and passed. F6.3 the timed quickstart, from the agent repository's `created_at` to the last of its four records (the first pull request refused then merged, the platform's deploy, the agent's answer to one of its own goldens, the registry and panel 1 listing it), exceeds `quickstart.max_seconds` (28,800 s wall clock, from PR 2), or a record is unread (the measured value for claim 6). F6.4 Grafana panel 1 shows an agent the registry does not. |
 | Seeded commit | `672fc1d` (S1a an unassigned seat); `1a576f4` (S1b goldens under the minimum); `0f3b977` (S2 a stand-in for the platform check); `b4eb959` (S3 the timed quickstart); `06c485a` (S4 panel 1 against the registry, two tests, one per reader), each its own commit before any reader (SPEC/06 §5). S2 and S3 are attempts to make, `observed: null`; S1a, S1b and S4 are fixtures |
-| Expected gate output | PR 1: refagent's envelope as at M05; it says nothing about claim 6. `make plants` lists S1a, S1b, S2, S3 and S4 (seeded cases, not golden plants); `tests/test_m06_seeds.py` shows 6 expected failures. PR 2, on the PR: S1a, S1b and S4 refused by their readers for their planted reasons (`validate` refuses the null seats, the missing goldens and a panel 1 query with a second source; `build.panel_not_in_registry` finds `ghost-agent`); both manifests' seats assigned. From PR 2's merge the gate requires `F6_1` and `F6_4` on every agent envelope, **from the seed tests alone: test-only witnesses**. F6.1's and F6.4's live halves, F6.2 and F6.3 are **recorded in the envelope's `template` and read by this row's cell, not gated** (SPEC/06 §4, ruled at open): the observer writes raw observations only and `build` rules on them. **A named P3 exception (SPEC/06 §5.1):** the platform check posts from `agentkeel`'s `main`, the deploy role trusts `main` only and the template is published from what PR 2 merges, so after PR 2's merge the owner reads that the template works from a test repository, S2 is attempted, S3 is timed once by the second developer (`floresinnovations`, write only), and **PR 3's run records them**; PR 3 is that read and cannot be skipped, and the repair. Stated before, and pushed before each attempt: the first pull request not mergeable on its planted reasons; S2 not mergeable, the stand-in's check run a success on its head and none from the App (amended at PR 2: the App reaches S2 too, so S2 carries one null seat); S3 under 28,800 s with all four records read; panel 1's rows equal to the registry's. refagent otherwise as at M05: ordinary 9/9, traps 2/2, guardrail 2/3, red team 5/5, golden plants 7/7. RED if a first pull request is mergeable with a seat unassigned or goldens under the minimum; if S2 can merge; if S3 is over the bar or a record is unread; if panel 1 shows an agent the registry does not; if a seed's test passes but by its reader; if PR 3's run cannot read S2 and S3; or if `make ledger` stops matching rows 0 to 5 |
+| Expected gate output | PR 1: refagent's envelope as at M05; it says nothing about claim 6. `make plants` lists S1a, S1b, S2, S3 and S4 (seeded cases, not golden plants); `tests/test_m06_seeds.py` shows 6 expected failures. PR 2, on the PR: S1a, S1b and S4 refused by their readers for their planted reasons (`validate` refuses the null seats, the missing goldens and a panel 1 query with a second source; `build.panel_not_in_registry` finds `ghost-agent`); both manifests' seats assigned. From PR 2's merge the gate requires `F6_1` and `F6_4` on every agent envelope, **from the seed tests alone: test-only witnesses**. F6.1's and F6.4's live halves, F6.2 and F6.3 are **recorded in the envelope's `template` and read by this row's cell, not gated** (SPEC/06 §4, ruled at open): the observer writes raw observations only and `build` rules on them. **A named P3 exception (SPEC/06 §5.1):** the platform check posts from `agentkeel`'s `main`, the deploy role trusts `main` only and the template is published from what PR 2 merges, so after PR 3's merge the owner reads that the template works from a test repository, S2 is attempted, S3 is timed once by the second developer (`floresinnovations`, write only), and **PR 4's run records them** (amended at PR 3: the platform check's ruleset reader refused every agent repository until a repair reached `main`, so the attempts wait for PR 3's merge); PR 3 is the repair and cannot be skipped, and PR 4 is that read and the close. Stated before, and pushed before each attempt: the first pull request not mergeable on its planted reasons; S2 not mergeable, the stand-in's check run a success on its head and none from the App (amended at PR 2: the App reaches S2 too, so S2 carries one null seat); S3 under 28,800 s with all four records read; panel 1's rows equal to the registry's. refagent otherwise as at M05: ordinary 9/9, traps 2/2, guardrail 2/3, red team 5/5, golden plants 7/7. RED if a first pull request is mergeable with a seat unassigned or goldens under the minimum; if S2 can merge; if S3 is over the bar or a record is unread; if panel 1 shows an agent the registry does not; if a seed's test passes but by its reader; if PR 4's run cannot read S2 and S3; or if `make ledger` stops matching rows 0 to 5 |
 | Measured | — |
-| PRs used / cap | 2 / 4 |
+| PRs used / cap | 3 / 4 |
 | State | OPEN |
 
 ### Open detail (PR 1, 2026-09-30)
@@ -30,11 +30,13 @@ Written at M06 PR 1 open. The row in `milestones/README.md` is the one
   check bound to a GitHub App the platform owns (`integration_id`), posted
   from `agentkeel`'s `main`: a job of the same name in a pull request's own
   workflow does not satisfy it (BLOCK 2's attack, S2). The documentation,
-  not an attempt: PR 2 reads the first ruleset back.
+  not an attempt: the first ruleset was read back at PR 3, and differed
+  from the export (the PR 3 detail).
 - **M01's, M03's, M04's and M05's P3 exception again.** The platform check,
   the deploy role and the template all run from `main`, so S2 and S3 are
-  made after PR 2 merges and read by PR 3's run. PR 3 is that read and
-  cannot be skipped (NOTE 22).
+  made after PR 3 merges and read by PR 4's run (amended at PR 3: the
+  ruleset reader's repair had to reach `main` first). PR 3 is the repair
+  and cannot be skipped.
 - **M05's lesson, planned at open.** The live readings are recorded in the
   envelope's `template` and read by row 6's cell; they gate no pull
   request. `F6_1` and `F6_4` on every envelope come from the seed tests, as
@@ -95,4 +97,27 @@ Written at M06 PR 1 open. The row in `milestones/README.md` is the one
   bootstrap, security and Grafana deploys after reading each `cdk diff`,
   the workspace and its data source, and the repository variables. After
   the merge: the template from `scripts/make_template.py`, the owner's
-  test repository, then S2, then S3, read by PR 3's run.
+  test repository, then S2, then S3, read by PR 4's run (amended at PR 3).
+
+### PR 3 detail (the repair, 2026-10-01)
+
+- **After PR 2's merge (`39031e7`):** refagent redeployed with its role
+  tag and wrote the registry's first row (deploy run 36860365548); panel 1
+  listed it; the template `agentkeel-studio/agent-template` was made from
+  `39031e7` (`a4c3788`). The App's first live check, on the template's own
+  `main` before it was marked a template, refused its null seats, its
+  missing goldens and its missing ruleset, from app 5144253.
+- **The finding:** the owner's test repository (`f6_0_owner_test.yaml`,
+  pushed at 12:57:19Z before the repository's `created_at`, 13:05:37Z) had
+  its ruleset applied from `infra/ruleset/agent.json`, and read back it
+  differed: GitHub adds `dismissal_restriction` and
+  `require_extra_approval_for_unattributed_changes` to an organisation
+  repository's pull request rule. The App compares exactly, so it would
+  have refused every head of every agent repository. Found before the
+  first pull request, so no attempt was spent on it.
+- **The repair** (`fcc7187`): the export in GitHub's form, and a test that
+  holds it equal to the live ruleset as read.
+- **Row 6 amended (Product):** the platform check runs from `main`, so the
+  owner's test, S2 and S3 are made after PR 3 merges and read by PR 4's
+  run, the close. A miss there is a RED close with the finding.
+

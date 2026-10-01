@@ -1,0 +1,38 @@
+# The owner's read that the template works (SPEC/06 §2, §5.1; row 6's
+# P3 exception): made once, after M06 PR 2's merge (39031e7) and before S2
+# and S3, from a test repository the owner creates from the template. It is
+# not a seed and plants nothing; it is the read S3's run file waits for.
+# No reader takes this file (scripts/observe_template.py reads S2's and
+# S3's): the owner reads each step from GitHub and AWS by hand, and PR 4's
+# ruling records what was read, as a precondition of S3, not as evidence
+# for row 6's cell (amended at PR 3; cold review F2). Every time and result
+# below is GitHub's or AWS's, looked up, never written here.
+#
+# Stated before, and pushed before the attempt (open.md row 17). The
+# human fills `observed` with the repository, the pull request's number and
+# the merge commit after the attempt; nothing else.
+read: owner-test
+principal: andaro74, owner of agentkeel-studio (every seat, R1)
+template: agentkeel-studio/agent-template at a4c3788, made by scripts/make_template.py from agentkeel 39031e7
+repository: agentkeel-studio/owner-check  # public: GitHub Free enforces a ruleset nowhere else
+agent_name: owner-check  # fictional
+steps:
+  - what: create the repository from the template, public; apply infra/ruleset/agent.json with `gh api --method POST repos/agentkeel-studio/owner-check/rulesets --input infra/ruleset/agent.json`
+    expected: the repository's one live ruleset equals the export, its required check `platform-check` bound to integration_id 5144253
+  - what: the first pull request, changing only the manifest's name to owner-check (every seat null, goldens/ empty, as the template ships)
+    expected: the App's `platform-check` (app 5144253) a failure on its head naming the unassigned seats and the goldens under the minimum, and no other check refused; the pull request's mergeable_state "blocked"
+  - what: a second commit on that pull request, every seat andaro74, goldens/ with one ordinary and one trap citing the agent's own data/table.json and data/clauses.json
+    expected: the App's `platform-check` a success on the new head; mergeable with no approving review asked for (the ruleset's require_extra_approval_for_unattributed_changes is true with 0 required approvals, read here before S3; security-reviewer F1 on PR 3); merged as a merge commit
+  - what: the merged default-branch head, left to the schedules (platform-check every 5 minutes, deploy every 10)
+    expected: the App's success on the merge commit; deploy.yml's find-agents lists owner-check, then sign-agent and deploy-agent succeed; stack agentkeel-owner-check and runtime agentkeel_owner_check exist; one answer record under envelopes/agents/owner-check/ in the audit bucket; the registry row owner-check with repository agentkeel-studio/owner-check and the merge commit; panel 1 lists refagent and owner-check, and nothing the registry does not
+red_when: the first pull request is mergeable, or refused for a reason other than the seats and the goldens; the fixed head is refused; the merge is not deployed within an hour of the merge; or panel 1 and the registry differ
+# Amended at PR 3, before step 2. **Step 1 missed**: the repository and its
+# ruleset were made (2026-10-01T13:05:37Z; ruleset 24310403), and the
+# ruleset read back differed from the export as it then stood (PR 2's
+# hand-written form), so the App would have refused every head for a
+# reason the expected readings exclude. The miss is recorded here and in
+# the PR 3 detail; it is not read again as held against the re-exported
+# file (cold review F3). PR 3 re-exports `agent.json` from that ruleset;
+# the repository keeps the ruleset as made. Steps 2 to 4 wait for PR 3's
+# merge.
+observed: null

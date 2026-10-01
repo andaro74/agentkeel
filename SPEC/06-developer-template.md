@@ -231,14 +231,19 @@ template that is on a branch. So:
   (test-only witnesses). During PR 2 the owner makes the organisation,
   the App and the Grafana workspace by hand (Security, after reading the
   plan).
-- **After PR 2 merges.** The owner reads that the template works (§2),
+- **After PR 2 merges, PR 3 repairs** (amended at PR 3). The owner's test
+  repository showed the platform check's ruleset reader refusing every
+  agent repository: GitHub adds two fields to an organisation repository's
+  pull request rule that PR 2's export lacked. The check runs from `main`,
+  so nothing can pass until PR 3 merges. **PR 3 is that repair and cannot
+  be skipped.**
+- **After PR 3 merges.** The owner reads that the template works (§2),
   from a test repository. Then **S2 is attempted, then S3 is timed, and
-  PR 3's run records both** with F6.1's and S4's live halves. **PR 3 is
-  that read and cannot be skipped** (NOTE 22), whatever PR 2's cold review
-  finds; it is also the repair. If the read misses, row 6 closes RED at PR
-  4 with that as the finding; there is no fifth PR.
+  PR 4's run records both** with F6.1's and S4's live halves. **PR 4 is
+  that read and the close.** If the read misses, row 6 closes RED at PR 4
+  with that as the finding; there is no fifth PR.
 - **S3 is made once.** SPEC/00 §10.5: timed on a clean account by the
-  author at M06 PR 3. A failed step is kept and explained, not retaken; a
+  author after M06 PR 3 merges (amended at PR 3). A failed step is kept and explained, not retaken; a
   second timing is a second attempt, recorded beside the first, and the
   first is the measured value. A repository deleted during an attempt is
   recorded, never replaced by a later one's `created_at` (finding 4).
@@ -293,7 +298,7 @@ lists below are written from the reads §11 owed, ruled by the human on
 
   | # | Change | How |
   |---|---|---|
-  | 1 | The repository's ruleset | Timed: the owner applies `infra/ruleset/agent.json`; the platform check fails while the live ruleset differs |
+  | 1 | The repository's ruleset | Timed: the owner applies `infra/ruleset/agent.post.json`, and the live ruleset must equal `infra/ruleset/agent.json`, GitHub's form of it (amended at PR 3); the platform check fails while it differs |
   | 2 | The App on the repository; the developer's write | Automatic (installed on all repositories); timed (the owner, seconds) |
   | 3 | The deploy role's and the eval role's trust; `verify`'s identity | **None.** `agentkeel`'s `deploy.yml` on `main` deploys every agent (R3); `verify`'s identity and repository id move to `infra/platform_identity.json` (Security) and do not widen |
   | 4 | The image repository | Automatic: `agentkeel/<name>`, made on the first push from an ECR repository creation template for the namespace `agentkeel` (immutable tags, AES-256; a template matches a namespace, not a name prefix, so not `agentkeel-<name>`), and `ecr:CreateRepository` on `repository/agentkeel/*` for the deploy role |
@@ -347,7 +352,7 @@ lists below are written from the reads §11 owed, ruled by the human on
   refused by their readers for their planted reasons. Both manifests'
   seats assigned. refagent's envelope otherwise as at M05: ordinary 9/9,
   traps 2/2, guardrail 2/3, red team 5/5, golden plants 7/7.
-- **PR 3's run, stated before it.** The timed run's first pull request not
+- **PR 4's run, stated before it** (PR 3's, until amended at PR 3). The timed run's first pull request not
   mergeable while a seat was null or the goldens were under the minimum;
   S2's pull request not mergeable, the stand-in's check run a success on
   its head and none from the App (amended at PR 2: S2 carries one null

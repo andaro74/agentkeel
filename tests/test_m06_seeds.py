@@ -219,7 +219,7 @@ def made(run: dict[str, Any]) -> list[dict[str, Any]]:
 def test_s2_a_stand_in_for_the_platform_check_was_refused():
     """In an agent repository, a pull request whose own workflow answers to the platform check's name
     and never asks agentkeel for it. Refused when it is not mergeable and no check run on its head
-    came from the platform's App (F6.2, BLOCK 2). Read by PR 3's run, not by this test."""
+    came from the platform's App (F6.2, BLOCK 2). Read by PR 4's run, not by this test."""
     run = run_file("f6_2_standin.yaml", "S2")
     observed = made(run)
     assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
@@ -232,7 +232,7 @@ def test_s2_a_stand_in_for_the_platform_check_was_refused():
 def test_s3_the_timed_quickstart_was_made():
     """The second developer runs the quickstart once, from the repository's created_at to the last of
     its four records (F6.3), with the first pull request refused on its planted reasons (F6.1's live
-    half). Read by PR 3's run from GitHub, AWS and Grafana, and ruled on by build, not by this test."""
+    half). Read by PR 4's run from GitHub, AWS and Grafana, and ruled on by build, not by this test."""
     run = run_file("f6_3_quickstart.yaml", "S3")
     holds("336113686" in str(run.get("principal")), "S3 names the second developer's account by id")
     observed = made(run)

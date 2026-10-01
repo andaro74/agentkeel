@@ -346,6 +346,45 @@ def test_the_repositorys_ruleset_must_be_the_export_with_no_bypass():
     assert "not shown" in platform.ruleset_errors([hidden])[0]
 
 
+# agentkeel-studio/owner-check's ruleset 24310403, GitHub's response as `gh api` saved it, 2026-10-01 (M06 PR 3).
+LIVE_ORGANISATION_RULESET = json.loads(
+    (build.ROOT / "milestones" / "M06" / "runs" / "owner_check_ruleset_24310403.json").read_text(encoding="utf-8"))
+GITHUBS_OWN = {"dismissal_restriction": {"enabled": False, "allowed_actors": []},
+               "require_extra_approval_for_unattributed_changes": True}
+
+
+def _with_pull_request(ruleset: dict, change) -> dict:
+    out = copy.deepcopy(ruleset)
+    rule = next(r for r in out["rules"] if r["type"] == "pull_request")
+    rule["parameters"] = change(dict(rule["parameters"]))
+    return out
+
+
+def test_the_export_is_the_form_github_returns_for_an_organisation_repository():
+    """GitHub adds `dismissal_restriction` and `require_extra_approval_for_unattributed_changes` to an
+    organisation repository's pull request rule. An export without them read as different from every live
+    ruleset, so the App would have refused every head of every agent repository (M06 PR 3, before S2 and S3)."""
+    assert platform.ruleset_errors([LIVE_ORGANISATION_RULESET]) == []
+    without = _with_pull_request(LIVE_ORGANISATION_RULESET, lambda p: {k: v for k, v in p.items()
+                                                                       if k != "dismissal_restriction"})
+    assert platform.ruleset_errors([without]) == [
+        f"{platform.EXPORT}: rules differs from live ruleset 24310403 (pull_request: dismissal_restriction)"]
+    # The weaker live ruleset an admin could make is refused too (security-reviewer F2 on PR 3).
+    weaker = _with_pull_request(LIVE_ORGANISATION_RULESET,
+                                lambda p: {**p, "require_extra_approval_for_unattributed_changes": False})
+    assert platform.ruleset_errors([weaker]) == [f"{platform.EXPORT}: rules differs from live ruleset 24310403 "
+                                                 "(pull_request: require_extra_approval_for_unattributed_changes)"]
+
+
+def test_the_post_body_is_the_export_without_githubs_own_fields():
+    """`agent.post.json` is what the owner POSTs: the form GitHub accepted for ruleset 24310403, to which it
+    added the two fields itself. With them added it is the export, field for field."""
+    body = json.loads((build.ROOT / "infra" / "ruleset" / "agent.post.json").read_text(encoding="utf-8"))
+    export = json.loads((build.ROOT / platform.EXPORT).read_text(encoding="utf-8"))
+    assert _with_pull_request(body, lambda p: {**p, **GITHUBS_OWN}) == export
+    assert not set(GITHUBS_OWN) & set(next(r for r in body["rules"] if r["type"] == "pull_request")["parameters"])
+
+
 def test_the_rulesets_app_is_the_platforms_app():
     """agent.json's integration_id and platform_identity.json's platform_app_id are one number (5144253 from 2026-09-30)."""
     export = json.loads((build.ROOT / platform.EXPORT).read_text(encoding="utf-8"))

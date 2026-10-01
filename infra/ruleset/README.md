@@ -56,8 +56,14 @@ applies this one to each agent repository when creating it, from the
 template, inside the timed run:
 
 ```
-gh api --method POST repos/<org>/<repo>/rulesets --input infra/ruleset/agent.json
+gh api --method POST repos/<org>/<repo>/rulesets --input infra/ruleset/agent.post.json
 ```
+
+`agent.post.json` is the body GitHub accepted for the first agent
+repository's ruleset (24310403, 2026-10-01); `agent.json` is what GitHub
+returned for it, the body plus two fields GitHub added itself (below). A
+test holds the two files to that difference. A POST of `agent.json` itself
+has not been tried, so the owner sends the body that was.
 
 It requires one status check, `platform-check`, **from the platform's App**
 (`integration_id`, which must equal `platform_app_id` in
@@ -74,7 +80,16 @@ It has no `id`: each repository's ruleset gets its own. The platform
 check's posting job reads the repository's live rulesets with the App's
 token and fails the check unless one equals this file in `name`, `target`,
 `enforcement`, `conditions`, `rules` and `bypass_actors`
-(`src/validate/agent.py ruleset`). When the first ruleset is made, it is
-read back and this file is re-exported in the form GitHub returns
-(GitHub adds fields such as `require_extra_approval_for_unattributed_changes`
-to a pull request rule), so that the compare is with GitHub's own form.
+(`src/validate/agent.py ruleset`). It is GitHub's own form, re-exported at
+M06 PR 3 from the first live one (`agentkeel-studio/owner-check`, ruleset
+24310403, 2026-10-01): GitHub adds `dismissal_restriction` and
+`require_extra_approval_for_unattributed_changes` to an organisation
+repository's pull request rule, and the PR 2 export, written by hand
+without them, read as different from every live ruleset, so the App would
+have refused every head. A ruleset made from `agent.post.json` was read
+back equal to this file once, on 2026-10-01 (GitHub's response is
+`milestones/M06/runs/owner_check_ruleset_24310403.json`, which the test
+loads); that is one read of one repository, not a guarantee. When GitHub
+adds another field, every head is refused again, and the refusal names
+the rule and the field (`src/validate/agent.py`), so the repair is a
+re-export.

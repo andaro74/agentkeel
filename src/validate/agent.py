@@ -159,6 +159,23 @@ def evaluate(agent: Path, repository: str, root: Path = ROOT, *, lookup=None) ->
     return errors
 
 
+def _which(export: dict[str, Any], live: dict[str, Any], key: str) -> str:
+    """For `rules`, which rule and which of its parameters differ: GitHub adding a field to a rule refused
+    every agent repository once (M06 PR 3), and the next drift should cost a re-export, not a search."""
+    if key != "rules" or not isinstance(export.get(key), list) or not isinstance(live.get(key), list):
+        return ""
+    ours = {r.get("type"): r.get("parameters") or {} for r in export[key] if isinstance(r, dict)}
+    theirs = {r.get("type"): r.get("parameters") or {} for r in live[key] if isinstance(r, dict)}
+    parts = []
+    for kind in sorted(set(ours) | set(theirs), key=str):
+        if kind not in ours or kind not in theirs:
+            parts.append(f"{kind}: {'only in the export' if kind in ours else 'only live'}")
+        elif ours[kind] != theirs[kind]:
+            names = sorted(n for n in set(ours[kind]) | set(theirs[kind]) if ours[kind].get(n) != theirs[kind].get(n))
+            parts.append(f"{kind}: {', '.join(names)}")
+    return f" ({'; '.join(parts)})" if parts else ""
+
+
 def ruleset_errors(live: list[dict[str, Any]], root: Path = ROOT) -> list[str]:
     """One of the repository's live rulesets equals the export in what it does, with no bypass."""
     export = json.loads((root / EXPORT).read_text(encoding="utf-8"))
@@ -169,8 +186,8 @@ def ruleset_errors(live: list[dict[str, Any]], root: Path = ROOT) -> list[str]:
         if one.get("bypass_actors") is None:
             found = [f"{EXPORT}: ruleset {one.get('id')}'s bypass_actors is not shown to the App's token"]
         else:
-            found = [f"{EXPORT}: {key} differs from live ruleset {one.get('id')}" for key in ruleset.COMPARED
-                     if export.get(key) != one.get(key)]  # fmt: skip
+            found = [f"{EXPORT}: {key} differs from live ruleset {one.get('id')}{_which(export, one, key)}"
+                     for key in ruleset.COMPARED if export.get(key) != one.get(key)]  # fmt: skip
         if not found:
             return []
         best = found if best is None or len(found) < len(best) else best
