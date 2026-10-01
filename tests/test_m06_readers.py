@@ -516,7 +516,8 @@ def test_find_lists_open_heads_the_app_has_not_checked(github):
 
 def test_post_checks_seats_and_the_ruleset_then_posts_one_check_on_the_head(github, tmp_path, monkeypatch):
     export = json.loads((build.ROOT / platform.EXPORT).read_text(encoding="utf-8"))
-    github["pages"].update({"/repos/org/a/rulesets?includes_parents=false&per_page=100": [{"id": 9}],
+    github["pages"].update({"/repos/org/a": {"private": False},
+                            "/repos/org/a/rulesets?includes_parents=false&per_page=100": [{"id": 9}],
                             "/repos/org/a/rulesets/9": {**export, "id": 9}})  # fmt: skip
     monkeypatch.setattr(seats, "login_holds_seat", type("L", (), {
         "__call__": staticmethod(lambda login: (login == "andaro74", "stand-in")),
@@ -535,6 +536,21 @@ def test_post_checks_seats_and_the_ruleset_then_posts_one_check_on_the_head(gith
     platform_check.post(tmp_path, APP)
     assert github["posted"][0][1]["conclusion"] == "failure"
     assert "floresinnovations is not a holder" in github["posted"][0][1]["output"]["summary"]
+
+    # A private repository's ruleset is not enforced on GitHub Free: refused, whatever else passes.
+    github["posted"].clear()
+    result["seat_logins"] = ["andaro74"]
+    (tmp_path / "1" / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    github["pages"]["/repos/org/a"] = {"private": True}
+    platform_check.post(tmp_path, APP)
+    assert github["posted"][0][1]["conclusion"] == "failure"
+    assert "org/a is private" in github["posted"][0][1]["output"]["summary"]
+
+
+def test_a_private_repository_is_not_deployed(github, monkeypatch):
+    monkeypatch.setattr(platform_check, "repositories", lambda org: [
+        {"full_name": "org/a", "id": 1, "private": True, "default_branch": "main"}])
+    assert platform_check.deployable("org", APP) == []
 
 
 @pytest.mark.parametrize("named", [(None, None), ("agentkeel-studio", None), (None, 5144253)])

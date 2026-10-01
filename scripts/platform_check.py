@@ -19,11 +19,12 @@ id, `tests/test_m06_readers.py`).
 - `post`: for each result `src/validate/agent.py evaluate` wrote, the seats'
   access to that repository (deferred from the evaluating job, which holds
   no token that may ask an organisation repository about its
-  collaborators), then the repository's live rulesets against
+  collaborators), then that the repository is public (GitHub Free enforces
+  a ruleset nowhere else), then the repository's live rulesets against
   `infra/ruleset/agent.json`, then one check run on the head that was
   evaluated, success only when every list is empty. Run with the App's
   installation token as `GITHUB_TOKEN`.
-- `deployable`: every repository's default-branch head that carries a
+- `deployable`: every public repository's default-branch head that carries a
   successful `platform-check` run from the App, with the agent name its
   manifest holds there. `deploy.yml` reads the registry to skip what is
   already deployed and to refuse a name another repository holds.
@@ -50,6 +51,10 @@ IDENTITY = ROOT / "infra" / "platform_identity.json"
 CHECK = "platform-check"
 LIMIT = 20
 SEAT_CHECK = "seats assigned, each a login that administers the repository"
+# GitHub Free enforces a repository's ruleset only while it is public (SPEC/06 section 2): a private agent
+# repository's required check binds nothing, so the App refuses it and deploy.yml does not deploy it
+# (security-reviewer F1 on the post-review delta of PR 2).
+PUBLIC_CHECK = "the repository is public, where its ruleset is enforced"
 
 
 def identity() -> tuple[str | None, int | None]:
@@ -163,6 +168,11 @@ def post(results: Path, app_id: int, mint=None) -> int:
             if not real:
                 errors.setdefault(SEAT_CHECK, []).append(f"manifest.yaml: seat login {login} is not a holder ({status})")
         try:
+            public = gh(f"/repos/{repository}").get("private") is False
+            errors[PUBLIC_CHECK] = [] if public else [f"{repository} is private: its ruleset is not enforced"]
+        except urllib.error.HTTPError as exc:
+            errors[PUBLIC_CHECK] = [f"the repository's visibility could not be read ({exc.code})"]
+        try:
             errors["the repository's ruleset is the export"] = platform.ruleset_errors(live_rulesets(repository))
         except urllib.error.HTTPError as exc:
             errors["the repository's ruleset is the export"] = [f"the live rulesets could not be read ({exc.code})"]
@@ -184,6 +194,8 @@ def deployable(org: str, app_id: int) -> list[dict[str, Any]]:
     out = []
     for repo in repositories(org):
         name = repo["full_name"]
+        if repo.get("private") is not False:
+            continue
         branch = gh(f"/repos/{name}/branches/{repo['default_branch']}")
         head = branch["commit"]["sha"]
         if not any(r.get("conclusion") == "success" for r in app_runs(name, head, app_id)):
