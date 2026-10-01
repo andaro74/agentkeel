@@ -167,7 +167,6 @@ def test_s1a_reader_does_not_refuse_s1b(worktree):
 # --- S1b: goldens under the minimum --------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1b's reader is M06 PR 2's (SPEC/06 §6)")
 def test_s1b_goldens_under_the_minimum_are_refused(worktree):
     """The same agent folder with every seat assigned and an empty goldens folder: a first PR adding
     it must not be mergeable (F6.1). Today `validate` over the tree with it is green: goldens are
@@ -179,6 +178,18 @@ def test_s1b_goldens_under_the_minimum_are_refused(worktree):
     holds((agent / "goldens").is_dir() and not list((agent / "goldens").glob("g-*.yaml")), "S1b has no goldens")
     refused = refused_by(validate_over(tree), f"agents/{AGENT}/", "golden")
     assert refused, "seed S1b: no check that reads an agent's goldens refused an agent with none"
+
+
+def test_s1b_reader_does_not_refuse_s1a(worktree):
+    """Cold review F4 on PR 1, the other half: S1a's goldens are at the minimum and cite its own data,
+    so S1b's reader must not refuse it. Each seed is refused by its own reader alone."""
+    tree = worktree()
+    with_agent(tree, "s1a-unassigned-seat")
+    errors = validate_over(tree)
+    golden_checks = [name for name in errors if name not in BASE_CHECKS and "golden" in name]
+    holds(bool(golden_checks), "S1b's reader is in validate")
+    refusing = [n for n in golden_checks if any(f"agents/{AGENT}/" in e.replace("\\", "/") for e in errors[n])]
+    assert not refusing, f"S1b's reader refused S1a, whose goldens are at the minimum: {refusing}"
 
 
 # --- The attempt seeds' run files (S2, S3) -----------------------------------

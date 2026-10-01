@@ -29,6 +29,7 @@ import yaml
 from src.gates import pattern_regex, two_key
 from src.gates import pr_number as two_key_pr
 from src.validate import (
+    agent_goldens,
     codeowners,
     controls,
     corpus,
@@ -420,4 +421,6 @@ CHECKS = {
     "deprecated_after more than 30 days away, or null": lifecycle.check,
     # M06 PR 2 (SPEC/06 section 6): S1a's reader
     "seats assigned, each a login with access": seats.check,
+    # M06 PR 2: S1b's reader
+    "an agent's goldens: one ordinary and one trap at least, citing its own data": agent_goldens.check,
 }
