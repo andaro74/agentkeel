@@ -46,28 +46,39 @@ Signed: ____________  Date: __________
 
 ---
 
-**2. Security — what was deployed and granted is what was read back.**
+**2. Security — what was granted and listed at the close, and what was
+not compared.**
 
-The platform's GitHub App (`agentkeel-platform`, 5144253) has
-Administration: read (its installation's permissions read 2026-10-01:
-administration, contents, metadata and pull requests read, checks write),
-and that is why it cannot see `bypass_actors`
-(finding 1). No permission was changed in M06 PR 3 or PR 4. owner-check's
+Each read below was made once, on 2026-10-01, by the owner's `gh` or the
+agent account's AWS CLI, as the command beside it; the output is not
+committed, so each is the owner's read, not a record. The platform's
+GitHub App (`agentkeel-platform`, 5144253) had Administration: read when
+read (`gh api orgs/agentkeel-studio/installations`: administration,
+contents, metadata and pull requests read, checks write), and that is why
+it cannot see `bypass_actors` (finding 1). One read shows the grant on
+that day, not that it was unchanged through PR 3 and PR 4. owner-check's
 one ruleset is 24310403, `bypass_actors: []` as the owner reads it, its
-required check `platform-check` bound to `integration_id` 5144253 (read
-2026-10-01). `floresinnovations` (id 336113686) is a write-only outside
-collaborator on `agentkeel-studio/owner-check` alone (the organisation's
-two repositories read 2026-10-01; `agent-template`'s one collaborator is
-`andaro74`); it made S2 in the browser, with no
-token. The temporary Grafana admin account `setup-temp` was deleted during
+required check `platform-check` bound to `integration_id` 5144253
+(`gh api repos/agentkeel-studio/owner-check/rulesets/24310403`). `floresinnovations` (id 336113686) is a write-only outside
+collaborator on `agentkeel-studio/owner-check` alone
+(`gh api orgs/agentkeel-studio/outside_collaborators`; the organisation's
+two repositories, and `agent-template`'s one collaborator, `andaro74`, from
+`gh api .../collaborators`); it made S2 in the browser, with no personal
+access token on the human's word. The temporary Grafana admin account `setup-temp` was deleted during
 PR 2: read at 2026-10-01T15:45Z, the workspace `g-745446386a` has one
 service account, `agentkeel-observer` (Viewer), with one token, which
-expires 2026-10-31T07:00:01Z (`milestones/M07/open.md` row 9). The agent
-account's stacks, as CloudFormation lists them at the close:
+expires 2026-10-31T07:00:01Z (`aws grafana list-workspace-service-accounts`
+and `list-workspace-service-account-tokens`; `milestones/M07/open.md` row
+9). The agent
+account's stacks, as `aws cloudformation describe-stacks` lists them at
+the close, **listed, not compared** with the commit each came from or the
+tree:
 `AgentkeelBootstrap` (updated 2026-10-01T03:44:35Z), `AgentkeelGrafana`
 (11:20:46Z), `agentkeel-refagent` (12:15:28Z, the deploy role from
 `main`), `AgentkeelAudit` and `AgentkeelIngest` unchanged since M05; the
-registry holds refagent alone. Not attested: that the security account's
+registry holds refagent alone (`aws dynamodb scan`). The bootstrap's
+update at 03:44:35Z (the deploy roles) is not traced to a commit here. Not
+attested: that the security account's
 deploy removed the stand-in's Allow (the human's word, read by nothing:
 `milestones/M07/open.md` row 16); that the tag-keyed audit prefix works
 for a template agent (none was deployed); and any control in SPEC/06 §8
@@ -95,7 +106,8 @@ Row 6's Measured cell is `make ledger`'s line for the envelope it names,
 copied, and the State is the verdict in it. The explainer's "What
 happened" uses that envelope's readings and the run files' records, and
 does not call the template, the platform check or the panel "governed",
-"secure" or "proven": F6.1's live half, F6.2 and F6.3 did not hold live.
+"secure" or "proven". F6.1's live half and F6.3 were unread; F6.2 held,
+while the App refused every head (`milestones/M07/open.md` row 5).
 S3 was not attempted, by Product's ruling of 2026-10-01 (option 1), so the
 second developer's one clean attempt is kept for M07. Every finding and
 every Unsure item of #34 to #37 is ruled in M06 or carried to

@@ -143,7 +143,7 @@ p95 12,277 ms. `template`, looked up at 15:48:23Z:
 | Falsifier | Read | Held | Why |
 |---|---|---|---|
 | F6.1 (live half) | no | — | no S3 observation |
-| F6.2 | yes | yes, no reasons | owner-check #2 not mergeable ("blocked", the only state `template.py` holds on); the stand-in's `platform-check` a success (github-actions, app 15368, 15:23:10Z); the App's a failure (app 5144253, 15:24:56Z); the required check bound to 5144253 |
+| F6.2 | yes | yes, no reasons | from the envelope: no reasons, which `template.py` gives only when owner-check #2 is "blocked", the ruleset requires `platform-check` from 5144253, no App run succeeded and a stand-in run of that name did. The apps, conclusions and times (stand-in, github-actions 15368, success 15:23:10Z; the App, 5144253, failure 15:24:56Z) are GitHub's check runs as the owner read them, not in the envelope |
 | F6.3 | no | — | no S3 observation; no elapsed time |
 | F6.4 (live half) | yes | yes | panel 1's rows equal the registry's: refagent |
 
@@ -194,8 +194,10 @@ request mergeable with a seat unassigned or goldens under the minimum
 F6.2 held); S3 over the bar or a record unread (**fires**: S3 not
 attempted, `F6_3` unread); panel 1 showing an agent the registry does not
 (no: `F6_4` held); a seed's test passing but by its reader
-(`uv run pytest tests/test_m06_seeds.py`, 7 passed and 1 xfailed, S3's;
-S2's marker came off when its run file was filled, `245eb9b`); PR 4's run
+(holds, as at M05: `uv run pytest tests/test_m06_seeds.py`, 7 passed and 1
+xfailed, S3's; S2's test passes because its run file is filled, which is
+not a reader and not F6.2, and its marker came off in that commit,
+`245eb9b`); PR 4's run
 unable to read S2 and S3 (**fires** for S3: nothing to read); `make ledger`
 matching rows 0 to 5 (holds).
 

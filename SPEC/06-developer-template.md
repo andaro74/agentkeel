@@ -247,6 +247,12 @@ template that is on a branch. So:
   second timing is a second attempt, recorded beside the first, and the
   first is the measured value. A repository deleted during an attempt is
   recorded, never replaced by a later one's `created_at` (finding 4).
+- **Amended at M06 PR 4** (`milestones/M06/rulings/pr4.md`): row 6 closed
+  RED. S2 was made and read by PR 4's run; the owner's test missed at step
+  2 and S3 was not attempted. S3, its timing and Act 1 move to M07 with
+  the App's repair (SPEC/00 §8 M06 and §10.5 as amended;
+  `milestones/M07/open.md` rows 2, 4, 31). The bullets above stand as
+  M06's plan.
 - **Act 1 is recorded during S3** (finding 14): the unedited screen
   capture of the timed run is SPEC/00 §10.2's Act 1. Act 2 is recorded at
   the close, against M02's pull requests.
