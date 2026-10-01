@@ -104,12 +104,14 @@ class GrafanaStack(cdk.Stack):
             resources=[f"arn:aws:logs:{REGION}:{ACCOUNT}:log-group:/aws/lambda/{CONNECTOR}:*"],
         ))  # fmt: skip
 
+        # LambdaMemory is the application's own default, 3008 MB: at 512 the connector ran out of
+        # Metaspace on its first query (2026-10-01) and Athena read the table as not found.
         connector = sam.CfnApplication(
             self, "Connector",
             location=sam.CfnApplication.ApplicationLocationProperty(
                 application_id=CONNECTOR_APP, semantic_version=CONNECTOR_VERSION),
             parameters={"AthenaCatalogName": CONNECTOR, "SpillBucket": bucket.bucket_name, "SpillPrefix": "spill",
-                        "LambdaRole": connector_role.role_arn, "LambdaMemory": "512", "LambdaTimeout": "120"},
+                        "LambdaRole": connector_role.role_arn, "LambdaMemory": "3008", "LambdaTimeout": "120"},
         )  # fmt: skip
 
         catalog = athena.CfnDataCatalog(
