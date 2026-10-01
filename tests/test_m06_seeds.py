@@ -138,7 +138,6 @@ def with_agent(tree: Path, fixture: str) -> Path:
 # --- S1a: an unassigned seat -------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S1a's reader is M06 PR 2's (SPEC/06 §6)")
 def test_s1a_an_unassigned_seat_is_refused(worktree):
     """The template's manifest with all seven seats null, beside one ordinary and one trap golden:
     a first PR adding it must not be mergeable (F6.1). Today `validate` over the tree with it is
@@ -151,6 +150,18 @@ def test_s1a_an_unassigned_seat_is_refused(worktree):
     holds(sorted(g["kind"] for g in goldens) == ["ordinary", "trap"], "S1a's goldens are at the minimum")
     refused = refused_by(validate_over(tree), f"agents/{AGENT}/", "seat")
     assert refused, "seed S1a: no check that reads seats refused the unassigned seats"
+
+
+def test_s1a_reader_does_not_refuse_s1b(worktree):
+    """Cold review F4 on PR 1: a seat check that refused every new agent folder would pass S1a. S1b's
+    seats are assigned, so S1a's reader must not refuse it."""
+    tree = worktree()
+    with_agent(tree, "s1b-no-goldens")
+    errors = validate_over(tree)
+    seat_checks = [name for name in errors if name not in BASE_CHECKS and "seat" in name]
+    holds(bool(seat_checks), "S1a's reader is in validate")
+    refusing = [n for n in seat_checks if any(f"agents/{AGENT}/" in e.replace("\\", "/") for e in errors[n])]
+    assert not refusing, f"S1a's reader refused S1b, whose seats are assigned: {refusing}"
 
 
 # --- S1b: goldens under the minimum --------------------------------------------

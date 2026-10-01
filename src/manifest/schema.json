@@ -58,7 +58,7 @@
       "items": {"enum": ["bedrock-runtime", "dynamodb", "ecr.api", "ecr.dkr", "kms", "logs", "s3"]}
     },
     "seats": {
-      "description": "Security: seat -> IdP group. Checked against real groups from M02, when the groups exist.",
+      "description": "Security: seat -> GitHub login (SPEC/00 R1, amended at M06 PR 1). validate refuses a seat that is null or not a login with access to the repository (src/validate/seats.py, M06 PR 2).",
       "type": "object",
       "additionalProperties": {"type": ["string", "null"]},
       "propertyNames": {"enum": ["product", "rule-owner", "data-owner", "tool-owner", "threshold-owner", "security", "engineering"]}

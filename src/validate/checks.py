@@ -37,6 +37,7 @@ from src.validate import (
     lifecycle,
     overlap,
     ruleset,
+    seats,
     semver,
 )
 
@@ -417,4 +418,6 @@ CHECKS = {
     "admitted.yaml is the corpus, byte for byte, under a Data Owner ruling": corpus.check,
     # M04 PR 2 (SPEC/04 section 5, seed S5)
     "deprecated_after more than 30 days away, or null": lifecycle.check,
+    # M06 PR 2 (SPEC/06 section 6): S1a's reader
+    "seats assigned, each a login with access": seats.check,
 }
