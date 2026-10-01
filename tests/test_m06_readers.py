@@ -191,3 +191,86 @@ def test_an_envelope_carrying_template_validates():
 def test_row_6s_cell_names_each_falsifier():
     parts = gate.template_reading(ruled(mutated(lambda o: o.update(s2=None))))
     assert parts == ["F6_1 held", "F6_2 unread", "F6_3 held 9060 s", "F6_4 held"]
+
+
+# --- the platform check over an agent repository (src/validate/agent.py) -------
+
+import shutil  # noqa: E402
+
+import yaml  # noqa: E402
+
+from src.validate import agent as platform  # noqa: E402
+
+
+def agent_repo(tmp_path: Path, fixture: str, **manifest: Any) -> Path:
+    """An agent repository's root, from a seed fixture, with the platform's guardrail and any change given."""
+    root = tmp_path / "repo"
+    shutil.copytree(FIXTURES / fixture, root)
+    doc = yaml.safe_load((root / "manifest.yaml").read_text(encoding="utf-8"))
+    platform_pin = yaml.safe_load((build.ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
+    doc |= {"guardrail": platform_pin["guardrail"], **manifest}
+    (root / "manifest.yaml").write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
+    return root
+
+
+def owner(login: str) -> tuple[bool, str]:
+    return login == "andaro74", "stand-in"
+
+
+def refused(errors: dict[str, list[str]]) -> list[str]:
+    return sorted(name for name, errs in errors.items() if errs)
+
+
+def test_an_agent_with_seats_assigned_and_goldens_at_the_minimum_passes(tmp_path):
+    repo = agent_repo(tmp_path, "s1a-unassigned-seat", seats={s: "andaro74" for s in shipped.SEAT_SLUGS})
+    assert refused(platform.evaluate(repo, "org/premiere-desk", lookup=owner)) == []
+
+
+def test_s1a_and_s1b_are_refused_in_an_agent_repository_for_their_planted_reasons(tmp_path):
+    s1a = platform.evaluate(agent_repo(tmp_path / "a", "s1a-unassigned-seat"), "org/premiere-desk", lookup=owner)
+    s1b = platform.evaluate(agent_repo(tmp_path / "b", "s1b-no-goldens"), "org/premiere-desk", lookup=owner)
+    assert refused(s1a) == ["seats assigned, each a login with access"]
+    assert refused(s1b) == ["an agent's goldens: one ordinary and one trap at least, citing its own data"]
+
+
+@pytest.mark.parametrize("name", ["refagent", "ratings-helper", "Premiere", "x"])
+def test_a_name_agentkeel_holds_or_that_is_not_a_name_is_refused_before_anything_else(tmp_path, name):
+    repo = agent_repo(tmp_path, "s1a-unassigned-seat", name=name)
+    assert refused(platform.evaluate(repo, "org/x", lookup=owner)) == ["the agent's name"]
+
+
+def test_a_guardrail_that_is_not_the_platforms_is_refused(tmp_path):
+    repo = agent_repo(tmp_path, "s1a-unassigned-seat", seats={s: "andaro74" for s in shipped.SEAT_SLUGS},
+                      guardrail={"id": "0000aaaa1111", "version": "1"})  # fmt: skip
+    assert refused(platform.evaluate(repo, "org/premiere-desk", lookup=owner)) == ["the platform's guardrail"]
+
+
+def test_a_symbolic_link_is_refused_before_anything_is_read(tmp_path):
+    repo = agent_repo(tmp_path, "s1a-unassigned-seat")
+    try:
+        (repo / "data" / "secret.json").symlink_to(build.ROOT / "infra" / "platform_identity.json")
+    except OSError:
+        pytest.skip("this machine cannot make a symbolic link")
+    assert refused(platform.evaluate(repo, "org/premiere-desk", lookup=owner)) == ["no symbolic links"]
+
+
+def test_the_repositorys_ruleset_must_be_the_export_with_no_bypass():
+    export = json.loads((build.ROOT / platform.EXPORT).read_text(encoding="utf-8"))
+    live = {**export, "id": 1}
+    assert platform.ruleset_errors([live]) == []
+    assert platform.ruleset_errors([]) and "no ruleset" in platform.ruleset_errors([])[0]
+    loose = {**live, "bypass_actors": [{"actor_type": "OrganizationAdmin", "bypass_mode": "always"}]}
+    assert platform.ruleset_errors([loose]) == [f"{platform.EXPORT}: bypass_actors differs from live ruleset 1"]
+    hidden = {**live, "bypass_actors": None}
+    assert "not shown" in platform.ruleset_errors([hidden])[0]
+
+
+def test_the_rulesets_app_is_the_platforms_app():
+    """agent.json's integration_id and platform_identity.json's platform_app_id are one number (both null until made)."""
+    export = json.loads((build.ROOT / platform.EXPORT).read_text(encoding="utf-8"))
+    identity = json.loads((build.ROOT / "infra" / "platform_identity.json").read_text(encoding="utf-8"))
+    checks = [r for r in export["rules"] if r["type"] == "required_status_checks"]
+    (required,) = checks[0]["parameters"]["required_status_checks"]
+    assert required["context"] == shipped.PLATFORM_CHECK
+    assert required["integration_id"] == identity["platform_app_id"]
+    assert export["bypass_actors"] == []
