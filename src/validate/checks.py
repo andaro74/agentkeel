@@ -366,11 +366,13 @@ def _names_its_case(reason: str, resource: str = "") -> bool:
     From M03 PR 2 a line of SPEC/03 §6 serves as SPEC/01 §6's does, on the ingest stack's rows only
     (security-reviewer on 2e93d27): SPEC/03 §6 names that stack and no other. From M05 PR 2 a line
     of SPEC/05 §6 does the same on the two stacks it names, the security account's and the audit
-    delivery's, and on no other.
+    delivery's, and on no other. From M06 PR 2 a line of SPEC/06 §6 does the same on the Grafana stack
+    (infra/grafana/), which it names, and on no other.
     """
     ingest = resource.startswith("AgentkeelIngest/") and "SPEC/03 §6" in reason
+    grafana = resource.startswith("AgentkeelGrafana/") and "SPEC/06 §6" in reason
     containment = resource.startswith(("AgentkeelSecurity/", "AgentkeelAudit/")) and "SPEC/05 §6" in reason
-    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason or ingest or containment)
+    return bool(re.search(r"\bseeds? S[34568]\b", reason) or "SPEC/01 §6" in reason or ingest or containment or grafana)
 
 
 THRESHOLDS = "thresholds.yaml"
