@@ -32,4 +32,38 @@ attempts:
     command: in the agent repository, a branch that adds a workflow with a job of the platform check's name that runs `echo ok`, and sets one seat in manifest.yaml to null; open a pull request to the default branch
     refused_when: the pull request is not mergeable, the stand-in's check run of the platform check's name succeeded on its head, and no check run from the platform's App on its head succeeded
     recorded_when: PR 4's run reads the pull request's check runs and merge state from GitHub
-observed: null
+# Made 2026-10-01 by floresinnovations, in the browser only, as a write-only
+# outside collaborator on agentkeel-studio/owner-check: branch s2-standin from
+# main (68df4b5), one commit e3a8083 adding .github/workflows/standin.yml, pull
+# request 2 opened 15:22:53Z (GitHub's record). Seen by the owner at 15:25Z.
+#
+# Not as planned in one respect, recorded (M06 PR 4): the attempt's command
+# says "sets one seat in manifest.yaml to null". The branch came from main,
+# where every seat was already null (the owner test's step 2 never got past
+# its refusal, so no seat was ever assigned): S2 changed no seat, and its
+# head carries all seven null and goldens/ empty. The App had a fault to
+# refuse either way.
+#
+# Stated before PR 4's run, pushed in this commit before the run reads it.
+# Read at 15:40Z without a token (the repository is public), which is the
+# viewpoint of evals.yml's observer: its GITHUB_TOKEN is agentkeel's and has
+# no rights in agentkeel-studio. The run is expected to record:
+#   found, merged false, head e3a8083e79fc199adef59e0b3bfc5dc23d30b5fc;
+#   check runs on the head: platform-check from github-actions (app 15368)
+#   success 15:23:10Z (the stand-in), platform-check from agentkeel-platform
+#   (app 5144253) failure 15:24:56Z (seats, goldens, and "ruleset 24310403's
+#   bypass_actors is not shown to the App's token", finding 1);
+#   required checks: platform-check bound to integration_id 5144253;
+#   mergeable_state "unstable", not "blocked".
+# If it reads "unstable", build's f6_2 reads F6.2 as not held ("not
+# 'blocked' by its required check"), and row 6 reads that. Product ruled
+# (2026-10-01, option a): no reader changes in PR 4. "unstable" is the
+# observer's outside viewpoint (finding 2), not GitHub allowing the merge:
+# read with the owner's token at 15:25Z the same pull request was "blocked".
+# That read is context, not evidence; the fix (the observer reads with a
+# token that has rights in agent repositories) is carried to M07.
+observed:
+  - what: a job named as the platform check in the pull request's own workflow
+    repository: agentkeel-studio/owner-check
+    pull_request: 2
+    at: '2026-10-01T15:25:00Z'

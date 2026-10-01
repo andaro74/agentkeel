@@ -215,7 +215,6 @@ def made(run: dict[str, Any]) -> list[dict[str, Any]]:
 # --- S2: a stand-in for the platform check -------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S2 is attempted after M06 PR 2 merges (SPEC/06 §5.1)")
 def test_s2_a_stand_in_for_the_platform_check_was_refused():
     """In an agent repository, a pull request whose own workflow answers to the platform check's name
     and never asks agentkeel for it. Refused when it is not mergeable and no check run on its head
