@@ -99,28 +99,56 @@ def check_runs(repository: str, sha: str) -> list[dict[str, Any]]:
              "conclusion": r.get("conclusion"), "completed_at": r.get("completed_at")} for r in runs]  # fmt: skip
 
 
+def required_checks(repository: str) -> list[dict[str, Any]] | None:
+    """The live rulesets' required checks, each with the App it must come from; None when unread."""
+    try:
+        listed = gh(f"/repos/{repository}/rulesets?includes_parents=false&per_page=100") or []
+        found = []
+        for one in listed:
+            ruleset = gh(f"/repos/{repository}/rulesets/{one['id']}")
+            for rule in ruleset.get("rules") or []:
+                if rule.get("type") == "required_status_checks":
+                    found += [{"context": c.get("context"), "integration_id": c.get("integration_id")}
+                              for c in (rule.get("parameters") or {}).get("required_status_checks") or []]  # fmt: skip
+        return found
+    except (urllib.error.URLError, KeyError, TimeoutError, OSError):
+        return None
+
+
 def folder_at(repository: str, sha: str) -> dict[str, Any]:
-    """The agent folder's seats and golden kinds as the commit holds them (the repository's root)."""
+    """The agent folder's seats and golden kinds as the commit holds them (the repository's root).
+
+    A file GitHub would not give is a read error, recorded, never read as a missing seat or golden
+    (cold review F5 on M06 PR 2). A manifest that is not there is a 404, which is a fact about the commit."""
+    read_error = None
     try:
         manifest = yaml.safe_load(gh(f"/repos/{repository}/contents/manifest.yaml?ref={sha}", raw=True))
         seats = manifest.get("seats") if isinstance(manifest, dict) else None
-    except (urllib.error.HTTPError, yaml.YAMLError):
+    except urllib.error.HTTPError as exc:
+        seats = None
+        if exc.code != 404:
+            read_error = f"manifest.yaml: {exc.code}"
+    except yaml.YAMLError:
         seats = None
     goldens = []
     try:
         listing = gh(f"/repos/{repository}/contents/goldens?ref={sha}")
-    except urllib.error.HTTPError:
+    except urllib.error.HTTPError as exc:
         listing = []
+        if exc.code != 404:
+            read_error = read_error or f"goldens/: {exc.code}"
     for entry in listing if isinstance(listing, list) else []:
         if entry.get("type") != "file" or not str(entry.get("name", "")).endswith(".yaml"):
             continue
         try:
             golden = yaml.safe_load(gh(f"/repos/{repository}/contents/goldens/{entry['name']}?ref={sha}", raw=True))
-        except (urllib.error.HTTPError, yaml.YAMLError):
+        except urllib.error.HTTPError as exc:
+            golden, read_error = None, read_error or f"goldens/{entry['name']}: {exc.code}"
+        except yaml.YAMLError:
             golden = None
         golden = golden if isinstance(golden, dict) else {}
         goldens.append({"file": entry["name"], "kind": golden.get("kind"), "retired": golden.get("retired")})
-    return {"seats": seats, "goldens": goldens}
+    return {"seats": seats, "goldens": goldens, "read_error": read_error}
 
 
 def read_s2() -> dict[str, Any] | None:
@@ -133,6 +161,8 @@ def read_s2() -> dict[str, Any] | None:
         pull = gh(f"/repos/{repository}/pulls/{number}")
         head = pull["head"]["sha"]
         out |= {"found": True, "merged": bool(pull.get("merged")), "head_sha": head,
+                # GitHub's own reading of whether it could merge, and the check its ruleset requires, with the App.
+                "mergeable_state": pull.get("mergeable_state"), "required_checks": required_checks(repository),
                 "check_runs": check_runs(repository, head)}  # fmt: skip
     except (urllib.error.URLError, KeyError, TimeoutError, OSError) as exc:
         out["error"] = f"{type(exc).__name__}: {exc}"
@@ -145,6 +175,7 @@ def read_s3_github(s3: dict[str, Any]) -> None:
     pull = gh(f"/repos/{repository}/pulls/{number}")
     commits = gh(f"/repos/{repository}/pulls/{number}/commits?per_page=100")
     s3["created_at"] = repo.get("created_at")
+    s3["required_checks"] = required_checks(repository)
     s3["first_pr"] = {
         "merged": bool(pull.get("merged")), "merged_at": pull.get("merged_at"),
         "merge_head_sha": pull["head"]["sha"] if pull.get("merged") else None,

@@ -193,7 +193,10 @@ def deployable(org: str, app_id: int) -> list[dict[str, Any]]:
         except (urllib.error.HTTPError, yaml.YAMLError):
             continue
         agent = manifest.get("name") if isinstance(manifest, dict) else None
-        if isinstance(agent, str):
+        # Again here, though the App passed it: deploy.yml puts the name in a path (cold review N3).
+        from src.validate.agent import NAME
+
+        if isinstance(agent, str) and NAME.match(agent):
             out.append({"repository": name, "repository_id": str(repo["id"]), "commit": head, "name": agent})
     return out
 

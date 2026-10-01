@@ -28,6 +28,11 @@ TABLE = "agentkeel-registry"
 SOURCE = re.compile(r"\b(?:from|join)\s+((?:[\"`]?[\w-]+[\"`]?\s*\.\s*)*[\"`]?[\w-]+[\"`]?)", re.IGNORECASE)
 
 
+# A second source that names no table after FROM or JOIN (cold review F4 on M06 PR 2): a UNION, a VALUES
+# list, a subquery, or a comma join. Refused outright; panel 1 is one SELECT from one table.
+SECOND_SOURCE = re.compile(r"\bunion\b|\bvalues\b|\(\s*select\b|\bfrom\s+[^,;]+?,", re.IGNORECASE)
+
+
 def tables(sql: str) -> list[str]:
     """The last part of every name after FROM or JOIN, unquoted and lower case."""
     return [re.split(r"\s*\.\s*", m.group(1))[-1].strip("\"`").lower() for m in SOURCE.finditer(sql)]
@@ -50,13 +55,20 @@ def check(root: Path) -> list[str]:
         return [f"{PANEL}: panel 1 has no target"]
     errors: list[str] = []
     for target in targets:
+        if not isinstance(target, dict) or not isinstance(target.get("datasource") or {}, dict):
+            errors.append(f"{PANEL}: panel 1 has a target that is not a mapping with a datasource mapping")
+            continue
         ref = target.get("refId", "?")
         source = target.get("datasource") or {}
         if source.get("uid") != DATASOURCE_UID:
             errors.append(f"{PANEL}: panel 1 target {ref} reads data source {source.get('uid')!r} "
                           f"({source.get('type')}), not the registry's {DATASOURCE_UID!r}")  # fmt: skip
             continue
-        sql = target.get("rawSQL") or target.get("query") or ""
+        sql = str(target.get("rawSQL") or target.get("query") or "")
+        if SECOND_SOURCE.search(sql):
+            errors.append(f"{PANEL}: panel 1 target {ref} reads a second source (a UNION, VALUES, subquery or "
+                          f"comma join), not {TABLE!r} alone")  # fmt: skip
+            continue
         named = tables(sql)
         if not named:
             errors.append(f"{PANEL}: panel 1 target {ref} names no table, so what it reads is unread")

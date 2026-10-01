@@ -37,9 +37,15 @@ def api(monkeypatch):
     seats.login_holds_seat.cache_clear()
 
 
-def test_the_repositorys_owner_has_access(api):
-    api["/repos/org/agent"] = (200, {"owner": {"login": "Org"}})
-    assert seats.login_holds_seat("org") == (True, "owner of org/agent")
+def test_a_person_who_owns_the_repository_holds_a_seat_and_an_organisation_does_not(api):
+    """cold review F1 on PR 2: an agent repository is the organisation's, and the write developer could have
+    named the organisation in every seat."""
+    api["/repos/org/agent"] = (200, {"owner": {"login": "Org", "type": "Organization"}})
+    real, status = seats.login_holds_seat("org")
+    assert real is False and "is the organisation that owns org/agent, not a person" in status
+    seats.login_holds_seat.cache_clear()
+    api["/repos/org/agent"] = (200, {"owner": {"login": "andaro74", "type": "User"}})
+    assert seats.login_holds_seat("andaro74") == (True, "owner of org/agent")
 
 
 def test_an_admin_holds_a_seat_and_a_write_developer_or_a_stranger_does_not(api):
@@ -84,6 +90,9 @@ SEATED = {slug: "andaro74" for slug in shipped.SEAT_SLUGS}
 TWO = [{"file": "g-001.yaml", "kind": "ordinary", "retired": None}, {"file": "g-002.yaml", "kind": "trap", "retired": None}]
 
 
+BOUND = [{"context": "platform-check", "integration_id": APP}]  # the agent repository's live ruleset: platform-check, from the App
+
+
 def runs(conclusion: str | None, stand_in: bool = False) -> list[dict[str, Any]]:
     out = [] if conclusion is None else [{"name": shipped.PLATFORM_CHECK, "app_id": APP, "app_slug": "agentkeel-platform",
                                            "conclusion": conclusion}]  # fmt: skip
@@ -98,10 +107,11 @@ def observation() -> dict[str, Any]:
         "looked_up_at": "2026-10-02T12:00:00Z",
         "platform_app_id": APP,
         "s2": {"repository": "org/premiere-desk", "pull_request": 3, "found": True, "error": None, "merged": False,
+               "mergeable_state": "blocked", "required_checks": BOUND,
                "head_sha": "c" * 40, "check_runs": runs("failure", stand_in=True)},  # fmt: skip
         "s3": {
             "repository": "org/premiere-desk", "pull_request": 1, "agent_name": "premiere-desk",
-            "found": True, "error": None, "created_at": "2026-10-01T09:00:00Z",
+            "found": True, "error": None, "created_at": "2026-10-01T09:00:00Z", "required_checks": BOUND,
             "first_pr": {
                 "merged": True, "merged_at": "2026-10-01T11:00:00Z", "merge_head_sha": "b" * 40,
                 "commits": [
@@ -153,6 +163,16 @@ def mutated(change) -> dict[str, Any]:
     ("F6_3", lambda o: o["s3"]["deploy"].update(conclusion="failure"), "unread: deployed_at"),
     ("F6_4", lambda o: o["registry"]["scan"]["Items"].pop(), "panel 1 shows premiere-desk"),
     ("F6_4", lambda o: o["panel"].update(error="401 Unauthorized"), "unread: 401 Unauthorized"),
+    # cold review F2: panel 1 not listing S3's agent is an unread record, not a held one
+    ("F6_3", lambda o: o["panel"]["frame"]["results"]["A"]["frames"][0]["data"].update(
+        values=[["refagent"], ["andaro74/agentkeel"]]), "unread: panel 1's row"),
+    # cold review F3: mergeable is not refused, and a refusal by an unbound check is not this control's
+    ("F6_2", lambda o: o["s2"].update(mergeable_state="clean"), "is mergeable"),
+    ("F6_2", lambda o: o["s2"].update(required_checks=[{"context": "platform-check", "integration_id": None}]),
+     "does not require platform-check from the platform's App"),
+    ("F6_1", lambda o: o["s3"].update(required_checks=None), "does not require platform-check"),
+    # cold review F5: a commit that could not be read is unread, not a planted fault
+    ("F6_1", lambda o: o["s3"]["first_pr"]["commits"][0].update(read_error="manifest.yaml: 403"), "unread: commits"),
     ("F6_2", lambda o: o.update(s2=None), "unread"),
 ])  # fmt: skip
 def test_row_6_names_each_falsifier_that_is_unread_or_not_held(name, change, miss):
@@ -201,7 +221,7 @@ def test_an_envelope_carrying_template_validates():
 
 def test_row_6s_cell_names_each_falsifier():
     parts = gate.template_reading(ruled(mutated(lambda o: o.update(s2=None))))
-    assert parts == ["F6_1 held", "F6_2 unread", "F6_3 held 9060 s", "F6_4 held"]
+    assert parts == ["F6_1 held", "F6_2 unread", "F6_3 held 9060 s", "F6_4 held"], parts
 
 
 # --- the platform check over an agent repository (src/validate/agent.py) -------
@@ -402,6 +422,9 @@ def test_the_observer_writes_what_github_returned_and_build_rules_on_it(monkeypa
         f"/repos/org/premiere-desk/contents/goldens/g-002.yaml?ref={'b' * 40}": "kind: trap\nretired: null\n",
         f"/repos/org/premiere-desk/commits/{'a' * 40}/check-runs?per_page=100":
             {"check_runs": [{"name": "platform-check", "app": {"id": APP, "slug": "p"}, "conclusion": "failure"}]},
+        "/repos/org/premiere-desk/rulesets?includes_parents=false&per_page=100": [{"id": 5}],
+        "/repos/org/premiere-desk/rulesets/5": {"rules": [{"type": "required_status_checks", "parameters": {
+            "required_status_checks": [{"context": "platform-check", "integration_id": APP}]}}]},
         f"/repos/org/premiere-desk/commits/{'b' * 40}/check-runs?per_page=100":
             {"check_runs": [{"name": "platform-check", "app": {"id": APP, "slug": "p"}, "conclusion": "success"}]},
     }  # fmt: skip
@@ -584,3 +607,30 @@ def test_the_app_token_is_minted_from_a_jwt_the_apps_key_signs(monkeypatch):
     assert json.loads(base64.urlsafe_b64decode(pad(body)))["iss"] == str(APP)
     key.public_key().verify(base64.urlsafe_b64decode(pad(signature)), f"{head}.{body}".encode(),
                             padding.PKCS1v15(), hashes.SHA256())  # fmt: skip
+
+
+@pytest.mark.parametrize("sql", [
+    'SELECT name FROM "agentkeel-registry" UNION SELECT \'ghost-agent\'',
+    'SELECT name FROM "agentkeel-registry" r, other_table o',
+    'SELECT name FROM (SELECT \'ghost-agent\' AS name)',
+    "SELECT * FROM (VALUES ('ghost-agent'))",
+])
+def test_a_second_source_with_no_from_or_join_of_its_own_is_refused(tmp_path, sql):
+    """cold review F4 on PR 2: tables() named only the registry for each of these, and they passed."""
+    from src.validate import panel
+
+    dashboard = json.loads((build.ROOT / panel.PANEL).read_text(encoding="utf-8"))
+    dashboard["panels"][0]["targets"][0]["rawSQL"] = sql
+    (tmp_path / "infra" / "grafana").mkdir(parents=True)
+    (tmp_path / panel.PANEL).write_text(json.dumps(dashboard), encoding="utf-8")
+    assert any("reads a second source" in e for e in panel.check(tmp_path))
+
+
+def test_a_malformed_panel_target_is_refused_not_a_crash(tmp_path):
+    from src.validate import panel
+
+    dashboard = json.loads((build.ROOT / panel.PANEL).read_text(encoding="utf-8"))
+    dashboard["panels"][0]["targets"] = ["not a mapping", {"refId": "B", "datasource": "registry"}]
+    (tmp_path / "infra" / "grafana").mkdir(parents=True)
+    (tmp_path / panel.PANEL).write_text(json.dumps(dashboard), encoding="utf-8")
+    assert len(panel.check(tmp_path)) == 2

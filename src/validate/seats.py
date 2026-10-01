@@ -79,8 +79,13 @@ def login_holds_seat(login: str) -> tuple[bool, str]:
         status, body, which = _get(f"/repos/{repo}")
         if status != 200 or body is None:
             return False, f"GET /repos/{repo}: {status} with {which}"
-        if (body.get("owner") or {}).get("login", "").lower() == login.lower():
+        owner = body.get("owner") or {}
+        # A person who owns a personal repository holds it; an organisation's own login never does (cold
+        # review F1 on M06 PR 2): a seat is a person, and the write developer could name the organisation.
+        if owner.get("type") == "User" and owner.get("login", "").lower() == login.lower():
             return True, f"owner of {repo}"
+        if owner.get("type") != "User" and owner.get("login", "").lower() == login.lower():
+            return False, f"{login} is the organisation that owns {repo}, not a person"
         status, body, which = _get(f"/repos/{repo}/collaborators/{login}/permission")
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         return False, f"{type(exc).__name__}: {exc}"

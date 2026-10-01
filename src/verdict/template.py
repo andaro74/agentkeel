@@ -100,6 +100,12 @@ def app_success(runs: list[dict[str, Any]], app_id: int) -> bool:
     return any(r.get("app_id") == app_id and r.get("conclusion") == "success" for r in runs)
 
 
+def bound_to_the_app(rulesets: Any, app_id: int) -> bool:
+    """The repository's live ruleset requires `platform-check` from the platform's App (cold review F3, F6)."""
+    return isinstance(rulesets, list) and any(
+        r.get("context") == PLATFORM_CHECK and r.get("integration_id") == app_id for r in rulesets)
+
+
 def planted_fault(commit: dict[str, Any]) -> list[str]:
     """What is wrong with a commit's agent folder as F6.1 counts it; [] if nothing."""
     faults = []
@@ -127,7 +133,12 @@ def f6_1(s3: dict[str, Any] | None, app_id: int | None) -> dict[str, Any]:
     commits = pr.get("commits")
     if not isinstance(commits, list) or not commits:
         return entry(False, ["unread: the first pull request's commits were not read"])
+    if unread := [str(c.get("sha"))[:12] for c in commits if c.get("read_error")]:
+        # A commit that could not be read is not a planted fault (cold review F5 on M06 PR 2).
+        return entry(False, [f"unread: commits {', '.join(unread)} of the first pull request"])
     reasons = []
+    if not bound_to_the_app(s3.get("required_checks"), app_id):
+        reasons.append("the repository's ruleset does not require platform-check from the platform's App")
     faulty = [c for c in commits if planted_fault(c)]
     if not faulty:
         reasons.append("the first pull request never carried a planted fault: nothing was refused")
@@ -150,6 +161,14 @@ def f6_2(s2: dict[str, Any] | None, app_id: int | None) -> dict[str, Any]:
     reasons = []
     if s2.get("merged") is not False:
         reasons.append("S2's pull request merged")
+    # Mergeable, not only merged (cold review F3 on M06 PR 2): GitHub's own reading of the pull request.
+    if s2.get("mergeable_state") == "clean":
+        reasons.append("S2's pull request is mergeable (mergeable_state clean)")
+    elif s2.get("mergeable_state") is None:
+        reasons.append("S2's mergeable_state was not read")
+    if not bound_to_the_app(s2.get("required_checks"), app_id):
+        reasons.append("S2's repository does not require platform-check from the platform's App, so its refusal "
+                       "is not that control's")  # fmt: skip
     if app_success(runs, app_id):
         reasons.append("the platform's App passed S2's head: the attempt carried no fault the check refuses")
     stand_in = [r for r in runs if r.get("name") == PLATFORM_CHECK and r.get("app_id") != app_id
@@ -159,7 +178,7 @@ def f6_2(s2: dict[str, Any] | None, app_id: int | None) -> dict[str, Any]:
     return entry(True, reasons)
 
 
-def f6_3(s3: dict[str, Any] | None, max_seconds: float) -> dict[str, Any]:
+def f6_3(s3: dict[str, Any] | None, max_seconds: float, panel: list[str] | None = None) -> dict[str, Any]:
     if not s3 or not s3.get("found"):
         return entry(False, [f"unread: {(s3 or {}).get('error') or 'no S3 observation'}"], elapsed_s=None, records={},
                      listed=False)  # fmt: skip
@@ -172,8 +191,12 @@ def f6_3(s3: dict[str, Any] | None, max_seconds: float) -> dict[str, Any]:
         "answered_at": answer.get("last_modified")
         if any(g.get("pass") is True for g in (answer.get("goldens") or {}).values()) else None,
     }  # fmt: skip
-    listed = row.get("name") == s3.get("agent_name") and row.get("repository") == s3.get("repository")
-    unread = [name for name, value in records.items() if when(value) is None] + ([] if listed else ["registry row"])
+    # The registry and panel 1 listing it (cold review F2 on M06 PR 2): both, read, neither timed.
+    in_registry = row.get("name") == s3.get("agent_name") and row.get("repository") == s3.get("repository")
+    on_panel = panel is not None and s3.get("agent_name") in panel
+    listed = in_registry and on_panel
+    unread = [name for name, value in records.items() if when(value) is None]
+    unread += ([] if in_registry else ["registry row"]) + ([] if on_panel else ["panel 1's row"])
     if unread:
         return entry(False, [f"unread: {', '.join(unread)}"], elapsed_s=None, records=records, listed=listed)
     start = when(records["created_at"])
@@ -203,12 +226,17 @@ def record(observation: dict[str, Any], max_seconds: float) -> dict[str, Any]:
     app_id = observation.get("platform_app_id")
     app_id = app_id if isinstance(app_id, int) and not isinstance(app_id, bool) else None
     s2, s3 = observation.get("s2"), observation.get("s3")
+    panel = observation.get("panel") or {}
+    try:
+        names = panel_names(panel["frame"]) if panel.get("frame") and not panel.get("error") else None
+    except Unreadable:
+        names = None
     return {
         "looked_up_at": observation["looked_up_at"],
         "max_seconds": max_seconds,
         "platform_app_id": app_id,
         "F6_1": f6_1(s3, app_id),
         "F6_2": f6_2(s2, app_id),
-        "F6_3": f6_3(s3, max_seconds),
+        "F6_3": f6_3(s3, max_seconds, names),
         "F6_4": f6_4(observation.get("panel"), observation.get("registry")),
     }
