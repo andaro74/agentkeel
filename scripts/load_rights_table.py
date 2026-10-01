@@ -63,9 +63,9 @@ def scan(client: Any, table: str) -> list[dict[str, Any]]:
         kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
 
 
-def load(dynamodb: Any, ssm: Any, table: str, rows: list[dict[str, Any]]) -> tuple[int, str]:
+def load(dynamodb: Any, ssm: Any, table: str, rows: list[dict[str, Any]], marker: str = MARKER) -> tuple[int, str]:
     """(exit code, what happened). The marker is `loading` from the first write to the last read."""
-    ssm.put_parameter(Name=MARKER, Value=LOADING, Type="String", Overwrite=True)
+    ssm.put_parameter(Name=marker, Value=LOADING, Type="String", Overwrite=True)
     for row in rows:
         dynamodb.put_item(TableName=table, Item={k: attribute(v) for k, v in row.items()})
     keep = {row[rights_table.KEY] for row in rows}
@@ -76,7 +76,7 @@ def load(dynamodb: Any, ssm: Any, table: str, rows: list[dict[str, Any]]) -> tup
     if held != wanted:
         return 1, (f"the table holds {held[:12]}, the file is {wanted[:12]}: the marker stays {LOADING!r}, "
                    f"so every run is in the runner")  # fmt: skip
-    ssm.put_parameter(Name=MARKER, Value=held, Type="String", Overwrite=True)
+    ssm.put_parameter(Name=marker, Value=held, Type="String", Overwrite=True)
     return 0, f"wrote {len(rows)} rows, deleted {len(gone)} ({', '.join(gone) or 'none'}); marker {held[:12]}"
 
 
@@ -85,11 +85,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--table", required=True)
     parser.add_argument("--region", default=REGION)
     parser.add_argument("--rights", type=Path, default=ROOT / "data" / "rights_table.json")
+    # M06 PR 2 (SPEC/06 section 6, item 7): an agent from the template loads its own data/table.json under
+    # its own marker, /agentkeel/marker/<name>/rights-table-digest.
+    parser.add_argument("--marker", default=MARKER)
     args = parser.parse_args(argv)
 
     rows = json.loads(args.rights.read_text(encoding="utf-8"))
     code, said = load(boto3.client("dynamodb", region_name=args.region), boto3.client("ssm", region_name=args.region),
-                      args.table, rows)  # fmt: skip
+                      args.table, rows, args.marker)  # fmt: skip
     print(f"{args.table}: {said}")
     return code
 
