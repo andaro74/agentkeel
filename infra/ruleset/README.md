@@ -74,7 +74,12 @@ It has no `id`: each repository's ruleset gets its own. The platform
 check's posting job reads the repository's live rulesets with the App's
 token and fails the check unless one equals this file in `name`, `target`,
 `enforcement`, `conditions`, `rules` and `bypass_actors`
-(`src/validate/agent.py ruleset`). When the first ruleset is made, it is
-read back and this file is re-exported in the form GitHub returns
-(GitHub adds fields such as `require_extra_approval_for_unattributed_changes`
-to a pull request rule), so that the compare is with GitHub's own form.
+(`src/validate/agent.py ruleset`). It is GitHub's own form, re-exported at
+M06 PR 3 from the first live one (`agentkeel-studio/owner-check`, ruleset
+24310403, 2026-10-01): GitHub adds `dismissal_restriction` and
+`require_extra_approval_for_unattributed_changes` to an organisation
+repository's pull request rule, and the PR 2 export, written by hand
+without them, read as different from every live ruleset, so the App would
+have refused every head. Whether GitHub accepts both fields on a POST is
+read when the next agent repository is made; a ruleset made from the
+earlier form reads equal to this one, because GitHub adds them itself.

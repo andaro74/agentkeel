@@ -346,6 +346,38 @@ def test_the_repositorys_ruleset_must_be_the_export_with_no_bypass():
     assert "not shown" in platform.ruleset_errors([hidden])[0]
 
 
+# agentkeel-studio/owner-check's ruleset 24310403 as GitHub returned it, 2026-10-01 (M06 PR 3).
+LIVE_ORGANISATION_RULESET = {
+    "id": 24310403, "name": "platform", "target": "branch", "source_type": "Repository", "enforcement": "active",
+    "conditions": {"ref_name": {"exclude": [], "include": ["~DEFAULT_BRANCH"]}},
+    "rules": [
+        {"type": "deletion"},
+        {"type": "non_fast_forward"},
+        {"type": "pull_request", "parameters": {
+            "required_approving_review_count": 0, "dismiss_stale_reviews_on_push": False, "required_reviewers": [],
+            "require_code_owner_review": False, "dismissal_restriction": {"enabled": False, "allowed_actors": []},
+            "require_last_push_approval": False, "required_review_thread_resolution": False,
+            "require_extra_approval_for_unattributed_changes": True, "allowed_merge_methods": ["merge"]}},
+        {"type": "required_status_checks", "parameters": {
+            "strict_required_status_checks_policy": True, "do_not_enforce_on_create": False,
+            "required_status_checks": [{"context": "platform-check", "integration_id": 5144253}]}},
+    ],
+    "bypass_actors": [],
+}  # fmt: skip
+
+
+def test_the_export_is_the_form_github_returns_for_an_organisation_repository():
+    """GitHub adds `dismissal_restriction` and `require_extra_approval_for_unattributed_changes` to an
+    organisation repository's pull request rule. An export without them read as different from every live
+    ruleset, so the App would have refused every head of every agent repository (M06 PR 3, before S2 and S3)."""
+    assert platform.ruleset_errors([LIVE_ORGANISATION_RULESET]) == []
+    pull_request = next(r for r in LIVE_ORGANISATION_RULESET["rules"] if r["type"] == "pull_request")
+    without = copy.deepcopy(LIVE_ORGANISATION_RULESET)
+    next(r for r in without["rules"] if r["type"] == "pull_request")["parameters"] = {
+        k: v for k, v in pull_request["parameters"].items() if k != "dismissal_restriction"}
+    assert platform.ruleset_errors([without]) == [f"{platform.EXPORT}: rules differs from live ruleset 24310403"]
+
+
 def test_the_rulesets_app_is_the_platforms_app():
     """agent.json's integration_id and platform_identity.json's platform_app_id are one number (5144253 from 2026-09-30)."""
     export = json.loads((build.ROOT / platform.EXPORT).read_text(encoding="utf-8"))
