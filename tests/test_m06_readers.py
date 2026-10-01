@@ -32,30 +32,41 @@ def api(monkeypatch):
     answers: dict[str, tuple[int, Any]] = {}
     monkeypatch.setattr(seats, "_get", lambda path: (*answers.get(path, (404, None)), "a test token"))
     monkeypatch.setenv("AGENTKEEL_SEAT_REPOSITORY", "org/agent")
-    seats.login_has_access.cache_clear()
+    seats.login_holds_seat.cache_clear()
     yield answers
-    seats.login_has_access.cache_clear()
+    seats.login_holds_seat.cache_clear()
 
 
 def test_the_repositorys_owner_has_access(api):
     api["/repos/org/agent"] = (200, {"owner": {"login": "Org"}})
-    assert seats.login_has_access("org") == (True, "owner of org/agent")
+    assert seats.login_holds_seat("org") == (True, "owner of org/agent")
 
 
-def test_a_collaborator_has_access_and_a_stranger_does_not(api):
+def test_an_admin_holds_a_seat_and_a_write_developer_or_a_stranger_does_not(api):
+    """security-reviewer F11 on PR 2: the developer has write, so a seat held by write would let them fill
+    every seat themselves (R1: the second developer's login holds none)."""
     api["/repos/org/agent"] = (200, {"owner": {"login": "org"}})
-    api["/repos/org/agent/collaborators/andaro74"] = (204, None)
-    assert seats.login_has_access("andaro74")[0] is True
-    real, status = seats.login_has_access("someone-else")
+    api["/repos/org/agent/collaborators/andaro74/permission"] = (200, {"permission": "admin"})
+    api["/repos/org/agent/collaborators/floresinnovations/permission"] = (200, {"permission": "write"})
+    assert seats.login_holds_seat("andaro74")[0] is True
+    real, status = seats.login_holds_seat("floresinnovations")
+    assert real is False and "write on org/agent, not admin" in status
+    real, status = seats.login_holds_seat("someone-else")
     assert real is False and "not a collaborator" in status
 
 
-def test_access_that_cannot_be_read_is_not_access(api):
-    """A 403 on the collaborators endpoint (a token without push) refuses the seat; it is not a skip."""
+def test_a_seat_that_cannot_be_read_is_not_held(api):
+    """A 403 (a token that may not ask) refuses the seat; it is not a skip."""
     api["/repos/org/agent"] = (200, {"owner": {"login": "org"}})
-    api["/repos/org/agent/collaborators/andaro74"] = (403, None)
-    real, status = seats.login_has_access("andaro74")
-    assert real is False and "access is unread" in status
+    api["/repos/org/agent/collaborators/andaro74/permission"] = (403, None)
+    real, status = seats.login_holds_seat("andaro74")
+    assert real is False and "it is unread" in status
+
+
+@pytest.mark.parametrize("login", ["a/../x", "name?per_page=1", "-lead", "x" * 40, ""])
+def test_a_string_that_is_not_a_login_never_reaches_a_url(api, login):
+    real, status = seats.login_holds_seat(login)
+    assert real is False and "is not a GitHub login" in status
 
 
 def test_an_assigned_seat_the_lookup_refuses_names_the_seat(tmp_path):
@@ -64,7 +75,7 @@ def test_an_assigned_seat_the_lookup_refuses_names_the_seat(tmp_path):
     manifest = (FIXTURES / "s1b-no-goldens" / "manifest.yaml").read_text(encoding="utf-8")
     (agent / "manifest.yaml").write_text(manifest, encoding="utf-8")
     errors = seats.check(tmp_path, lookup=lambda login: (False, "404"))
-    assert len(errors) == 7 and all("not a login with access (404)" in e for e in errors)
+    assert len(errors) == 7 and all("not a login that administers the repository (404)" in e for e in errors)
 
 
 # --- claim 6's live readings ---------------------------------------------------
@@ -102,7 +113,7 @@ def observation() -> dict[str, Any]:
             "answer": {"key": "envelopes/agents/premiere-desk/" + "d" * 40 + ".json", "sha256": "e" * 64,
                        "last_modified": "2026-10-01T11:31:00Z", "goldens": {"g-001": {"kind": "ordinary", "pass": True}}},
             "registry_row": {"name": "premiere-desk", "repository": "org/premiere-desk", "commit_sha": "d" * 40,
-                             "deployed_at": "2026-10-01T11:29:00Z"},
+                             "deployed_at": "2026-10-03T08:00:00Z"},  # a later redeploy's: not timed (N8)
         },  # fmt: skip
         "panel": {"read_at": "2026-10-02T12:00:00Z", "error": None, "frame": {"results": {"A": {"frames": [
             {"schema": {"fields": [{"name": "name"}, {"name": "repository"}]},
@@ -137,7 +148,7 @@ def mutated(change) -> dict[str, Any]:
     ("F6_2", lambda o: o["s2"].update(check_runs=runs("success", stand_in=True)), "passed S2's head"),
     ("F6_2", lambda o: o["s2"].update(check_runs=runs("failure")), "not made as planted"),
     ("F6_3", lambda o: o["s3"]["answer"].update(last_modified="2026-10-01T17:01:00Z"), "over quickstart.max_seconds"),
-    ("F6_3", lambda o: o["s3"]["registry_row"].update(repository="org/other"), "unread: registered_at"),
+    ("F6_3", lambda o: o["s3"]["registry_row"].update(repository="org/other"), "unread: registry row"),
     ("F6_3", lambda o: o["s3"]["answer"]["goldens"]["g-001"].update(**{"pass": False}), "unread: answered_at"),
     ("F6_3", lambda o: o["s3"]["deploy"].update(conclusion="failure"), "unread: deployed_at"),
     ("F6_4", lambda o: o["registry"]["scan"]["Items"].pop(), "panel 1 shows premiere-desk"),
@@ -202,10 +213,17 @@ import yaml  # noqa: E402
 from src.validate import agent as platform  # noqa: E402
 
 
+CODE = ("__init__.py", "agent.py", "server.py", "prompt.txt")
+
+
 def agent_repo(tmp_path: Path, fixture: str, **manifest: Any) -> Path:
-    """An agent repository's root, from a seed fixture, with the platform's guardrail and any change given."""
+    """An agent repository's root, from a seed fixture with the example agent's code beside it, the platform's
+    guardrail, and any change given. The fixtures carry no code: the seeds plant manifests and goldens."""
     root = tmp_path / "repo"
     shutil.copytree(FIXTURES / fixture, root)
+    for name in CODE:
+        shutil.copyfile(build.ROOT / "agents" / "refagent" / name, root / name)
+    shutil.copytree(build.ROOT / "agents" / "refagent" / "tools", root / "tools")
     doc = yaml.safe_load((root / "manifest.yaml").read_text(encoding="utf-8"))
     platform_pin = yaml.safe_load((build.ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
     doc |= {"guardrail": platform_pin["guardrail"], **manifest}
@@ -229,7 +247,7 @@ def test_an_agent_with_seats_assigned_and_goldens_at_the_minimum_passes(tmp_path
 def test_s1a_and_s1b_are_refused_in_an_agent_repository_for_their_planted_reasons(tmp_path):
     s1a = platform.evaluate(agent_repo(tmp_path / "a", "s1a-unassigned-seat"), "org/premiere-desk", lookup=owner)
     s1b = platform.evaluate(agent_repo(tmp_path / "b", "s1b-no-goldens"), "org/premiere-desk", lookup=owner)
-    assert refused(s1a) == ["seats assigned, each a login with access"]
+    assert refused(s1a) == ["seats assigned, each a login that administers the repository"]
     assert refused(s1b) == ["an agent's goldens: one ordinary and one trap at least, citing its own data"]
 
 
@@ -243,6 +261,46 @@ def test_a_guardrail_that_is_not_the_platforms_is_refused(tmp_path):
     repo = agent_repo(tmp_path, "s1a-unassigned-seat", seats={s: "andaro74" for s in shipped.SEAT_SLUGS},
                       guardrail={"id": "0000aaaa1111", "version": "1"})  # fmt: skip
     assert refused(platform.evaluate(repo, "org/premiere-desk", lookup=owner)) == ["the platform's guardrail"]
+
+
+def test_a_null_guardrail_is_refused_even_where_the_platform_pins_none(tmp_path, monkeypatch):
+    """rule-owner on PR 2: equality alone would copy a null on refagent's pin to every agent at once."""
+    seated = {s: "andaro74" for s in shipped.SEAT_SLUGS}
+    repo = agent_repo(tmp_path, "s1a-unassigned-seat", seats=seated, guardrail=None)
+    assert refused(platform.evaluate(repo, "org/premiere-desk", lookup=owner)) == ["the platform's guardrail"]
+
+
+def test_a_folder_the_platforms_image_cannot_be_built_from_is_refused(tmp_path):
+    """security-reviewer F3 on PR 2: a merged repository without server.py would stop every agent's deploy."""
+    repo = agent_repo(tmp_path, "s1a-unassigned-seat", seats={s: "andaro74" for s in shipped.SEAT_SLUGS})
+    (repo / "server.py").unlink()
+    errors = platform.evaluate(repo, "org/premiere-desk", lookup=owner)
+    assert refused(errors) == ["the files the platform's image copies"]
+    assert errors["the files the platform's image copies"] == [
+        "server.py: missing; the platform's image copies it (infra/construct/agent.Dockerfile)"]
+
+
+@pytest.mark.parametrize(("where", "value"), [("table_row", ["pd-001"]), ("clause_id", {"PD-1.1": 1})])
+def test_an_id_that_is_not_a_string_is_refused_not_a_crash(tmp_path, where, value):
+    """data-owner F4 on PR 2: a list or a mapping as an id raised, and the head got no check at all."""
+    repo = agent_repo(tmp_path, "s1a-unassigned-seat", seats={s: "andaro74" for s in shipped.SEAT_SLUGS})
+    golden = yaml.safe_load((repo / "goldens" / "g-001.yaml").read_text(encoding="utf-8"))
+    golden["expected"][where] = value
+    (repo / "goldens" / "g-001.yaml").write_text(yaml.safe_dump(golden), encoding="utf-8")
+    errors = platform.evaluate(repo, "org/premiere-desk", lookup=owner)
+    goldens = errors["an agent's goldens: one ordinary and one trap at least, citing its own data"]
+    assert any("each one id, a string" in e for e in goldens)
+
+
+def test_a_row_without_a_key_or_a_key_twice_is_refused(tmp_path):
+    """data-owner N2 on PR 2: R5 says rows are keyed by table_row; a missing key let `table_row: null` cite it."""
+    repo = agent_repo(tmp_path, "s1a-unassigned-seat", seats={s: "andaro74" for s in shipped.SEAT_SLUGS})
+    rows = json.loads((repo / "data" / "table.json").read_text(encoding="utf-8"))
+    rows += [{"title": "no key"}, dict(rows[0])]
+    (repo / "data" / "table.json").write_text(json.dumps(rows), encoding="utf-8")
+    goldens = platform.evaluate(repo, "org/premiere-desk", lookup=owner)[
+        "an agent's goldens: one ordinary and one trap at least, citing its own data"]
+    assert any("have no table_row string" in e for e in goldens) and any("appear more than once" in e for e in goldens)
 
 
 def test_a_symbolic_link_is_refused_before_anything_is_read(tmp_path):
@@ -371,7 +429,7 @@ def test_the_template_as_shipped_is_refused_for_its_seats_and_its_goldens_and_no
     assert "from . import agent" in (repo / "server.py").read_text(encoding="utf-8")
     assert refused(platform.evaluate(repo, "org/example-agent", lookup=owner)) == [
         "an agent's goldens: one ordinary and one trap at least, citing its own data",
-        "seats assigned, each a login with access"]
+        "seats assigned, each a login that administers the repository"]
 
 
 def test_the_template_with_seats_and_two_goldens_passes_the_platform_check(tmp_path):
@@ -380,10 +438,12 @@ def test_the_template_with_seats_and_two_goldens_passes_the_platform_check(tmp_p
     doc = yaml.safe_load((repo / "manifest.yaml").read_text(encoding="utf-8"))
     doc["seats"] = {s: "andaro74" for s in shipped.SEAT_SLUGS}
     (repo / "manifest.yaml").write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
-    for golden_id, kind, row in (("g-001", "ordinary", "r-019"), ("g-002", "trap", "r-001")):
+    # As refagent's g-001 and g-010 (data-owner N8 on PR 2: the trap is one the row makes, not a guess of "no").
+    for golden_id, kind, row, clause, available in (("g-001", "ordinary", "r-019", "ML-2.1", True),
+                                                    ("g-002", "trap", "r-009", "HS-4", False)):  # fmt: skip
         (repo / "goldens" / f"{golden_id}.yaml").write_text(yaml.safe_dump({
-            "id": golden_id, "kind": kind, "question": "Can we publish it?",
-            "expected": {"table_row": row, "clause_id": "ML-2.1", "answer_fields": {"available": kind == "ordinary"}},
+            "id": golden_id, "kind": kind, "question": "Can we publish it on 2027-01-20?",
+            "expected": {"table_row": row, "clause_id": clause, "answer_fields": {"available": available}},
             "seat": "Data Owner", "added": "M06", "retired": None}), encoding="utf-8")  # fmt: skip
     assert refused(platform.evaluate(repo, "org/example-agent", lookup=owner)) == []
 
@@ -410,23 +470,29 @@ def github(monkeypatch):
 
 def test_find_lists_open_heads_the_app_has_not_checked(github):
     github["pages"].update({
-        "/orgs/org/repos?per_page=100&type=all": [{"full_name": "org/a", "archived": False, "is_template": False},
+        "/orgs/org/repos?per_page=100&type=all": [{"full_name": "org/a", "archived": False, "is_template": False,
+                                                    "default_branch": "main"},
                                                    {"full_name": "org/template", "archived": False, "is_template": True}],
         "/repos/org/a/pulls?state=open&per_page=100": [{"number": 1, "head": {"sha": "1" * 40}},
                                                        {"number": 2, "head": {"sha": "2" * 40}}],
+        "/repos/org/a/branches/main": {"commit": {"sha": "0" * 40}},
+        f"/repos/org/a/commits/{'0' * 40}/check-runs?check_name=platform-check&app_id={APP}&per_page=100":
+            {"check_runs": []},
         f"/repos/org/a/commits/{'1' * 40}/check-runs?check_name=platform-check&app_id={APP}&per_page=100":
             {"check_runs": [{"app": {"id": APP}, "conclusion": "failure"}]},
         f"/repos/org/a/commits/{'2' * 40}/check-runs?check_name=platform-check&app_id={APP}&per_page=100":
             {"check_runs": [{"app": {"id": 15368}, "conclusion": "success"}]},  # the stand-in's, not the App's
     })  # fmt: skip
-    assert platform_check.find("org", APP) == [{"repository": "org/a", "number": 2, "head": "2" * 40}]
+    # The default-branch head too: a merge makes a commit no pull request's head is (security-reviewer F1).
+    assert platform_check.find("org", APP) == [{"repository": "org/a", "number": 0, "head": "0" * 40},
+                                               {"repository": "org/a", "number": 2, "head": "2" * 40}]
 
 
 def test_post_checks_seats_and_the_ruleset_then_posts_one_check_on_the_head(github, tmp_path, monkeypatch):
     export = json.loads((build.ROOT / platform.EXPORT).read_text(encoding="utf-8"))
     github["pages"].update({"/repos/org/a/rulesets?includes_parents=false&per_page=100": [{"id": 9}],
                             "/repos/org/a/rulesets/9": {**export, "id": 9}})  # fmt: skip
-    monkeypatch.setattr(seats, "login_has_access", type("L", (), {
+    monkeypatch.setattr(seats, "login_holds_seat", type("L", (), {
         "__call__": staticmethod(lambda login: (login == "andaro74", "stand-in")),
         "cache_clear": staticmethod(lambda: None)})())  # fmt: skip
     (tmp_path / "1").mkdir()
@@ -442,7 +508,7 @@ def test_post_checks_seats_and_the_ruleset_then_posts_one_check_on_the_head(gith
     (tmp_path / "1" / "result.json").write_text(json.dumps(result), encoding="utf-8")
     platform_check.post(tmp_path, APP)
     assert github["posted"][0][1]["conclusion"] == "failure"
-    assert "floresinnovations has no access" in github["posted"][0][1]["output"]["summary"]
+    assert "floresinnovations is not a holder" in github["posted"][0][1]["output"]["summary"]
 
 
 def test_nothing_is_read_or_posted_while_the_organisation_or_the_app_is_unnamed(tmp_path, github):
@@ -466,22 +532,28 @@ class FakeTable:
         item = self.items.get(Key["name"]["S"])
         return {"Item": item} if item else {}
 
-    def put_item(self, TableName, Item, ConditionExpression, ExpressionAttributeNames, ExpressionAttributeValues):  # noqa: N803
+    def put_item(self, TableName, Item, ConditionExpression, ExpressionAttributeNames,  # noqa: N803
+                 ExpressionAttributeValues=None):  # noqa: N803
         from botocore.exceptions import ClientError
 
         held = self.items.get(Item["name"]["S"])
-        if held and held["repository_id"] != ExpressionAttributeValues[":id"]:
+        same = ExpressionAttributeValues is not None and held and held["repository_id"] == ExpressionAttributeValues[":id"]
+        if held and not same:
             raise ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
         self.items[Item["name"]["S"]] = Item
 
 
 def test_a_name_belongs_to_the_first_repository_deployed_under_it():
     table = FakeTable()
-    assert registry.claim(table, "premiere-desk", "111")[0] == 0
-    assert registry.write(table, "premiere-desk", "org/a", "111", "a" * 40, "7")[0] == 0
-    assert registry.claim(table, "premiere-desk", "111")[0] == 0  # the same repository redeploys
-    code, said = registry.claim(table, "premiere-desk", "222")
+    assert registry.claim(table, "premiere-desk", "org/a", "111")[0] == 0
+    # The claim is written before the stack is touched: a deploy that fails after it keeps the name (F2).
+    assert table.items["premiere-desk"]["repository_id"]["S"] == "111"
+    code, said = registry.claim(table, "premiere-desk", "org/b", "222")
     assert code == 3 and "held by repository 111" in said
+    assert registry.write(table, "premiere-desk", "org/a", "111", "a" * 40, "7")[0] == 0
+    assert registry.claim(table, "premiere-desk", "org/a", "111")[0] == 0  # the same repository redeploys
+    assert table.items["premiere-desk"]["commit_sha"]["S"] == "a" * 40  # and its claim does not undo the row
+    assert registry.deployed(table, "premiere-desk", "a" * 40)[0] == 0
     assert registry.write(table, "premiere-desk", "org/b", "222", "b" * 40, "8")[0] == 3
     assert table.items["premiere-desk"]["repository"]["S"] == "org/a"
 

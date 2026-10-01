@@ -53,9 +53,18 @@ def check_agent(agent: Path, rel: str) -> list[str]:
     errors: list[str] = []
     table = _load_json(agent / "data" / "table.json")
     clauses = _load_json(agent / "data" / "clauses.json")
-    rows = {r.get("table_row") for r in table if isinstance(r, dict)} if isinstance(table, list) else None
-    if rows is None:
+    rows: set[str] | None = None
+    if not isinstance(table, list):
         errors.append(f"{rel}data/table.json: missing or not a list of rows keyed by table_row")
+    else:
+        keys = [r.get("table_row") if isinstance(r, dict) else None for r in table]
+        bad = [i for i, key in enumerate(keys) if not isinstance(key, str) or not key]
+        twice = sorted({key for key in keys if isinstance(key, str) and keys.count(key) > 1})
+        if bad:
+            errors.append(f"{rel}data/table.json: rows {bad[:5]} have no table_row string; every row is keyed by one")
+        if twice:
+            errors.append(f"{rel}data/table.json: table_row {twice[:5]} appear more than once; a key is one row")
+        rows = {key for key in keys if isinstance(key, str) and key}
     if not isinstance(clauses, dict):
         errors.append(f"{rel}data/clauses.json: missing or not a mapping of clause ids")
         clauses = None
@@ -93,6 +102,9 @@ def check_agent(agent: Path, rel: str) -> list[str]:
             continue
         if not isinstance(expected["answer_fields"], dict) or not expected["answer_fields"]:
             errors.append(f"{where}: answer_fields is empty")
+        if not all(isinstance(expected[k], str) and expected[k] for k in ("table_row", "clause_id")):
+            errors.append(f"{where}: table_row and clause_id are each one id, a string")
+            continue
         if rows is not None and expected["table_row"] not in rows:
             errors.append(f"{where}: table_row {expected['table_row']!r} is not a row of {rel}data/table.json")
         if clauses is not None and expected["clause_id"] not in clauses:

@@ -494,12 +494,13 @@
         "F6_3": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["read", "held", "reasons", "elapsed_s", "records"],
+          "required": ["read", "held", "reasons", "elapsed_s", "records", "listed"],
           "properties": {
             "read": {"type": "boolean"},
             "held": {"type": ["boolean", "null"]},
             "reasons": {"type": "array", "items": {"type": "string"}},
             "elapsed_s": {"type": ["number", "null"]},
+            "listed": {"type": "boolean"},
             "records": {
               "type": "object",
               "additionalProperties": false,
@@ -507,8 +508,7 @@
                 "created_at": {"type": ["string", "null"]},
                 "merged_at": {"type": ["string", "null"]},
                 "deployed_at": {"type": ["string", "null"]},
-                "answered_at": {"type": ["string", "null"]},
-                "registered_at": {"type": ["string", "null"]}
+                "answered_at": {"type": ["string", "null"]}
               }
             }
           }

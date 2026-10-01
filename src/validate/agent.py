@@ -16,10 +16,15 @@ and these run over it:
   agent in `agentkeel` holds. A name the registry holds for another
   repository is refused at deploy (SPEC/06 §6, item 9);
 - the guardrail: at M06 every agent from the template pins the platform's,
-  refagent's, by id and version (SPEC/06 §6, item 6);
+  refagent's, by id and version (SPEC/06 section 6, item 6), and a null pin
+  on either side is refused, so one key on refagent's pin cannot relax every
+  agent at once (rule-owner on M06 PR 2);
+- the files `infra/construct/agent.Dockerfile` copies are there, so a merged
+  repository cannot stop the deploy of every other agent
+  (security-reviewer F3 on M06 PR 2);
 - manifest schema; edges two-sided, no cycle, ceilings within bounds;
   `deprecated_after`;
-- seats assigned, each a login with access to **this** repository (S1a's
+- seats assigned, each a login that administers the repository to **this** repository (S1a's
   reader, `seats.py`, with `AGENTKEEL_SEAT_REPOSITORY` set to it);
 - an agent's goldens (S1b's reader, `agent_goldens.py`).
 
@@ -90,8 +95,22 @@ def name_errors(name: Any, root: Path = ROOT) -> list[str]:
     return []
 
 
+# What infra/construct/agent.Dockerfile copies into the image; a folder without them cannot be built.
+IMAGE_FILES = ("__init__.py", "agent.py", "server.py", "prompt.txt", "manifest.yaml")
+
+
+def image_file_errors(agent: Path) -> list[str]:
+    missing = [name for name in IMAGE_FILES if not (agent / name).is_file()]
+    if not (agent / "tools").is_dir() or not any((agent / "tools").glob("*.json")):
+        missing.append("tools/*.json")
+    return [f"{name}: missing; the platform's image copies it (infra/construct/agent.Dockerfile)" for name in missing]
+
+
 def guardrail_errors(doc: dict[str, Any], root: Path = ROOT) -> list[str]:
     platform = yaml.safe_load((root / "agents" / PLATFORM_AGENT / "manifest.yaml").read_text(encoding="utf-8"))
+    if not platform.get("guardrail") or not doc.get("guardrail"):
+        return ["manifest.yaml: no guardrail pinned; an agent from the template pins the platform's "
+                "(SPEC/06 section 6, item 6), and the platform's must be a pin"]  # fmt: skip
     if doc.get("guardrail") != platform.get("guardrail"):
         return [f"manifest.yaml: guardrail {doc.get('guardrail')!r} is not the platform's {platform.get('guardrail')!r} "
                 "(SPEC/06 section 6, item 6: one guardrail for every agent at M06)"]  # fmt: skip
@@ -116,20 +135,22 @@ def evaluate(agent: Path, repository: str, root: Path = ROOT, *, lookup=None) ->
         return errors
     name = doc["name"]
     errors["the platform's guardrail"] = guardrail_errors(doc, root)
+    errors["the files the platform's image copies"] = image_file_errors(agent)
     tree = scratch_tree(agent, name, root)
     previous = os.environ.get("AGENTKEEL_SEAT_REPOSITORY")
     os.environ["AGENTKEEL_SEAT_REPOSITORY"] = repository
-    seats.login_has_access.cache_clear()
+    seats.login_holds_seat.cache_clear()
     try:
         mine = f"agents/{name}/"
         errors["manifest schema"] = [e for e in check_manifests(tree) if e.startswith(mine)]
         errors["edges two-sided, no cycle, ceilings within bounds"] = edges.check(tree)
         errors["deprecated_after more than 30 days away, or null"] = [e for e in lifecycle.check(tree) if e.startswith(mine)]
         seat_errors = seats.check(tree, lookup=lookup) if lookup else seats.check(tree)
-        errors["seats assigned, each a login with access"] = [e for e in seat_errors if e.startswith(mine)]
-        errors["an agent's goldens: one ordinary and one trap at least, citing its own data"] = agent_goldens.check(tree)
+        errors["seats assigned, each a login that administers the repository"] = [e for e in seat_errors if e.startswith(mine)]
+        errors["an agent's goldens: one ordinary and one trap at least, citing its own data"] = [
+            e for e in agent_goldens.check(tree) if e.startswith(mine)]
     finally:
-        seats.login_has_access.cache_clear()
+        seats.login_holds_seat.cache_clear()
         if previous is None:
             os.environ.pop("AGENTKEEL_SEAT_REPOSITORY", None)
         else:

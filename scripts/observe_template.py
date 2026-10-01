@@ -20,12 +20,14 @@ per set and each call merges its part into the same file:
   its head with the App that posted it); S3's repository (`created_at`), its
   first pull request (merged, `merged_at`, the merged head) and, for each of
   its commits, the agent folder's seats and golden kinds as the commit holds
-  them and the check runs on it; the platform's deploy run for the agent
-  (from the registry row's `deploy_run_id`, so `registry` first when both are
-  read in one call). `GITHUB_TOKEN`; the repositories are public.
+  them and the check runs on it; the deploy run that wrote the agent's first
+  answer record (from that record, so `bucket` first when both are read). `GITHUB_TOKEN`; the repositories are public.
 - `grafana`: panel 1's rows, `POST /api/ds/query` with panel 1's own target
-  from `infra/grafana/panel1.json`, as the workspace answers
-  (`AGENTKEEL_GRAFANA_URL`, `AGENTKEEL_GRAFANA_TOKEN`).
+  from `infra/grafana/panel1.json`, as the workspace answers. In CI the
+  workflow posts the query in a step of its own and hands this the file
+  (`AGENTKEEL_PANEL_FILE`), so the workspace's token is never in this
+  process (security-reviewer F9 on M06 PR 2); locally,
+  `AGENTKEEL_GRAFANA_URL` and `AGENTKEEL_GRAFANA_TOKEN`.
 - `registry`: a scan of `agentkeel-registry` and S3's row in it.
 - `bucket`: S3's first answer record, the earliest object under
   `envelopes/agents/<name>/` in the security account's bucket: its key,
@@ -150,11 +152,12 @@ def read_s3_github(s3: dict[str, Any]) -> None:
                     for c in commits],
     }  # fmt: skip
     s3["found"] = True
-    row = s3.get("registry_row") or {}
-    if run_id := row.get("deploy_run_id"):
+    # The deploy run that wrote the first answer record, not the registry row's latest (threshold-owner N8).
+    answer = s3.get("answer") or {}
+    if run_id := answer.get("run_id"):
         run = gh(f"/repos/{PLATFORM}/actions/runs/{run_id}")
         s3["deploy"] = {"run_id": run_id, "conclusion": run.get("conclusion"), "completed_at": run.get("updated_at"),
-                        "agent_commit": row.get("commit_sha")}  # fmt: skip
+                        "agent_commit": answer.get("commit")}  # fmt: skip
 
 
 # --- AWS and Grafana --------------------------------------------------------------
@@ -192,14 +195,23 @@ def read_bucket(s3: dict[str, Any]) -> None:
         got = client.get_object(Bucket=AUDIT_BUCKET, Key=first["Key"])
         body = got["Body"].read()
         record = json.loads(body)
+        run_url = str(record.get("run_url") or "")
         s3["answer"] = {"key": first["Key"], "sha256": hashlib.sha256(body).hexdigest(),
                         "last_modified": got["LastModified"].isoformat().replace("+00:00", "Z"),
-                        "goldens": record.get("goldens") or {}}  # fmt: skip
+                        "goldens": record.get("goldens") or {}, "commit": record.get("commit"),
+                        # The deploy run that wrote it, which F6.3 times by GitHub's own completion.
+                        "run_id": run_url.rstrip("/").rsplit("/", 1)[-1] if "/actions/runs/" in run_url else None}  # fmt: skip
     except Exception as exc:  # noqa: BLE001 - an unread record is an observation
         s3["answer"], s3["answer_error"] = None, f"{prefix}: {type(exc).__name__}: {exc}"
 
 
 def read_panel() -> dict[str, Any]:
+    if path := os.environ.get("AGENTKEEL_PANEL_FILE"):
+        try:
+            return {"read_at": now(), "error": None, "frame": json.loads(Path(path).read_text(encoding="utf-8"))}
+        except (OSError, ValueError) as exc:
+            return {"read_at": now(), "frame": None,
+                    "error": f"{path}: {type(exc).__name__}; the workflow step that reads panel 1 wrote nothing"}  # fmt: skip
     url, token = os.environ.get("AGENTKEEL_GRAFANA_URL"), os.environ.get("AGENTKEEL_GRAFANA_TOKEN")
     if not url or not token:
         return {"read_at": now(), "error": "no AGENTKEEL_GRAFANA_URL or AGENTKEEL_GRAFANA_TOKEN", "frame": None}

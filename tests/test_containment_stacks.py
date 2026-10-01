@@ -131,10 +131,15 @@ def test_the_read_role_reads_its_prefixes_and_the_put_role_trusts_main_only(secu
     both = roles(security)
     put = both["agentkeel-envelope-put"]["AssumeRolePolicyDocument"]["Statement"][0]["Condition"]["StringEquals"]
     assert put["token.actions.githubusercontent.com:sub"] == ["repo:andaro74@3157440/agentkeel@1376369685:ref:refs/heads/main"]
-    # evals.yml, and from M06 PR 2 deploy.yml (an agent from the template's answer record, SPEC/06 R7), on main.
-    assert put["token.actions.githubusercontent.com:job_workflow_ref"] == [
-        "andaro74/agentkeel/.github/workflows/evals.yml@refs/heads/main",
-        "andaro74/agentkeel/.github/workflows/deploy.yml@refs/heads/main"]
+    assert put["token.actions.githubusercontent.com:job_workflow_ref"] == "andaro74/agentkeel/.github/workflows/evals.yml@refs/heads/main"
+    # M06 PR 2 (R7; security-reviewer F7): deploy.yml's own role, on main, under envelopes/agents/ alone.
+    answer = both["agentkeel-answer-put"]["AssumeRolePolicyDocument"]["Statement"][0]["Condition"]["StringEquals"]
+    assert answer["token.actions.githubusercontent.com:job_workflow_ref"] == "andaro74/agentkeel/.github/workflows/deploy.yml@refs/heads/main"
+    assert answer["token.actions.githubusercontent.com:sub"] == ["repo:andaro74@3157440/agentkeel@1376369685:ref:refs/heads/main"]
+    answer_put = next(p for k, p in {json.dumps(p["Roles"]): p for p in of_type(security, "AWS::IAM::Policy")}.items()
+                      if "AnswerPutRole" in k)["PolicyDocument"]["Statement"]  # fmt: skip
+    assert [s["Action"] for s in answer_put] == ["s3:PutObject"]
+    assert "envelopes/agents/*" in json.dumps(answer_put[0]["Resource"])
     policies = {json.dumps(p["Roles"]): p for p in of_type(security, "AWS::IAM::Policy")}
     read = next(p for k, p in policies.items() if "ReadRole" in k)["PolicyDocument"]["Statement"]
     listed = next(s for s in read if "s3:ListBucket" in s["Action"])

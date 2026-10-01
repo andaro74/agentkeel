@@ -424,7 +424,7 @@ CHECKS = {
     # M04 PR 2 (SPEC/04 section 5, seed S5)
     "deprecated_after more than 30 days away, or null": lifecycle.check,
     # M06 PR 2 (SPEC/06 section 6): S1a's reader
-    "seats assigned, each a login with access": seats.check,
+    "seats assigned, each a login that administers the repository": seats.check,
     # M06 PR 2: S1b's reader
     "an agent's goldens: one ordinary and one trap at least, citing its own data": agent_goldens.check,
     # M06 PR 2: S4's query reader (finding 11)

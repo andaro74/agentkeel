@@ -10,9 +10,12 @@ either is null every subcommand writes an empty list and says so, and no
 check is posted (the ruleset export's `integration_id` is null too, so no
 agent repository can require one yet).
 
-- `find`: every open pull request in the organisation's repositories whose
-  head has no `platform-check` run from the App. At most `LIMIT` per run;
-  the next run takes the rest.
+- `find`: every open pull request's head, and every default-branch head, in
+  the organisation's repositories, that has no `platform-check` run from the
+  App. The default-branch head is the merge commit a merge makes, which no
+  pull request's head is; `deployable` deploys only a head the App passed
+  (security-reviewer F1 on PR 2). At most `LIMIT` per run; the next run
+  takes the rest.
 - `post`: for each result `src/validate/agent.py evaluate` wrote, the seats'
   access to that repository (deferred from the evaluating job, which holds
   no token that may ask an organisation repository about its
@@ -46,7 +49,7 @@ API = os.environ.get("GITHUB_API_URL", "https://api.github.com")
 IDENTITY = ROOT / "infra" / "platform_identity.json"
 CHECK = "platform-check"
 LIMIT = 20
-SEAT_CHECK = "seats assigned, each a login with access"
+SEAT_CHECK = "seats assigned, each a login that administers the repository"
 
 
 def identity() -> tuple[str | None, int | None]:
@@ -80,13 +83,17 @@ def app_runs(repository: str, sha: str, app_id: int) -> list[dict[str, Any]]:
 
 
 def find(org: str, app_id: int) -> list[dict[str, Any]]:
-    heads = []
+    heads: list[dict[str, Any]] = []
     for repo in repositories(org):
         name = repo["full_name"]
-        for pull in gh(f"/repos/{name}/pulls?state=open&per_page=100"):
-            head = pull["head"]["sha"]
+        branch = gh(f"/repos/{name}/branches/{repo['default_branch']}")
+        candidates = [(0, branch["commit"]["sha"])]
+        candidates += [(pull["number"], pull["head"]["sha"]) for pull in gh(f"/repos/{name}/pulls?state=open&per_page=100")]
+        for number, head in candidates:
+            if any(h["repository"] == name and h["head"] == head for h in heads):
+                continue
             if not app_runs(name, head, app_id):
-                heads.append({"repository": name, "number": pull["number"], "head": head})
+                heads.append({"repository": name, "number": number, "head": head})
             if len(heads) >= LIMIT:
                 return heads
     return heads
@@ -97,11 +104,17 @@ def live_rulesets(repository: str) -> list[dict[str, Any]]:
     return [gh(f"/repos/{repository}/rulesets/{r['id']}") for r in listed]
 
 
-def app_token(app_id: int, org: str, private_key_pem: str) -> str:
-    """The App's installation token for the organisation, minted here so it never leaves this process.
+# What one post needs, on one repository (security-reviewer N6 on PR 2): the token is minted per repository
+# with these permissions only, not every permission the App holds on every repository.
+POST_PERMISSIONS = {"checks": "write", "administration": "read", "contents": "read", "metadata": "read"}
 
-    A JWT the App's key signs (RS256, ten minutes), then the organisation's installation's token. No
-    third-party action holds the key (SPEC/06 section 6: the key is in the `platform-app` environment)."""
+
+def app_token(app_id: int, org: str, private_key_pem: str, repository: str | None = None) -> str:
+    """The App's installation token, minted here so it never leaves this process.
+
+    A JWT the App's key signs (RS256, ten minutes), then the organisation's installation's token, for
+    `repository` alone and POST_PERMISSIONS when one is named. No third-party action holds the key
+    (SPEC/06 section 6: the key is in the `platform-app` environment)."""
     import base64
     import time
 
@@ -121,7 +134,9 @@ def app_token(app_id: int, org: str, private_key_pem: str) -> str:
     os.environ["GITHUB_TOKEN"] = jwt
     try:
         installation = gh(f"/orgs/{org}/installation")
-        return gh(f"/app/installations/{installation['id']}/access_tokens", method="POST", body={})["token"]
+        scope = {} if repository is None else {"repositories": [repository.split("/", 1)[1]],
+                                                 "permissions": POST_PERMISSIONS}  # fmt: skip
+        return gh(f"/app/installations/{installation['id']}/access_tokens", method="POST", body=scope)["token"]
     finally:
         if saved is None:
             os.environ.pop("GITHUB_TOKEN", None)
@@ -129,7 +144,8 @@ def app_token(app_id: int, org: str, private_key_pem: str) -> str:
             os.environ["GITHUB_TOKEN"] = saved
 
 
-def post(results: Path, app_id: int) -> int:
+def post(results: Path, app_id: int, mint=None) -> int:
+    """`mint(repository)` gives the App's token for that repository alone; each post runs under its own."""
     from src.validate import agent as platform
     from src.validate import seats
 
@@ -137,13 +153,15 @@ def post(results: Path, app_id: int) -> int:
     for path in sorted(results.rglob("result.json")):
         result = json.loads(path.read_text(encoding="utf-8"))
         repository, head = result["repository"], result["head"]
+        if mint is not None:
+            os.environ["GITHUB_TOKEN"] = mint(repository)
         errors: dict[str, list[str]] = dict(result["errors"])
         os.environ["AGENTKEEL_SEAT_REPOSITORY"] = repository
-        seats.login_has_access.cache_clear()
+        seats.login_holds_seat.cache_clear()
         for login in result.get("seat_logins") or []:
-            real, status = seats.login_has_access(login)
+            real, status = seats.login_holds_seat(login)
             if not real:
-                errors.setdefault(SEAT_CHECK, []).append(f"manifest.yaml: seat login {login} has no access ({status})")
+                errors.setdefault(SEAT_CHECK, []).append(f"manifest.yaml: seat login {login} is not a holder ({status})")
         try:
             errors["the repository's ruleset is the export"] = platform.ruleset_errors(live_rulesets(repository))
         except urllib.error.HTTPError as exc:
@@ -186,6 +204,9 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("find", "deployable"):
         one = sub.add_parser(name)
         one.add_argument("--out", required=True, type=Path)
+        if name == "deployable":
+            # As the deploy role, in deploy.yml's find-agents: drop a commit the registry already holds.
+            one.add_argument("--skip-deployed", action="store_true")
     two = sub.add_parser("post")
     two.add_argument("--results", required=True, type=Path)
     args = parser.parse_args(argv)
@@ -201,10 +222,14 @@ def main(argv: list[str] | None = None) -> int:
         if not key:
             print("no AGENTKEEL_APP_PRIVATE_KEY: the posting job runs in the platform-app environment only")
             return 1
-        os.environ["GITHUB_TOKEN"] = app_token(app_id, org, key)
-        print(f"posted {post(args.results, app_id)} check runs")
+        print(f"posted {post(args.results, app_id, mint=lambda repo: app_token(app_id, org, key, repo))} check runs")
         return 0
     found = find(org, app_id) if args.what == "find" else deployable(org, app_id)
+    if args.what == "deployable" and args.skip_deployed:
+        from scripts import registry
+
+        table = registry.client()
+        found = [a for a in found if registry.deployed(table, a["name"], a["commit"])[0] != 0]
     args.out.write_text(json.dumps(found) + "\n", encoding="utf-8")
     print(f"{len(found)}: {json.dumps(found)}")
     return 0

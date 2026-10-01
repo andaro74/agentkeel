@@ -18,12 +18,16 @@ One entry per live falsifier, each `read` (every record it needs was found),
 - **F6.2.** S2's pull request: not merged, a check run of the platform
   check's name from another app concluded success on its head (the stand-in
   was there), and none from the platform's App did.
-- **F6.3.** S3's five records: the repository's `created_at`, the first pull
-  request's merge, the platform's deploy run of the agent completed, the
-  agent's answer envelope (one of its own goldens passed) and the registry
-  row. Elapsed is the last record less `created_at`; held when it is at most
-  `quickstart.max_seconds`. Panel 1's listing is read under F6.4, not timed:
-  the panel reads the registry when it is asked.
+- **F6.3.** S3's records, each time GitHub's or AWS's own: the repository's
+  `created_at`, the first pull request's merge, the completion of the deploy
+  run that wrote the agent's **first** answer record (GitHub's), and that
+  record's `LastModified` (AWS's), with one of its own goldens passed.
+  Elapsed is the last less `created_at`; held when it is at most
+  `quickstart.max_seconds`. The registry row must hold the agent for this
+  repository (`listed`), and is not timed: its `deployed_at` is a runner's
+  clock, rewritten by every redeploy (threshold-owner N8 on M06 PR 2), and
+  the deploy run that wrote it ends after it. Panel 1's listing is read under
+  F6.4, not timed: the panel reads the registry when it is asked.
 - **F6.4.** Panel 1's rows against a registry scan, by name: held when the
   panel names no agent the registry does not hold.
 """
@@ -157,7 +161,8 @@ def f6_2(s2: dict[str, Any] | None, app_id: int | None) -> dict[str, Any]:
 
 def f6_3(s3: dict[str, Any] | None, max_seconds: float) -> dict[str, Any]:
     if not s3 or not s3.get("found"):
-        return entry(False, [f"unread: {(s3 or {}).get('error') or 'no S3 observation'}"], elapsed_s=None, records={})
+        return entry(False, [f"unread: {(s3 or {}).get('error') or 'no S3 observation'}"], elapsed_s=None, records={},
+                     listed=False)  # fmt: skip
     pr, deploy = s3.get("first_pr") or {}, s3.get("deploy") or {}
     answer, row = s3.get("answer") or {}, s3.get("registry_row") or {}
     records = {
@@ -166,18 +171,17 @@ def f6_3(s3: dict[str, Any] | None, max_seconds: float) -> dict[str, Any]:
         "deployed_at": deploy.get("completed_at") if deploy.get("conclusion") == "success" else None,
         "answered_at": answer.get("last_modified")
         if any(g.get("pass") is True for g in (answer.get("goldens") or {}).values()) else None,
-        "registered_at": row.get("deployed_at")
-        if row.get("name") == s3.get("agent_name") and row.get("repository") == s3.get("repository") else None,
     }  # fmt: skip
-    unread = [name for name, value in records.items() if when(value) is None]
+    listed = row.get("name") == s3.get("agent_name") and row.get("repository") == s3.get("repository")
+    unread = [name for name, value in records.items() if when(value) is None] + ([] if listed else ["registry row"])
     if unread:
-        return entry(False, [f"unread: {', '.join(unread)}"], elapsed_s=None, records=records)
+        return entry(False, [f"unread: {', '.join(unread)}"], elapsed_s=None, records=records, listed=listed)
     start = when(records["created_at"])
     elapsed = max((when(v) - start).total_seconds() for v in records.values())  # type: ignore[operator]
     reasons = [f"{elapsed:.0f} s, over quickstart.max_seconds {max_seconds:.0f}"] if elapsed > max_seconds else []
     if any((when(v) - start).total_seconds() < 0 for v in records.values()):  # type: ignore[operator]
         reasons.append("a record is earlier than the repository's created_at: the wrong record was matched")
-    return entry(True, reasons, elapsed_s=round(elapsed, 1), records=records)
+    return entry(True, reasons, elapsed_s=round(elapsed, 1), records=records, listed=listed)
 
 
 def f6_4(panel: dict[str, Any] | None, registry: dict[str, Any] | None) -> dict[str, Any]:
