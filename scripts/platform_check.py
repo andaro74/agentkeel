@@ -326,6 +326,13 @@ def grant_errors(installation: dict[str, Any], environment: dict[str, Any], gran
     selection = app.get("repository_selection")
     covered = selection.get(account) if isinstance(selection, dict) else selection
     if account not in (app.get("installed_on") or []):
+        # An App installed on two accounts has to be public on GitHub, so anybody may install it on an
+        # account of their own. That gives this platform's key reach into their repositories and gives
+        # them nothing here: no token is ever minted for an account the callers do not name. The grant
+        # says which App is public; for it, such an installation is recorded and is not an error, or a
+        # stranger could stop every keyed job by installing the App. For every other App it is one.
+        if app.get("public") is True:
+            return errors
         errors.append(f"{slug} is installed on {account}, which the grant does not name "
                       f"(installed_on {', '.join(app.get('installed_on') or []) or 'nothing'})")  # fmt: skip
     elif covered == "all":
@@ -444,6 +451,7 @@ def check_grant(slug: str, private_key_pem: str, root: Path = ROOT) -> tuple[dic
                      f"the grant names {level}" for name, level in sorted((app.get("permissions") or {}).items())
                      if held.get(name) is None or LEVELS.get(str(held[name]), 99) < LEVELS.get(str(level), 0)]  # fmt: skip
     installed = {i["account"]["login"] for i in read["installations"]}
+    read["not_ours"] = sorted(installed - set(app.get("installed_on") or [])) if app.get("public") is True else []
     narrower += [f"{slug}: not installed on {account}, which the grant names" for account in app.get("installed_on") or []
                  if account not in installed]  # fmt: skip
     read |= {"grant": {slug: app, "environments": grant.get("environments")}, "errors": errors, "narrower": narrower}
@@ -614,6 +622,8 @@ def grant_command(slug: str, out: Path) -> int:
           f"can_admins_bypass {environment['can_admins_bypass']}; its secrets' names are not read by a job")
     for note in read["narrower"]:
         print(f"narrower than the grant: {note}")
+    for account in read.get("not_ours") or []:
+        print(f"{slug} is public and is also installed on {account}: recorded, never minted for")
     for error in errors:
         print(f"FAIL {error}")
     print(f"{slug}: {'beyond the ruled grant; nothing is minted' if errors else 'within the ruled grant'}")

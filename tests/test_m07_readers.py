@@ -712,3 +712,27 @@ def test_a_repository_whose_ruleset_does_not_bind_the_check_gets_no_call(owner_c
     record = platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key)
     assert record["status"] is None and "nothing to ask" in record["message"]
     assert not any(method == "PUT" for method, *_ in owner_check["sent"])
+
+
+# --- a public App, installed by a stranger (rulings/pr2-security.md item 13a) -----
+
+
+def test_a_strangers_installation_of_the_public_app_is_recorded_and_stops_nothing():
+    """`agentkeel-upgrades` is installed on two accounts, so GitHub requires it to be public, and anybody
+    may install it on an account of their own. That must not stop every keyed job."""
+    grant, environment = s0("grant.json"), s0("environment_upgrades_as_ruled.json")
+    assert grant["agentkeel-upgrades"]["public"] is True
+    assert platform_check.grant_errors(s0("upgrades_on_a_strangers_account.json"), environment, grant) == []
+    # And only for the App the grant calls public: the checking App on an unnamed account is still refused.
+    assert "public" not in grant["agentkeel-platform"]
+    errors = platform_check.grant_errors(s0("installation_on_personal_account.json"), s0("environment_as_ruled.json"), grant)
+    assert any("andaro74" in e for e in errors)
+    # A stranger's installation that holds more than the App's own permissions is still said.
+    more = {**s0("upgrades_on_a_strangers_account.json"), "permissions": {"contents": "write", "administration": "write"}}
+    assert platform_check.grant_errors(more, environment, grant) == []  # their account, their grant: not this platform's to refuse
+
+
+def test_no_token_is_minted_for_an_account_the_caller_does_not_name(github, key):
+    with pytest.raises(ValueError, match="not agentkeel-studio's"):
+        platform_check.app_token(5200001, "agentkeel-studio", key, "a-stranger/their-own-repository", "open")
+    assert github["sent"] == []

@@ -36,6 +36,16 @@ The workspace itself, its Identity Center user and its Athena data source
 (uid `registry`, this workgroup, this catalog) are made by hand
 (`README.md`). Panel 1's query is `infra/grafana/panel1.json`, which
 `validate` holds to the registry alone (S4's query reader).
+
+From M07 PR 2 (SPEC/07 section 2 "Panel 2", section 6): **panel 2, the
+verdict history**, reads a second table through the same connector, catalog,
+workgroup and data source: `agentkeel-envelopes`, one row per envelope on
+`main` (`infra/bootstrap/`, written by `evals.yml`'s `archive` job). This
+stack adds that table's schema in Glue (`commit`, `verdict`, `mode`) and
+lets the connector's role read that one table and that one Glue table. The
+workspace's role does not change: it already runs queries in this catalog.
+Panel 2's query is `infra/grafana/panel2.json`, which `validate` holds to
+the stored columns of that table alone (seed S4's query reader, SPEC/07).
 """
 
 from __future__ import annotations
@@ -60,6 +70,9 @@ CATALOG = "agentkeel_registry"  # panel1.json's connectionArgs.catalog
 GLUE_DATABASE = "default"  # the account's existing Glue database, and panel1.json's connectionArgs.database
 # The registry's attributes, every one a string (scripts/registry.py).
 REGISTRY_COLUMNS = ("name", "repository", "repository_id", "commit_sha", "deploy_run_id", "deployed_at")
+# M07 PR 2: panel 2's table (infra/bootstrap/app.py, ENVELOPES_TABLE) and its columns, every one a string.
+ENVELOPES_TABLE = "agentkeel-envelopes"
+ENVELOPE_COLUMNS = ("commit", "verdict", "mode")
 WORKGROUP = "agentkeel-grafana"
 WORKSPACE_ROLE = "agentkeel-grafana-workspace"
 # AWS's published connector, pinned. Read from the Serverless Application Repository on 2026-09-30
@@ -111,6 +124,29 @@ class GrafanaStack(cdk.Stack):
                 storage_descriptor=glue.CfnTable.StorageDescriptorProperty(
                     location=registry,
                     columns=[glue.CfnTable.ColumnProperty(name=c, type="string") for c in REGISTRY_COLUMNS],
+                ),
+            ),
+        )  # fmt: skip
+        # M07 PR 2 (SPEC/07 section 6): panel 2's table, read through the same connector, and its schema.
+        envelopes = f"arn:aws:dynamodb:{REGION}:{ACCOUNT}:table/{ENVELOPES_TABLE}"
+        connector_role.add_to_policy(iam.PolicyStatement(
+            sid="ReadTheEnvelopesRowsOnly",
+            actions=["dynamodb:DescribeTable", "dynamodb:Scan", "dynamodb:Query", "dynamodb:PartiQLSelect"],
+            resources=[envelopes],
+        ))  # fmt: skip
+        connector_role.add_to_policy(iam.PolicyStatement(
+            sid="TheEnvelopesSchemaOnly", actions=["glue:GetTable"],
+            resources=[f"arn:aws:glue:{REGION}:{ACCOUNT}:table/{GLUE_DATABASE}/{ENVELOPES_TABLE}"],
+        ))  # fmt: skip
+        glue.CfnTable(
+            self, "EnvelopesSchema", catalog_id=ACCOUNT, database_name=GLUE_DATABASE,
+            table_input=glue.CfnTable.TableInputProperty(
+                name=ENVELOPES_TABLE, table_type="EXTERNAL_TABLE",
+                description="agentkeel: the verdict history's columns, for Athena's DynamoDB connector (panel 2).",
+                parameters={"classification": "dynamodb", "sourceTable": ENVELOPES_TABLE},
+                storage_descriptor=glue.CfnTable.StorageDescriptorProperty(
+                    location=envelopes,
+                    columns=[glue.CfnTable.ColumnProperty(name=c, type="string") for c in ENVELOPE_COLUMNS],
                 ),
             ),
         )  # fmt: skip

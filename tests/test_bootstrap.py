@@ -185,15 +185,20 @@ def test_the_eval_role_may_not_change_what_cloudtrail_says(template):
 
 
 def test_the_eval_role_may_read_which_bytes_the_runtime_runs_and_nothing_more(template):
-    """ADR-0007, P1: three reads, on refagent alone, and no write among them."""
-    reads = {"cloudformation:DescribeStacks": "stack/agentkeel-refagent/*",
-             "bedrock-agentcore:GetAgentRuntime": "runtime/refagent*",
-             "ecr:DescribeImages": "repository/agentkeel-refagent"}  # fmt: skip
+    """ADR-0007, P1: three reads, on refagent, and no write among them. From M07 PR 2 (SPEC/07 section 6,
+    the rollback reading) the same three reads on an agent from the template: its stack, its runtime and
+    its image repository, each a statement of its own, and nothing else in this shared account."""
+    reads = {"cloudformation:DescribeStacks": ("stack/agentkeel-refagent/*", "stack/agentkeel-*/*"),
+             "bedrock-agentcore:GetAgentRuntime": ("runtime/refagent*", "runtime/agentkeel_*"),
+             "ecr:DescribeImages": ("repository/agentkeel-refagent", "repository/agentkeel/*")}  # fmt: skip
     statements_ = eval_role_policy(template)
-    for action, resource in reads.items():
+    for action, resources in reads.items():
         granting = [s for s in statements_ if s["Effect"] == "Allow" and action in actions(s)]
-        assert len(granting) == 1, action
-        assert json.dumps(granting[0]["Resource"]).endswith(f':{resource}"]]}}'), action
+        assert len(granting) == 2 and all(actions(s) == {action} for s in granting), action
+        assert sorted(json.dumps(s["Resource"]).rsplit(":", 1)[-1].rstrip('"]}') for s in granting) == sorted(resources), action
+    # It reads a template agent's runtime; it does not call one.
+    invoking = [s for s in statements_ if s["Effect"] == "Allow" and "bedrock-agentcore:InvokeAgentRuntime" in actions(s)]
+    assert len(invoking) == 1 and json.dumps(invoking[0]["Resource"]).endswith(':runtime/refagent*"]]}')
     allowed_here = {a for s in statements_ if s["Effect"] == "Allow" for a in actions(s)}
     assert not {a for a in allowed_here if a.startswith(("cloudformation:", "ecr:"))} - set(reads)
     assert not {a for a in allowed_here if a.startswith("bedrock-agentcore:")} - {
@@ -847,3 +852,49 @@ def test_the_guardrail_parameter_says_who_reads_it(template):
                 if p["Properties"].get("Name") == "/agentkeel/security/guardrail/refagent"]
     assert "GovernedAgent's ApplyGuardrail" not in param["Description"]
     assert "from the manifest" in param["Description"]
+
+
+# --- M07 PR 2: model-watch's role, and panel 2's table and its writer (SPEC/07 section 6) ----
+
+
+def trust(template: dict[str, Any], name: str) -> dict[str, Any]:
+    role = next(r["Properties"] for r in of_type(template, "AWS::IAM::Role").values() if r["Properties"].get("RoleName") == name)
+    (statement,) = role["AssumeRolePolicyDocument"]["Statement"]
+    return statement["Condition"]["StringEquals"]
+
+
+def test_model_watchs_role_reads_a_models_lifecycle_from_main_and_does_nothing_else(template):
+    on_main = trust(template, "agentkeel-model-watch")
+    assert on_main["token.actions.githubusercontent.com:sub"] == ["repo:andaro74@3157440/agentkeel@1376369685:ref:refs/heads/main"]
+    assert on_main["token.actions.githubusercontent.com:job_workflow_ref"] == [
+        "andaro74/agentkeel/.github/workflows/model-watch.yml@refs/heads/main"]
+    allowed_here = allowed_actions(role_statements(template, "ModelWatchRole"))
+    assert allowed_here == {"bedrock:GetFoundationModel"}  # it reads; it invokes no model and opens nothing
+    (reading,) = [s for s in role_statements(template, "ModelWatchRole") if s["Effect"] == "Allow"]
+    assert reading["Resource"] == "arn:aws:bedrock:us-west-2::foundation-model/*"
+
+
+def test_panel_2s_rows_are_written_from_main_only_and_never_by_a_pull_requests_run(template):
+    """The eval role is trusted for a pull request's run; the role that writes the row a surface shows is not."""
+    on_main = trust(template, "agentkeel-envelope-row-put")
+    assert on_main["token.actions.githubusercontent.com:sub"] == ["repo:andaro74@3157440/agentkeel@1376369685:ref:refs/heads/main"]
+    assert on_main["token.actions.githubusercontent.com:job_workflow_ref"] == [
+        "andaro74/agentkeel/.github/workflows/evals.yml@refs/heads/main"]
+    assert allowed_actions(role_statements(template, "EnvelopeRowPutRole")) == {"dynamodb:Scan", "dynamodb:PutItem"}
+    (writing,) = [s for s in role_statements(template, "EnvelopeRowPutRole") if s["Effect"] == "Allow"]
+    assert "Envelopes" in json.dumps(writing["Resource"])  # that table, by its ARN
+    table = next(t["Properties"] for t in of_type(template, "AWS::DynamoDB::Table").values() if t["Properties"]["TableName"] == "agentkeel-envelopes")
+    assert table["KeySchema"] == [{"AttributeName": "commit", "KeyType": "HASH"}]
+    assert table["PointInTimeRecoverySpecification"]["PointInTimeRecoveryEnabled"] is True
+    # And the eval role cannot write it.
+    assert not {a for a in allowed_actions(eval_role_policy(template)) if a.startswith("dynamodb:")} - {"dynamodb:Scan"}
+
+
+def test_a_retirement_needs_no_new_grant_on_the_deploy_plane(template):
+    """rulings/pr2-security.md item 11: the deploy role updates a stack, the execution role deletes the runtime,
+    and the registry row is put as before. No DeleteStack, no UpdateItem, no key deletion."""
+    granted = deploy_granted(template)
+    assert "cloudformation:UpdateStack" in granted and "cloudformation:DeleteStack" not in granted
+    assert {"dynamodb:GetItem", "dynamodb:PutItem"} <= granted and "dynamodb:UpdateItem" not in granted
+    deleting = [s for s in role_statements(template, "ExecutionRole") if "bedrock-agentcore:DeleteAgentRuntime" in actions(s)]
+    assert deleting and all("runtime/agentkeel_*" in json.dumps(s["Resource"]) for s in deleting)

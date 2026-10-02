@@ -16,6 +16,7 @@
   },
   "agentkeel-upgrades": {
     "app_id": 5200001,
+    "public": true,
     "environment": "platform-upgrades",
     "installed_on": [
       "agentkeel-studio",

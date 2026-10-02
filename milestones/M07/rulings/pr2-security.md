@@ -11,8 +11,15 @@ authorises:
   - .github/workflows/platform-check.yml
   - .github/workflows/deploy.yml
   - .github/workflows/evals.yml
+  - .github/workflows/platform-upgrade.yml
+  - .github/workflows/model-watch.yml
+  - .github/workflows/observe.yml
   - infra/workflows.sha256
   - infra/platform_identity.json
+  - infra/construct/**
+  - infra/security/**
+  - infra/bootstrap/**
+  - infra/grafana/**
 evidence:
   - SPEC/00-overview.md#8-M07
   - SPEC/07-upgrade-retire-surfaces.md
@@ -173,6 +180,7 @@ grant:
     permissions: {administration: write, checks: write, contents: read, metadata: read, pull_requests: read}
   agentkeel-upgrades:
     app_id: null            # filled when the App exists, in a pushed commit, before any attempt
+    public: true            # item 13a, not ruled on 2026-10-02: installed on two accounts, so GitHub makes it public
     environment: platform-upgrades
     installed_on: [agentkeel-studio, andaro74]
     repository_selection: {agentkeel-studio: all, andaro74: [agentkeel]}
@@ -261,7 +269,8 @@ role may schedule a key's deletion.
 
 ## 12. What the human does, in order. Each is a grant or a setting.
 
-Nothing below is done before this file reads "Ruled by".
+Nothing below is done before this file reads "Ruled by". The exact steps
+and commands for 2 and 3 are `milestones/M07/runs/pr2_by_hand.md`.
 
 1. **Before PR 2's code:** nothing more. Item 1 is done.
 2. **During PR 2, before its merge** (so the reader can be tested against
@@ -271,13 +280,124 @@ Nothing below is done before this file reads "Ruled by".
    bypass off; store each key as its environment's secret. Install them
    as item 2 says. Neither new App holds administration or checks write.
 3. **During PR 2:** read `cdk diff` for `infra/security/` (the `bundles/`
-   and `observations/` statements) and `infra/bootstrap/` (the observer's
-   put role), then deploy both by hand.
+   and `observations/` statements and the observer's put role, which is
+   in the security account, where the bucket's other put roles are) and
+   for `infra/bootstrap/` and `infra/grafana/` (item 13b to 13d, if the
+   seat rules them), then deploy by hand.
 4. **After PR 2 merges, and only then:** raise `agentkeel-platform`'s
    Administration to write in the App's settings, and accept the new
    permission on the organisation's installation. `main` no longer mints
    a token with no repository at that point.
 5. **Before 2026-10-31:** renew the Grafana observer token (Unsure J).
+
+## 13. Not ruled on 2026-10-02: found while building, put to the seat
+
+The ruling of 2026-10-02 covers items 1 to 12 as they stood at `16d9f84`.
+Each item below was met while building PR 2. Each is built as its
+recommended option, so that the diff shows it, and **none is deployed,
+granted or set**: every one that is a permission waits for the seat. If
+the seat rules an alternative, the code changes before this file's first
+line does.
+
+**13a. `agentkeel-upgrades` has to be public.** A GitHub App that is "only
+on this account" can be installed on its owner alone. Item 2 installs
+`agentkeel-upgrades` on the organisation and on `andaro74`, so it must be
+"any account". Anybody can then install it on an account of their own.
+That gives the platform's key reach into their repositories and gives
+them nothing here: `app_token()` mints only for a repository whose owner
+the caller names, and the callers name the organisation and `andaro74`.
+
+- **Recommended:** the grant block says `public: true` for that App; the
+  reader records an installation on an unnamed account (`not_ours`) and
+  does not fail on it. Otherwise a stranger could stop every keyed job by
+  installing the App. `agentkeel-platform` and `agentkeel-observer` stay
+  "only on this account", and an installation of either on any other
+  account is still refused by the reader.
+- **Alternative:** a second App owned by `andaro74`, installed there
+  only, with its own key and environment, for `model-watch`. Four Apps;
+  none public.
+
+**13b. `model-watch` reads Bedrock as a role of its own, not as the eval
+role.** Item 4 says "a first job as the eval role". The eval role trusts
+`evals.yml` only, may invoke models, and is trusted for a pull request's
+run; the read needs none of that.
+
+- **Recommended:** `agentkeel-model-watch` (`infra/bootstrap/`): trusted
+  for `model-watch.yml` on `main` only; one action,
+  `bedrock:GetFoundationModel`, on `foundation-model/*`. A new role with
+  one read-only permission: **a grant**.
+- **Alternative:** widen the eval role's trust to `model-watch.yml` and
+  add the action to it. One role fewer; a role that can invoke models
+  then runs in a second workflow.
+
+**13c. The eval role reads a template agent's runtime, not only
+refagent's.** F7.2 and F7.3 are read by a pull request's run: is the
+retired runtime gone, and which bytes does a runtime run after a revert.
+Today the eval role may read refagent's alone.
+
+- **Recommended:** three read-only statements (`infra/bootstrap/`):
+  `cloudformation:DescribeStacks` on `stack/agentkeel-*/*`,
+  `bedrock-agentcore:GetAgentRuntime` on `runtime/agentkeel_*`,
+  `ecr:DescribeImages` on `repository/agentkeel/*`. No invoke of a
+  template agent. **A grant**: a read widened.
+- **Alternative:** not granted. Then F7.2's runtime read and F7.3's on
+  the fallback are unread, and row 7 is RED on them at the close.
+
+**13d. Where panel 2 reads envelopes (SPEC/07 §11, R8).** Not among the
+drafts ruled. An envelope file is printed over many lines, which Athena's
+JSON reader cannot take, so reading `envelopes/` in the audit bucket
+directly would need a second copy written in another form.
+
+- **Recommended:** a copy in the agent account, as R8's second option: a
+  DynamoDB table `agentkeel-envelopes` (commit, verdict, mode), read by
+  panel 2 through the connector, catalog, workgroup and data source panel
+  1 already uses; one row per envelope, written once by `evals.yml`'s
+  `archive` job on a push to `main`, as a new role
+  `agentkeel-envelope-row-put` trusted for that workflow on `main` only
+  (`Scan`, `PutItem` on that table). The connector's role gains read on
+  that table and its Glue schema. The workspace's role does not change,
+  and no new data source is made by hand. **Grants**: one table, one
+  role, two statements on the connector's role. The table is a copy for
+  a surface: `build.panel_verdict_mismatch` holds its rows to the
+  envelopes, and that comparison is F7.4.
+- **Alternative:** no source at M07. `validate`'s check and build's
+  comparison stay (S4's readers); panel 2's live read is unread and row 7
+  is RED on F7.4 at the close.
+
+**13e. The read role lists `bundles/`.** Item 11 gives `bundles/` its
+put. For F7.2 the observer must see that a retired agent's bundle is
+there. **Recommended:** list only, no read of a bundle's bytes
+(`infra/security/`, with item 9's `observations/` read). **A grant.**
+
+**13f. What the reader of the grant does not read, and how it reads.**
+
+- The names of an environment's secrets, and the repository's: no token
+  a job holds may list them. **Recommended:** read by hand by an admin
+  (`gh api repos/andaro74/agentkeel/environments/<name>/secrets`) and
+  recorded under `milestones/M07/runs/`; the artifact says they were not
+  read. The alternative is a token with secrets read in each keyed job,
+  which is a wider grant than the gap.
+- A value narrower than the grant is not an error. Before step 12.4 the
+  installation holds Administration: read; the reader passes, the
+  `rulesets` mint is refused by GitHub (422), and every head is refused
+  for a ruleset that could not be read. **Recommended**, since the other
+  reading stops `post` posting anything until the grant is made.
+
+**13g. Smaller choices, each Security's or Engineering's.**
+
+- `platform-upgrade.yml` lists agents from GitHub (the heads the App
+  passed), not from the registry, so it holds no AWS credentials. An
+  agent the App passed and the deploy has not yet reached can get its
+  upgrade a deploy early.
+- The seeded relaxation can be pointed at one repository only, the one
+  seed S0's run file names on `main`. It is a tool for one attempt.
+- A retirement's idle trigger (a registry row with no answer for 90
+  days) is not built: nothing writes `idle_since`. The dispatch and a pin
+  30 days from its date are built.
+- refagent's own deploy does not put its bundle under `bundles/`: its
+  two jobs are unchanged, and it is never retired.
+- A pull request the platform opens is opened once per branch name,
+  ever. A closed draft is a seat's answer.
 
 ## What a reader can run
 
