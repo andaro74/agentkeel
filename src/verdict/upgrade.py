@@ -570,9 +570,12 @@ def relaxation(seen: dict[str, Any] | None, app_id: int | None, now: Any = None,
     "merged meanwhile" itself, and "after the restore" was any App success after the call). **The
     restore is read from the ruleset itself**: it is restored when, as GitHub returns it, it equals
     `infra/ruleset/agent.json` in every field GitHub shows, and GitHub's own `updated_at` on it is
-    after the call; that time is when. The call's time is GitHub's `created_at` of the run that made
-    it, on `main`, not the runner's clock. While the ruleset still differs there is no restore, and
-    the interval in which nothing may merge runs to `now`."""
+    after the platform check failed the new head for the ruleset; that time is when. The App's own
+    accepted call also sets `updated_at`, after the run that made it began, so "after the call" would
+    read the relaxation itself as its restore (cold review F1 on M07 PR 3): a restore is a change
+    after the detection, and with no detection there is none. The call's time, where the no-merge
+    interval starts, is GitHub's `created_at` of the run that made it, on `main`, not the runner's
+    clock. While the ruleset still differs there is no restore, and the interval runs to `now`."""
     if not seen or not seen.get("found") or app_id is None:
         return entry(False, [f"unread: {(seen or {}).get('error') or 'the relaxation was not attempted'}"], outcome=None)
     status = (seen.get("answer") or {}).get("status")
@@ -599,12 +602,15 @@ def relaxation(seen: dict[str, Any] | None, app_id: int | None, now: Any = None,
     if export is None:
         export = json.loads(RULESET_EXPORT.read_text(encoding="utf-8"))
     differs, changed = ruleset_differs(ruleset, export), when(ruleset.get("updated_at"))
-    restored_at = changed if not differs and changed is not None and changed > asked else None
+    detected = run.get("conclusion") == "failure" and RULESET_CHECK in (run.get("refused") or [])
+    detected_at = when(run.get("completed_at")) if detected else None
+    restored_at = changed if (not differs and changed is not None and detected_at is not None
+                              and changed > detected_at and changed > asked) else None  # fmt: skip
     until = restored_at or when(now)
     if until is None:
         return entry(False, ["unread: the ruleset is not restored and the time of this reading is not known"], outcome=None)
     reasons = []
-    if run.get("conclusion") != "failure" or RULESET_CHECK not in (run.get("refused") or []):
+    if not detected:
         reasons.append("GitHub accepted the call and the platform check did not fail the new head for the ruleset")
     between = sorted(m.get("number") for m in merges if (at := when(m.get("merged_at"))) is not None and asked <= at <= until)
     if between:
@@ -612,8 +618,8 @@ def relaxation(seen: dict[str, Any] | None, app_id: int | None, now: Any = None,
     if differs:
         reasons.append(f"the ruleset still differs from the export ({', '.join(differs)}): it has not been restored")
     elif restored_at is None:
-        reasons.append("the ruleset equals the export, and GitHub's record of its last change is not after the call: "
-                       "no restore is recorded")  # fmt: skip
+        reasons.append("the ruleset equals the export, and GitHub's record of its last change is not after the platform "
+                       "check failed the new head for it: no restore is recorded")  # fmt: skip
     elif not any((at := when(p.get("completed_at"))) is not None and at > restored_at for p in passes):
         reasons.append(f"after the restore ({ruleset.get('updated_at')}, the ruleset's own last change) the App passed no head")
     hidden = ruleset.get("bypass_actors") is None

@@ -466,11 +466,13 @@ def ruleset(**more: Any) -> dict[str, Any]:
 
 
 def relaxed(**more: Any) -> dict[str, Any]:
-    """The call at 10:00 (GitHub's time of the run), the restore at 10:30, the App's pass at 10:40."""
+    """The call at 10:00 (GitHub's time of the run), the new head failed for the ruleset at 10:05, the
+    restore at 10:30, the App's pass at 10:40."""
     base = {"repository": "agentkeel-studio/owner-check", "run": 5, "found": True, "error": None,
             "answer": {"status": 200, "ruleset": 24310403, "at": "2026-10-06T10:00:20Z"},
             "asked": {"run": 5, "at": "2026-10-06T10:00:00Z", "error": None},
-            "new_head": {"sha": "5" * 40, "check_runs": [app_check("failure", [upgrade.RULESET_CHECK])]},
+            "new_head": {"sha": "5" * 40, "check_runs": [{**app_check("failure", [upgrade.RULESET_CHECK]),
+                                                          "completed_at": "2026-10-06T10:05:00Z"}]},
             "ruleset": ruleset(), "merges": [{"number": 1, "merged_at": "2026-10-02T14:39:32Z"}],
             "app_passes": [{"sha": "4" * 40, "completed_at": "2026-10-06T09:00:00Z"},
                            {"sha": "5" * 40, "completed_at": "2026-10-06T10:40:00Z"}]}  # fmt: skip
@@ -517,6 +519,15 @@ def test_after_the_restore_is_read_from_the_ruleset_itself_and_the_times_are_com
     # Equal to the export with no change after the call: GitHub said yes and nothing shows a restore.
     never = upgrade.relaxation(relaxed(ruleset=ruleset(updated_at="2026-10-01T13:06:00Z")), APP, NOW)
     assert never["held"] is False and "no restore is recorded" in never["reasons"][0]
+    # Cold review F1 on M07 PR 3: the App's own accepted call sets updated_at too, after the run began. A
+    # last change between the run's start and the detection is the relaxation, not its restore; and with
+    # no detection at all nothing is a restore, however late the change.
+    own_call = upgrade.relaxation(relaxed(ruleset=ruleset(updated_at="2026-10-06T10:00:25Z")), APP, NOW)
+    assert own_call["held"] is False and own_call["restored_at"] is None and "no restore is recorded" in own_call["reasons"][0]
+    unseen = relaxed(new_head={"sha": "5" * 40, "check_runs": [app_check("success")]})
+    reading = upgrade.relaxation(unseen, APP, NOW)
+    assert reading["restored_at"] is None and len(reading["reasons"]) == 2
+    assert "did not fail the new head" in reading["reasons"][0] and "no restore is recorded" in reading["reasons"][1]
     # A bypass actor, where GitHub shows the field, is a difference; hidden, it is said and not guessed.
     shown = upgrade.relaxation(relaxed(ruleset=ruleset(bypass_actors=[{"actor_id": 5, "actor_type": "RepositoryRole"}])), APP, NOW)
     assert "bypass_actors" in shown["reasons"][0] and shown["bypass_actors_shown"] is True
