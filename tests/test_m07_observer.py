@@ -197,6 +197,15 @@ def test_the_real_reader_mints_first_for_the_repositories_named_and_does_not_kee
     anonymous = observer.GitHub("anonymous")
     anonymous(REPO, "/pulls/1")
     assert seen[-1] == "the-jobs-own-token" and len(minted) == 1
+    # security-reviewer 14 on M07 PR 3: the tokens are revoked when the observation is done, not left an hour.
+    revoked: list[str] = []
+    monkeypatch.setattr(platform_check, "revoke", revoked.append)
+    gh.close()
+    assert revoked == [f"observer-token-for-{REPO}"] and gh.tokens == {}
+    with pytest.raises(KeyError):
+        gh(REPO, "/pulls/1")  # and nothing is read under a revoked token
+    anonymous.close()
+    assert len(revoked) == 1  # the job's own token is not this script's to revoke
 
 
 def test_the_repositories_minted_for_are_the_ones_the_run_files_name_and_the_template():
@@ -248,6 +257,12 @@ def test_an_artifact_is_fetched_from_the_storage_host_with_no_credential():
     assert observer.download("https://api.github.com/x", "the-token", direct) == b"the bytes" and len(direct.requests) == 1
     with pytest.raises(ValueError, match="not to an https address"):
         observer.download("https://api.github.com/x", "the-token", Redirecting("http://storage.example/a.zip"))
+    # security-reviewer 15 on M07 PR 3: the first address is GitHub's API host or nothing is sent.
+    for elsewhere in ("https://storage.example/a.zip", "https://api.github.com.example/x", "http://api.github.com/x"):
+        nowhere = Redirecting(None)
+        with pytest.raises(ValueError, match="not on GitHub's API host"):
+            observer.download(elsewhere, "the-token", nowhere)
+        assert nowhere.requests == []
     # The real opener never follows one by itself.
     assert observer._NoRedirect().redirect_request(None, None, 302, "Found", {}, "https://elsewhere.example/") is None
 

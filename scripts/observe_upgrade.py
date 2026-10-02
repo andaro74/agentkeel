@@ -31,9 +31,14 @@ on `main` name, and the key is let go: nothing that reads GitHub holds it.
 A repository no token was minted for is unread. As the App, no agent
 repository's tree is fetched or packed: the bundle digests are the pull
 request's run's to work out, under no key, and build never takes them from
-the stored observation. A token is sent to `api.github.com` and nowhere
-else: an artifact's bytes are fetched from the storage host GitHub
-redirects to with no credential (`download`).
+the stored observation. What is still read from an agent repository beside
+the App's tokens: its `manifest.yaml` and its goldens' front matter,
+through GitHub's contents API, parsed as YAML and never run (the owner's
+test; cold review N4 on M07 PR 3). A token is sent to GitHub's API host
+and to no other: `download` refuses any other first address, and an
+artifact's bytes are fetched from the storage host GitHub redirects to
+with no credential. Each minted token is revoked when the observation is
+written (`GitHub.close`), not left to its hour.
 
 Each `--read` part needs its own credentials, so `evals.yml` calls this once
 per set and each call merges its part into the same file:
@@ -148,6 +153,12 @@ class GitHub:
                                                                        "observe")  # fmt: skip
                 except (urllib.error.URLError, ValueError, KeyError, TimeoutError, OSError) as exc:
                     self.unminted[repository] = failed(exc)
+
+    def close(self) -> None:
+        """Revoke every token minted here (security-reviewer 14 on M07 PR 3: each lived its hour past a job
+        of minutes). `platform_check.revoke` never raises; a token that could not be revoked expires."""
+        for repository in sorted(self.tokens):
+            platform_check.revoke(self.tokens.pop(repository))
 
     def token(self, repository: str) -> str | None:
         if self.viewpoint != "app" or repository.split("/")[0] != self.organisation:
@@ -435,7 +446,10 @@ def download(url: str, token: str | None, opener: Any = None) -> bytes:
     with the request's headers, the Authorization header among them, so until M07 PR 3 the job's token
     went to that host too (security-reviewer 12 on M07 PR 2). Here the redirect is not followed: its
     Location is fetched by a second request that carries no credential, and that one is not allowed a
-    redirect of its own. Anything but https is refused."""
+    redirect of its own. Anything but https is refused, and so is a first address that is not GitHub's
+    API host: the token is sent nowhere else (security-reviewer 15 on M07 PR 3)."""
+    if not url.startswith(platform_check.API.rstrip("/") + "/"):
+        raise ValueError("an artifact's address is not on GitHub's API host: no token is sent to it")
     opener = opener or urllib.request.build_opener(_NoRedirect)
     request = urllib.request.Request(url)
     if token:
@@ -932,14 +946,17 @@ def main(argv: list[str] | None = None) -> int:
     # before the first read.
     gh = GitHub(args.viewpoint, key, named_repositories() if args.viewpoint == "app" else ())
     del key
-    observation = observe(parts, observation, gh)
-    if args.viewpoint == "app":
-        # What is stored: the App's reading, with the run that made it, in the shape build takes as `app`.
-        observation = {"viewpoint": "app", "run_id": args.run_id, "read_at": observation["looked_up_at"],
-                       "upgrade": {k: observation.get(k) for k in ("s0", "s1", "s2", "s3")},
-                       "template": observe_template_as(gh),
-                       "minted_for": sorted(gh.tokens), "not_minted_for": gh.unminted,
-                       "github_error": observation.get("github_error")}  # fmt: skip
+    try:
+        observation = observe(parts, observation, gh)
+        if args.viewpoint == "app":
+            # What is stored: the App's reading, with the run that made it, in the shape build takes as `app`.
+            observation = {"viewpoint": "app", "run_id": args.run_id, "read_at": observation["looked_up_at"],
+                           "upgrade": {k: observation.get(k) for k in ("s0", "s1", "s2", "s3")},
+                           "template": observe_template_as(gh),
+                           "minted_for": sorted(gh.tokens), "not_minted_for": gh.unminted,
+                           "github_error": observation.get("github_error")}  # fmt: skip
+    finally:
+        gh.close()
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(observation, indent=2, default=str) + "\n", encoding="utf-8")
     print(f"wrote {args.out} ({', '.join(parts) or 'nothing more'}; viewpoint {args.viewpoint})")

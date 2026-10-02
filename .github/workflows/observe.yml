@@ -25,8 +25,11 @@
 #    job with no keyless job before it): every token is minted first, for
 #    the repositories the run files on main name, and the key is let go
 #    before anything is read; no agent repository's tree is fetched or
-#    packed here; and an artifact's bytes are fetched from GitHub's storage
-#    host with no credential, where urllib used to carry the job's token.
+#    packed here (its manifest and its goldens' front matter are still read
+#    through GitHub's contents API and parsed, never run); an artifact's
+#    bytes are fetched from GitHub's storage host with no credential, where
+#    urllib used to carry the job's token; and each token is revoked when
+#    the observation is written.
 # 3. The observation is put once, as observations/<run id>.json, in the
 #    security account's audit bucket, through `agentkeel-observation-put`, a
 #    role that trusts this workflow on refs/heads/main and nothing else and

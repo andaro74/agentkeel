@@ -44,12 +44,13 @@
 # Rewritten at M07 PR 3 (item 13j): platform-check.yml's and platform-upgrade.yml's headers name infra/platform_grant.yaml as where the grant is read from. No step changes.
 # Rewritten at M07 PR 3 (item 13l): platform-upgrade.yml's header says the open job holds the proposed bytes to the template and the guardrail to main's. No step changes.
 # Rewritten at M07 PR 3 (item 13i): deploy.yml's retire-agent job holds the retired head's manifest to the one at the registry row's commit, before the registry or the stack is touched.
+# Rewritten at M07 PR 3 after the seat reviews: observe.yml's header says what is still read from an agent repository beside the App's tokens, and that each token is revoked (cold review N4, security-reviewer 14). No step changes.
 bedf184401fe99b3e2e3d893c3e7e3569f7dc6eecc689d8585b12fd5ffb98d48  .github/workflows/cold-review-ruling.yml
 865b89ef9ce12d39cf923f274da9f5fc988725e8c0b2b35c57918216fcf03d82  .github/workflows/deploy.yml
 2801eb4da8a685088687f046b9ad6a461a352978e74e9f13e49ef2bcd420af7b  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 977005d6918897772b83d279230d5febb4c3c35150d0037d08ed139af8727414  .github/workflows/model-watch.yml
-f906d3c4f89f5a6e79f9eace017d7d878b371d321f8788396630daf9d8af50d0  .github/workflows/observe.yml
+33550c4d1d9d15db10dbf6409d679856084f178179fe45004b219c774750fd0a  .github/workflows/observe.yml
 28505afb258751dd419f0eb18f8d064b0144036acf4869b01a8c76eb492bfbdb  .github/workflows/platform-check.yml
 a3186767e18839634c8efa8009669ed680d7d96dae620917c97736d8dfef627b  .github/workflows/platform-upgrade.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml
