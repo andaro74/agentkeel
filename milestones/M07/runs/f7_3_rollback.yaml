@@ -38,7 +38,7 @@ attempts:
     refused_when: there is no falsifier to refuse; the upgrade arrived when a draft pull request authored by the App exists in andaro74/agentkeel changing `model` in agents/refagent/manifest.yaml to the candidate's pin and, beside it, only a ruling file under milestones/M07/rulings/; every other commit on it is the App's; no file under .github/workflows/ is touched and infra/workflows.sha256 is unchanged
     recorded_when: the observer reads the pull request, its commits' authors and files, its envelope as the gate rules it, its merge and the deploy run of the merge
   - what: the rollback
-    command: if the swap merged, a pull request reverting its merge commit, ruled and merged; if it did not, a pull request in owner-check reverting the platform upgrade's merge, merged by the agent's seats when the App passes it. Then nothing: deploy.yml redeploys from main
+    command: if the swap merged, a pull request reverting its merge commit, ruled and merged; if it did not, a pull request in owner-check reverting the platform upgrade's merge, merged by the agent's seats when the App passes it. Then nothing, since deploy.yml redeploys from main
     refused_when: after the revert's deploy run completed, GetAgentRuntime names an image whose tags hold the digest the tree gives at the revert's merge commit, and do not hold the upgrade's digest (F7.3 fires on either miss)
     recorded_when: the observer reads the revert's merge, its deploy run, the runtime's image and its tags (scripts/runtime_for_tree.py's steps 1 to 4, for that agent), and packs the tree at the revert for its digest
 observed: null
