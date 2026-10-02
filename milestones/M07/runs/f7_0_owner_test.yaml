@@ -1,0 +1,40 @@
+# Seed S0 (SPEC/07 §5, F7.0): the template's repair, read by CI.
+#
+# Planted at M07 PR 1 as the attempts to make, `observed: null`. At M06's
+# close the platform's App refused every head of every agent repository:
+# its token asks Administration: read, GitHub shows a ruleset's
+# `bypass_actors` only to a caller that can administer it, and
+# src/validate/agent.py refuses a ruleset whose `bypass_actors` it cannot
+# see (milestones/M06/runs/f6_0_owner_test.yaml, step 2 missed;
+# milestones/M07/open.md row 2). No agent from the template exists.
+#
+# Three attempts, each made after M07 PR 2 merges and after Security makes
+# the grant as milestones/M07/rulings/pr2-security.md names it (SPEC/07
+# §5.1: the grant is made only once `main` no longer carries `scope = {}`).
+# Each is stated before, and pushed before it is made. The human fills
+# `observed` with the repository, the pull request's number or the run's
+# id; nothing else. scripts/observe_upgrade.py looks each up in GitHub and
+# AWS, with the viewpoint it read from; `build` rules on it. A
+# human-written file feeds no reading by itself (SPEC/07 §4).
+#
+# Each observed entry: what, repository (owner/name), pull_request or run
+# (its number or id), at (ISO 8601, UTC, as the human saw it; not read as
+# a time).
+seed: S0
+falsifiers: [F7.0]
+principal: andaro74, owner of agentkeel-studio (every seat, R1)
+repository: agentkeel-studio/owner-check  # created 2026-10-01T13:05:37Z; ruleset 24310403
+attempts:
+  - what: the owner's test, steps 2 to 4 again, on owner-check pull request 1
+    command: on branch first-pr, one empty commit (the template's content again, every seat null, goldens/ empty); wait for the App; then one commit with every seat andaro74 and one ordinary and one trap golden citing the agent's own data/; wait for the App; merge as a merge commit; leave the merged head to the schedules
+    refused_when: the App's platform-check (app 5144253) is a failure on the empty commit naming the unassigned seats and the goldens under the minimum and nothing else; a success on the fixed head; the pull request merged; the App's success on the merge commit; deploy.yml's deploy-agent completed within upgrade.deploy_max_seconds of the merge; one answer record under envelopes/agents/owner-check/; the registry row owner-check; panel 1 listing it
+    recorded_when: the observer reads pull request 1's commits, each with its check runs and the App's reasons, its merge, the deploy run, the answer record, the registry row and panel 1's rows
+  - what: platform-check.yml dispatched from a branch
+    command: "`gh workflow run platform-check.yml --ref <a branch that is not main>` in andaro74/agentkeel, by a login with write"
+    refused_when: the run's `post` job did not start, refused by the platform-app environment's branch policy (GitHub's record of the run's jobs), so the App's key was not reached from a branch
+    recorded_when: the observer reads the run's jobs and their conclusions from GitHub
+  - what: the App's token asked to relax owner-check's ruleset
+    command: one call, by Security, with a token minted exactly as platform-check.yml's `post` job mints it for owner-check, asking GitHub to remove the required status check from ruleset 24310403; then the ruleset read back, and restored from infra/ruleset/agent.json if it changed
+    refused_when: GitHub refused the call; or, if GitHub accepted it, the next platform check refused every head of owner-check for the ruleset differing from the export until it was restored. The second is detection, not refusal, and is recorded as that
+    recorded_when: the observer reads the ruleset's history and the App's check runs on owner-check's heads after the call
+observed: null

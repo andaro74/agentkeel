@@ -136,6 +136,19 @@ SEEDS_M06: dict[str, tuple[str, str, str]] = {
     "S4": ("F6.4", "tests/fixtures/m06/s4-panel1/", "src/validate/panel.py, src/verdict/template.py"),
 }
 
+# Claim 7's seeded cases (SPEC/07 section 5), the same shape. Listed at M07
+# PR 1, one seed per commit. Each of S0 to S3 is a fixture and a run file:
+# the fixture is read by a function PR 2 adds (the name is fixed by
+# tests/test_m07_seeds.py), the run file by the observer after PR 2 merges
+# (SPEC/07 section 5.1). S4 and S5 are fixtures only. A reader that is a
+# new function in a file already in the tree is named here by the new file
+# PR 2 adds beside it, so `make plants` does not say "in the tree" early.
+# The strict markers, not this list, say whether a seed is read. Listing
+# them reads nothing and gates nothing.
+SEEDS_M07: dict[str, tuple[str, str, str]] = {
+    "S0": ("F7.0", "tests/fixtures/m07/s0-app-token/, milestones/M07/runs/f7_0_owner_test.yaml", "scripts/observe_upgrade.py"),
+}
+
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
 SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/01 section 5", SEEDS),
@@ -144,6 +157,7 @@ SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/04 section 5", SEEDS_M04),
     ("SPEC/05 section 5", SEEDS_M05),
     ("SPEC/06 section 5", SEEDS_M06),
+    ("SPEC/07 section 5", SEEDS_M07),
 ]
 
 

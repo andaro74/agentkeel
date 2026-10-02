@@ -218,3 +218,23 @@ section 5.1).
 | S2 | `milestones/M06/runs/f6_2_standin.yaml` | a pull request in an agent repository whose own workflow adds a job named as the platform check and drops the request to `agentkeel`, not yet attempted. There is no agent repository; in `agentkeel` today the same shape is answered by the pull request's own files (`infra/ruleset/main.json` requires checks by name, no `integration_id`) |
 | S3 | `milestones/M06/runs/f6_3_quickstart.yaml` | the timed quickstart by `floresinnovations` (id 336113686), not yet made; its preparation recorded, the agent's name not yet stated. There is no template and no quickstart |
 | S4 | `m06/s4-panel1/` | `dashboard.json`, a dashboard whose panel 1 merges the registry with a static list naming `ghost-agent`; `frame.json`, panel 1's rows as Grafana's `/api/ds/query` returns them, naming `refagent` and `ghost-agent`; `registry.json`, a registry scan naming `refagent` only. Two tests, one per reader (finding 10's rule): placed at `infra/grafana/panel1.json` the dashboard passes `validate`, and `build` has no `panel_not_in_registry` to find `ghost-agent`. The data source types are placeholders until Security reads where Grafana runs (SPEC/06 section 11) |
+
+## M07 (SPEC/07 section 5)
+
+Committed at M07 PR 1, one commit per seed, each with its tests in
+`tests/test_m07_seeds.py`, before any code that reads them. Each test is
+`xfail(strict=True, raises=AssertionError)` until its reader lands (the
+fixture tests, at PR 2) or its attempt is made (the run-file tests),
+asserts the planted reason, and was run once with `--runxfail` and its
+message read. Nothing here reaches `evals/history/`, calls AWS, calls a
+model or calls GitHub.
+
+A fixture test hands its fixture to the reader PR 2 must build, by a name
+the test fixes, and asks it to refuse the fixture. The run files are under
+`milestones/M07/runs/`, each the attempt to make with `observed: null`,
+made after M07 PR 2 merges (SPEC/07 section 5.1). SPEC/06's S3, the timed
+quickstart, is received at M07 and stays where M06 planted it.
+
+| Seed | File | What is wrong with it |
+|---|---|---|
+| S0 | `m07/s0-app-token/`; `milestones/M07/runs/f7_0_owner_test.yaml` | `grant.json`, a grant as a ruling would name it (the installation's repositories and permissions, the environment's branch policies and admin bypass). `installation_as_ruled.json` and `environment_as_ruled.json` are the App's installation and the `platform-app` environment as GitHub's API returns them, equal to it; `installation_uncovered.json` adds `members: write` and a repository `scratch-repo`; `environment_uncovered.json` adds a branch policy `m07-*` and `can_admins_bypass: true`. Nothing in the tree reads either back, and `app_token()` can be called with no repository, minting every permission on every repository. None is the live installation: that is read with the App's key, which no test holds. The run file is three attempts not yet made: the owner's test again on owner-check #1, the platform check dispatched from a branch, the App's token asked to relax a ruleset |
