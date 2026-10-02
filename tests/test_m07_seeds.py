@@ -163,3 +163,42 @@ def test_s0_the_owners_test_was_read():
     run = run_file("f7_0_owner_test.yaml", "S0", 3)
     observed = made(run)
     assert all(o.get("what") and o.get("repository") for o in observed), observed
+
+
+# --- S1: a platform bump opens a draft pull request ---------------------------
+
+PLATFORM_OWNED = {"manifest.yaml", "server.py", "__init__.py"}
+
+
+@expected_failure
+def test_s1_a_platform_upgrade_changes_platform_owned_files_only():
+    """An agent folder at `platform_version: m06` that carries a workflow of its own and an edited
+    `agent.py`, beside the platform-owned files at a later version. The upgrade's diff must move
+    `platform_version` and the guardrail pin, bring `server.py`, and leave the workflow, `agent.py`
+    and the manifest's other fields alone (F7.1). Today nothing computes an upgrade: a person edits."""
+    agent, platform = FIXTURES / "s1-platform-upgrade" / "agent", FIXTURES / "s1-platform-upgrade" / "platform"
+    before = yaml.safe_load((agent / "manifest.yaml").read_text(encoding="utf-8"))
+    target = json.loads((platform / "platform.json").read_text(encoding="utf-8"))
+    holds(before["platform_version"] == "m06" and target["platform_version"] == "m07", "the fixture is one version behind")
+    holds(before["guardrail"] != target["guardrail"], "the platform's guardrail pin moved")
+    holds((agent / ".github" / "workflows" / "own.yml").is_file(), "the agent folder carries a workflow of its own")
+    holds((agent / "server.py").read_text(encoding="utf-8") != (platform / "server.py").read_text(encoding="utf-8"),
+          "the platform's server.py differs from the agent's")  # fmt: skip
+    upgrade = module("scripts.platform_upgrade", "S1", "nothing computes an agent's platform upgrade")
+    changed: dict[str, str] = upgrade.diff(agent, platform)
+    assert set(changed) == {"manifest.yaml", "server.py"}, sorted(changed)
+    assert not any(path.startswith(".github/") for path in changed), "the upgrade touches a workflow"
+    after = yaml.safe_load(changed["manifest.yaml"])
+    assert after["platform_version"] == "m07" and after["guardrail"] == target["guardrail"]
+    assert {k: v for k, v in after.items() if k not in ("platform_version", "guardrail")} == {
+        k: v for k, v in before.items() if k not in ("platform_version", "guardrail")}, "another manifest field moved"
+    assert changed["server.py"] == (platform / "server.py").read_text(encoding="utf-8")
+
+
+@expected_failure
+def test_s1_the_platform_upgrade_was_made():
+    """The template re-made from M07 PR 2's merge, and the draft pull request the platform must open
+    in owner-check. Made after the owner's test and the timed run (SPEC/07 §5.1), read by the observer."""
+    run = run_file("f7_1_platform_upgrade.yaml", "S1", 1)
+    observed = made(run)
+    assert all(o.get("repository") and o.get("pull_request") for o in observed), observed

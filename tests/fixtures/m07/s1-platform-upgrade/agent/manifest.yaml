@@ -1,0 +1,27 @@
+# A fictional agent, one platform version behind (seed S1, SPEC/07 section 5).
+name: premiere-desk
+version: 1.0.0
+model:
+  id: anthropic.claude-sonnet-4-6
+  version: null
+  profile: us.anthropic.claude-sonnet-4-6
+  region: us-west-2
+judge_model_id: null
+guardrail:
+  id: 1088aw3ujhyd
+  version: "5"
+endpoint_allowlist:
+  - bedrock-runtime
+  - dynamodb
+seats:
+  product: andaro74
+  rule-owner: andaro74
+  data-owner: andaro74
+  tool-owner: andaro74
+  threshold-owner: andaro74
+  security: andaro74
+  engineering: andaro74
+may_call: []
+may_be_called_by: []
+rollout: all-at-once
+platform_version: m06
