@@ -400,12 +400,18 @@ def test_behind_is_ancestry_in_agentkeel_not_a_comparison_of_names():
     assert head and platform_upgrade.behind("m05", head[:12])[0] is True  # a short commit is a version too
 
 
+TEMPLATE_AT = "e" * 40  # the template commit the fixture's plan is said to have been made from
+# The guardrail the fixture's platform side carries (version 6, invented for it), as main's pin for these tests.
+S1_PIN = {"guardrail": json.loads((S1 / "platform" / "platform.json").read_text(encoding="utf-8"))["guardrail"]}
+
+
 def plan_entry(tmp_path, **more: Any) -> dict[str, Any]:
     def fetch(repository: str, commit: str, into: Path) -> Path:
         return S1 / "agent"
 
     entry = platform_upgrade.plan_one({"repository": "agentkeel-studio/premiere-desk", "commit": "c" * 40,
-                                       "name": "premiere-desk"}, more.pop("template", S1 / "platform"), tmp_path, fetch)  # fmt: skip
+                                       "name": "premiere-desk"}, more.pop("template", S1 / "platform"), tmp_path, fetch,
+                                      TEMPLATE_AT)  # fmt: skip
     return {**entry, **more}
 
 
@@ -464,6 +470,9 @@ def test_an_agent_that_is_not_behind_or_is_retired_gets_no_pull_request(tmp_path
     ({"refused": ["[click](https://example.invalid)"]}, "not a list of check names"),
     ({"refused": "the files"}, "not a list of check names"),
     ({"refused": []}, "does not agree with 0 refusing checks"),
+    # Item 13l: a plan that does not say which template commit it read cannot be held to the template.
+    ({"template_commit": None}, "names no template commit"),
+    ({"template_commit": "main"}, "names no template commit"),
 ])  # fmt: skip
 def test_the_keyed_job_checks_the_artifact_again_before_it_mints(tmp_path, versions, monkeypatch, change, said):
     """The plan is data from a job that read an agent repository. Each bound is held again on main's code."""
@@ -484,6 +493,110 @@ def test_a_proposed_manifest_that_moves_another_field_is_refused_by_the_keyed_jo
     entry["files"]["manifest.yaml"] = entry["files"]["manifest.yaml"].replace("security: andaro74", "security: someone-else")
     errors = platform_upgrade.entry_errors(entry, "agentkeel-studio", current)
     assert errors == ["manifest.yaml: the proposal moves seats"]
+
+
+# --- item 13l: the bytes a platform upgrade proposes (security-reviewer 4, cold review N7 on M07 PR 2) ---
+
+
+def test_the_plan_names_the_template_commit_it_read(tmp_path, versions):
+    assert plan_entry(tmp_path)["template_commit"] == TEMPLATE_AT
+    # A folder that is not a checkout names none (`make upgrade`, a fixture): the keyed job opens nothing from it.
+    assert platform_upgrade.checkout_commit(S1 / "platform") is None
+    assert platform_upgrade.checkout_commit(ROOT) == platform_upgrade.subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()  # fmt: skip
+    entry = platform_upgrade.plan([], S1 / "platform")
+    assert entry == []
+
+
+@pytest.mark.parametrize("change, said", [
+    (lambda e: e["files"].update({"server.py": e["files"]["server.py"] + "import os; os.system('x')\n"}),
+     "server.py: the proposal is not the template's server.py at eeeeeeeeeeee"),
+    (lambda e: e["files"].update({"__init__.py": "CHANGED = True\n"}), "__init__.py: the proposal is not the template's"),
+    (lambda e: e["files"].update({"manifest.yaml": e["files"]["manifest.yaml"].replace("version: '6'", "version: '4'")
+                                  .replace('version: "6"', 'version: "4"')}), "is not the one main pins"),
+    (lambda e: e.update(to="m08"), "the template at eeeeeeeeeeee is at platform_version 'm07', the plan says 'm08'"),
+])  # fmt: skip
+def test_each_proposed_file_is_held_to_the_template_and_the_guardrail_to_mains(tmp_path, versions, change, said):
+    """Until M07 PR 3 `open` held the paths and the manifest's fields, and took the content from the plan."""
+    entry = plan_entry(tmp_path)
+    assert platform_upgrade.content_errors(entry, S1 / "platform", S1_PIN) == []
+    change(entry)
+    errors = platform_upgrade.content_errors(entry, S1 / "platform", S1_PIN)
+    assert any(said in e for e in errors), errors
+
+
+def test_the_guardrail_is_held_to_mains_pin_not_to_the_templates(tmp_path, versions):
+    """A template made from an older `main`, or one somebody pushed a pin into, proposes a guardrail `main`
+    does not pin. Held against this tree's own refagent manifest, the fixture's version 6 is refused."""
+    entry = plan_entry(tmp_path)
+    mains = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
+    assert mains["guardrail"] != S1_PIN["guardrail"]
+    assert any("is not the one main pins" in e for e in platform_upgrade.content_errors(entry, S1 / "platform", mains))
+    assert any("is not the one main pins" in e for e in platform_upgrade.content_errors(entry, S1 / "platform", {}))
+    # A template that cannot be read, or lost a file the plan proposes, is refused, not skipped.
+    assert "could not be read" in platform_upgrade.content_errors(entry, tmp_path / "nothing-here", S1_PIN)[0]
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    (bare / "platform.json").write_text((S1 / "platform" / "platform.json").read_text(encoding="utf-8"), encoding="utf-8")
+    assert any("has no such file" in e for e in platform_upgrade.content_errors(entry, bare, S1_PIN))
+
+
+def test_open_reads_the_template_itself_before_any_token_and_refuses_a_plan_made_from_another_commit(tmp_path, versions, monkeypatch):
+    minted: list[str] = []
+    opened: list[tuple[str, list[str]]] = []
+    monkeypatch.setattr(platform_upgrade.subprocess, "run", lambda *a, **k: type("Done", (), {"returncode": 0})())
+    monkeypatch.setattr(platform_check, "identity", lambda: ("agentkeel-studio", APP))
+    monkeypatch.setattr(platform_check, "load_grant", lambda root=None: {"agentkeel-upgrades": {"app_id": 5200001}})
+    monkeypatch.setattr(platform_check, "app_token", lambda app, account, key, repository, named: minted.append(repository) or "t")
+    current = (S1 / "agent" / "manifest.yaml").read_text(encoding="utf-8")
+    monkeypatch.setattr(platform_check, "gh", lambda path, **k: current if k.get("raw") else {"default_branch": "main"})
+    monkeypatch.setattr(platform_pr, "open_draft", lambda repository, base_branch, base, branch, files, **k: opened.append(
+        (repository, sorted(files))) or {"number": 3})  # fmt: skip
+    root = tmp_path / "main"
+    (root / "agents" / "refagent").mkdir(parents=True)
+    (root / "agents" / "refagent" / "manifest.yaml").write_text(yaml.safe_dump(S1_PIN), encoding="utf-8")
+
+    def template(head: str):
+        return lambda organisation, into: (head, S1 / "platform")
+
+    entry = plan_entry(tmp_path / "plan-a")
+    # The template moved since the plan was made: nothing is minted, nothing opened; the next run plans again.
+    (moved,) = platform_upgrade.open_all([entry], "key", root, template("f" * 40))
+    assert moved["opened"] is False and "the next run plans again" in moved["why"] and minted == [] and opened == []
+    # The template cannot be read: the same.
+    def unreadable(organisation, into):
+        raise platform_upgrade.Refused("the template's default-branch head could not be read (no answer)")
+
+    (unread,) = platform_upgrade.open_all([entry], "key", root, unreadable)
+    assert unread["opened"] is False and "could not be read as data" in unread["why"] and minted == []
+    # A file that is not the template's: refused before any token.
+    forged = {**entry, "files": {**entry["files"], "server.py": "import os\n"}}
+    (refused,) = platform_upgrade.open_all([forged], "key", root, template(TEMPLATE_AT))
+    assert refused["opened"] is False and "is not the template's server.py" in refused["why"] and minted == []
+    # As planned, from the commit the template is at: one token, for that repository, and one draft.
+    (done,) = platform_upgrade.open_all([entry], "key", root, template(TEMPLATE_AT))
+    assert done["opened"] is True and minted == ["agentkeel-studio/premiere-desk"]
+    assert opened == [("agentkeel-studio/premiere-desk", ["manifest.yaml", "server.py"])]
+    # Nothing to open: the template is not asked for at all.
+    assert platform_upgrade.open_all([{"open": False}], "key", root, unreadable) == []
+
+
+def test_the_templates_head_is_read_with_git_and_no_token(monkeypatch):
+    seen: dict[str, Any] = {}
+
+    def run(command, **kwargs):
+        seen.update(command=command, env=kwargs["env"])
+        return type("Done", (), {"returncode": 0, "stdout": f"{'a' * 40}\tHEAD\n", "stderr": ""})()
+
+    monkeypatch.setenv("GITHUB_TOKEN", "a-token")
+    monkeypatch.setattr(platform_upgrade.subprocess, "run", run)
+    assert platform_upgrade.template_head("agentkeel-studio") == "a" * 40
+    assert seen["command"] == ["git", "ls-remote", "https://github.com/agentkeel-studio/agent-template.git", "HEAD"]
+    assert "GITHUB_TOKEN" not in seen["env"] and seen["env"]["GIT_TERMINAL_PROMPT"] == "0"
+    monkeypatch.setattr(platform_upgrade.subprocess, "run", lambda *a, **k: type(
+        "Done", (), {"returncode": 128, "stdout": "", "stderr": "fatal: repository not found"})())  # fmt: skip
+    with pytest.raises(platform_upgrade.Refused, match="could not be read"):
+        platform_upgrade.template_head("agentkeel-studio")
 
 
 # --- the one place a draft pull request is opened (scripts/platform_pr.py) ------
