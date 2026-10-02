@@ -122,6 +122,17 @@ INVOCATION = "One invocation of the retired runtime; anything but ResourceNotFou
 SAME = "The retired head's manifest is the deployed one's, but for rollout"
 
 
+def test_deploy_agent_reads_nothing_of_sign_agents_from_outside_the_one_folder():
+    """Cold review N2 on M07 PR 3: the layout test read only paths under the staged folder, so a step that
+    still read the old `$RUNNER_TEMP/image.tar` would not have been seen."""
+    import re
+
+    steps = load("deploy.yml")["jobs"]["deploy-agent"]["steps"]
+    read = [path for step in steps for path in re.findall(r"\$RUNNER_TEMP/[A-Za-z0-9_./$-]+", str(step.get("run", "")))]
+    signed = [path for path in read if path.endswith((".tar", ".cosign.json"))]
+    assert signed and all(path.startswith("$RUNNER_TEMP/signed/") for path in signed), signed
+
+
 def test_a_retirement_is_held_to_the_deployed_manifest_before_the_registry_or_the_stack_is_touched():
     """rulings/pr2-security.md item 13i: a retirement is a stack update from a head nobody signed."""
     steps = load("deploy.yml")["jobs"]["retire-agent"]["steps"]
