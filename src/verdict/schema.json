@@ -470,6 +470,16 @@
         "looked_up_at": {"type": ["string", "null"]},
         "max_seconds": {"type": "number", "exclusiveMinimum": 0},
         "platform_app_id": {"type": ["integer", "null"]},
+        "app_observation": {
+          "description": "From M07 PR 2 (SPEC/07 section 2 'The viewpoint', section 4; milestones/M07/open.md row 3). The observation main's scheduled observer stored, read as the platform's observer App, that this reading took its App-viewpoint records from; null when none was read. Each F6 entry's `viewpoint` says which it was ruled on.",
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "run_id": {"type": ["string", "integer", "null"]},
+            "read_at": {"type": ["string", "null"]},
+            "key": {"type": ["string", "null"]}
+          }
+        },
         "F6_1": {
           "type": "object",
           "additionalProperties": false,
@@ -478,7 +488,8 @@
             "read": {"type": "boolean"},
             "held": {"type": ["boolean", "null"]},
             "reasons": {"type": "array", "items": {"type": "string"}},
-            "faulty_commits": {"type": "integer", "minimum": 0}
+            "faulty_commits": {"type": "integer", "minimum": 0},
+            "viewpoint": {"type": "string"}
           }
         },
         "F6_2": {
@@ -488,7 +499,9 @@
           "properties": {
             "read": {"type": "boolean"},
             "held": {"type": ["boolean", "null"]},
-            "reasons": {"type": "array", "items": {"type": "string"}}
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "viewpoint": {"type": "string"},
+            "mergeable_state": {"description": "GitHub's own word, raw, beside the verdict (M07 PR 2; open.md row 3): it depends on who asks.", "type": ["string", "null"]}
           }
         },
         "F6_3": {
@@ -501,6 +514,7 @@
             "reasons": {"type": "array", "items": {"type": "string"}},
             "elapsed_s": {"type": ["number", "null"]},
             "listed": {"type": "boolean"},
+            "viewpoint": {"type": "string"},
             "records": {
               "type": "object",
               "additionalProperties": false,
@@ -522,6 +536,161 @@
             "held": {"type": ["boolean", "null"]},
             "reasons": {"type": "array", "items": {"type": "string"}},
             "not_in_registry": {"type": ["array", "null"], "items": {"type": "string"}}
+          }
+        }
+      }
+    },
+    "upgrade": {
+      "description": "From M07 PR 2 (SPEC/07 section 4). Claim 7's readings as scripts/observe_upgrade.py read GitHub, AWS and Grafana and verdict.build (src/verdict/upgrade.py) ruled on them: F7.0 to F7.5, each read or not, held or not, with its reasons and the viewpoint its GitHub records were read from, the surfaces' plant counts, and `taken`, how many of the three upgrades (platform, model, retirement) arrived as a pull request the platform opened and went live. Recorded, never gated; the ledger's row 7 reading reads it, with `template`. Optional, so no envelope before it becomes invalid.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["looked_up_at", "bars", "app_observation", "F7_0", "F7_1", "F7_2", "F7_3", "F7_4", "F7_5", "surfaces", "taken"],
+      "properties": {
+        "looked_up_at": {"type": ["string", "null"]},
+        "bars": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["arrive_max_seconds", "deploy_max_seconds", "retire_max_seconds"],
+          "properties": {
+            "arrive_max_seconds": {"type": "number", "exclusiveMinimum": 0},
+            "deploy_max_seconds": {"type": "number", "exclusiveMinimum": 0},
+            "retire_max_seconds": {"type": "number", "exclusiveMinimum": 0}
+          }
+        },
+        "app_observation": {
+          "description": "The observation main's scheduled observer stored, read as the platform's observer App, that this reading took its App-viewpoint records from; null when none was read.",
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "run_id": {"type": ["string", "integer", "null"]},
+            "read_at": {"type": ["string", "null"]},
+            "key": {"type": ["string", "null"]}
+          }
+        },
+        "F7_0": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "viewpoint", "parts", "relaxation"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "viewpoint": {"type": "string"},
+            "parts": {
+              "description": "The owner's test, the platform check dispatched from a branch, the App's token asked to relax a ruleset, and the timed run's agent: all four are read and held, or F7.0 is not.",
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["owner_test", "dispatch", "relaxation", "timed_run"],
+              "patternProperties": {
+                "^(owner_test|dispatch|relaxation|timed_run)$": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["read", "held"],
+                  "properties": {"read": {"type": "boolean"}, "held": {"type": ["boolean", "null"]}}
+                }
+              }
+            },
+            "relaxation": {"description": "refused by GitHub, or accepted and detected by the next platform check, which is detection and not refusal.", "enum": ["refused", "detected", "undetected", null]}
+          }
+        },
+        "F7_1": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "viewpoint", "upgrades"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "viewpoint": {"type": "string"},
+            "upgrades": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "repository", "pull_request", "arrived_s", "merged", "read", "held"],
+                "properties": {
+                  "kind": {"enum": ["platform", "model", "retirement"]},
+                  "repository": {"type": ["string", "null"]},
+                  "pull_request": {"type": ["integer", "null"]},
+                  "arrived_s": {"description": "The pull request's created_at less its trigger's time, both GitHub's.", "type": ["number", "null"]},
+                  "merged": {"type": ["boolean", "null"]},
+                  "read": {"type": "boolean"},
+                  "held": {"type": ["boolean", "null"]}
+                }
+              }
+            }
+          }
+        },
+        "F7_2": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "viewpoint", "elapsed_s"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "viewpoint": {"type": "string"},
+            "elapsed_s": {"description": "DeleteAgentRuntime's eventTime less the retirement pull request's merged_at.", "type": ["number", "null"]}
+          }
+        },
+        "F7_3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "viewpoint", "on"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "viewpoint": {"type": "string"},
+            "on": {"description": "The agent whose revert was read: refagent's model swap, or the fallback the run file names.", "type": ["string", "null"]}
+          }
+        },
+        "F7_4": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "viewpoint", "mismatched", "rows"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "viewpoint": {"type": "string"},
+            "mismatched": {"type": ["array", "null"], "items": {"type": "string"}},
+            "rows": {"type": ["integer", "null"], "minimum": 0}
+          }
+        },
+        "F7_5": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "viewpoint"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "viewpoint": {"type": "string"}
+          }
+        },
+        "surfaces": {
+          "description": "The surfaces' plants (src/verdict/plants.py SURFACE_PLANTS), counted apart from the golden plants in plants_expected and plants_fired above.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["plants_expected", "plants_fired", "silent"],
+          "properties": {
+            "plants_expected": {"type": "integer", "minimum": 0},
+            "plants_fired": {"type": "integer", "minimum": 0},
+            "silent": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "taken": {
+          "description": "The measured value for claim 7: n of 3. Each kind is true when its upgrade arrived as the platform's pull request, merged and went live; false when it missed; null when unread.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["n", "of", "platform", "model", "retirement"],
+          "properties": {
+            "n": {"type": "integer", "minimum": 0, "maximum": 3},
+            "of": {"const": 3},
+            "platform": {"type": ["boolean", "null"]},
+            "model": {"type": ["boolean", "null"]},
+            "retirement": {"type": ["boolean", "null"]}
           }
         }
       }

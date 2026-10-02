@@ -141,12 +141,14 @@ def test_row_4_reads_the_swaps_and_closes_red_on_f4_2():
     cell = gate.measured_at(envelope, history, milestone="M04")
     assert "; swap #26 equivalent missed: RED, expected GREEN; RED; " in cell and "; GREEN; " not in cell
     assert "breaking missed" not in cell
-    # A later row that reads neither the runtime, the swaps, the attempts nor the template reads the envelope
-    # alone. Not M05 from M05 PR 2: row 5 reads `containment` (READ_THE_CONTAINMENT), and this envelope has
-    # none. Not M06 from M06 PR 2: row 6 reads `template` (READ_THE_TEMPLATE), which it has not either.
-    assert gate.measured_at(envelope, history, milestone="M07") == gate.measured_at(envelope, history)
+    # A later row that reads neither the runtime, the swaps, the attempts, the template nor the upgrades reads
+    # the envelope alone. Not M05 from M05 PR 2: row 5 reads `containment` (READ_THE_CONTAINMENT), and this
+    # envelope has none. Not M06 from M06 PR 2: row 6 reads `template` (READ_THE_TEMPLATE), which it has not
+    # either. Not M07 from M07 PR 2: row 7 reads `upgrade` (READ_THE_UPGRADE).
+    assert gate.measured_at(envelope, history, milestone="M08") == gate.measured_at(envelope, history)
     assert "containment not read" in gate.measured_at(envelope, history, milestone="M05")
     assert "template not read" in gate.measured_at(envelope, history, milestone="M06")
+    assert "upgrade not read: the envelope records no attempt; RED; " in gate.measured_at(envelope, history, milestone="M07")
     as_row = {"#": "4", "M": "M04", "Measured": cell}
     assert ledger.check_measured({**as_row, "State": "RED"}, history) is None
     assert "is not the verdict" in ledger.check_measured({**as_row, "State": "GREEN"}, history)

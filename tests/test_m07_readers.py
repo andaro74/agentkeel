@@ -567,3 +567,83 @@ def test_panel_1s_check_does_not_read_panel_2_and_the_other_way(tmp_path):
     names = [name for name in checks.CHECKS if "panel 2" in name]
     assert names == ["panel 2 selects the verdict as stored, from the envelopes' table and nothing else"]
     assert checks.CHECKS[names[0]] is panel.check_panel_2 and len(checks.CHECKS) == 20
+
+
+# --- inherited from PR 1's review: claim 6's readers (src/verdict/template.py) ----
+
+import copy  # noqa: E402
+
+from src.verdict import template as shipped  # noqa: E402
+from tests import test_m06_readers as m06  # noqa: E402
+
+
+def test_a_merged_s2_is_a_miss_even_when_github_says_its_state_is_unknown():
+    """Re-read of 69f8383, A: GitHub gives a merged pull request the state "unknown", and the unread
+    return came first, so a merged S2 read as unread. `merged` is read before it now."""
+    seen = copy.deepcopy(m06.observation())
+    seen["s2"] |= {"merged": True, "mergeable_state": "unknown"}
+    reading = shipped.record(seen, 28800.0)["F6_2"]
+    assert reading["read"] is True and reading["held"] is False and reading["reasons"] == ["S2's pull request merged"]
+    seen["s2"] |= {"merged": None}
+    reading = shipped.record(seen, 28800.0)["F6_2"]
+    assert reading["read"] is False and "whether S2's pull request merged was not read" in reading["reasons"][0]
+    # Not merged and still unknown is GitHub still computing: unread, as before.
+    seen["s2"] |= {"merged": False}
+    assert shipped.record(seen, 28800.0)["F6_2"]["read"] is False
+
+
+def test_refused_first_means_refused_for_the_planted_fault():
+    """Re-read of 69f8383, B: any failure from the App counted as "refused first". At M06 every head failed
+    on the hidden bypass_actors, so a head would have read as refused for seats it was never checked on."""
+    seen = copy.deepcopy(m06.observation())
+    first = seen["s3"]["first_pr"]["commits"][0]
+    first["check_runs"][0]["refused"] = ["the repository's ruleset is the export"]
+    reading = shipped.record(seen, 28800.0)["F6_1"]
+    assert reading["held"] is False and "not for its planted fault" in reading["reasons"][0]
+    assert shipped.SEAT_CHECK in reading["reasons"][0] and shipped.GOLDENS_CHECK in reading["reasons"][0]
+    # Refused for the planted faults and for something else as well is still refused for them.
+    first["check_runs"][0]["refused"] = [shipped.SEAT_CHECK, shipped.GOLDENS_CHECK, "the repository's ruleset is the export"]
+    assert shipped.record(seen, 28800.0)["F6_1"]["held"] is True
+    # The App's reasons not read is unread, not held.
+    first["check_runs"][0]["refused"] = None
+    reading = shipped.record(seen, 28800.0)["F6_1"]
+    assert reading["read"] is False and "reasons for refusing the first commit were not read" in reading["reasons"][0]
+    # Only the fault that is there is asked for: goldens present, seats null.
+    first["goldens"] = m06.TWO
+    first["check_runs"][0]["refused"] = [shipped.SEAT_CHECK]
+    assert shipped.record(seen, 28800.0)["F6_1"]["held"] is True
+
+
+def test_the_observer_reads_the_apps_reasons_from_its_check_runs_own_summary():
+    from scripts import observe_template
+
+    summary = f"- **{shipped.SEAT_CHECK}**: manifest.yaml: seat product is null; seat security is null\n- **{shipped.GOLDENS_CHECK}**: none"
+    run = {"conclusion": "failure", "output": {"title": "2 refused", "summary": summary}}
+    assert observe_template.refused_checks(run) == [shipped.SEAT_CHECK, shipped.GOLDENS_CHECK]
+    assert observe_template.refused_checks({"conclusion": "success", "output": {"summary": "Every check passed."}}) == []
+    assert observe_template.refused_checks({"conclusion": "failure", "output": {"summary": None}}) is None
+    assert observe_template.refused_checks({"conclusion": "failure"}) is None
+
+
+def test_each_github_reading_of_claim_6_says_which_viewpoint_it_was_ruled_on():
+    """open.md row 3: the owner read `blocked` on S2 where CI's own token read `unstable`. The envelope now
+    keeps the raw state and who asked, and rules on the App's reading where main's observer stored one."""
+    own = copy.deepcopy(m06.observation())
+    own["s2"]["mergeable_state"] = "unstable"  # as a pull request's own run, with no rights there, reads it
+    alone = shipped.record(own, 28800.0)
+    assert alone["F6_2"]["held"] is False and alone["F6_2"]["viewpoint"] == "anonymous"
+    assert alone["F6_2"]["mergeable_state"] == "unstable" and alone["app_observation"] is None
+    stored = {"run_id": "777", "read_at": "2026-10-06T11:45:00Z", "key": "observations/777.json",
+              "template": {"s2": {**own["s2"], "mergeable_state": "blocked"}}}  # fmt: skip
+    both = shipped.record(own, 28800.0, stored)
+    assert both["F6_2"] == {"read": True, "held": True, "reasons": [], "viewpoint": "app", "mergeable_state": "blocked"}
+    assert both["F6_1"]["viewpoint"] == both["F6_3"]["viewpoint"] == "anonymous"  # the App stored no S3
+    assert both["app_observation"]["run_id"] == "777" and "viewpoint" not in both["F6_4"]
+    # A record the App did not find is not preferred, and row 6's reading of it is unchanged.
+    stored["template"]["s2"]["found"] = False
+    assert shipped.record(own, 28800.0, stored)["F6_2"]["viewpoint"] == "anonymous"
+    from src.verdict import gate, schema_errors
+
+    recorded = json.loads((ROOT / "evals" / "history" / "827ee8bc014b28f588e9b8f3e1d4a947be885f26.json").read_text(encoding="utf-8"))
+    assert schema_errors({**recorded, "template": both}) == []
+    assert gate.template_reading({"template": both})[1] == "F6_2 held"

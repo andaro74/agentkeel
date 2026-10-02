@@ -156,3 +156,46 @@ def test_build_writes_no_claim_6_checks_and_the_gate_requires_them(chain):
 def test_the_gate_requires_f6_1_and_f6_4_from_m06s_readers_and_not_before():
     assert {"F6_1", "F6_4"} <= set(gate.required_checks("HEAD"))
     assert "F6_1" not in gate.required_checks("ef7e48e")  # M06 PR 1's merge, before the readers
+
+
+# --- M07 PR 2 (SPEC/07 §4, P5): a case for each new reading ---------------------
+
+
+def test_the_observer_says_held_and_taken_and_build_reads_unread():
+    """The observer writes raw records. A verdict it writes about itself is not one build reads."""
+    from src.verdict import upgrade
+
+    from .test_m07_upgrade import HISTORY, THRESHOLDS, observation
+
+    seen = observation(held=True, taken={"n": 3, "of": 3}, F7_0={"read": True, "held": True})  # the observer's own claims
+    seen["s2"] = {"held": True, "retirement": {"held": True, "read": True}}
+    reading = upgrade.record(seen, THRESHOLDS, HISTORY)
+    assert reading["taken"]["n"] == 0
+    assert reading["F7_0"]["read"] is False and reading["F7_2"]["read"] is False and reading["F7_2"]["held"] is None
+
+
+def test_build_holds_an_upgrade_and_row_7_reads_it_again_at_the_commits_bars():
+    """build ruled on the bars it was given; the gate's row 7 reading holds each time again to the bars at
+    the envelope's commit, and counts `taken` again from its kinds (tests/test_m07_envelope.py has the rest)."""
+    from src.verdict import upgrade
+
+    from .test_m07_upgrade import HISTORY, TEMPLATE, THRESHOLDS, full
+
+    reading = upgrade.record(full(), THRESHOLDS, HISTORY, template=TEMPLATE)
+    assert reading["F7_2"]["held"] is True and reading["taken"]["n"] == 3  # build: held, 3 of 3
+    tighter = {"arrive_max_seconds": 4500.0, "deploy_max_seconds": 3600.0, "retire_max_seconds": 300.0}
+    misses = gate.upgrade_misses({"upgrade": reading}, tighter, "the envelope's commit")
+    assert "F7_2: build held 600 s, over the commit's bar 300 s" in misses  # the gate: not at this commit's bar
+    forged = {**reading, "taken": {**reading["taken"], "n": 3, "retirement": None}}
+    assert "taken: the envelope says 3, its three kinds count 2" in gate.upgrade_misses({"upgrade": forged}, tighter, "here")
+
+
+def test_build_says_every_claim_7_check_passed_and_the_gate_still_requires_each(chain):
+    """F7_0 to F7_5 come from tests the gate is not given. What it holds: none may be absent, and F7_5 may
+    not say pass beside counts that differ (the silent-plant case is in tests/test_m07_envelope.py)."""
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    carried = {**envelope, "checks": {**envelope["checks"], **{name: {"status": "pass", "url": "u"} for name in gate.CLAIM_7_CHECKS[:5]}}}
+    verdict, reasons = gate.judge(carried, load_golden_kinds(GOLDENS_DIR), {}, [],
+                                  required=gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_7_CHECKS)  # fmt: skip
+    assert verdict == "RED" and "checks.F7_5 is missing from an agent envelope" in reasons

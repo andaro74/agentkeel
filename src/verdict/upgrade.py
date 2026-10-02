@@ -47,11 +47,19 @@ from pathlib import Path
 from typing import Any
 
 from src.verdict import plants, replay_history
-from src.verdict.template import PLATFORM_CHECK, Unreadable, app_success, entry, planted_fault, when
+from src.verdict.template import (
+    GOLDENS_CHECK,
+    PLATFORM_CHECK,
+    SEAT_CHECK,
+    Unreadable,
+    app_success,
+    as_the_app_saw,
+    entry,
+    planted_fault,
+    when,
+)
 
-# The check names the platform's App posts under (scripts/platform_check.py, src/validate/agent.py).
-SEAT_CHECK = "seats assigned, each a login that administers the repository"
-GOLDENS_CHECK = "an agent's goldens: one ordinary and one trap at least, citing its own data"
+# The check name the platform's App posts a ruleset that differs under (scripts/platform_check.py).
 RULESET_CHECK = "the repository's ruleset is the export"
 REFUSED_AS_PLANTED = {SEAT_CHECK, GOLDENS_CHECK}
 GONE = "ResourceNotFoundException"
@@ -508,15 +516,9 @@ def bars_of(thresholds: dict[str, Any]) -> dict[str, float]:
 
 
 def _prefer(own: Any, app: Any) -> tuple[Any, str | None]:
-    """One GitHub record, and the viewpoint it was read from.
-
-    The App's stored record where the scheduled observer on `main` found it, laid over the run's own:
-    what only the run reads (AWS's records, under its own roles) stays the run's. Otherwise the run's
-    own, read with a token that has no rights in the organisation. None when neither read anything."""
-    if isinstance(app, dict) and app.get("found"):
-        mine = own if isinstance(own, dict) else {}
-        return {**mine, **{k: v for k, v in app.items() if v is not None}}, "app"
-    return own, ("anonymous" if isinstance(own, dict) else None)
+    """`template.as_the_app_saw`, with no viewpoint at all when neither read anything."""
+    found, viewpoint = as_the_app_saw(own, app)
+    return found, (viewpoint if isinstance(found, dict) else None)
 
 
 def _viewpoint(seen: list[str | None]) -> str:

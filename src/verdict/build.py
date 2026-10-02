@@ -46,6 +46,16 @@ And `build answer` writes item 4's record for an agent from the template:
 its deployed runtime's answers to its own goldens, scored against its own
 data, keyed to the agent repository's commit (SPEC/06 §6, R7).
 
+From M07 PR 2, with `--upgrade`, `upgrade`: claim 7's readings, ruled here
+(src/verdict/upgrade.py) on what `scripts/observe_upgrade.py` read, against
+the `upgrade.*` bars, with `taken`, n of 3. `--surfaces` is the run's JUnit
+file, from which the surfaces' plants are counted into `upgrade.surfaces`
+and joined to `checks.F7_5` through both(). `--app-observation` is what
+`main`'s scheduled observer stored, read as the platform's observer App:
+`template` and `upgrade` rule on its record where it found one, and each
+entry says which viewpoint it was ruled on. Recorded, never gated (SPEC/07
+§4); only row 7's reading reads it.
+
 From M04 PR 3, with `--swaps`, `swaps`: what `scripts/rule_swaps.py` wrote,
 the gate's verdict on each swap PR's own envelope beside GitHub's record of
 the pull. Copied, not read: build rules on no envelope (P5), and nothing
@@ -701,10 +711,38 @@ def quickstart_bar(thresholds: dict[str, Any]) -> float:
     return float(bar)
 
 
-def template_record(path: Path, thresholds: dict[str, Any]) -> dict[str, Any]:
+def template_record(path: Path, thresholds: dict[str, Any], app: dict[str, Any] | None = None) -> dict[str, Any]:
     """scripts/observe_template.py's observation, ruled into `template` (SPEC/06 §4)."""
     try:
-        return template.record(load_json(path), quickstart_bar(thresholds))
+        return template.record(load_json(path), quickstart_bar(thresholds), app)
+    except template.Unreadable as exc:
+        raise Refused(f"{path}: {exc}") from exc
+
+
+def app_observation(path: Path | None) -> dict[str, Any] | None:
+    """What `main`'s scheduled observer stored, as the run fetched it; None when there is none to read.
+
+    A file that says it could not be fetched (`error`), or names no run, is no observation: the
+    readings are then the run's own, anonymous, and say so. A file that is not a mapping is refused."""
+    if path is None or not path.is_file():
+        return None
+    stored = load_json(path)
+    if not isinstance(stored, dict):
+        raise Refused(f"{path}: not an observation scripts/observe_upgrade.py fetched")
+    return None if stored.get("error") or not stored.get("run_id") else stored
+
+
+def upgrade_record(path: Path, thresholds: dict[str, Any], history_dir: Path, *, template_reading: dict[str, Any] | None,
+                   app: dict[str, Any] | None, surfaces: Path | None) -> dict[str, Any]:  # fmt: skip
+    """scripts/observe_upgrade.py's observation, ruled into `upgrade` (SPEC/07 §4).
+
+    The surfaces' plants are counted here from the run's own JUnit file, not taken from the observer:
+    which tests ran and passed is the run's record, and the count is build's."""
+    try:
+        observation = load_json(path)
+        if isinstance(observation, dict) and surfaces is not None:
+            observation = {**observation, "surfaces": {"results": upgrade.surface_results(surfaces)}}
+        return upgrade.record(observation, thresholds, history_dir, template=template_reading, app=app)
     except template.Unreadable as exc:
         raise Refused(f"{path}: {exc}") from exc
 
@@ -731,6 +769,7 @@ def compose_envelope(
     swaps: list[dict[str, Any]] | None = None,
     containment: tuple[dict[str, Any], float | None] | None = None,
     template_reading: dict[str, Any] | None = None,
+    upgrade_reading: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """`bars` and `incumbent` (its runs, and where the pin was read) give F4_4; `second`, the
     agent's second raw and its scores, gives A-vs-A and F4_3; `control_second`, the control's
@@ -772,6 +811,13 @@ def compose_envelope(
             a_vs_a = {"agent": differ(results, as_the_agent_is_scored(second[1])),
                       "control": control_second[1] if control_second else None}  # fmt: skip
             checks = both(checks, "F4_3", {"status": "fail" if a_vs_a["agent"] else "pass", "url": run_url})
+        # SPEC/07 §4 (S5): the surfaces' plants, counted in this run, joined to the S5 test's own witness.
+        if upgrade_reading is not None:
+            surfaces = upgrade_reading["surfaces"]
+            silent = surfaces["plants_fired"] != surfaces["plants_expected"]
+            for plant in surfaces["silent"]:
+                print(f"F7_5: silent surface plant: {plant}", file=sys.stderr)
+            checks = both(checks, "F7_5", {"status": "fail" if silent else "pass", "url": run_url})
     plant_ids = plant_ids if gated else []
     failing = [g for g, r in results.items() if not r["pass"]]
     passed_before = {g for g in failing if replay_history.ever_passed(history, scope, g)}
@@ -814,6 +860,9 @@ def compose_envelope(
     # M06 PR 2 (SPEC/06 section 4): claim 6's live readings, recorded and gated by nothing; row 6 reads them.
     if gated and template_reading is not None:
         one_subject["template"] = template_reading
+    # M07 PR 2 (SPEC/07 section 4): claim 7's readings, recorded and gated by nothing; row 7 reads them.
+    if gated and upgrade_reading is not None:
+        one_subject["upgrade"] = upgrade_reading
     return {
         "commit": raw["commit"],
         "tag": tag,
@@ -964,6 +1013,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--containment", type=Path, metavar="OBSERVATION")
     # M06 PR 2 (SPEC/06 §4): the template's live records, as scripts/observe_template.py read them. Recorded only.
     parser.add_argument("--template", type=Path, metavar="OBSERVATION")
+    # M07 PR 2 (SPEC/07 §4): claim 7's records, as scripts/observe_upgrade.py read them. Recorded only.
+    parser.add_argument("--upgrade", type=Path, metavar="OBSERVATION")
+    parser.add_argument("--app-observation", type=Path, metavar="STORED")
+    parser.add_argument("--surfaces", type=Path, metavar="JUNIT_XML")
     parser.add_argument("--run-url")
     parser.add_argument("--allow-dirty", action="store_true")
     # M06 PR 2 (R7): `answer` reads an agent from the template, placed at --agent-dir, from --repository.
@@ -1057,6 +1110,8 @@ def main(argv: list[str] | None = None) -> int:
                     exclude_commit=raw["commit"], ancestors_of=raw["commit"],
                 )  # fmt: skip
                 incumbent = (runs, f"{pin and pin['profile']} {pin and pin['region']} {raw.get('mode')}, pin at {where}")
+            stored = app_observation(args.app_observation)
+            shipped = template_record(args.template, thresholds, stored) if args.template else None
             if scope_of(raw, control) == "control":
                 # No agent ran: the control is the subject, in M00's form (ADR-0004
                 # amendment 2, ruling A). Its own card is the base; no control_card_ref.
@@ -1085,8 +1140,10 @@ def main(argv: list[str] | None = None) -> int:
                     control_second=control_second,
                     swaps=swaps_record(args.swaps) if args.swaps else None,
                     containment=containment_record(args.containment, thresholds) if args.containment else None,
-                    template_reading=template_record(args.template, thresholds) if args.template else None,
-                )
+                    template_reading=shipped,
+                    upgrade_reading=upgrade_record(args.upgrade, thresholds, args.history_dir, template_reading=shipped,
+                                                   app=stored, surfaces=args.surfaces) if args.upgrade else None,
+                )  # fmt: skip
             emit(envelope, args.out, envelope=True)
     except Refused as refusal:
         print(f"REFUSED: {refusal}", file=sys.stderr)

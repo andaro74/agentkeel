@@ -197,6 +197,10 @@ M05_READERS = "2c88265"
 # into the Makefile (M06 PR 2; SPEC/06 section 4). The gate requires them from here. Named in the
 # commit after it, as M05's was.
 M06_READERS = "c2a15d0"
+# The commit that wired claim 7's six checks, F7_0 to F7_5 from the nine fixture tests of S0 to S5, into the
+# Makefile (M07 PR 2; SPEC/07 section 4). The gate requires them from here. Named in the commit after
+# it, as M05's and M06's were.
+M07_READERS = "0000000000000000000000000000000000000000"
 
 
 def descends_from(commit: str, anchor: str, root: Path = ROOT) -> bool:

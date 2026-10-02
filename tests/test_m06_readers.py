@@ -94,8 +94,11 @@ BOUND = [{"context": "platform-check", "integration_id": APP}]  # the agent repo
 
 
 def runs(conclusion: str | None, stand_in: bool = False) -> list[dict[str, Any]]:
+    # From M07 PR 2 the observer keeps the App's own reasons beside each run: a failure here is for the
+    # template's two planted faults, as the App names them.
     out = [] if conclusion is None else [{"name": shipped.PLATFORM_CHECK, "app_id": APP, "app_slug": "agentkeel-platform",
-                                           "conclusion": conclusion}]  # fmt: skip
+                                           "conclusion": conclusion,
+                                           "refused": [shipped.SEAT_CHECK, shipped.GOLDENS_CHECK] if conclusion == "failure" else []}]  # fmt: skip
     if stand_in:
         out.append({"name": shipped.PLATFORM_CHECK, "app_id": 15368, "app_slug": "github-actions", "conclusion": "success"})
     return out
@@ -463,7 +466,10 @@ def test_the_observer_writes_what_github_returned_and_build_rules_on_it(monkeypa
         f"/repos/org/premiere-desk/contents/goldens/g-001.yaml?ref={'b' * 40}": "kind: ordinary\nretired: null\n",
         f"/repos/org/premiere-desk/contents/goldens/g-002.yaml?ref={'b' * 40}": "kind: trap\nretired: null\n",
         f"/repos/org/premiere-desk/commits/{'a' * 40}/check-runs?per_page=100":
-            {"check_runs": [{"name": "platform-check", "app": {"id": APP, "slug": "p"}, "conclusion": "failure"}]},
+            {"check_runs": [{"name": "platform-check", "app": {"id": APP, "slug": "p"}, "conclusion": "failure",
+                             "output": {"title": "2 refused", "summary": (
+                                 f"- **{shipped.SEAT_CHECK}**: manifest.yaml: seat product is null\n"
+                                 f"- **{shipped.GOLDENS_CHECK}**: goldens/: no live ordinary")}}]},
         "/repos/org/premiere-desk/rulesets?includes_parents=false&per_page=100": [{"id": 5}],
         "/repos/org/premiere-desk/rulesets/5": {"rules": [{"type": "required_status_checks", "parameters": {
             "required_status_checks": [{"context": "platform-check", "integration_id": APP}]}}]},
@@ -476,7 +482,8 @@ def test_the_observer_writes_what_github_returned_and_build_rules_on_it(monkeypa
     assert [c["seats"]["product"] for c in commits] == [None, "andaro74"]
     assert [g["kind"] for g in commits[1]["goldens"]] == ["ordinary", "trap"]
     reading = shipped.record(observation, 28800.0)
-    assert reading["F6_1"] == {"read": True, "held": True, "reasons": [], "faulty_commits": 1}
+    assert commits[0]["check_runs"][0]["refused"] == [shipped.SEAT_CHECK, shipped.GOLDENS_CHECK]  # the App's own words
+    assert reading["F6_1"] == {"read": True, "held": True, "reasons": [], "faulty_commits": 1, "viewpoint": "anonymous"}
     assert reading["F6_3"]["read"] is False  # no deploy, answer or registry row read in this part
 
 
