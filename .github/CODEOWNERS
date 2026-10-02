@@ -58,7 +58,9 @@
 /src/ @andaro74
 # Engineering's scripts, one by one from ADR-0012: `validate` refuses a file
 # two seats' lines match, and scripts/platform_check.py is Security's. A new
-# script matches no line, and `validate` fails, until it is listed here.
+# script matches no line, and `validate` fails, until it is listed here; but
+# for a new scripts/observe_<name>.py, which the pattern below takes as
+# Engineering's with no change to this file (security-reviewer 18 on M07 PR 3).
 /scripts/check_model_access.py @andaro74
 /scripts/envelope_rows.py @andaro74
 /scripts/load_rights_table.py @andaro74

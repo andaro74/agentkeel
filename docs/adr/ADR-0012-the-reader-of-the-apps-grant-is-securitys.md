@@ -51,7 +51,8 @@ and no Security gate.
 3. **`.github/CODEOWNERS` lists Engineering's scripts one by one**
    (`observe_*.py` as one pattern), because `validate` refuses a file
    that lines from two seats match. A script no line names matches none,
-   and `validate` fails until it is listed.
+   and `validate` fails until it is listed. A new `observe_<name>.py` is
+   the exception: the pattern takes it as Engineering's.
 
 ## Consequences
 
