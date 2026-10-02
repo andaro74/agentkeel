@@ -1,0 +1,34 @@
+{
+  "results": {
+    "A": {
+      "status": 200,
+      "frames": [
+        {
+          "schema": {
+            "refId": "A",
+            "fields": [
+              {
+                "name": "commit",
+                "type": "string"
+              },
+              {
+                "name": "verdict",
+                "type": "string"
+              }
+            ]
+          },
+          "data": {
+            "values": [
+              [
+                "6f3d1618f42acbb217f7bcd62ecf2fc000ac4a9f"
+              ],
+              [
+                "GREEN"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

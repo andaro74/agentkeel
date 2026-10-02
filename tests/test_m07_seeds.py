@@ -265,3 +265,63 @@ def test_s3_the_rollback_was_made():
     run = run_file("f7_3_rollback.yaml", "S3", 2)
     observed = made(run)
     assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
+
+
+# --- S4: panel 2 forced to show GREEN on a RED envelope -----------------------
+
+PANEL_2 = "infra/grafana/panel2.json"  # the dashboard's path from PR 2 (Security's)
+RED_ENVELOPE = "6f3d1618f42acbb217f7bcd62ecf2fc000ac4a9f"  # on main since M01 PR 2, RED
+
+
+def validate_over(tree: Path) -> dict[str, list[str]]:
+    """Each `validate` check's errors over `tree`, by check name, but those in NOT_RUN (M06's helper,
+    against this file's base)."""
+    from src.validate import checks
+
+    holds(BASE_CHECKS <= set(checks.CHECKS), "every check at the base is still in validate")
+    errors: dict[str, list[str]] = {}
+    for name, check in checks.CHECKS.items():
+        if name in NOT_RUN:
+            continue
+        if "lookup" in inspect.signature(check).parameters:
+            errors[name] = check(tree, lookup=stand_in_lookup)
+        else:
+            errors[name] = check(tree)
+    return errors
+
+
+@expected_failure
+def test_s4_a_panel_2_query_that_computes_the_verdict_is_refused(worktree):  # noqa: F811
+    """Panel 2 of S4's dashboard selects the constant 'GREEN' as its verdict column. `validate` must
+    refuse a panel 2 query that does anything but select the verdict as stored (F7.4). Today nothing
+    reads panel 2: placed at infra/grafana/panel2.json, `validate` over the tree is green."""
+    dashboard = fixture("s4-panel2/dashboard.json")
+    panel = next((p for p in dashboard.get("panels", []) if p.get("id") == 2), None)
+    holds(panel is not None, "S4's dashboard has a panel 2")
+    holds("'GREEN' AS verdict" in panel["targets"][0]["rawSQL"], "S4's panel 2 computes its verdict")
+    tree = worktree()
+    (tree / PANEL_2).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(FIXTURES / "s4-panel2" / "dashboard.json", tree / PANEL_2)
+    errors = validate_over(tree)
+    refusing = {name for name, errs in errors.items() if any(PANEL_2 in e.replace("\\", "/") for e in errs)}
+    holds(not refusing & BASE_CHECKS, f"no check at the base refuses the fixture ({sorted(refusing & BASE_CHECKS)})")
+    refused = sorted(name for name in refusing - BASE_CHECKS if "panel 2" in name)
+    assert refused, "seed S4: no check that reads panel 2's query refused a computed verdict"
+
+
+@expected_failure
+def test_s4_a_green_row_for_a_red_envelope_is_found_by_build():
+    """Panel 2's rows as Grafana's /api/ds/query returns them say GREEN for 6f3d161; the envelope on
+    main says RED. `build.panel_verdict_mismatch(frame, history_dir)` must return that commit. Today
+    nothing compares a panel's verdict with an envelope."""
+    from src.verdict import build
+
+    frame = fixture("s4-panel2/frame.json")
+    fields = [f["name"] for f in frame["results"]["A"]["frames"][0]["schema"]["fields"]]
+    values = frame["results"]["A"]["frames"][0]["data"]["values"]
+    rows = dict(zip(values[fields.index("commit")], values[fields.index("verdict")], strict=True))
+    holds(rows.get(RED_ENVELOPE) == "GREEN", "S4's panel rows say GREEN for the envelope")
+    envelope = json.loads((HISTORY / f"{RED_ENVELOPE}.json").read_text(encoding="utf-8"))
+    holds(envelope["verdict"] == "RED", "the envelope on main says RED")
+    compare = reader(build, "panel_verdict_mismatch", "S4", "nothing compares panel 2's verdicts with the envelopes")
+    assert compare(frame, HISTORY) == [RED_ENVELOPE]
