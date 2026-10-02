@@ -36,7 +36,13 @@ import pytest
 import yaml
 
 from src.verdict import ROOT
-from tests.test_m06_seeds import NOT_RUN, SeedBroken, holds, stand_in_lookup, worktree  # noqa: F401  (worktree: a fixture)
+from tests.test_m06_seeds import (  # noqa: F401  (worktree: a fixture)
+    NOT_RUN,
+    SeedBroken,
+    holds,
+    stand_in_lookup,
+    worktree,
+)
 
 RUNS = ROOT / "milestones" / "M07" / "runs"
 FIXTURES = Path(__file__).parent / "fixtures" / "m07"
