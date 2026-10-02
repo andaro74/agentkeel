@@ -202,3 +202,36 @@ def test_s1_the_platform_upgrade_was_made():
     run = run_file("f7_1_platform_upgrade.yaml", "S1", 1)
     observed = made(run)
     assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
+
+
+# --- S2: a retired agent's target is gone -------------------------------------
+
+
+@expected_failure
+def test_s2_a_retired_agent_that_still_answers_is_found_by_build():
+    """The records of a retirement that did not hold: CloudTrail's DeleteAgentRuntime, a GetAgentRuntime
+    that still finds the runtime after the limit, the retire job's invocation answered, and an answer
+    record dated after the deletion. `build.f7_2(observation, max_seconds)` must read it as not held and
+    name each (F7.2). Today nothing reads a retirement."""
+    from src.verdict import build
+
+    observation = fixture("s2-retired-agent/observation.json")
+    holds(observation["delete_event"]["eventName"] == "DeleteAgentRuntime", "the fixture carries the deletion's record")
+    holds(observation["get_runtime"]["found"] is True and observation["invocation"]["answered"] is True,
+          "the runtime is still found and still answers")  # fmt: skip
+    holds(observation["answer_records"][0]["last_modified"] > observation["delete_event"]["eventTime"],
+          "an answer record is dated after the deletion")  # fmt: skip
+    read = reader(build, "f7_2", "S2", "nothing reads a retired agent's records against each other")
+    entry = read(observation, 3600.0)
+    assert entry["read"] is True and entry["held"] is False, entry
+    reasons = " ".join(entry["reasons"])
+    assert "invocation" in reasons and "still exists" in reasons and "answer record" in reasons, entry["reasons"]
+
+
+@expected_failure
+def test_s2_the_retirement_was_made():
+    """The retire workflow dispatched for owner-check, its draft pull request, the merge. Made last,
+    after owner-check has deployed, answered, been listed and taken S1 (SPEC/07 §5.1)."""
+    run = run_file("f7_2_retire.yaml", "S2", 1)
+    observed = made(run)
+    assert all(o.get("repository") and o.get("pull_request") for o in observed), observed

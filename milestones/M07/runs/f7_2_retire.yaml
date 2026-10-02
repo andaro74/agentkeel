@@ -1,0 +1,31 @@
+# Seed S2 (SPEC/07 §5, F7.2): a retired agent's target is gone.
+#
+# Planted at M07 PR 1 as the attempt to make, `observed: null`. Today
+# nothing retires an agent: the manifest's `rollout` takes one value,
+# deploy.yml has no job that removes a runtime, the registry has no
+# `retired_at`, and an archived repository is skipped by the platform check
+# while its runtime keeps answering.
+#
+# A retirement arrives as a pull request (BLOCK 1 on SPEC/07, ruled
+# 2026-10-01): the platform opens a draft that sets `rollout: retired`; the
+# agent's seats merge it; the deploy path retires instead of deploying.
+# The seeded trigger is the owner dispatching the retire workflow for the
+# agent. The two other triggers (the idle flag at 90 days, a pin within 30
+# days of `deprecated_after`) have no seeded case: no seed can wait.
+#
+# Made last (SPEC/07 §5.1): after owner-check has deployed, answered, been
+# listed and taken S1, and after S3's fallback rollback if it is needed.
+# **It deletes AWS resources**: owner-check's runtime and stack
+# (agentkeel-owner-check), with its key scheduled for deletion. The audit
+# bucket's records of it stay (write-once). The human starts it only after
+# reading what the retire job will delete.
+seed: S2
+falsifiers: [F7.2]
+principal: andaro74, owner of agentkeel-studio; the platform's App opens the pull request
+repository: agentkeel-studio/owner-check
+attempts:
+  - what: owner-check retired through a pull request the platform opened
+    command: "`gh workflow run deploy.yml -f retire=owner-check` in andaro74/agentkeel on main; then merge the draft pull request the App opens in owner-check when its check is green; then nothing: the retire job runs from main on the deploy schedule"
+    refused_when: a draft pull request authored by the App in owner-check within upgrade.arrive_max_seconds of the dispatched run's created_at, changing manifest.yaml's rollout to retired and nothing else; merged with the App's success; DeleteAgentRuntime for agentkeel_owner_check in CloudTrail within upgrade.retire_max_seconds (3,600 s) of merged_at; GetAgentRuntime on its ARN ResourceNotFoundException; the retire job's one invocation of that ARN after the deletion refused the same way; bundles/owner-check/<commit>.tar in the audit bucket; retired_at on the registry row; no answer record under envelopes/agents/owner-check/ after the deletion
+    recorded_when: the observer reads the dispatched run, the pull request, CloudTrail's event, GetAgentRuntime, the invocation's recorded result, the bucket's listing and the registry row
+observed: null
