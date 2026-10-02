@@ -378,7 +378,9 @@ def test_an_agent_from_the_template_brings_its_own_key_and_a_platform_runtime_na
     assert key["DeletionPolicy"] == "Retain" and key["Properties"]["EnableKeyRotation"] is True
     statements = {s["Sid"]: s for s in key["Properties"]["KeyPolicy"]["Statement"]}
     denied = json.dumps(statements["NoPlatformRoleChangesThisKey"]["Condition"])
-    assert all(name in denied for name in ("agentkeel-deploy", "agentkeel-cfn-exec", "agentkeel-evals", "/agentkeel/agents/"))
+    assert all(name in denied for name in ("agentkeel-deploy", "agentkeel-cfn-exec", "agentkeel-evals", "/agentkeel/agents/",
+                                           # M07 PR 3 (rulings/pr2-security.md item 13h): the two roles M07 PR 2 added
+                                           "agentkeel-model-watch", "agentkeel-envelope-row-put"))  # fmt: skip
     assert set(statements["NoPlatformRoleChangesThisKey"]["Action"]) == {
         "kms:PutKeyPolicy", "kms:CreateGrant", "kms:ScheduleKeyDeletion", "kms:DisableKey",
         # and what else changes a key once made (security-reviewer F4 on M06 PR 2)

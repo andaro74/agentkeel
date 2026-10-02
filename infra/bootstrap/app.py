@@ -1166,6 +1166,9 @@ class BootstrapStack(cdk.Stack):
                 f"arn:aws:iam::{self.account}:role/agentkeel-cfn-exec",
                 f"arn:aws:iam::{self.account}:role/{EVAL_ROLE_NAME}",
                 f"arn:aws:iam::{self.account}:role/agentkeel-developer",
+                # M07 PR 3 (rulings/pr2-security.md item 13h): the two roles M07 PR 2 added.
+                f"arn:aws:iam::{self.account}:role/{MODEL_WATCH_ROLE_NAME}",
+                f"arn:aws:iam::{self.account}:role/{ENVELOPE_ROW_PUT_ROLE_NAME}",
             ]}},
         ))  # fmt: skip
         key.grant_decrypt(eval_role)

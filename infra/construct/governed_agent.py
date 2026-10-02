@@ -73,8 +73,11 @@ UNPINNED = "sha256:" + "0" * 64
 PLATFORM_AGENT = "refagent"
 AGENT_TAG = "agentkeel:agent"  # on the agent's role; the audit bucket's policy reads it as aws:PrincipalTag
 # The roles no key policy here lets alter, grant on, disable or delete the key (R4), as the bootstrap
-# stack's key policy names them, plus every agent role by path.
-PLATFORM_ROLES = ("agentkeel-deploy", "agentkeel-cfn-exec", "agentkeel-evals", "agentkeel-developer")
+# stack's key policy names them, plus every agent role by path. M07 PR 3 (rulings/pr2-security.md item
+# 13h; platform-architect F2 on M07 PR 2): the two roles M07 PR 2 added are named too, before any agent
+# from the template has a key. After a key is made its policy is not changed by any role here.
+PLATFORM_ROLES = ("agentkeel-deploy", "agentkeel-cfn-exec", "agentkeel-evals", "agentkeel-developer",
+                  "agentkeel-model-watch", "agentkeel-envelope-row-put")  # fmt: skip
 
 
 class GovernedAgent(Construct):
