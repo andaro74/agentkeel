@@ -690,17 +690,18 @@ def test_no_agent_role_can_read_the_table_marker(template):
     assert not any(a.startswith("ssm:") for a in allowed(named(template, "agentkeel-boundary")))
 
 
-def test_the_execution_role_may_make_the_default_endpoint_of_a_runtime_being_created_and_nothing_more_on_any_runtime(template):
-    """M07, the second finding under F7.0 (run 37066321605): CreateAgentRuntime authorises the DEFAULT endpoint
-    against runtime/*. One action on runtime/*; every other runtime action stays on the two prefixes."""
+def test_the_execution_role_holds_on_any_runtime_only_what_create_agent_runtime_checks_before_the_runtime_has_an_id(template):
+    """M07, the second finding under F7.0 (runs 37066321605 and 37074759767): CreateAgentRuntime authorises the
+    DEFAULT endpoint, then the tags CloudFormation passes, against runtime/*. Those two actions on runtime/*;
+    every other runtime action stays on the two prefixes."""
     statements = [s for policy in of_type(template, "AWS::IAM::Policy").values()
                   if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
                   for s in policy["Properties"]["PolicyDocument"]["Statement"]]  # fmt: skip
     wide = [s for s in statements if s.get("Effect") == "Allow"
             and any("runtime/*" in json.dumps(r) and "bedrock-agentcore" in json.dumps(r) for r in
                     (s["Resource"] if isinstance(s["Resource"], list) else [s["Resource"]]))]  # fmt: skip
-    assert len(wide) == 1 and wide[0]["Sid"] == "TheDefaultEndpointOfARuntimeBeingCreated"
-    assert actions(wide[0]) == {"bedrock-agentcore:CreateAgentRuntimeEndpoint"}
+    assert len(wide) == 1 and wide[0]["Sid"] == "WhatCreateAgentRuntimeChecksOnTheRuntimeItHasNotNamedYet"
+    assert actions(wide[0]) == {"bedrock-agentcore:CreateAgentRuntimeEndpoint", "bedrock-agentcore:TagResource"}
     (narrow,) = [s for s in statements if s.get("Sid") == "TheRuntimeAndItsWorkloadIdentity"]
     assert not any(":runtime/*" in json.dumps(r) for r in narrow["Resource"])
 

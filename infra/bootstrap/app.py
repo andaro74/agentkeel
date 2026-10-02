@@ -645,20 +645,24 @@ class BootstrapStack(cdk.Stack):
                 "Null": {"bedrock-agentcore:subnets": "false"},
             },
         ))  # fmt: skip
-        # M07, the second finding under F7.0 (run 37066321605, 2026-10-02): CreateAgentRuntime also
-        # authorises the runtime's DEFAULT endpoint, and does so against runtime/* because the runtime has
-        # no id yet. The statement above held CreateAgentRuntimeEndpoint to the two prefixes from M06 PR 2
-        # (platform-architect F4 then), and no create ran after the narrowing until owner-check's, which
-        # the service refused: "not authorized to perform: bedrock-agentcore:CreateAgentRuntimeEndpoint
-        # on resource: ...:runtime/*". refagent's runtime was made on 2026-09-22, when the statement read
-        # runtime/*. This is one action on runtime/*, and it is wider than the two prefixes: the execution
-        # role may also create an endpoint on a runtime in this account that is not the platform's. No
-        # condition narrows it: the service does not say which keys the implicit check carries, and a
-        # second refused create would cost another stack rolled back by hand. Every other runtime action
-        # stays on the two prefixes. Ruled by Security (milestones/M07/rulings/pr4-security.md).
+        # M07, the second finding under F7.0 (runs 37066321605 and 37074759767, 2026-10-02): a runtime
+        # being created has no id yet, so what CreateAgentRuntime authorises on its behalf is checked
+        # against runtime/*, one action at a time. The statement above held every runtime action to the two
+        # prefixes from M06 PR 2 (platform-architect F4 then), and no create ran after the narrowing until
+        # owner-check's. The service refused it twice: first "not authorized to perform:
+        # bedrock-agentcore:CreateAgentRuntimeEndpoint on resource: ...:runtime/*" (the DEFAULT endpoint),
+        # then, with that granted, the same for bedrock-agentcore:TagResource (the three
+        # aws:cloudformation:* tags CloudFormation passes in the create). refagent's runtime was made on
+        # 2026-09-22, when the statement read runtime/*. These two actions on runtime/* are wider than the
+        # two prefixes: the execution role may also create an endpoint on, or tag, a runtime in this account
+        # that is not the platform's. No condition narrows them: the service does not say which keys the
+        # implicit check carries, and each refused create costs a stack rolled back and its retained key and
+        # table deleted by hand. Whether a third action follows is not known until a create passes. Every
+        # other runtime action stays on the two prefixes. Ruled by Security
+        # (milestones/M07/rulings/pr4-security.md).
         role.add_to_policy(iam.PolicyStatement(
-            sid="TheDefaultEndpointOfARuntimeBeingCreated",
-            actions=["bedrock-agentcore:CreateAgentRuntimeEndpoint"],
+            sid="WhatCreateAgentRuntimeChecksOnTheRuntimeItHasNotNamedYet",
+            actions=["bedrock-agentcore:CreateAgentRuntimeEndpoint", "bedrock-agentcore:TagResource"],
             resources=[f"{agentcore}:runtime/*"],
         ))  # fmt: skip
         # The Runtime create handler's VPC-mode calls (describe-type,
@@ -1478,7 +1482,7 @@ APPLIES_TO = {
                           "Resource::*", f"Resource::arn:aws:s3:::{AUDIT_BUCKET}/agents/*"],
     "ExecutionRole/DefaultPolicy/Resource": ["Resource::*"] + [f"Resource::{_ARN.format(service, rest)}" for service, rest in (
         ("bedrock-agentcore", "runtime/agentkeel_*"), ("bedrock-agentcore", "runtime/refagent*"),
-        ("bedrock-agentcore", "runtime/*"),  # M07: the DEFAULT endpoint of a runtime being created
+        ("bedrock-agentcore", "runtime/*"),  # M07: what CreateAgentRuntime checks before the runtime has an id
         ("bedrock-agentcore", "workload-identity-directory/default/workload-identity/*"),
         ("bedrock", "application-inference-profile/*"), ("dynamodb", "table/agentkeel-*-rights"),
         ("ec2", "network-interface/*"), ("ec2", "security-group-rule/*"), ("ec2", "security-group/*"),

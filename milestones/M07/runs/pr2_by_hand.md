@@ -65,7 +65,8 @@ Whichever it is, the table below is filled when it is done.
 | Stack | Commit deployed (`git rev-parse HEAD`) | Deployed at | The diff read, and where its output is kept |
 |---|---|---|---|
 | B1 security | `3bfd074` (as the human stated it) | 2026-10-02 | the console's change set; not kept. **Owed** (platform-architect 3 on M07 PR 3): the sha256 of `AgentkeelSecurity.template.json` synthesised at that commit, and the same hash of the template CloudFormation stores, read by `hector.flores` |
-| B2 bootstrap | not deployed. From `m07-pr4`, which carries the cfn-exec statement above | | |
+| B2 bootstrap, first | `7a9032d` (`m07-pr4`; `CreateAgentRuntimeEndpoint` alone) | 2026-10-02T22:49:50Z (`AgentkeelBootstrap` `LastUpdatedTime`); `AWS_ENVELOPE_ROW_PUT_ROLE_ARN` set 22:51:50Z | **Owed**: the `cdk diff --strict` output the human kept |
+| B2 bootstrap, second | not deployed. From `m07-pr4` at the commit that adds `TagResource` | | |
 | B3 Grafana | not deployed | | |
 
 ## A. The two new Apps, their environments and keys
@@ -225,8 +226,13 @@ cd infra/bootstrap && npx aws-cdk@2 diff --strict | tee "$HOME/agentkeel-b2-diff
 The diff should show, and nothing else:
 
 - `agentkeel-cfn-exec`: one new statement,
-  `TheDefaultEndpointOfARuntimeBeingCreated`, `CreateAgentRuntimeEndpoint`
-  on `runtime/*` (M07 PR 4; the second F7.0 finding, run 37066321605);
+  `WhatCreateAgentRuntimeChecksOnTheRuntimeItHasNotNamedYet`,
+  `CreateAgentRuntimeEndpoint` and `TagResource` on `runtime/*` (M07 PR 4;
+  the second F7.0 finding, runs 37066321605 and 37074759767). The first
+  B2 deploy carried the endpoint action alone, under the sid
+  `TheDefaultEndpointOfARuntimeBeingCreated`; the second B2 deploy renames
+  that statement and adds `TagResource`, and its `cdk diff --strict`
+  shows that one statement and nothing else;
 - `agentkeel-evals`: three new statements,
   `ReadWhichBytesATemplateAgentsRuntimeRuns`, `ReadATemplateAgentsRuntime`
   and `ReadATemplateAgentsImageTags`, each one read-only action (13c);

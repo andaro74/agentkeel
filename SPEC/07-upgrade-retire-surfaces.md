@@ -1035,11 +1035,19 @@ role allowed `CreateAgentRuntimeEndpoint` on `runtime/refagent*` and
 `runtime/agentkeel_*` only. That statement read `runtime/*` when
 refagent's runtime was made (2026-09-22); M06 PR 2 narrowed it, and no
 create ran after the narrowing until this one. The stack rolled back and
-kept its key and its rights table. **The repair is a widening of IAM**:
-one action, `CreateAgentRuntimeEndpoint`, on `runtime/*`, in the
+kept its key and its rights table. With that one action granted and
+deployed (B2, 22:49Z) and the stack deleted, the next create (run
+37074759767, 22:54Z) was refused one check further along:
+`bedrock-agentcore:TagResource` on `runtime/*`, for the three
+`aws:cloudformation:*` tags CloudFormation passes in the create. The
+service checks one action at a time, so each refusal hides the next;
+whether a third follows is not known until a create passes. That stack
+rolled back too and kept a second key, its alias and the table.
+**The repair is a widening of IAM**: two actions,
+`CreateAgentRuntimeEndpoint` and `TagResource`, on `runtime/*`, in the
 bootstrap stack (`infra/bootstrap/app.py`), ruled by Security and
-deployed by hand; it is wider than the platform's own runtimes, and no
-condition narrows it. It is carried in PR 4, the close, and said there
+deployed by hand; they are wider than the platform's own runtimes, and no
+condition narrows them. It is carried in PR 4, the close, and said there
 as a repair in the close. Until it is deployed no agent from the
 template can get a runtime, and every scheduled deploy run fails the
 same way. The owner's test stays a miss, by hours now, whatever the

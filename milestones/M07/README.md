@@ -322,8 +322,19 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   and no create ran between. The stack rolled back (`ROLLBACK_COMPLETE`)
   and kept its key (`ce2d6f46-8088-4bd3-a57e-2c014278aa34`) and its table
   (`agentkeel-owner-check-rights`), which a redeploy would collide with.
+- **Refused again, one check further along.** With
+  `CreateAgentRuntimeEndpoint` on `runtime/*` deployed (B2 from `7a9032d`,
+  22:49Z) and the stack, table and key gone, run 37074759767 (22:54Z)
+  created the stack again and `CreateAgentRuntime` was refused for
+  `TagResource` on `runtime/*`: CloudFormation passes its three
+  `aws:cloudformation:*` tags in the create, and the service checks them
+  against the runtime it has not named yet. The service checks one action
+  at a time. The stack rolled back and kept a second key
+  (`fcd9e973-0d4b-4828-8f7a-022d9b414c65`, this time with
+  `alias/agentkeel-owner-check`) and the table.
 - **The second finding under F7.0, and a repair in the close.** The
-  repair is one action on `runtime/*` in the bootstrap stack, a widening
+  repair is two actions on `runtime/*` in the bootstrap stack, a widening
   of IAM, ruled by Security and deployed by hand (`runs/pr2_by_hand.md`
-  B2). It is in PR 4's branch from its first commit, before the close is
-  written. The owner's test stays a miss.
+  B2, twice). It is in PR 4's branch from its first commit, before the
+  close is written. Whether a third action follows is not known until a
+  create passes. The owner's test stays a miss.
