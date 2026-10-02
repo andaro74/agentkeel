@@ -43,8 +43,9 @@
 # Rewritten at M07 PR 3: observe.yml's header says what its keyed job now holds (tokens minted first, the key let go; security-reviewer 12 on M07 PR 2). No step changes.
 # Rewritten at M07 PR 3 (item 13j): platform-check.yml's and platform-upgrade.yml's headers name infra/platform_grant.yaml as where the grant is read from. No step changes.
 # Rewritten at M07 PR 3 (item 13l): platform-upgrade.yml's header says the open job holds the proposed bytes to the template and the guardrail to main's. No step changes.
+# Rewritten at M07 PR 3 (item 13i): deploy.yml's retire-agent job holds the retired head's manifest to the one at the registry row's commit, before the registry or the stack is touched.
 bedf184401fe99b3e2e3d893c3e7e3569f7dc6eecc689d8585b12fd5ffb98d48  .github/workflows/cold-review-ruling.yml
-d07d1042bf31480d48e5023753899e2b421e02f0812301a85023243d01c43d8b  .github/workflows/deploy.yml
+865b89ef9ce12d39cf923f274da9f5fc988725e8c0b2b35c57918216fcf03d82  .github/workflows/deploy.yml
 2801eb4da8a685088687f046b9ad6a461a352978e74e9f13e49ef2bcd420af7b  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 977005d6918897772b83d279230d5febb4c3c35150d0037d08ed139af8727414  .github/workflows/model-watch.yml

@@ -819,6 +819,20 @@ jobs:
           role-duration-seconds: 3600
           aws-region: us-west-2
 
+      # M07 PR 3 (rulings/pr2-security.md item 13i; platform-architect F4, security-reviewer 17 on M07 PR 2):
+      # the stack below is updated from this head's manifest, and nobody signed this head. The commit the
+      # registry row holds was signed, verified and deployed. So this head's manifest must be that commit's
+      # in every field but rollout. A head that moves another field, or an agent whose row holds no deployed
+      # commit, is refused here, before the registry or the stack is touched. The cost: a head that failed
+      # to deploy before it was retired cannot be retired until it is fixed. The deployed manifest is read
+      # from GitHub's API, as data, with the job's own token.
+      - name: The retired head's manifest is the deployed one's, but for rollout
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          uv run python scripts/retire_agent.py same --name "$NAME" --repository "$REPOSITORY"
+          --repository-id "$REPOSITORY_ID" --retired "agents/$NAME/manifest.yaml"
+
       # The ARN is kept on the registry row before anything is removed, so the one invocation after the
       # deletion, and a rerun of a retirement that failed halfway, still know which ARN to ask. Exit 4 is
       # "already retired"; 3 is another repository's agent, refagent, or no ARN known: refused.

@@ -119,6 +119,21 @@ def test_the_jobs_that_read_an_agent_repository_hold_no_secret():
 
 
 INVOCATION = "One invocation of the retired runtime; anything but ResourceNotFoundException stops here"
+SAME = "The retired head's manifest is the deployed one's, but for rollout"
+
+
+def test_a_retirement_is_held_to_the_deployed_manifest_before_the_registry_or_the_stack_is_touched():
+    """rulings/pr2-security.md item 13i: a retirement is a stack update from a head nobody signed."""
+    steps = load("deploy.yml")["jobs"]["retire-agent"]["steps"]
+    names = [s.get("name") or s.get("uses", "").split("@")[0] for s in steps]
+    held = names.index(SAME)
+    assert names.index("aws-actions/configure-aws-credentials") < held  # the registry is read as the deploy role
+    assert held < names.index("Keep the runtime's ARN, before it is removed") \
+        < names.index("Update agentkeel-<name> to the stack without its runtime")
+    step = steps[held]
+    assert "if" not in step  # never skipped
+    assert "retire_agent.py same" in step["run"] and '--retired "agents/$NAME/manifest.yaml"' in step["run"]
+    assert step["env"] == {"GITHUB_TOKEN": "${{ github.token }}"}  # no App key, no other secret
 
 
 def test_the_table_panel_2_reads_is_written_through_the_shared_reader_of_envelopes():
