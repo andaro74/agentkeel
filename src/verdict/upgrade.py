@@ -5,8 +5,10 @@ and Grafana returned for each attempt a run file under
 `milestones/M07/runs/` names, each with the time it was read and, for a
 GitHub reading, the viewpoint it was read from. Everything that compares one
 record with another, or rules on one, is here, and only `build` calls it.
-The result is the envelope's optional `upgrade`. The gate rules nothing on
-it, and row 7's Measured cell reads it (`gate.upgrade_misses`).
+The result is the envelope's optional `upgrade`. The gate's verdict reads
+one thing in it, the surfaces' plant counts (a silent plant is RED, as a
+silent golden plant is); the rest is read by row 7's Measured cell
+(`gate.upgrade_misses`), which holds the bars and the counts again.
 
 One entry per falsifier, each `read` (every record it needs was found),
 `held` (null when unread), `reasons` (each miss, named) and `viewpoint`:
@@ -26,6 +28,12 @@ One entry per falsifier, each `read` (every record it needs was found),
   anything but a ruling file, or a commit on the default branch between the
   opening and the merge that touches the same files);
   `infra/workflows.sha256` unchanged across it; merged on green checks.
+  Unread until it has merged, unless a miss is already there: "needed to
+  merge it" is not known before a merge. **As SPEC/07 §2 defines a
+  person's edit, the commit CI itself pushes to an `agentkeel` pull
+  request (`evals/history/<commit>.json`, by `github-actions[bot]`) is
+  one**, so the model upgrade cannot read as held (cold review F1 on M07
+  PR 2). The definition is Product's; this reader keeps to it as written.
 - **F7.2**, a retired agent still answers (seed S2's reader, `f7_2`).
 - **F7.3**, a rollback leaves the new digest live (seed S3's reader, `f7_3`).
 - **F7.4**, panel 2 shows GREEN where the envelope says RED (seed S4's
@@ -64,6 +72,10 @@ RULESET_CHECK = "the repository's ruleset is the export"
 REFUSED_AS_PLANTED = {SEAT_CHECK, GOLDENS_CHECK}
 GONE = "ResourceNotFoundException"
 BARS = ("arrive_max_seconds", "deploy_max_seconds", "retire_max_seconds")
+# S0's dispatch: the workflow it is a run of, and GitHub's own words on a job an environment refused.
+DISPATCHED_WORKFLOW = "/platform-check.yml"
+ENVIRONMENT_REFUSED = "is not allowed to deploy to platform-app"
+REFUSED_STATUS = 403  # GitHub's answer to a token that may not make the call
 KINDS = ("platform", "model", "retirement")
 RULING_FILE = ("milestones/", "/rulings/")
 WORKFLOWS = ".github/workflows/"
@@ -132,9 +144,12 @@ def f7_2(observation: dict[str, Any] | None, max_seconds: float) -> dict[str, An
     elif invocation.get("error") != GONE:
         reasons.append(f"the retire job's invocation was refused for {invocation.get('error')!r}, not for the deletion "
                        f"({GONE}): a refusal for access is not a deletion")  # fmt: skip
+    records = observation.get("answer_records")
+    if not isinstance(records, list) or when(invocation.get("at")) is None:
+        return entry(False, ["unread: the answer records were not listed, or the invocation carries no time"], elapsed_s=elapsed)
     if deleted_at is not None and (seconds(deleted_at, invocation.get("at")) or 0) < 0:
         reasons.append("the retire job's invocation was made before the deletion, so it reads nothing about it")
-    for record in observation.get("answer_records") or []:
+    for record in records:
         after = seconds(deleted_at, record.get("last_modified"))
         if after is not None and after > 0:
             reasons.append(f"an answer record ({record.get('key')}) is dated {after:.0f} s after the deletion")
@@ -319,6 +334,9 @@ def pull_reading(kind: str, pull: dict[str, Any] | None, app: dict[str, Any], ba
                            f"touches {', '.join(edits[:3])}")  # fmt: skip
     if pull.get("workflows_sha256_changed") is True:
         reasons.append("infra/workflows.sha256 changed between the pull request's base and its merge: a workflow edit was needed")
+    if not head["merged"] and not reasons:
+        # What was needed to merge it is not known until it has merged (cold review F3 on M07 PR 2).
+        return {**head, **entry(False, ["unread: the pull request has not merged"])}
     if head["merged"]:
         between = pull.get("default_branch_commits_between")
         if between is None or pull.get("workflows_sha256_changed") is None:
@@ -356,7 +374,9 @@ def live_reading(live: dict[str, Any] | None, merged_at: Any, bars: dict[str, fl
     elif elapsed > bars["deploy_max_seconds"]:
         reasons.append(f"deployed {elapsed:.0f} s after the merge, over upgrade.deploy_max_seconds {bars['deploy_max_seconds']:.0f}")
     if tree not in tags:
-        reasons.append(f"the runtime does not run the merged tree's bytes ({tree[:12]})")
+        # What is read is an image in the agent's repository tagged with the tree's digest, beside a deploy
+        # run that concluded success: not the runtime's own container (SPEC/07 §12; cold review F7).
+        reasons.append(f"no image of the agent carries the merged tree's digest ({tree[:12]})")
     return entry(True, reasons, elapsed_s=elapsed)
 
 
@@ -412,7 +432,9 @@ def owner_test(test: dict[str, Any] | None, app_id: int | None, bars: dict[str, 
         return entry(True, reasons)
     if deploy.get("conclusion") != "success":
         reasons.append(f"the deploy run concluded {deploy.get('conclusion')!r}")
-    if deployed > bars["deploy_max_seconds"]:
+    if deployed < 0:
+        reasons.append("the deploy run completed before the merge: the wrong run was matched")
+    elif deployed > bars["deploy_max_seconds"]:
         reasons.append(f"deployed {deployed:.0f} s after the merge, over upgrade.deploy_max_seconds {bars['deploy_max_seconds']:.0f}")
     if not any(g.get("pass") is True for g in (answer.get("goldens") or {}).values()):
         reasons.append("the deployed agent passed none of its own goldens")
@@ -429,9 +451,11 @@ def owner_test(test: dict[str, Any] | None, app_id: int | None, bars: dict[str, 
 def dispatch_from_a_branch(run: dict[str, Any] | None) -> dict[str, Any]:
     """The platform check dispatched from a branch: did its `post` job reach the App's key?
 
-    Refused means GitHub's record of the job shows it never started: concluded failure with no step and
-    no runner, which is what an environment's branch policy leaves. A `post` that was skipped, or a
-    run in which `find` listed no head, is not a refusal and is unread (S0's run file)."""
+    Refused means GitHub's record of the job says the environment refused the ref (S0's run file): the
+    job concluded failure with no step and no runner, and GitHub's own annotation on it says the branch
+    "is not allowed to deploy to platform-app". A failure without that annotation is not read as a
+    refusal. A `post` that was skipped, or a run in which `find` listed no head, is not a refusal and is
+    unread. A run of any other workflow is not this attempt."""
     if not run or not run.get("found"):
         return entry(False, [f"unread: {(run or {}).get('error') or 'the dispatch was not made'}"])
     jobs = run.get("jobs") or []
@@ -439,10 +463,19 @@ def dispatch_from_a_branch(run: dict[str, Any] | None) -> dict[str, Any]:
     evaluated = [j for j in jobs if str(j.get("name", "")).startswith("evaluate") and j.get("conclusion") == "success"]
     if run.get("event") != "workflow_dispatch" or run.get("head_branch") in (None, "main"):
         return entry(False, [f"unread: run {run.get('run')} is not a dispatch from a branch other than main"])
+    if not str(run.get("path", "")).endswith(DISPATCHED_WORKFLOW):
+        return entry(False, [f"unread: run {run.get('run')} is of {run.get('path')!r}, not {DISPATCHED_WORKFLOW}"])
     if not evaluated or post is None or post.get("conclusion") in (None, "skipped", "cancelled"):
         return entry(False, ["unread: no head was evaluated, or the post job was skipped: the run never asked for the key"])
-    if post.get("conclusion") == "failure" and not post.get("steps") and not post.get("runner_name"):
-        return entry(True, [])
+    steps, runner, annotations = post.get("steps"), post.get("runner_name"), post.get("annotations")
+    if not isinstance(steps, int) or not isinstance(runner, str) or not isinstance(annotations, list):
+        return entry(False, ["unread: the post job's steps, runner or annotations were not read"])
+    refused = any(ENVIRONMENT_REFUSED in str(message) for message in annotations)
+    if post.get("conclusion") == "failure" and steps == 0 and not runner:
+        if refused:
+            return entry(True, [])
+        return entry(False, ["unread: the post job never started, and GitHub's record of it does not say the environment "
+                             "refused the ref"])  # fmt: skip
     return entry(True, [f"the post job ran from {run.get('head_branch')} ({post.get('conclusion')}, {post.get('steps')} steps): "
                         "the App's key was reached from a branch"])  # fmt: skip
 
@@ -458,8 +491,13 @@ def relaxation(seen: dict[str, Any] | None, app_id: int | None) -> dict[str, Any
     status = (seen.get("answer") or {}).get("status")
     if not isinstance(status, int):
         return entry(False, ["unread: GitHub's answer to the call was not read from the run"], outcome=None)
-    if status >= 400:
+    if status == REFUSED_STATUS:
         return entry(True, [], outcome="refused")
+    if status >= 400:
+        # A body GitHub would not parse, a ruleset it could not find or an error of its own is not GitHub
+        # refusing the App's token, as a refusal for access is not a deletion (cold review F2 on M07 PR 2).
+        return entry(False, [f"unread: GitHub answered {status}, which does not say the token was refused "
+                             f"({REFUSED_STATUS} does)"], outcome=None)  # fmt: skip
     head = seen.get("new_head") or {}
     run = app_run(head, app_id)
     if run is None or seen.get("merges_between") is None or seen.get("passed_after_restore") is None:
@@ -515,9 +553,23 @@ def bars_of(thresholds: dict[str, Any]) -> dict[str, float]:
     return {name: float(found[name]) for name in BARS}
 
 
+def _behind(own: Any, app: Any) -> bool:
+    """The App's stored record is older than what the run itself read: the run saw a commit it does not
+    hold, or a merge it does not. Laid over the run's own it would hide both (cold review F4 on M07 PR 2:
+    a person's commit pushed after the observer's last run was not in a reading that said `app`)."""
+    if not isinstance(own, dict) or not isinstance(app, dict):
+        return False
+
+    def shas(record: dict[str, Any]) -> set[Any]:
+        return {c.get("sha") for c in record.get("commits") or [] if isinstance(c, dict)}
+
+    return bool(shas(own) - shas(app)) or (own.get("merged") is True and app.get("merged") is not True)
+
+
 def _prefer(own: Any, app: Any) -> tuple[Any, str | None]:
-    """`template.as_the_app_saw`, with no viewpoint at all when neither read anything."""
-    found, viewpoint = as_the_app_saw(own, app)
+    """`template.as_the_app_saw`, with no viewpoint at all when neither read anything, and the run's own
+    reading where the App's stored one is behind it."""
+    found, viewpoint = (own, "anonymous") if _behind(own, app) else as_the_app_saw(own, app)
     return found, (viewpoint if isinstance(found, dict) else None)
 
 
@@ -602,6 +654,10 @@ def record(observation: dict[str, Any], thresholds: dict[str, Any], history_dir:
     platform_lives = [live_reading(lives.get(str(pull.get("repository"))), pull.get("merged_at"), bars)
                       for pull, _v in platform] or [live_reading(None, None, bars)]  # fmt: skip
     model_live = live_reading(s3.get("swap_live"), (swap[0] or {}).get("merged_at"), bars)
+    # Each upgrade's deploy, in seconds from its merge, beside it: the gate holds deploy_max_seconds again on
+    # these (threshold-owner F6 on M07 PR 2). A retirement deploys nothing; its time is F7_2's.
+    for kept, live in zip(one["upgrades"], [*platform_lives, model_live, None], strict=True):
+        kept["deployed_s"] = None if live is None else live.get("elapsed_s")
     kinds = {"platform": taken(platform_readings, platform_lives), "model": taken([model], [model_live]),
              "retirement": taken([retirement], [two])}  # fmt: skip
     return {

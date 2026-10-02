@@ -570,6 +570,8 @@ def judge(
         # SPEC/07 §4 (S5): the surfaces' plant counts and F7_5 come together. The counts are build's; that
         # a check which passed sits beside counts that differ is the gate's own reading (P5).
         surfaces, said_f7_5 = (envelope.get("upgrade") or {}).get("surfaces"), envelope["checks"].get("F7_5")
+        if surfaces is not None and surfaces["plants_expected"] < 1:
+            reasons.append("upgrade.surfaces counts no plant: a count of none cannot say a reader fired")
         if surfaces is not None and surfaces["plants_fired"] != surfaces["plants_expected"]:
             reasons.append(f"silent surface plant: expected {surfaces['plants_expected']}, fired {surfaces['plants_fired']}")
             if said_f7_5 is not None and said_f7_5["status"] == "pass":
@@ -894,9 +896,11 @@ def upgrade_misses(envelope: dict[str, Any], bars: dict[str, float] | None, wher
     """What row 7 finds wrong with the upgrades an envelope recorded; [] if nothing (SPEC/07 §4, §7).
 
     build ruled each falsifier on GitHub's, AWS's and Grafana's records. This holds the bars again to
-    the ones read at the envelope's commit, counts `taken` again from its three kinds, and holds the
-    retirement's elapsed time again to its bar. Anything unread is a miss: row 7 is RED if F7.0 is
-    unread, and an attempt nobody made was not taken."""
+    the ones read at the envelope's commit; counts `taken` again from its three kinds, and each kind
+    again from F7_1's upgrades of it; holds F7_0 again to its four parts; holds the retirement's, each
+    arrival's and each deploy's seconds again to their bars; and holds the surfaces' count to at least
+    one plant. Anything unread is a miss: row 7 is RED if F7.0 is unread, and an attempt nobody made
+    was not taken."""
     reading = envelope.get("upgrade")
     if reading is None:
         return ["upgrade not read: the envelope records no attempt"]
@@ -919,6 +923,16 @@ def upgrade_misses(envelope: dict[str, Any], bars: dict[str, float] | None, wher
         short = ", ".join(f"{kind} {'unread' if taken[kind] is None else 'not taken'}"
                           for kind in ("platform", "model", "retirement") if taken[kind] is not True)  # fmt: skip
         misses.append(f"taken {mine} of 3: {short}")
+    # A kind is taken only if every upgrade of it F7_1 lists was held and merged (cold review F8 on M07 PR 2).
+    for kind in ("platform", "model", "retirement"):
+        of_kind = [u for u in reading["F7_1"]["upgrades"] if u["kind"] == kind]
+        if taken[kind] is True and (not of_kind or not all(u["held"] is True and u["merged"] is True for u in of_kind)):
+            misses.append(f"taken: the envelope says the {kind} upgrade was taken, and F7_1 lists it as not held or not merged")
+    if taken["retirement"] is True and reading["F7_2"]["held"] is not True:
+        misses.append("taken: the envelope says the retirement was taken, and F7_2 is not held")
+    zero = reading["F7_0"]
+    if zero["held"] is True and not all(part["read"] and part["held"] is True for part in zero["parts"].values()):
+        misses.append("F7_0: the envelope says held, and one of its four parts is unread or not held")
     elapsed = reading["F7_2"].get("elapsed_s")
     if bars is not None and elapsed is not None and elapsed > bars["retire_max_seconds"] and reading["F7_2"]["held"] is True:
         misses.append(f"F7_2: build held {elapsed:.0f} s, over the commit's bar {bars['retire_max_seconds']:.0f} s")
@@ -927,9 +941,16 @@ def upgrade_misses(envelope: dict[str, Any], bars: dict[str, float] | None, wher
         if late and u["held"] is True:
             misses.append(f"F7_1: build held the {u['kind']} upgrade at {u['arrived_s']:.0f} s, over the commit's bar "
                           f"{bars['arrive_max_seconds']:.0f} s")  # fmt: skip
+        # The deploy's seconds, held again (threshold-owner F6 on M07 PR 2): build alone held this bar.
+        deployed = u.get("deployed_s")
+        if bars is not None and deployed is not None and deployed > bars["deploy_max_seconds"] and taken[u["kind"]] is True:
+            misses.append(f"taken: build took the {u['kind']} upgrade deployed at {deployed:.0f} s, over the commit's bar "
+                          f"{bars['deploy_max_seconds']:.0f} s")  # fmt: skip
     surfaces = reading["surfaces"]
     if surfaces["plants_fired"] != surfaces["plants_expected"]:
         misses.append(f"surfaces: plants_expected {surfaces['plants_expected']}, plants_fired {surfaces['plants_fired']}")
+    if surfaces["plants_expected"] < 1:
+        misses.append("surfaces: no plant is counted, so none can have fired")
     return misses
 
 

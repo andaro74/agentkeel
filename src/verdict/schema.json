@@ -541,7 +541,7 @@
       }
     },
     "upgrade": {
-      "description": "From M07 PR 2 (SPEC/07 section 4). Claim 7's readings as scripts/observe_upgrade.py read GitHub, AWS and Grafana and verdict.build (src/verdict/upgrade.py) ruled on them: F7.0 to F7.5, each read or not, held or not, with its reasons and the viewpoint its GitHub records were read from, the surfaces' plant counts, and `taken`, how many of the three upgrades (platform, model, retirement) arrived as a pull request the platform opened and went live. Recorded, never gated; the ledger's row 7 reading reads it, with `template`. Optional, so no envelope before it becomes invalid.",
+      "description": "From M07 PR 2 (SPEC/07 section 4). Claim 7's readings as scripts/observe_upgrade.py read GitHub, AWS and Grafana and verdict.build (src/verdict/upgrade.py) ruled on them: F7.0 to F7.5, each read or not, held or not, with its reasons and the viewpoint its GitHub records were read from, the surfaces' plant counts, and `taken`, how many of the three upgrades (platform, model, retirement) arrived as a pull request the platform opened and went live. Live, for a platform or a model upgrade, is read as a deploy run that concluded success within the bar and an image of the agent tagged with the merged tree's digest, not from the runtime's own container (SPEC/07 section 12). The gate's verdict reads the surfaces' plant counts and nothing else in it; the ledger's row 7 reading reads the rest, with `template`. Optional, so no envelope before it becomes invalid.",
       "type": "object",
       "additionalProperties": false,
       "required": ["looked_up_at", "bars", "app_observation", "F7_0", "F7_1", "F7_2", "F7_3", "F7_4", "F7_5", "surfaces", "taken"],
@@ -614,6 +614,7 @@
                   "pull_request": {"type": ["integer", "null"]},
                   "arrived_s": {"description": "The pull request's created_at less its trigger's time, both GitHub's.", "type": ["number", "null"]},
                   "merged": {"type": ["boolean", "null"]},
+                  "deployed_s": {"description": "The deploy run's completion less the pull request's merged_at, both GitHub's. Null for a retirement, whose time is F7_2's, and until a deploy is read.", "type": ["number", "null"]},
                   "read": {"type": "boolean"},
                   "held": {"type": ["boolean", "null"]}
                 }

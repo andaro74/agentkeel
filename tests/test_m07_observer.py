@@ -79,8 +79,12 @@ def test_a_pull_request_is_written_with_who_opened_it_its_files_its_commits_and_
     assert pull["found"] is True and pull["error"] is None
     assert pull["author"] == {"login": "agentkeel-upgrades[bot]", "type": "Bot", "app_id": OPENER, "app_slug": "agentkeel-upgrades"}
     assert pull["files"] == ["manifest.yaml", "server.py"] and pull["merged"] is True and pull["merge_commit_sha"] == "4" * 40
+    nobody = {"login": None, "type": None, "app_id": None, "app_slug": None}
+    # The committer and GitHub's verification are written raw beside the author (cold review F5 on M07 PR 2:
+    # "no person's edit" rests on the author's login). Nothing rules on them yet.
     assert pull["commits"] == [{"sha": "1" * 40, "author": {"login": "agentkeel-upgrades[bot]", "type": "Bot", "app_id": None,
-                                                           "app_slug": None}, "files": ["manifest.yaml", "server.py"]}]  # fmt: skip
+                                                           "app_slug": None}, "committer": nobody, "verified": None,
+                                "files": ["manifest.yaml", "server.py"]}]  # fmt: skip
     assert pull["required_on_head"] == {"platform-check": "success"}
     assert pull["default_branch_commits_between"] == []  # the merge commit itself is the pull request's own
     # build rules on it as written: held, once it carries its trigger.
@@ -218,12 +222,21 @@ def test_the_dispatch_already_recorded_is_read_from_githubs_jobs_as_refused():
                                                               "path": ".github/workflows/platform-check.yml",
                                                               "created_at": "2026-10-02T04:12:44Z"},
         (observer.PLATFORM, f"/actions/runs/{raw['run']}/jobs"): {"jobs": [
-            {"name": j["name"], "conclusion": j["conclusion"], "runner_name": j["runner_name"],
-             "steps": [{"name": s} for s in j["steps"]]} for j in raw["jobs"]]},
+            {"id": 100 + n, "name": j["name"], "conclusion": j["conclusion"], "runner_name": j["runner_name"],
+             "steps": [{"name": s} for s in j["steps"]]} for n, j in enumerate(raw["jobs"])]},
+        # GitHub's own annotations on the refused job (check run 110702392789, read 2026-10-02).
+        (observer.PLATFORM, "/check-runs/102/annotations"): [
+            {"message": 'Branch "m07-pr1" is not allowed to deploy to platform-app due to environment protection rules.'},
+            {"message": "The deployment was rejected or didn't satisfy other protection rules."}],
     }  # fmt: skip
     seen = observer.read_dispatch(FakeGitHub(pages), {"run": raw["run"]})
     assert [(j["name"].split()[0], j["steps"]) for j in seen["jobs"]] == [("find", 8), ("evaluate", 11), ("post", 0)]
+    assert seen["jobs"][0]["annotations"] == [] and len(seen["jobs"][2]["annotations"]) == 2  # asked for the failed job only
     assert upgrade.dispatch_from_a_branch(seen) == {"read": True, "held": True, "reasons": []}
+    # Annotations that could not be read are unread, not "none": the refusal is GitHub's word, never inferred.
+    del pages[(observer.PLATFORM, "/check-runs/102/annotations")]
+    unread = observer.read_dispatch(FakeGitHub(pages), {"run": raw["run"]})
+    assert unread["jobs"][2]["annotations"] is None and upgrade.dispatch_from_a_branch(unread)["read"] is False
 
 
 def test_the_run_files_as_they_stand_name_one_attempt_made_the_dispatch(monkeypatch):

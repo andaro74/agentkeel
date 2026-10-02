@@ -7,6 +7,7 @@ own commit. Each can disagree with the one before it, and a test here shows each
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from typing import Any
@@ -324,3 +325,33 @@ def two_key_bars(text: str) -> str:
     from src.gates import two_key
 
     return " ".join(two_key.bars(yaml.safe_load(text)))
+
+
+# --- after the cold review of M07 PR 2: what the gate counts again (cold review F8; threshold-owner F6) ----
+
+
+def test_the_gate_counts_each_kind_again_and_holds_the_deploy_bar_again():
+    reading = upgrade.record(full(), THRESHOLDS, HISTORY, template=TEMPLATE)
+    template = {"F6_1": {"read": True, "held": True}, "F6_3": {"read": True, "held": False, "elapsed_s": 30000.0}}
+    assert gate.upgrade_misses(envelope_with(reading, template), BARS, "here") == []
+
+    def misses(change) -> list[str]:
+        mine = copy.deepcopy(reading)
+        change(mine)
+        return gate.upgrade_misses(envelope_with(mine, template), BARS, "here")
+
+    # build says a kind was taken, and F7_1's own list of that kind says it was not held, or not merged.
+    said = misses(lambda r: next(u for u in r["F7_1"]["upgrades"] if u["kind"] == "model").update(held=False))
+    assert any("the model upgrade was taken, and F7_1 lists it as not held or not merged" in m for m in said)
+    said = misses(lambda r: next(u for u in r["F7_1"]["upgrades"] if u["kind"] == "platform").update(merged=False))
+    assert any("the platform upgrade was taken" in m for m in said)
+    assert any("the retirement was taken, and F7_2 is not held" in m for m in misses(lambda r: r["F7_2"].update(held=False)))
+    # F7_0 says held, and one of its parts does not.
+    said = misses(lambda r: r["F7_0"]["parts"]["relaxation"].update(read=False, held=None))
+    assert any("one of its four parts is unread or not held" in m for m in said)
+    # A deploy over the commit's bar that build took.
+    said = misses(lambda r: next(u for u in r["F7_1"]["upgrades"] if u["kind"] == "platform").update(deployed_s=3601.0))
+    assert any("deployed at 3601 s, over the commit's bar 3600 s" in m for m in said)
+    # A count of no plants is not a count that fired.
+    said = misses(lambda r: r["surfaces"].update(plants_expected=0, plants_fired=0))
+    assert any("no plant is counted" in m for m in said)

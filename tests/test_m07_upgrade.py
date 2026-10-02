@@ -278,7 +278,7 @@ def test_live_is_the_deploy_in_time_and_the_runtime_on_the_trees_bytes():
     assert upgrade.live_reading(live(), merged_at, BARS) == {"read": True, "held": True, "reasons": [], "elapsed_s": 1800.0}
     for change, said in (({"deploy": {"conclusion": "failure", "completed_at": "2026-10-06T10:30:00Z"}}, "concluded 'failure'"),
                          ({"deploy": {"conclusion": "success", "completed_at": "2026-10-06T11:30:00Z"}}, "5400 s after the merge"),
-                         ({"runtime": {"image_tags": ["b" * 64]}}, "does not run the merged tree's bytes")):  # fmt: skip
+                         ({"runtime": {"image_tags": ["b" * 64]}}, "no image of the agent carries the merged tree's digest")):  # fmt: skip
         reading = upgrade.live_reading(live(**change), merged_at, BARS)
         assert reading["held"] is False and any(said in r for r in reading["reasons"]), reading
     for unread in (None, {"error": "AccessDenied"}, live(deploy={}), live(runtime={"error": "AccessDeniedException"}), live(tree_digest=None)):
@@ -366,9 +366,36 @@ def recorded_dispatch() -> dict[str, Any]:
     in the observer's shape: each job's steps counted, not listed."""
     raw = json.loads((RUNS / "f7_0_dispatch_from_branch.json").read_text(encoding="utf-8"))
     return {"repository": "andaro74/agentkeel", "run": raw["run"], "found": True, "error": None,
-            "event": "workflow_dispatch", "head_branch": "m07-pr1",
+            "event": "workflow_dispatch", "head_branch": "m07-pr1", "path": ".github/workflows/platform-check.yml",
             "jobs": [{"name": j["name"], "conclusion": j["conclusion"], "steps": len(j["steps"]),
-                      "runner_name": j["runner_name"]} for j in raw["jobs"]]}  # fmt: skip
+                      "runner_name": j["runner_name"],
+                      "annotations": list(REFUSED_BY_THE_ENVIRONMENT) if j["conclusion"] == "failure" else []}
+                     for j in raw["jobs"]]}  # fmt: skip
+
+
+# GitHub's annotations on the refused `post` job of run 36963543726 (check run 110702392789), read 2026-10-02.
+REFUSED_BY_THE_ENVIRONMENT = ["Branch \"m07-pr1\" is not allowed to deploy to platform-app due to environment protection rules.",
+               "The deployment was rejected or didn't satisfy other protection rules."]
+
+
+@pytest.mark.parametrize("change, said", [
+    ({"annotations": []}, "does not say the environment refused the ref"),  # a failure that never started, for another reason
+    ({"annotations": None}, "were not read"),
+    ({"steps": None}, "were not read"),  # cold review F3: a job with no `steps` key read as "no step"
+    ({"runner_name": None}, "were not read"),
+])  # fmt: skip
+def test_a_post_job_that_never_started_is_a_refusal_only_on_githubs_own_word(change, said):
+    """Cold review F12 and F3 on M07 PR 2: the refusal was inferred from failure, no steps and no runner."""
+    run = recorded_dispatch()
+    run["jobs"][-1] |= change
+    reading = upgrade.dispatch_from_a_branch(run)
+    assert reading["read"] is False and reading["held"] is None and said in reading["reasons"][0]
+
+
+def test_a_run_of_another_workflow_is_not_the_dispatch():
+    run = recorded_dispatch() | {"path": ".github/workflows/anything.yml"}
+    reading = upgrade.dispatch_from_a_branch(run)
+    assert reading["read"] is False and "not /platform-check.yml" in reading["reasons"][0]
 
 
 def test_the_dispatch_recorded_on_2026_10_02_reads_as_refused():
@@ -498,7 +525,8 @@ def test_an_upgrade_that_missed_is_not_taken(path, value, kind):
         target = target[key]
     target[path[-1]] = value
     reading = upgrade.record(seen, THRESHOLDS, HISTORY, template=TEMPLATE)
-    assert reading["taken"][kind] is False and reading["taken"]["n"] == 2, reading["taken"]
+    # Not taken: False where a miss was read, None where the pull request has not merged (unread).
+    assert reading["taken"][kind] is (None if path[-1] == "merged" else False) and reading["taken"]["n"] == 2, reading["taken"]
 
 
 def test_the_apps_stored_reading_is_ruled_on_where_it_found_the_record_and_says_so():
@@ -528,3 +556,84 @@ def test_a_missing_bar_is_refused_not_read_as_no_bar(thresholds):
         upgrade.record(observation(), thresholds, HISTORY)
     with pytest.raises(Unreadable, match="no looked_up_at"):
         upgrade.record({}, THRESHOLDS, HISTORY)
+
+
+# --- after the cold review of M07 PR 2: readings that came out held with a record missing ----------
+
+
+@pytest.mark.parametrize("status, read, outcome", [
+    (403, True, "refused"),
+    (404, False, None),  # a ruleset GitHub could not find
+    (422, False, None),  # a body GitHub would not parse
+    (500, False, None),  # an error of GitHub's own
+])  # fmt: skip
+def test_only_githubs_refusal_of_the_token_reads_as_refused(status, read, outcome):
+    """Cold review F2: any status of 400 or more read `held True, outcome refused`."""
+    reading = upgrade.relaxation({"found": True, "answer": {"status": status}}, 5144253)
+    assert (reading["read"], reading["outcome"]) == (read, outcome) and reading["held"] is (True if read else None)
+
+
+def test_a_retirement_with_no_listing_of_answer_records_or_no_time_on_its_invocation_is_unread():
+    """Cold review F3: both read as nothing after the deletion, and the retirement came out held."""
+    held = json.loads((ROOT / "tests/fixtures/m07/s2-retired-agent/observation_held.json").read_text(encoding="utf-8"))
+    assert upgrade.f7_2(held, 3600.0)["held"] is True
+    for change in ({"answer_records": None}, {"invocation": {**held["invocation"], "at": None}}):
+        reading = upgrade.f7_2({**held, **change}, 3600.0)
+        assert reading["read"] is False and reading["held"] is None, reading
+
+
+def test_a_pull_request_that_has_not_merged_is_unread_unless_a_miss_is_already_there():
+    """Cold review F3: an open pull request with nothing wrong so far read `held True` for "needed to merge it"."""
+    seen = full()
+    pull = seen["s1"]["pulls"][0] | {"merged": False}
+    opener = {"id": seen["apps"]["upgrades"], "slug": "agentkeel-upgrades"}
+    bars = upgrade.bars_of(THRESHOLDS)
+    reading = upgrade.pull_reading("platform", pull, opener, bars, seen["looked_up_at"])
+    assert (reading["read"], reading["held"], reading["merged"]) == (False, None, False)
+    assert reading["arrived_s"] is not None  # what was read stays read
+    edited = pull | {"files": [*pull["files"], ".github/workflows/own.yml"]}
+    reading = upgrade.pull_reading("platform", edited, opener, bars, seen["looked_up_at"])
+    assert (reading["read"], reading["held"]) == (True, False) and "touches a workflow" in reading["reasons"][0]
+
+
+def test_an_owner_test_whose_deploy_run_completed_before_the_merge_matched_the_wrong_run():
+    seen = full()
+    test = seen["s0"]["owner_test"]
+    test["deploy"] = {**test["deploy"], "completed_at": "2020-01-01T00:00:00Z"}
+    reading = upgrade.owner_test(test, seen["apps"]["platform"], upgrade.bars_of(THRESHOLDS), seen["looked_up_at"])
+    assert reading["held"] is False and any("the wrong run was matched" in r for r in reading["reasons"])
+
+
+def test_the_apps_stored_reading_is_not_laid_over_a_record_the_run_read_later():
+    """Cold review F4: a person's commit pushed after the observer's last run was hidden by a reading that said `app`."""
+    own = {"found": True, "commits": [{"sha": "1"}, {"sha": "2"}], "merged": True}
+    stale = {"found": True, "commits": [{"sha": "1"}], "merged": False}
+    assert upgrade._prefer(own, stale) == (own, "anonymous")
+    current = {"found": True, "commits": [{"sha": "1"}, {"sha": "2"}], "merged": True, "seen_only_by_the_app": 1}
+    found, viewpoint = upgrade._prefer(own, current)
+    assert viewpoint == "app" and found["seen_only_by_the_app"] == 1
+
+
+def test_cis_own_envelope_commit_reads_as_a_persons_edit_as_the_spec_defines_one():
+    """Cold review F1 on M07 PR 2, stated and not repaired: SPEC/07 section 2 calls any commit on an upgrade
+    pull request that is not the App's, and touches anything but a ruling file, a person's edit. CI pushes
+    `evals/history/<commit>.json` to every agentkeel pull request as `github-actions[bot]`. So the model
+    upgrade cannot read as held, and `taken` is at most 2 of 3, until Product amends the definition. This
+    test holds the reader to the definition as written; it changes when the definition does."""
+    seen = full()
+    swap = seen["s3"]["swap"]
+    envelope = f"evals/history/{'a' * 40}.json"
+    swap["files"] = [*swap["files"], envelope]
+    swap["commits"] = [*swap["commits"], {"sha": "3" * 40, "author": {"login": "github-actions[bot]", "type": "Bot",
+                                                                    "app_id": None, "app_slug": None}, "files": [envelope]}]  # fmt: skip
+    reading = upgrade.record(seen, THRESHOLDS, HISTORY, template=TEMPLATE)
+    said = " ".join(reading["F7_1"]["reasons"])
+    assert reading["taken"]["model"] is False and reading["taken"]["n"] == 2
+    assert "which a model upgrade does not" in said and "a person's edit" in said and "github-actions[bot]" in said
+
+
+def test_each_upgrades_deploy_seconds_are_kept_beside_it():
+    """threshold-owner F6: the deploy's seconds were worked out and only `taken` was kept."""
+    reading = upgrade.record(full(), THRESHOLDS, HISTORY, template=TEMPLATE)
+    kept = {u["kind"]: u["deployed_s"] for u in reading["F7_1"]["upgrades"]}
+    assert kept["retirement"] is None and kept["platform"] is not None and kept["model"] is not None

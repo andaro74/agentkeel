@@ -423,6 +423,10 @@ def test_s4_a_panel_2_query_that_computes_the_verdict_is_refused(worktree):  # n
     holds(not refusing & BASE_CHECKS, f"no check at the base refuses the fixture ({sorted(refusing & BASE_CHECKS)})")
     refused = sorted(name for name in refusing - BASE_CHECKS if "panel 2" in name)
     assert refused, "seed S4: no check that reads panel 2's query refused a computed verdict"
+    # And for the planted reason, not only for the fixture's source names (cold review F10 on M07 PR 2).
+    said = [e for name in refused for e in errors[name] if PANEL_2 in e.replace("\\", "/")]
+    assert any("verdict as a constant" in e or "selects each column as stored" in e for e in said), \
+        f"seed S4: panel 2's fixture was refused, and not for its computed verdict ({said})"
 
 
 def test_s4_a_green_row_for_a_red_envelope_is_found_by_build():

@@ -53,8 +53,9 @@ file, from which the surfaces' plants are counted into `upgrade.surfaces`
 and joined to `checks.F7_5` through both(). `--app-observation` is what
 `main`'s scheduled observer stored, read as the platform's observer App:
 `template` and `upgrade` rule on its record where it found one, and each
-entry says which viewpoint it was ruled on. Recorded, never gated (SPEC/07
-§4); only row 7's reading reads it.
+entry says which viewpoint it was ruled on. Recorded: the gate's verdict
+reads only its surfaces' plant counts, and row 7's reading reads the rest
+(SPEC/07 §4).
 
 From M04 PR 3, with `--swaps`, `swaps`: what `scripts/rule_swaps.py` wrote,
 the gate's verdict on each swap PR's own envelope beside GitHub's record of

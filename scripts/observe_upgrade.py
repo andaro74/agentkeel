@@ -261,7 +261,9 @@ def pull_record(gh: GitHub, repository: str, number: Any, platform_app: int | No
             "head_sha": head, "base_sha": pull["base"]["sha"], "base_ref": pull["base"]["ref"],
             "mergeable_state": pull.get("mergeable_state"), "opened_by_run": opened[1] if opened else None,
             "files": [f["filename"] for f in files],
-            "commits": [{"sha": c["sha"], "author": actor(c.get("author")), "files": commit_files(gh, repository, c["sha"])}
+            "commits": [{"sha": c["sha"], "author": actor(c.get("author")), "committer": actor(c.get("committer")),
+                         "verified": ((c.get("commit") or {}).get("verification") or {}).get("verified"),
+                         "files": commit_files(gh, repository, c["sha"])}
                         for c in commits],
             "required_on_head": required_on_head(gh, repository, head, platform_app),
             "default_branch_commits_between": None, "workflows_sha256_changed": None,
@@ -369,6 +371,15 @@ def read_owner_test(gh: GitHub, entry: dict[str, Any], platform_app: int | None)
     return out
 
 
+def job_annotations(gh: GitHub, job: dict[str, Any]) -> list[str] | None:
+    """GitHub's own annotations on a job (its check run): where it says why a job never started, as
+    'Branch "x" is not allowed to deploy to platform-app due to environment protection rules.' None if unread."""
+    try:
+        return [str(a.get("message")) for a in gh(PLATFORM, f"/check-runs/{int(job['id'])}/annotations?per_page=100")]
+    except (*GITHUB_ERRORS, KeyError, TypeError, ValueError):
+        return None
+
+
 def read_dispatch(gh: GitHub, entry: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {"repository": PLATFORM, "run": entry.get("run"), "found": False, "error": None}
     try:
@@ -376,8 +387,10 @@ def read_dispatch(gh: GitHub, entry: dict[str, Any]) -> dict[str, Any]:
         jobs = gh(PLATFORM, f"/actions/runs/{int(entry['run'])}/jobs?per_page=100").get("jobs") or []
         out |= {"found": True, "event": run.get("event"), "head_branch": run.get("head_branch"), "path": run.get("path"),
                 "created_at": run.get("created_at"),
-                "jobs": [{"name": j.get("name"), "conclusion": j.get("conclusion"), "steps": len(j.get("steps") or []),
-                          "runner_name": j.get("runner_name") or ""} for j in jobs]}  # fmt: skip
+                "jobs": [{"name": j.get("name"), "conclusion": j.get("conclusion"),
+                          "steps": len(j["steps"]) if isinstance(j.get("steps"), list) else None,
+                          "runner_name": j.get("runner_name"),
+                          "annotations": job_annotations(gh, j) if j.get("conclusion") == "failure" else []} for j in jobs]}  # fmt: skip
     except GITHUB_ERRORS as exc:
         out["error"] = failed(exc)
     return out
@@ -744,6 +757,8 @@ def compose(observation: dict[str, Any], gh: GitHub | None = None) -> None:
             retirement["get_runtime"] = {k: aws["retiring"].get(k) for k in ("found", "status", "error", "read_at") if k in aws["retiring"]}
             runtime_id = str(aws["retiring"].get("arn", "")).rsplit("/", 1)[-1]
             merged_at = (retirement.get("pull_request") or {}).get("merged_at") or ""
+            # Matching, by the runtime's id, no error and a time at or after the merge. Build's own "earlier
+            # than the merge" is then a guard on a record from any other source (cold review F6 on M07 PR 2).
             after = sorted((d for d in aws.get("deletes") or [] if d.get("runtime") == runtime_id and not d.get("errorCode")
                             and str(d.get("eventTime")) >= merged_at), key=lambda d: str(d.get("eventTime")))  # fmt: skip
             retirement["delete_event"] = {"eventName": after[0]["eventName"], "eventTime": after[0]["eventTime"]} if after else None
