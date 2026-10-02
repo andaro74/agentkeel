@@ -236,7 +236,8 @@ by hand; M00 itself opens and closes without them.
   memory (retention, ttl, per_user), `data_class` (informational in the
   PoC; enforcement deferred, §12), region set, `deprecated_after`,
   `rollout` (PoC default `all-at-once`; canary policy deferred, §12),
-  `platform_version` (pinned tag of the platform repo).
+  `platform_version` (the platform tag or commit the template was made
+  from; amended at M07 PR 1, SPEC/07 §2).
 - **Bundle**: manifest + prompt + tools + rules, built and cosign-signed in
   CI (keyless, GitHub OIDC). Runtime refuses an unsigned or mismatched
   digest.
@@ -542,6 +543,38 @@ Received at M06 PR 1 (`milestones/M06/rulings/pr1.md`): the Bedrock
 Knowledge Base and refagent's retrieval, the cached-answer seed, F3.5's
 second half and `g-014` as a plant (the knowledge base's fourth move, a
 finding); FRAGILE; and, if M06 takes them, its cuts (SPEC/06 §9).
+Amended at M07 PR 1 (`milestones/M07/rulings/pr1.md`; SPEC/07 §9, §10;
+`milestones/M07/feasibility.md` §2), ruled by Product on 2026-10-01
+before any seed.
+**Seeded, added:** S0, the template's repair (the App can read an agent
+repository's ruleset; its token's bounds read back), read by CI through
+the owner's test; and SPEC/06's S3, the timed quickstart with Act 1,
+received from M06. Neither is ever cut. "Platform major bump opens a
+draft PR" reads "a platform bump opens a draft PR; major when the
+platform check at the new version refuses the agent's head, recorded".
+"A Playwright plant goes silent" reads "a surface plant goes silent", and
+the build line's "Playwright over the surfaces with a plants-fired list"
+reads "a plants-fired list for the surfaces". A retirement is carried by
+a pull request the platform opens (`rollout: retired`), merged by the
+agent's seats.
+**Falsifiers, amended:** F7.0 (new) no agent from the template exists to
+upgrade. F7.1 an upgrade requires a manual edit: no pull request the
+platform opened arrives, or a workflow or a person's commit was needed
+to merge it; a ruling file is not a person's edit. F7.4 is read through
+Grafana's query API, as F6.4, not by Playwright.
+**Cut list, replaced** by SPEC/07 §9. Taken at open and **not built in
+this project** (§12; M08 adds no code path): the knowledge base (its
+fifth move), the judge and FRAGILE, the Braintrust mirror, HITL as a
+Gateway tool with `ratings-helper`'s code, the gateway, k6 and the CLI.
+Panels 3–4 are doc-only. Then, in order, if the cap is threatened: the
+compliance page → doc-only; Act 6 → M08 PR 4; Acts 3 and 4 → M08 PR 4;
+`docs/developer/manifest.md`, `goldens.md`, `edges.md` → M08 PR 4;
+`make upgrade` as a local command → the workflow alone.
+**Contradictions recorded, each ruled at M08 open** (SPEC/07 §9): R6's
+judge of record; M08 run 1's attempt on the judge rubric; F8.5's
+"Gateway policy"; M08 PR 3's Braintrust experiments; Act 3's HITL
+refusal and Braintrust trace; and §15's "at least seven are GREEN",
+which rows 1, 4, 5 and 6, RED, already rule out.
 
 ### M08 — Game-day drill
 Claim 8 above. **Zero new code paths** (ADR ruling at PR 1); any needed
@@ -877,6 +910,29 @@ change made to this SPEC at adoption.
 - Cross-org agent repos (required workflows assume the same GitHub org;
   the workflow-hash check is the only cross-org guard).
 
+**Not built in this project** (ruled at M07 PR 1, SPEC/07 §9; M08 adds no
+code path). Each is named so that no document describes it as working.
+
+- The Bedrock Knowledge Base over the production bucket and refagent
+  retrieving from it. Moved five times (M01 → M03 → M04 → M06 → M07 →
+  here). **Not measured in this project** with it: the cached-answer
+  seed, F3.5's second half ("or changes an answer", claim 3's), and
+  `g-014` as a plant, which stays never-passed.
+- The judge of record (R6): the Bedrock Evaluations judge, its rubric,
+  the graded examples, `admitted_false_fails.json`, `model-watch` over
+  the judge; and FRAGILE. Moved three times (M03 → M04 → M07 → here).
+  "Correct" is the answer's fields compared by code, tool-grounded.
+- The Braintrust mirror, its divergence check, redaction before upload.
+  Moved three times (M03 → M04 → M07 → here).
+- HITL as a Gateway tool; `ratings-helper`'s code and its edge; the
+  gateway; credentials only via Identity; the per-agent Budgets filter;
+  the nightly declared-vs-observed graph diff; k6; Promptfoo as the
+  red-team runner; the CLI (`agent upgrade`, `agent evals --local`, P11).
+- The Rule Owner's filter on tool results. **Not measured in this
+  project**: S5 of SPEC/05's live half.
+- Grafana panels 3 and 4, described in `docs/platform/surfaces.md` only.
+- Playwright (§13): no surface is asserted as rendered.
+
 ## 13. Third-party tools and their single job
 
 | Tool | Job | Not its job |
@@ -888,7 +944,7 @@ change made to this SPEC at adoption.
 | Bedrock / AgentCore Evaluations | judge of record, prod scoring | cross-run diffs |
 | Braintrust | experiment diffs, trace review; mirror of `main` | source of truth; ops dashboard |
 | Promptfoo | red-team plant list in CI | runtime |
-| Playwright | surfaces assert the envelope | answer quality |
+| Playwright | not used (amended at M07 PR 1: the surfaces are read through Grafana's query API) | answer quality |
 | k6 | ceilings and p95 on the envelope | the verdict |
 | Grafana | registry, history, graph, containment panels | anything custom |
 
