@@ -1,0 +1,44 @@
+# Seed S3 (SPEC/07 §5, F7.3): a model-watch pull request is merged and
+# rolled back.
+#
+# Planted at M07 PR 1 as the attempts to make, `observed: null`. Today
+# nothing opens a swap but a person (M04's two swap pull requests were
+# opened by hand), and nothing compares the runtime's digest with the
+# tree's after a merge to main, so a revert that left the swap's bytes
+# live would be seen by nobody.
+#
+# The candidate, named here before any run (Threshold Owner, ruled
+# 2026-10-01; milestones/M07/feasibility.md section 2, item 16):
+# `pinned_roles.m04_cheaper_swap`, Haiku 4.5,
+# anthropic.claude-haiku-4-5-20251001-v1:0. It has never been run against
+# the goldens (milestones/M07/open.md row 66), so its envelope's verdict is
+# **not stated**. Sonnet 4.5, the one candidate measured, regressed g-005
+# (row 67).
+#
+# **The fallback, named here before any run.** If the swap's envelope is
+# RED it is not merged; F4's reading is recorded; and the rollback is read
+# on owner-check's platform upgrade (S1), merged and then reverted by a
+# pull request in owner-check. With the fallback the model upgrade is not
+# taken (`upgrade.taken` stays under 3, row 7 RED on it) and F7.3 is still
+# read.
+#
+# Independent of the owner's test and the timed run (SPEC/07 §5.1): the
+# swap may be attempted at any time after M07 PR 2 merges and the token
+# model-watch opens pull requests with is granted (SPEC/07 §11, R3). The
+# swap and its revert are pull requests on agentkeel's main outside M07's
+# cap of four, by a line in the ledger. Each needs its Threshold Owner
+# ruling file, which is not a person's edit (BLOCK 2).
+seed: S3
+falsifiers: [F7.3]
+principal: the platform's App opens the pull request; andaro74 as Threshold Owner rules and merges
+candidate: pinned_roles.m04_cheaper_swap
+attempts:
+  - what: model-watch's draft swap pull request on refagent
+    command: nothing by hand but naming the candidate; model-watch.yml runs from main on its schedule and opens the draft; the Threshold Owner rules its ruling file; merged as a merge commit only if its envelope is GREEN and every required check is green
+    refused_when: there is no falsifier to refuse; the upgrade arrived when a draft pull request authored by the App exists in andaro74/agentkeel changing `model` in agents/refagent/manifest.yaml to the candidate's pin and, beside it, only a ruling file under milestones/M07/rulings/; every other commit on it is the App's; no file under .github/workflows/ is touched and infra/workflows.sha256 is unchanged
+    recorded_when: the observer reads the pull request, its commits' authors and files, its envelope as the gate rules it, its merge and the deploy run of the merge
+  - what: the rollback
+    command: if the swap merged, a pull request reverting its merge commit, ruled and merged; if it did not, a pull request in owner-check reverting the platform upgrade's merge, merged by the agent's seats when the App passes it. Then nothing: deploy.yml redeploys from main
+    refused_when: after the revert's deploy run completed, GetAgentRuntime names an image whose tags hold the digest the tree gives at the revert's merge commit, and do not hold the upgrade's digest (F7.3 fires on either miss)
+    recorded_when: the observer reads the revert's merge, its deploy run, the runtime's image and its tags (scripts/runtime_for_tree.py's steps 1 to 4, for that agent), and packs the tree at the revert for its digest
+observed: null

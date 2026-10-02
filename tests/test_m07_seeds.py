@@ -235,3 +235,33 @@ def test_s2_the_retirement_was_made():
     run = run_file("f7_2_retire.yaml", "S2", 1)
     observed = made(run)
     assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
+
+
+# --- S3: a model-watch pull request is merged and rolled back -----------------
+
+
+@expected_failure
+def test_s3_a_rollback_that_leaves_the_new_digest_live_is_found_by_build():
+    """After a revert's deploy completed, the runtime's image tags hold the upgrade's digest and not
+    the digest the tree gives at the revert. `build.f7_3(observation)` must read it as not held and
+    name the digest still live (F7.3). Today nothing compares the two after a merge to main."""
+    from src.verdict import build
+
+    observation = fixture("s3-rollback/observation.json")
+    tags = observation["runtime"]["image_tags"]
+    holds(observation["upgrade_digest"] in tags and observation["tree_digest_at_revert"] not in tags,
+          "the runtime runs the upgrade's digest, not the revert's")  # fmt: skip
+    holds(observation["revert_deploy"]["conclusion"] == "success", "the revert's deploy completed")
+    read = reader(build, "f7_3", "S3", "nothing compares the runtime's digest with the tree's after a revert")
+    entry = read(observation)
+    assert entry["read"] is True and entry["held"] is False, entry
+    assert any(observation["upgrade_digest"][:12] in reason for reason in entry["reasons"]), entry["reasons"]
+
+
+@expected_failure
+def test_s3_the_rollback_was_made():
+    """model-watch's draft swap pull request on refagent, merged if its envelope is GREEN, then
+    reverted; or the fallback the run file names before any run (SPEC/07 §5, item 16)."""
+    run = run_file("f7_3_rollback.yaml", "S3", 2)
+    observed = made(run)
+    assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
