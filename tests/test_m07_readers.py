@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -133,3 +134,160 @@ def test_before_the_grant_the_head_is_refused_and_the_check_still_posted(github,
     (body,) = [b for method, path, b, _t in github["sent"] if method == "POST" and path.endswith("/check-runs")]
     assert body["conclusion"] == "failure" and "could not be read (422)" in body["output"]["summary"]
     assert not any(method == "DELETE" for method, *_ in github["sent"])  # no token was minted to revoke
+
+
+# --- the reader of the grant (S0; rulings/pr2-security.md item 6) --------------
+
+FIXTURES = Path(__file__).parent / "fixtures" / "m07" / "s0-app-token"
+
+
+def s0(name: str) -> Any:
+    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+
+
+def ruling(tmp_path, body: str, name: str = "pr2-security.md") -> None:
+    folder = tmp_path / "milestones" / "M07" / "rulings"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / name).write_text(body, encoding="utf-8")
+
+
+GRANT_BLOCK = "```yaml\ngrant:\n  agentkeel-observer:\n    app_id: 7\n    environment: platform-observer\n```\n"
+
+
+def test_a_draft_is_not_a_grant_and_two_blocks_are_refused(tmp_path):
+    ruling(tmp_path, f"DRAFT for a seat.\n\n{GRANT_BLOCK}")
+    with pytest.raises(platform_check.NoGrant, match="a draft"):
+        platform_check.load_grant(tmp_path)
+    assert platform_check.load_grant(tmp_path, ruled_only=False)["agentkeel-observer"]["app_id"] == 7
+    ruling(tmp_path, f"Ruled by andaro74 as Security, 2026-10-02.\n\n{GRANT_BLOCK}")
+    assert sorted(platform_check.load_grant(tmp_path)) == ["agentkeel-observer"]
+    # "Ruled by" inside a sentence is not the line the gate reads.
+    ruling(tmp_path, f"Not ruled until this line reads \"Ruled by\".\n\n{GRANT_BLOCK}")
+    with pytest.raises(platform_check.NoGrant, match="a draft"):
+        platform_check.load_grant(tmp_path)
+    ruling(tmp_path, f"Ruled by andaro74 as Security.\n\n{GRANT_BLOCK}")
+    ruling(tmp_path, f"Ruled by andaro74 as Security.\n\n{GRANT_BLOCK}", name="pr3-security.md")
+    with pytest.raises(platform_check.NoGrant, match="found 2"):
+        platform_check.load_grant(tmp_path)
+
+
+def test_no_ruling_with_a_block_is_no_grant(tmp_path):
+    ruling(tmp_path, "Ruled by andaro74 as Security.\n\nNo block here.\n")
+    with pytest.raises(platform_check.NoGrant, match="found 0"):
+        platform_check.load_grant(tmp_path)
+
+
+def test_the_rulings_own_block_is_the_fixtures_grant_but_for_the_ids_not_yet_made():
+    """The fixture is the shape of the ruling's block: if either moves, this says so. The two new Apps'
+    ids are null in the ruling until each App exists, and the reader refuses a null id."""
+    live = platform_check.load_grant(ruled_only=False)
+    fixture = s0("grant.json")
+    assert sorted(live) == sorted(fixture)
+    for slug in ("agentkeel-platform", "agentkeel-upgrades", "agentkeel-observer"):
+        assert {k: v for k, v in live[slug].items() if k != "app_id"} == {k: v for k, v in fixture[slug].items() if k != "app_id"}
+    assert live["agentkeel-platform"]["app_id"] == fixture["agentkeel-platform"]["app_id"] == APP
+    assert live["environments"] == fixture["environments"]
+
+
+def test_a_grant_not_yet_made_reads_as_narrower_and_not_as_an_error():
+    """Before the grant, 5144253 holds Administration: read. That is inside the ruled grant: nothing
+    is beyond it, so the reader passes, and the keyed job then finds it cannot mint `rulesets`."""
+    held = {**s0("installation_as_ruled.json"), "permissions": {"administration": "read", "checks": "write",
+                                                               "contents": "read", "metadata": "read",
+                                                               "pull_requests": "read"}}  # fmt: skip
+    assert platform_check.grant_errors(held, s0("environment_as_ruled.json"), s0("grant.json")) == []
+    selected = {**s0("upgrades_org_as_ruled.json"), "repository_selection": "selected", "repositories": ["owner-check"]}
+    assert platform_check.grant_errors(selected, s0("environment_upgrades_as_ruled.json"), s0("grant.json")) == []
+
+
+@pytest.mark.parametrize("change, said", [
+    ({"branch_policies": []}, "no deployment policy main (branch)"),  # no policy: any branch may deploy
+    ({"branch_policies": None}, "were not read"),
+    ({"branch_policies": [{"name": "(every protected branch)", "type": "protected"}]}, "protected"),
+    ({"can_admins_bypass": None}, "can_admins_bypass is None"),
+    ({"secrets": []}, "holds 0 secrets"),
+])  # fmt: skip
+def test_an_environment_that_does_not_limit_the_key_to_main_is_refused(change, said):
+    environment = {**s0("environment_as_ruled.json"), **change}
+    errors = platform_check.grant_errors(s0("installation_as_ruled.json"), environment, s0("grant.json"))
+    assert any(said in e for e in errors), errors
+
+
+def test_an_unknown_level_and_an_unread_list_are_refused_not_passed():
+    grant = s0("grant.json")
+    odd = {**s0("installation_as_ruled.json"), "permissions": {"metadata": "admin"}}
+    assert any("metadata is admin" in e for e in platform_check.grant_errors(odd, s0("environment_as_ruled.json"), grant))
+    unread = {**s0("upgrades_as_ruled.json"), "repositories": None}
+    errors = platform_check.grant_errors(unread, s0("environment_upgrades_as_ruled.json"), grant)
+    assert any("were not read" in e for e in errors), errors
+    assert platform_check.grant_errors({"app_slug": "environments"}, {}, grant)[0].startswith("the grant names no App")
+
+
+def live_pages(github, installation: dict[str, Any], registered: dict[str, str], environment: dict[str, Any]) -> None:
+    name = environment["name"]
+    github["pages"].update({
+        "/app": {"slug": installation["app_slug"], "id": installation["app_id"], "permissions": registered},
+        "/app/installations?per_page=100": [{k: v for k, v in installation.items() if k != "repositories"}],
+        "/installation/repositories?per_page=100&page=1": {
+            "total_count": len(installation["repositories"]),
+            "repositories": [{"name": n} for n in installation["repositories"]]},
+        f"/repos/andaro74/agentkeel/environments/{name}": {
+            "can_admins_bypass": environment["can_admins_bypass"],
+            "deployment_branch_policy": {"protected_branches": False, "custom_branch_policies": True}},
+        f"/repos/andaro74/agentkeel/environments/{name}/deployment-branch-policies?per_page=100": {
+            "branch_policies": environment["branch_policies"]},
+    })  # fmt: skip
+
+
+def test_the_grant_is_read_back_with_the_apps_jwt_and_a_metadata_only_token(github, key, tmp_path, monkeypatch):
+    fixture = s0("grant.json")
+    monkeypatch.setattr(platform_check, "load_grant", lambda root=None: fixture)
+    monkeypatch.setenv("GITHUB_TOKEN", "the-jobs-own-token")
+    installation = s0("observer_as_ruled.json")
+    live_pages(github, installation, installation["permissions"], s0("environment_observer_as_ruled.json"))
+    read, errors = platform_check.check_grant("agentkeel-observer", key)
+    assert errors == [] and read["narrower"] == []
+    assert read["installations"][0]["repositories"] == ["agent-template", "owner-check"]
+    assert read["environment"]["secrets"] is None  # not read by a job; said in the artifact, not guessed
+    minted = [body for method, path, body, _t in github["sent"] if method == "POST"]
+    assert minted == [{"permissions": {"metadata": "read"}}]  # the only token the reader mints
+    revoked = [t for method, path, _b, t in github["sent"] if method == "DELETE"]
+    assert revoked == ["token-for-metadata"]
+    environment_reads = [t for method, path, _b, t in github["sent"] if "/environments/" in path]
+    assert set(environment_reads) == {"the-jobs-own-token"}  # the environment is not read as the App
+    assert os.environ["GITHUB_TOKEN"] == "the-jobs-own-token"
+
+
+def test_a_permission_registered_and_not_yet_accepted_is_beyond_the_grant(github, key, monkeypatch):
+    fixture = s0("grant.json")
+    monkeypatch.setattr(platform_check, "load_grant", lambda root=None: fixture)
+    installation = s0("observer_as_ruled.json")
+    live_pages(github, installation, {**installation["permissions"], "contents": "write"},
+               s0("environment_observer_as_ruled.json"))  # fmt: skip
+    _read, errors = platform_check.check_grant("agentkeel-observer", key)
+    assert errors == ["agentkeel-observer as registered: permission contents is write, the grant names read"]
+
+
+def test_a_key_that_is_another_apps_and_an_unreadable_github_are_refused(github, key, monkeypatch):
+    fixture = s0("grant.json")
+    monkeypatch.setattr(platform_check, "load_grant", lambda root=None: fixture)
+    installation = s0("observer_as_ruled.json")
+    live_pages(github, installation, installation["permissions"], s0("environment_observer_as_ruled.json"))
+    github["pages"]["/app"] = {"slug": "agentkeel-platform", "id": APP, "permissions": installation["permissions"]}
+    _read, errors = platform_check.check_grant("agentkeel-observer", key)
+    assert any("the key is App agentkeel-platform" in e for e in errors), errors
+    github["fail"][("GET", "/app")] = 401
+    read, errors = platform_check.check_grant("agentkeel-observer", key)
+    assert read["installations"] == [] and any("could not be read as the App" in e for e in errors), errors
+
+
+def test_the_grant_command_stops_on_a_draft_a_missing_key_and_a_missing_id(tmp_path, monkeypatch, capsys):
+    out = tmp_path / "read.json"
+    monkeypatch.delenv("AGENTKEEL_APP_PRIVATE_KEY", raising=False)
+    assert platform_check.main(["grant", "--app", "agentkeel-platform", "--out", str(out)]) == 1
+    assert "read in its key's environment only" in capsys.readouterr().out
+    monkeypatch.setenv("AGENTKEEL_APP_PRIVATE_KEY", "not a key")
+    monkeypatch.setattr(platform_check, "load_grant", lambda root=None: {"agentkeel-upgrades": {"app_id": None}})
+    assert platform_check.main(["grant", "--app", "agentkeel-upgrades", "--out", str(out)]) == 1
+    assert "holds no app_id" in capsys.readouterr().out
+    assert "AGENTKEEL_APP_PRIVATE_KEY" not in os.environ and not out.exists()  # the key is taken out of the environment

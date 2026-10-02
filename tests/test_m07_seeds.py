@@ -144,7 +144,6 @@ def test_s0_app_token_refuses_a_call_with_no_repository(monkeypatch):
         f"repository (it asked for a token with scope {minted})")
 
 
-@expected_failure
 def test_s0_the_installations_grant_is_read_back():
     """An installation as GitHub returns it to its App, for each of the three Apps Security ruled on
     2026-10-02 (milestones/M07/rulings/pr2-security.md, item 2): as `grant.json` names it, and with a
@@ -225,7 +224,6 @@ def test_s0_the_installations_grant_is_read_back():
     assert any("platform-upgrades" in e for e in errors), errors
 
 
-@expected_failure
 def test_s0_the_key_environment_is_read_back():
     """The `platform-app` environment as GitHub returns it, twice: one branch policy, `main`, with no
     admin bypass, as `grant.json` names it; and with a second branch policy and `can_admins_bypass`

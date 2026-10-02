@@ -1,7 +1,8 @@
 """The platform check's two halves and the deploy's list, for `.github/workflows/` on `main` (SPEC/06 §6, R2, R3).
 
     python scripts/platform_check.py find --out heads.json            # no secret: what to evaluate
-    python scripts/platform_check.py post --results DIR               # the App's token: seats, ruleset, the check
+    python scripts/platform_check.py grant --app SLUG --out READ.json  # the App's key: its grant, read back
+    python scripts/platform_check.py post --results DIR               # the App's key: seats, ruleset, the check
     python scripts/platform_check.py deployable --out merged.json     # no secret: what deploy.yml may deploy
 
 Nothing comes from an agent repository but what GitHub's API says about
@@ -22,8 +23,16 @@ id, `tests/test_m06_readers.py`).
   collaborators), then that the repository is public (GitHub Free enforces
   a ruleset nowhere else), then the repository's live rulesets against
   `infra/ruleset/agent.json`, then one check run on the head that was
-  evaluated, success only when every list is empty. Run with the App's
-  installation token as `GITHUB_TOKEN`.
+  evaluated, success only when every list is empty. From M07 PR 2 it mints
+  two tokens per repository from the App's key, each for that repository and
+  one named permission set (`PERMISSION_SETS`): `rulesets` for the one read
+  that needs Administration, revoked after it, then `check`.
+- `grant` (M07 PR 2; seed S0's reader): what GitHub says one App holds, read
+  with the App's own JWT (its registered permissions, each installation's
+  permissions, selection and repositories) and its key's environment (branch
+  policies, admin bypass), against the `grant:` block of the ruled file under
+  `milestones/M07/rulings/`. It writes what it read and exits 1 on any value
+  beyond the grant. It runs first in every keyed job.
 - `deployable`: every public repository's default-branch head that carries a
   successful `platform-check` run from the App, with the agent name its
   manifest holds there. `deploy.yml` reads the registry to skip what is
@@ -35,9 +44,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -202,6 +213,242 @@ def revoke(token: str) -> None:
         print("note: a token could not be revoked; it expires within the hour")
 
 
+# --- the reader of the grant (M07 PR 2; SPEC/07 section 6; rulings/pr2-security.md item 6; S0's reader) ----
+
+RULINGS = "milestones/M07/rulings"
+PLATFORM_REPOSITORY = "andaro74/agentkeel"  # whose environments hold the Apps' keys
+LEVELS = {"read": 1, "write": 2, "admin": 3}
+FENCED_YAML = re.compile(r"^```yaml\n(.*?)^```", re.DOTALL | re.MULTILINE)
+
+
+class NoGrant(Exception):
+    """No ruled grant can be read: a keyed job then stops before it mints anything."""
+
+
+def load_grant(root: Path = ROOT, *, ruled_only: bool = True) -> dict[str, Any]:
+    """The `grant:` block of the one ruling file under milestones/M07/rulings/ that carries one.
+
+    Read from the checkout, which in a keyed job is `main`'s (each key's environment deploys from
+    `main` only): a pull request cannot widen the grant it is checked against. A draft is not a grant:
+    with `ruled_only`, the file must carry a line that starts "Ruled by", as `cold-review-ruling` reads
+    it. Two files with a block is refused, not resolved."""
+    found: list[tuple[str, dict[str, Any], bool]] = []
+    for path in sorted((root / RULINGS).glob("*.md")):
+        text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
+        for block in FENCED_YAML.findall(text):
+            try:
+                doc = yaml.safe_load(block)
+            except yaml.YAMLError as exc:
+                raise NoGrant(f"{RULINGS}/{path.name}: a yaml block does not parse ({exc.__class__.__name__})") from exc
+            if isinstance(doc, dict) and isinstance(doc.get("grant"), dict):
+                ruled = any(line.startswith("Ruled by ") for line in text.splitlines())
+                found.append((path.name, doc["grant"], ruled))
+    if len(found) != 1:
+        names = ", ".join(name for name, _grant, _ruled in found) or "none"
+        raise NoGrant(f"{RULINGS}/: one ruling file must carry a grant: block; found {len(found)} ({names})")
+    name, grant, ruled = found[0]
+    if ruled_only and not ruled:
+        raise NoGrant(f"{RULINGS}/{name}: the grant is a draft; no seat has ruled it (no line starts 'Ruled by')")
+    return grant
+
+
+def _beyond(held: Any, granted: Any) -> bool:
+    """True when a permission level is more than the grant's. A level this does not know is more."""
+    return LEVELS.get(str(held), 99) > LEVELS.get(str(granted), 0)
+
+
+def permission_errors(who: str, permissions: Any, granted: dict[str, Any]) -> list[str]:
+    if not isinstance(permissions, dict):
+        return [f"{who}: its permissions were not read"]
+    errors = []
+    for name, level in sorted(permissions.items()):
+        if name not in granted:
+            errors.append(f"{who}: permission {name}: {level} is not in the grant")
+        elif _beyond(level, granted[name]):
+            errors.append(f"{who}: permission {name} is {level}, the grant names {granted[name]}")
+    return errors
+
+
+def environment_errors(slug: str, app: dict[str, Any], environment: Any, rules: Any) -> list[str]:
+    """The environment that holds an App's key, against the grant's `environments` (items 1, 6)."""
+    if not isinstance(environment, dict) or not isinstance(rules, dict):
+        return [f"{slug}: its key's environment, or the grant's environments, was not read"]
+    name = environment.get("name")
+    errors = []
+    if name != app.get("environment"):
+        errors.append(f"{slug}: its key was read in environment {name!r}, the grant names {app.get('environment')!r}")
+    wanted = [(p.get("name"), p.get("type")) for p in rules.get("branch_policies") or []]
+    policies = environment.get("branch_policies")
+    if not isinstance(policies, list):
+        errors.append(f"environment {name}: its deployment branch policies were not read")
+        policies = []
+    found = [(p.get("name"), p.get("type")) for p in policies if isinstance(p, dict)]
+    errors += [f"environment {name}: deployment policy {n} ({t}) is not in the grant" for n, t in found
+               if (n, t) not in wanted]  # fmt: skip
+    errors += [f"environment {name}: no deployment policy {n} ({t}), which the grant names" for n, t in wanted
+               if (n, t) not in found]  # fmt: skip
+    if environment.get("can_admins_bypass") is not rules.get("can_admins_bypass"):
+        errors.append(f"environment {name}: can_admins_bypass is {environment.get('can_admins_bypass')!r}, "
+                      f"the grant names {rules.get('can_admins_bypass')!r}")  # fmt: skip
+    # The secrets' names, where a caller that may list them read them (an admin's token; no job's own).
+    secrets = environment.get("secrets")
+    if isinstance(secrets, list):
+        if len(secrets) != 1:
+            errors.append(f"environment {name} holds {len(secrets)} secrets ({', '.join(map(str, secrets)) or 'none'}); "
+                          "the grant names one, the App's key")  # fmt: skip
+        shared = sorted(set(secrets) & set(environment.get("repository_secrets") or []))
+        errors += [f"environment {name}: {secret} is also a repository secret, which a workflow on any branch can read"
+                   for secret in shared]  # fmt: skip
+    return errors
+
+
+def grant_errors(installation: dict[str, Any], environment: dict[str, Any], grant: dict[str, Any]) -> list[str]:
+    """What one installation of one App, and the environment that holds its key, hold beyond the grant.
+
+    `installation` is GitHub's answer for it, with `repositories`, the names it reaches. `grant` is the
+    ruling's `grant:` block: one entry per App, and `environments`. [] when nothing is beyond it; a
+    value narrower than the grant is not an error (a grant not yet made reads as narrower). Each error
+    names what is not covered: an App or an id the grant does not name, an account it is not installed
+    on by ruling, a permission or a level, a repository, a widened selection, a branch policy, an admin
+    bypass, a second secret."""
+    slug = installation.get("app_slug")
+    app = grant.get(slug) if slug != "environments" else None
+    if not isinstance(app, dict):
+        return [f"the grant names no App {slug!r} (it names {', '.join(sorted(a for a in grant if a != 'environments'))})"]
+    errors = []
+    if app.get("app_id") is None:
+        errors.append(f"{slug}: the grant holds no app_id for it yet, so no installation is covered")
+    elif installation.get("app_id") != app["app_id"]:
+        errors.append(f"{slug}: the installation is App {installation.get('app_id')}, the grant names {app['app_id']}")
+    account = (installation.get("account") or {}).get("login")
+    who = f"{slug} on {account}"
+    selection = app.get("repository_selection")
+    covered = selection.get(account) if isinstance(selection, dict) else selection
+    if account not in (app.get("installed_on") or []):
+        errors.append(f"{slug} is installed on {account}, which the grant does not name "
+                      f"(installed_on {', '.join(app.get('installed_on') or []) or 'nothing'})")  # fmt: skip
+    elif covered == "all":
+        pass  # every repository of the account, as ruled; `selected` is narrower
+    elif isinstance(covered, list):
+        if installation.get("repository_selection") != "selected":
+            errors.append(f"{who}: repository_selection is {installation.get('repository_selection')!r}, "
+                          f"the grant names {', '.join(covered)} and no other")  # fmt: skip
+        repositories = installation.get("repositories")
+        if not isinstance(repositories, list):
+            errors.append(f"{who}: the repositories it reaches were not read")
+        else:
+            errors += [f"{who}: it reaches {repo}, which the grant does not name" for repo in repositories
+                       if repo not in covered]  # fmt: skip
+    else:
+        errors.append(f"{who}: the grant names no repository_selection for {account}")
+    errors += permission_errors(who, installation.get("permissions"), app.get("permissions") or {})
+    return errors + environment_errors(slug, app, environment, grant.get("environments"))
+
+
+def read_environment(name: str, repository: str = PLATFORM_REPOSITORY) -> dict[str, Any]:
+    """An environment's rules as GitHub returns them, in `grant_errors`' shape. A read that fails is
+    written with its error and no policies, which the reader refuses.
+
+    The secrets' names are not read: no token a job holds may list them (`secrets` is None, and the
+    artifact says so). They are read by hand, by an admin, and recorded under milestones/M07/runs/."""
+    out: dict[str, Any] = {"name": name, "can_admins_bypass": None, "branch_policies": None, "secrets": None,
+                           "error": None}  # fmt: skip
+    try:
+        environment = gh(f"/repos/{repository}/environments/{name}")
+        out["can_admins_bypass"] = environment.get("can_admins_bypass")
+        policy = environment.get("deployment_branch_policy")
+        if policy is None:
+            out["branch_policies"] = []  # no policy: any branch may deploy
+        elif policy.get("custom_branch_policies"):
+            listed = gh(f"/repos/{repository}/environments/{name}/deployment-branch-policies?per_page=100")
+            out["branch_policies"] = [{"name": p.get("name"), "type": p.get("type")}
+                                      for p in listed.get("branch_policies") or []]  # fmt: skip
+        else:
+            out["branch_policies"] = [{"name": "(every protected branch)", "type": "protected"}]
+    except (urllib.error.URLError, TimeoutError, OSError, KeyError) as exc:
+        out["error"] = f"{type(exc).__name__}: {exc}"
+    return out
+
+
+def read_grant(slug: str, app_id: int, private_key_pem: str) -> dict[str, Any]:
+    """What GitHub says one App holds, read with the App's own JWT: its registered permissions, each of
+    its installations with the repositories it reaches, and its key's environment.
+
+    The repository list of an installation is read with a token that holds `metadata: read` and
+    nothing else, revoked after the read (item 6). The environment is read with the job's own token."""
+    read: dict[str, Any] = {"app": slug, "app_id": app_id, "registered": None, "installations": [], "error": None}
+    try:
+        with _As(app_jwt(app_id, private_key_pem)):
+            registered = gh("/app")
+            read["registered"] = {"slug": registered.get("slug"), "id": registered.get("id"),
+                                  "permissions": registered.get("permissions")}  # fmt: skip
+            listed = gh("/app/installations?per_page=100")
+            for one in listed:
+                installation = {"id": one.get("id"), "app_id": one.get("app_id"), "app_slug": one.get("app_slug"),
+                                "account": {"login": (one.get("account") or {}).get("login")},
+                                "repository_selection": one.get("repository_selection"),
+                                "permissions": one.get("permissions"), "suspended_at": one.get("suspended_at"),
+                                "repositories": None}  # fmt: skip
+                token = gh(f"/app/installations/{one['id']}/access_tokens", method="POST",
+                           body={"permissions": {"metadata": "read"}})["token"]  # fmt: skip
+                try:
+                    with _As(token):
+                        names, page = [], 1
+                        while True:
+                            got = gh(f"/installation/repositories?per_page=100&page={page}")
+                            names += [r["name"] for r in got.get("repositories") or []]
+                            if len(names) >= got.get("total_count", 0) or not got.get("repositories"):
+                                break
+                            page += 1
+                        installation["repositories"] = sorted(names)
+                finally:
+                    revoke(token)
+                read["installations"].append(installation)
+    except (urllib.error.URLError, TimeoutError, OSError, KeyError) as exc:
+        read["error"] = f"{type(exc).__name__}: {exc}"
+    return read
+
+
+def check_grant(slug: str, private_key_pem: str, root: Path = ROOT) -> tuple[dict[str, Any], list[str]]:
+    """What was read, and every way it is beyond the ruled grant. Any error stops the keyed job."""
+    grant = load_grant(root)
+    app = grant.get(slug) if slug != "environments" else None
+    if not isinstance(app, dict):
+        raise NoGrant(f"the grant names no App {slug!r}")
+    if not isinstance(app.get("app_id"), int):
+        raise NoGrant(f"{slug}: the grant holds no app_id for it yet; the App is made, and its id pushed, first")
+    read = read_grant(slug, app["app_id"], private_key_pem)
+    read["environment"] = read_environment(str(app.get("environment")))
+    errors = []
+    if read["error"]:
+        errors.append(f"{slug}: GitHub could not be read as the App ({read['error']})")
+    if read["environment"]["error"]:
+        errors.append(f"environment {app.get('environment')}: could not be read ({read['environment']['error']})")
+    registered = read.get("registered") or {}
+    if registered and (registered.get("slug"), registered.get("id")) != (slug, app["app_id"]):
+        errors.append(f"{slug}: the key is App {registered.get('slug')} ({registered.get('id')})'s, "
+                      f"the grant names {slug} ({app['app_id']})")  # fmt: skip
+    errors += permission_errors(f"{slug} as registered", registered.get("permissions"), app.get("permissions") or {})
+    if not read["installations"] and not read["error"]:
+        errors.append(f"{slug}: no installation was read")
+    for installation in read["installations"]:
+        errors += [e for e in grant_errors(installation, read["environment"], grant) if e not in errors]
+        if installation.get("suspended_at"):
+            errors.append(f"{slug} on {installation['account']['login']}: the installation is suspended")
+    # Narrower than the grant is not an error; it is what a grant not yet made, or not yet accepted, reads as.
+    narrower = []
+    for installation in read["installations"]:
+        held = installation.get("permissions") or {}
+        narrower += [f"{slug} on {installation['account']['login']}: {name} is {held.get(name) or 'not held'}, "
+                     f"the grant names {level}" for name, level in sorted((app.get("permissions") or {}).items())
+                     if held.get(name) is None or LEVELS.get(str(held[name]), 99) < LEVELS.get(str(level), 0)]  # fmt: skip
+    installed = {i["account"]["login"] for i in read["installations"]}
+    narrower += [f"{slug}: not installed on {account}, which the grant names" for account in app.get("installed_on") or []
+                 if account not in installed]  # fmt: skip
+    read |= {"grant": {slug: app, "environments": grant.get("environments")}, "errors": errors, "narrower": narrower}
+    return read, errors
+
+
 def post(results: Path, app_id: int, mint=None) -> int:
     """`mint(repository, permission_set)` gives the App's token for that repository and that set alone.
 
@@ -283,6 +530,41 @@ def deployable(org: str, app_id: int) -> list[dict[str, Any]]:
     return out
 
 
+def grant_command(slug: str, out: Path) -> int:
+    """Read one App's grant back and write what was read; exit 1 on anything beyond the ruled grant.
+
+    The key is taken from the environment and removed from it. Nothing with a write permission is
+    minted here: the JWT, and one `metadata: read` token per installation for its repository list."""
+    key = os.environ.pop("AGENTKEEL_APP_PRIVATE_KEY", None)
+    if not key:
+        print(f"no AGENTKEEL_APP_PRIVATE_KEY: {slug}'s grant is read in its key's environment only")
+        return 1
+    try:
+        read, errors = check_grant(slug, key)
+    except NoGrant as refusal:
+        print(f"REFUSED: {refusal}")
+        return 1
+    _org, platform_app = identity()
+    if slug == "agentkeel-platform" and read["app_id"] != platform_app:
+        errors.append(f"{slug}: the grant names App {read['app_id']}, infra/platform_identity.json names {platform_app}")
+        read["errors"] = errors
+    read["read_at"] = datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(read, indent=2) + "\n", encoding="utf-8")
+    for installation in read["installations"]:
+        print(f"{slug} on {installation['account']['login']}: {installation['repository_selection']}, "
+              f"{len(installation['repositories'] or [])} repositories, {json.dumps(installation['permissions'], sort_keys=True)}")
+    environment = read["environment"]
+    print(f"environment {environment['name']}: policies {environment['branch_policies']}, "
+          f"can_admins_bypass {environment['can_admins_bypass']}; its secrets' names are not read by a job")
+    for note in read["narrower"]:
+        print(f"narrower than the grant: {note}")
+    for error in errors:
+        print(f"FAIL {error}")
+    print(f"{slug}: {'beyond the ruled grant; nothing is minted' if errors else 'within the ruled grant'}")
+    return 1 if errors else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="what", required=True)
@@ -294,7 +576,14 @@ def main(argv: list[str] | None = None) -> int:
             one.add_argument("--skip-deployed", action="store_true")
     two = sub.add_parser("post")
     two.add_argument("--results", required=True, type=Path)
+    # M07 PR 2: the reader of the grant, first in every keyed job (rulings/pr2-security.md item 6).
+    three = sub.add_parser("grant")
+    three.add_argument("--app", required=True)
+    three.add_argument("--out", required=True, type=Path)
     args = parser.parse_args(argv)
+
+    if args.what == "grant":
+        return grant_command(args.app, args.out)
 
     org, app_id = identity()
     if not org or not isinstance(app_id, int):
