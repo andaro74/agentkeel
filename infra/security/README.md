@@ -71,9 +71,12 @@ years (M08); a gate on the lock's retention (SPEC/05 §8).
 
 Ruled 2026-10-02 (`milestones/M07/rulings/pr2-security.md` items 9 and
 11); the read role's listing of `bundles/` is item 13e, not ruled then.
-Redeployed by hand after reading `cdk diff`: the steps, and what the diff
+Redeployed by hand after reading the change set: the steps, and what it
 should show and nothing else, are `milestones/M07/runs/pr2_by_hand.md`
-step B1. Not deployed as this is written.
+step B1. Deployed on 2026-10-02 by `hector.flores` in the console, from a
+template synthesised from `main` at `3bfd074` (corrected at M07 PR 3: the
+profile `agentkeel-security` named above went with
+`OrganizationAccountAccessRole` at M05, and step B1 first named it).
 
 - `bundles/<name>/<commit>.tar` and its signature: the signed archive of
   each deploy of an agent from the template, put by `agentkeel-answer-put`
