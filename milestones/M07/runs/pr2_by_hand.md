@@ -65,8 +65,8 @@ Whichever it is, the table below is filled when it is done.
 | Stack | Commit deployed (`git rev-parse HEAD`) | Deployed at | The diff read, and where its output is kept |
 |---|---|---|---|
 | B1 security | `3bfd074` (as the human stated it) | 2026-10-02 | the console's change set; not kept. **Owed** (platform-architect 3 on M07 PR 3): the sha256 of `AgentkeelSecurity.template.json` synthesised at that commit, and the same hash of the template CloudFormation stores, read by `hector.flores` |
-| B2 bootstrap, first | `7a9032d` (`m07-pr4`; `CreateAgentRuntimeEndpoint` alone) | 2026-10-02T22:49:50Z (`AgentkeelBootstrap` `LastUpdatedTime`); `AWS_ENVELOPE_ROW_PUT_ROLE_ARN` set 22:51:50Z | **Owed**: the `cdk diff --strict` output the human kept |
-| B2 bootstrap, second | `81508ab` (`m07-pr4`; `TagResource` added) | 2026-10-02T23:16:52Z (`AgentkeelBootstrap` `LastUpdatedTime`) | **Owed**: the `cdk diff --strict` output the human kept. The next deploy run, 37077850271, created owner-check's runtime |
+| B2 bootstrap, first | `7a9032d` (`m07-pr4`; `CreateAgentRuntimeEndpoint` alone) | 2026-10-02T22:49:50Z (`AgentkeelBootstrap` `LastUpdatedTime`); `AWS_ENVELOPE_ROW_PUT_ROLE_ARN` set 22:51:50Z | read by the human against the list above; its last lines (the two outputs) in `runs/b2_cdk_diff.md`; the rest not kept (the session's `tee` caught stdout, and `cdk diff` writes to stderr) |
+| B2 bootstrap, second | `81508ab` (`m07-pr4`; `TagResource` added) | 2026-10-02T23:16:52Z (`AgentkeelBootstrap` `LastUpdatedTime`) | in full in `runs/b2_cdk_diff.md`: one statement, and `Metadata` hunks that are `§` against `?`. The stored template read equal to the tree's synth, signs aside. The next deploy run, 37077850271, created owner-check's runtime |
 | B3 Grafana | not deployed | | |
 
 ## A. The two new Apps, their environments and keys
