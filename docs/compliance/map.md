@@ -20,7 +20,8 @@ made from the template exists" is not evidenced and F7.0 fired
 "Ruled by", and the grant is now `infra/platform_grant.yaml`. The audit
 bucket's `bundles/` and `observations/` statements were deployed by hand
 on 2026-10-02; nothing has been put under either. `two-key` now reads a
-pin's `deprecated_after`. The map is drafted again at the close.
+pin's `deprecated_after`, in `agentkeel` only: an agent repository has no
+`two-key`, and a date moved later there takes one commit. The map is drafted again at the close.
 
 This page is not legal advice and not an audit opinion. It says which
 record in this repository bears on which line of a public framework.

@@ -22,7 +22,8 @@ commit (ADR-0008).
 ## Context
 
 `F4_4` fails an envelope whose p95 is over 2.0 times the incumbent's
-median in the same mode (`thresholds.yaml` `delta_max.p95_ratio_max`).
+median in the same mode (`thresholds.yaml` `relative.p95_ratio_max`; SPEC/04
+§2 calls the policy `delta_max`).
 The gate rules that envelope RED, and `evals` is a required check, so
 the pull request cannot merge.
 
@@ -40,7 +41,7 @@ change with no ADR (one ADR per rule change).
 
 ## Decision
 
-1. **The bar does not move.** `delta_max.p95_ratio_max` stays 2.0, and
+1. **The bar does not move.** `relative.p95_ratio_max` stays 2.0, and
    the reading stays as SPEC/04 §2 gives it. Raising the bar is a
    relaxation with two keys (SPEC/02 §2), and is not this rule.
 2. **One second run, and only here.** When `F4_4` alone fails, on p95,
@@ -54,7 +55,12 @@ change with no ADR (one ADR per rule change).
 4. **A swap pull request never gets a second run.** Its p95 is the thing
    under test. One exception: the revert of a merged swap that is RED on
    `F4_4` alone, since a revert restores the incumbent of record
-   (`pr2-threshold-owner.md` item 3).
+   (`pr2-threshold-owner.md` item 3). What that revert is held to, said
+   here because item 3's own sentence names the wrong median
+   (threshold-owner F2 on M07 PR 2, F4 on PR 3): the revert's p95 on
+   Sonnet 4.6 is compared with 2.0 times the median of the incumbent at
+   its merge-base, which is then Haiku 4.5, over that model's one or two
+   envelopes in the same mode. Its verdict is not stated.
 5. **No gate reads this rule.** The run file and the two envelopes are
    its record. A second run made outside it is a finding for the
    Threshold Owner, and is written as one in the pull request that
@@ -62,6 +68,9 @@ change with no ADR (one ADR per rule change).
 
 ## Consequences
 
+- **M07 PR 3, the pull request that carries this ADR, gets no second
+  run under it.** Its diff touches `infra/construct/`. If its run is RED
+  on `F4_4`, it is RED (threshold-owner F1 on M07 PR 3).
 - M07 PR 1's second run predates this ADR. It is the case the rule was
   written from, and it met every term of it: `F4_4` alone, a diff that
   touched nothing the agent runs, stated before, both envelopes kept.

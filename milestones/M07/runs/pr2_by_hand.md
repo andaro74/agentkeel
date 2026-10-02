@@ -1,7 +1,10 @@
 # M07 PR 2 and PR 3: what is done by hand, and in what order
 
 For andaro74, as Security. `rulings/pr2-security.md` item 12 is the order;
-this is each step with its commands. Nothing here is done by a session.
+this is each step with its commands. Nothing here is done by a session,
+and no stack is deployed from a commit whose Security ruling still reads
+DRAFT (the sentence PR 2's version of this file opened with, restored
+after the reviews of PR 3).
 
 Git Bash, from the repository's root. The agent account is 581208540944
 (the default profile, the account's admin user). The security account is
@@ -45,9 +48,25 @@ variable `AWS_MODEL_WATCH_ROLE_ARN` is set last, and only after the swap's
 statement (`runs/f7_3_rollback.yaml`) is pushed.** The role itself may be
 deployed with B2: a role with no variable naming it starts nothing.
 
-B2 and B3 are deployed from the branch `m07-pr3`, not from `main`: PR 3
-adds the two new roles to refagent's key policy (item 13h), and one deploy
-is better than two.
+**When B2 and B3 are deployed is Security's to rule, and is not ruled as
+this is written** (security-reviewer 5, platform-architect 2 and cold
+review F2 on M07 PR 3: this file first said "from the branch `m07-pr3`",
+which changes refagent's key policy from a head no ruling covers). PR 3
+adds the two new roles to that key policy (item 13h), so the stack is
+deployed once, from a commit that holds it. Either:
+
+- after PR 3 merges, from `main`; or
+- before the merge, from `m07-pr3`, only after `rulings/pr3-security.md`
+  reads "Ruled by", from one named commit, with the `cdk diff --strict`
+  output kept.
+
+Whichever it is, the table below is filled when it is done.
+
+| Stack | Commit deployed (`git rev-parse HEAD`) | Deployed at | The diff read, and where its output is kept |
+|---|---|---|---|
+| B1 security | `3bfd074` (as the human stated it) | 2026-10-02 | the console's change set; not kept. **Owed** (platform-architect 3 on M07 PR 3): the sha256 of `AgentkeelSecurity.template.json` synthesised at that commit, and the same hash of the template CloudFormation stores, read by `hector.flores` |
+| B2 bootstrap | not deployed | | |
+| B3 Grafana | not deployed | | |
 
 ## A. The two new Apps, their environments and keys
 
@@ -64,7 +83,7 @@ Ruled 2026-10-02 (items 2, 3, 13a). `agentkeel-platform` is not touched.
    Administration, not Workflows.
 5. "Where can this GitHub App be installed?": **Any account**. It is
    installed on two accounts, and GitHub allows that only for a public
-   App (`rulings/pr2-security.md` item 13a, ruled).
+   App (`rulings/pr2-security.md` item 13a; ruled by that file's first line, as the seat confirmed at PR 3).
 6. Create. Note the **App ID**. Generate a private key; a `.pem` file
    downloads.
 7. Install it on `agentkeel-studio`: **All repositories**.
@@ -192,14 +211,15 @@ account, can change it.
 PR 3 changes nothing under `infra/security/` but its README, so B1 is not
 made again for PR 3.
 
-### B2. The agent account's bootstrap stack (items 13b, 13c, 13d, 13h: ruled)
+### B2. The agent account's bootstrap stack (items 13b, 13c, 13d, 13h)
 
-From `m07-pr3`, after the session says the branch is pushed.
+From the commit Security rules (above). Write the commit down first.
 
 ```sh
-git fetch origin && git checkout m07-pr3 && git pull --rebase
+git fetch origin && git checkout <main, or m07-pr3> && git pull --rebase
+git rev-parse HEAD                                               # the commit deployed: into the table above
 aws sts get-caller-identity                                      # Account 581208540944
-cd infra/bootstrap && npx aws-cdk@2 diff --strict
+cd infra/bootstrap && npx aws-cdk@2 diff --strict | tee "$HOME/agentkeel-b2-diff.txt"
 ```
 
 The diff should show, and nothing else:

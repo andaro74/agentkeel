@@ -972,3 +972,55 @@ has run live, and no document describes any as working.
 model's `deprecated_after`), moot while refagent's is null, and
 `model-watch`'s paths fixed to M07 (threshold-owner N13): both to M08's
 open list at the close.
+
+**After the seat reviews of PR 3** (four reports on `3bfd074...936eb17`;
+`milestones/M07/rulings/pr3-engineering.md`, `pr3-security.md` and
+`pr3-threshold-owner.md` carry each finding and what was done). Repaired
+in code: a restore is a change to the ruleset after the detection, not
+after the call; `two-key` reads an unquoted timestamp by its day; the
+observer revokes its tokens and sends one only to GitHub's API host; the
+`open` job compares text and says so. Still true, and said here so no
+document describes these as working:
+
+- **The cost of the row's amendment.** None of PR 3's repairs has run
+  live: the artifact's layout, the keyed observer, the rule on who made a
+  commit, the retire job's check, the `open` job's check. Each first runs
+  during an attempt. A fault one of them shows then has no pull request
+  left to repair it in: PR 4 is the close. It is recorded as a finding.
+- **A platform role added after an agent's key exists.** A template
+  agent's key policy is made with its stack and names the platform's
+  roles. No platform role may change a key policy afterwards. So a later
+  change to that list changes the policy in the template, CloudFormation
+  is refused the change, and that agent's next stack update fails, its
+  retirement included. No key exists yet; PR 3's two names land before
+  the first. Nothing tests the case.
+- **`two-key` reads `deprecated_after` in `agentkeel` only.** An agent
+  repository has no `two-key`; a date moved later there takes one commit
+  and switches the 30-day check off for that agent.
+- **The grant file is tied to its ruling by name.** The reader checks the
+  named ruling is Security's and ruled, not that it rules these bytes.
+  `ruling-cited` on `/infra/` is what holds a later change.
+- **The files that hold PR 3's new checks stay Engineering's**
+  (`scripts/platform_upgrade.py`, `scripts/retire_agent.py`,
+  `scripts/observe_upgrade.py`, `scripts/platform_pr.py`,
+  `scripts/registry.py`, `src/validate/agent.py`). A pull request that
+  weakens one meets `cold-review-ruling` and no Security gate.
+- **The bundle put under `bundles/` is the artifact's file.** The deploy
+  job verifies its own re-pack against the signature and then puts the
+  artifact's `bundle.tar`; nothing compares the two digests before the
+  put. `image.tar` is carried in the same artifact and is not signed.
+- **What is deployed in the security account rests on one person's
+  statement.** No role in either account reads that stack back, and no
+  hash of the template deployed on 2026-10-02 was kept.
+- **The Deny for the two new roles has not fired.** They are named in
+  both lists. Neither holds a kms Allow, so a refusal could not be shown
+  to be the key policy's.
+- **"No role the platform creates"** is still what refagent's key says of
+  itself. Its policy names seven roles and the agent path; the Grafana
+  connector's, the ingest's and the audit's are not among them.
+
+**To M08's open list at the close, by name:** the six items above that
+are not repaired; threshold-owner F2 on PR 2 (item 3's sentence on the
+revert's median, restated in ADR-0011 and not in the ruling), its F5 (a
+swap leaves the old model's date) and N9 (the manifest's stale judge
+comment), N13 (`model-watch`'s paths fixed to M07); item 13n.

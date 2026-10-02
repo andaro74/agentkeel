@@ -92,8 +92,9 @@ are kept by the security account's own rules, not by a lock.
 If your agent should not be retired, close the pull request.
 
 A retirement changes one line and must stay one line. When the platform
-retires your agent it compares your manifest with the one it last
-deployed, and refuses if anything but `rollout` differs. So do not change
+retires your agent it is built to compare your manifest with the one it
+last deployed, and to refuse if anything but `rollout` differs. No
+retirement has run yet. So do not change
 another field in the retirement pull request, and do not merge another
 manifest change just before it: let that change deploy first. If your
 agent's last deploy failed, it cannot be retired until a deploy succeeds.

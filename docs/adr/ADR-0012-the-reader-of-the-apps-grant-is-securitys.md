@@ -14,7 +14,13 @@ amendments: 0
 
 Raised by `security-reviewer` on M07 PR 2 (finding 5) and put to the
 Security seat as item 13j of `milestones/M07/rulings/pr2-security.md`,
-ruled as written on 2026-10-02. Ruled by Product at M07 PR 3
+ruled on 2026-10-02 by that file's line "Ruled by andaro74 as Security,
+2026-10-02, as written": the file as written carries each of 13a to 13n
+with its recommended option, under a heading that still reads "not
+ruled", which was true when the heading was written and not after the
+line. The seat confirmed that reading on 2026-10-02 at M07 PR 3, and
+`milestones/M07/rulings/pr3-security.md` rules the items PR 3 builds, by
+item. Ruled by Product at M07 PR 3
 (`milestones/M07/rulings/pr3.md`), accepted on `main` at that PR's merge
 commit (ADR-0008). ADR-0003 has used both its amendments, so a change to
 path ownership is a new ADR.

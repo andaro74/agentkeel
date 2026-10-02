@@ -14,10 +14,13 @@
 # (`ruling-cited`). The block in pr2-security.md stays as the record of
 # what was ruled then; nothing reads it now.
 #
-# `ruled_in` names the ruling file that rules this file as it stands. The
-# reader refuses the grant unless that file is on the checkout, its seat is
-# Security, and it carries a line that starts "Ruled by": a draft is not a
-# grant.
+# `ruled_in` names the ruling file that rules this file. The reader refuses
+# the grant unless that file is on the checkout, its seat is Security, and
+# it carries a line that starts "Ruled by": a draft is not a grant. That is
+# a guard against a draft and nothing more: the reader does not hold these
+# bytes to that ruling, so a later change here that left `ruled_in` alone
+# would be read as ruled. What holds a later change is `ruling-cited` on
+# /infra/, at the pull request (security-reviewer 2 on M07 PR 3).
 ruled_in: milestones/M07/rulings/pr3-security.md
 
 # The one repository the seeded relaxation may be pointed at (seed S0's

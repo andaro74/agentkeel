@@ -269,6 +269,25 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   `deprecated_after` in place): moot while refagent's is null; to M08's
   open list at the close. Nothing that had to precede an attempt was left
   out.
+- **The seat reviews, read on `3bfd074...936eb17` before the pull request
+  was opened:** engineering-cold-reviewer 1 BLOCK, 3 FINDING, 7 NOTE;
+  security-reviewer 0, 5, 19; platform-architect 0, 6, 7; threshold-owner
+  0, 5, 9. The BLOCK: the two ruling files this diff rests on were not in
+  the tree. They are written now, as drafts, and it clears when the seats
+  rule them. Repaired in code, each in its own commit: a restore is a
+  change after the detection (`44a86eb`); `two-key` on an unquoted
+  timestamp (`b5b3b5f`); the observer revokes its tokens and sends one
+  only to GitHub's API host; the `open` job says text, not bytes
+  (`4fd46f8`). Each finding and what was done:
+  `rulings/pr3-engineering.md`, `pr3-security.md`,
+  `pr3-threshold-owner.md`.
+- **What the amendment costs, said by the cold review (F3).** None of
+  PR 3's repairs has run live. Each first runs during an attempt, and a
+  fault one of them shows then has no pull request left: PR 4 is the
+  close. It would be recorded as a finding.
+- **This PR's own run gets no second run.** Its diff touches
+  `infra/construct/`, so under ADR-0011 a p95 miss on it is RED
+  (`runs/pr3_expected.md`).
 - **`runs/pr2_by_hand.md` corrected** (`96f3cda`): no local profile
   reaches the security account. B1 was deployed on 2026-10-02 by
   `hector.flores` in the console. No put under `bundles/` or
