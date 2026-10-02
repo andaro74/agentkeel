@@ -243,3 +243,21 @@ quickstart, is received at M07 and stays where M06 planted it.
 | S3 | `m07/s3-rollback/`; `milestones/M07/runs/f7_3_rollback.yaml` | `observation.json`: a revert whose deploy run completed, the digest the tree gives at the revert, the upgrade's digest, and a `GetAgentRuntime` answer whose image tags still hold the upgrade's. `build` has no `f7_3`, and nothing compares a runtime's digest with the tree's after a merge to `main`. The run file is `model-watch`'s swap to Haiku 4.5 and its rollback, with the fallback named before any run, not yet made |
 | S4 | `m07/s4-panel2/` | `dashboard.json`, a dashboard whose panel 2 selects the constant `'GREEN'` as its verdict column; `frame.json`, panel 2's rows as Grafana's `/api/ds/query` returns them, GREEN for `6f3d1618f42a…`, whose envelope on `main` (`evals/history/`, M01 PR 2) says RED. Two tests, one per reader: placed at `infra/grafana/panel2.json` the dashboard passes `validate`, which reads panel 1 only, and `build` has no `panel_verdict_mismatch`. The data source and table names are placeholders until Security rules where panel 2 reads envelopes (SPEC/07 section 11, R8) |
 | S5 | `m07/s5-silent-surface-plant/` | `results.json`, one run's results for the surfaces' plants: panel 1's plant (S4 of M06) fired, and panel 2's (S4 above) is missing. A counter must give 2 expected, 1 fired, and name the silent one. No control in `src/verdict/plants.py` names a surface's plants and `build` counts none. S5 is the test of the counter and is not itself counted |
+
+Added in M07 PR 1's repair of its own review, before any reader (cold
+review F1 to F3; security-reviewer 19, 20; legal-compliance 7). S0:
+`installation_raised.json` (no new permission name and no new repository:
+`contents` raised to write, `repository_selection` all) and
+`environment_tag.json` (one policy still named `main`, but a tag); the
+grant names the selection and each policy's type; and the `app_token()`
+test calls it with no repository against a stub and expects a refusal and
+no token asked for. S1: the platform side carries a workflow and an
+`agent.py`, which an upgrade must leave behind. S2: `observation_held.json`
+(a retirement that held), `observation_no_bundle.json` (held but for the
+bundle) and `observation_access_denied.json` (the invocation refused for
+access, not for the deletion). S3: `observation_held.json`. S4: a second
+row in `frame.json`, GREEN for an envelope that stores GREEN. Each fixture
+test now asks its reader to hold the held case as well as refuse the bad
+one. S0's grant is still one flat permission set: whether the platform has
+one App or several, and so the reader's shape, is Security's before PR 2
+(SPEC/07 section 11, R2).

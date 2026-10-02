@@ -1,5 +1,6 @@
 {
   "installation": {
+    "repository_selection": "selected",
     "repositories": [
       "agent-template",
       "owner-check"
@@ -14,7 +15,10 @@
   },
   "environment": {
     "branch_policies": [
-      "main"
+      {
+        "name": "main",
+        "type": "branch"
+      }
     ],
     "can_admins_bypass": false
   }

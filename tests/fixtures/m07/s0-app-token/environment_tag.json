@@ -1,0 +1,10 @@
+{
+  "name": "platform-app",
+  "can_admins_bypass": false,
+  "branch_policies": [
+    {
+      "name": "main",
+      "type": "tag"
+    }
+  ]
+}

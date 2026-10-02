@@ -109,16 +109,37 @@ def made(run: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 @expected_failure
-def test_s0_app_token_refuses_a_call_with_no_repository():
+def test_s0_app_token_refuses_a_call_with_no_repository(monkeypatch):
     """`app_token()` with no repository mints the installation's token with `scope = {}`: every
     permission the App holds, on every repository it reaches (open.md row 2). After the grant that
-    token could relax any agent repository's ruleset. It must not be callable that way."""
+    token could relax any agent repository's ruleset. Called with None, it must refuse and send no
+    request for a token: a signature with no default would not be a refusal (cold review F1,
+    security-reviewer 20 on M07 PR 1). GitHub is a stub here; the key is made for the test."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
     from scripts import platform_check
 
-    parameters = inspect.signature(platform_check.app_token).parameters
-    holds("repository" in parameters, "app_token() still takes the repository it mints for")
-    assert parameters["repository"].default is inspect.Parameter.empty, (
-        "seed S0: app_token() can be called with no repository, and then mints every permission on every repository")
+    holds("repository" in inspect.signature(platform_check.app_token).parameters,
+          "app_token() still takes the repository it mints for")  # fmt: skip
+    pem = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()  # fmt: skip
+    sent: list[tuple[str, str, Any]] = []
+
+    def stub(path: str, *, method: str = "GET", body: Any = None, raw: bool = False) -> Any:
+        sent.append((method, path, body))
+        return {"id": 1, "token": "not-a-token"}
+
+    monkeypatch.setattr(platform_check, "gh", stub)
+    try:
+        platform_check.app_token(1, "an-organisation", pem, None)
+        refused = False
+    except (TypeError, ValueError):
+        refused = True
+    minted = [body for method, _path, body in sent if method == "POST"]
+    assert refused and not minted, (
+        "seed S0: app_token() can be called with no repository, and then mints every permission on every "
+        f"repository (it asked for a token with scope {minted})")
 
 
 @expected_failure
@@ -138,6 +159,15 @@ def test_s0_the_installations_grant_is_read_back():
     assert check(ruled, environment, grant) == []
     errors = check(uncovered, environment, grant)
     assert any("members" in e for e in errors) and any("scratch-repo" in e for e in errors), errors
+    # The same keys and the same names, one level raised and the selection widened (security-reviewer 19):
+    # a reader that compares key sets and ignores values would pass it.
+    raised = fixture("s0-app-token/installation_raised.json")
+    holds(set(raised["permissions"]) == set(grant["installation"]["permissions"]) and raised["repositories"] == ruled["repositories"],
+          "the third installation holds no new permission name and no new repository")  # fmt: skip
+    holds(raised["permissions"]["contents"] == "write" and raised["repository_selection"] == "all",
+          "the third installation raises contents to write and reaches all repositories")  # fmt: skip
+    errors = check(raised, environment, grant)
+    assert any("contents" in e for e in errors) and any("repository_selection" in e for e in errors), errors
 
 
 @expected_failure
@@ -159,6 +189,11 @@ def test_s0_the_key_environment_is_read_back():
     assert check(installation, ruled, grant) == []
     errors = check(installation, uncovered, grant)
     assert any("m07-*" in e for e in errors) and any("can_admins_bypass" in e for e in errors), errors
+    # One policy still named main, but a tag policy, not a branch (security-reviewer 19).
+    tag = fixture("s0-app-token/environment_tag.json")
+    holds([(p["name"], p["type"]) for p in tag["branch_policies"]] == [("main", "tag")], "the third environment's one policy is a tag")
+    errors = check(installation, tag, grant)
+    assert any("tag" in e for e in errors), errors
 
 
 @expected_failure
@@ -190,10 +225,15 @@ def test_s1_a_platform_upgrade_changes_platform_owned_files_only():
     holds((agent / ".github" / "workflows" / "own.yml").is_file(), "the agent folder carries a workflow of its own")
     holds((agent / "server.py").read_text(encoding="utf-8") != (platform / "server.py").read_text(encoding="utf-8"),
           "the platform's server.py differs from the agent's")  # fmt: skip
+    # The platform side carries a workflow and an agent.py too: a reader that copies whatever is there
+    # brings them, and that is the arm of F7.1 the fixture must be able to fire (cold review F2).
+    holds((platform / ".github" / "workflows" / "platform.yml").is_file() and (platform / "agent.py").is_file(),
+          "the platform side carries a workflow and an agent.py, neither platform-owned")  # fmt: skip
     upgrade = module("scripts.platform_upgrade", "S1", "nothing computes an agent's platform upgrade")
     changed: dict[str, str] = upgrade.diff(agent, platform)
+    outside = sorted(set(changed) - PLATFORM_OWNED)
+    assert not outside, f"the upgrade touches paths the platform does not own: {outside}"
     assert set(changed) == {"manifest.yaml", "server.py"}, sorted(changed)
-    assert not any(path.startswith(".github/") for path in changed), "the upgrade touches a workflow"
     after = yaml.safe_load(changed["manifest.yaml"])
     assert after["platform_version"] == "m07" and after["guardrail"] == target["guardrail"]
     assert {k: v for k, v in after.items() if k not in ("platform_version", "guardrail")} == {
@@ -232,6 +272,15 @@ def test_s2_a_retired_agent_that_still_answers_is_found_by_build():
     assert entry["read"] is True and entry["held"] is False, entry
     reasons = " ".join(entry["reasons"])
     assert "invocation" in reasons and "still exists" in reasons and "answer record" in reasons, entry["reasons"]
+    # The reader must also hold a retirement that held, and refuse one for the bundle alone and one whose
+    # invocation was refused for access, not for the deletion (cold review F3; legal-compliance 7;
+    # security-reviewer 15).
+    held = read(fixture("s2-retired-agent/observation_held.json"), 3600.0)
+    assert held["read"] is True and held["held"] is True and held["reasons"] == [], held
+    no_bundle = read(fixture("s2-retired-agent/observation_no_bundle.json"), 3600.0)
+    assert no_bundle["held"] is False and len(no_bundle["reasons"]) == 1 and "bundle" in no_bundle["reasons"][0], no_bundle
+    denied = read(fixture("s2-retired-agent/observation_access_denied.json"), 3600.0)
+    assert denied["held"] is False and len(denied["reasons"]) == 1 and "invocation" in denied["reasons"][0], denied
 
 
 @expected_failure
@@ -262,6 +311,8 @@ def test_s3_a_rollback_that_leaves_the_new_digest_live_is_found_by_build():
     entry = read(observation)
     assert entry["read"] is True and entry["held"] is False, entry
     assert any(observation["upgrade_digest"][:12] in reason for reason in entry["reasons"]), entry["reasons"]
+    held = read(fixture("s3-rollback/observation_held.json"))  # the tree's digest live: held (cold review F3)
+    assert held["read"] is True and held["held"] is True and held["reasons"] == [], held
 
 
 @expected_failure
@@ -277,6 +328,7 @@ def test_s3_the_rollback_was_made():
 
 PANEL_2 = "infra/grafana/panel2.json"  # the dashboard's path from PR 2 (Security's)
 RED_ENVELOPE = "6f3d1618f42acbb217f7bcd62ecf2fc000ac4a9f"  # on main since M01 PR 2, RED
+GREEN_ENVELOPE = "245eb9baf796cd9ceed652abe3805825208358c9"  # row 6's: its stored verdict is GREEN
 
 
 def validate_over(tree: Path) -> dict[str, list[str]]:
@@ -329,6 +381,10 @@ def test_s4_a_green_row_for_a_red_envelope_is_found_by_build():
     holds(rows.get(RED_ENVELOPE) == "GREEN", "S4's panel rows say GREEN for the envelope")
     envelope = json.loads((HISTORY / f"{RED_ENVELOPE}.json").read_text(encoding="utf-8"))
     holds(envelope["verdict"] == "RED", "the envelope on main says RED")
+    # A second row, GREEN for an envelope that stores GREEN: the comparison must not name it (cold review F3).
+    holds(rows.get(GREEN_ENVELOPE) == "GREEN", "S4's panel rows say GREEN for a second envelope")
+    holds(json.loads((HISTORY / f"{GREEN_ENVELOPE}.json").read_text(encoding="utf-8"))["verdict"] == "GREEN",
+          "the second envelope on main stores GREEN")  # fmt: skip
     compare = reader(build, "panel_verdict_mismatch", "S4", "nothing compares panel 2's verdicts with the envelopes")
     assert compare(frame, HISTORY) == [RED_ENVELOPE]
 
@@ -353,3 +409,5 @@ def test_s5_a_silent_surface_plant_is_counted():
     counted = count(results)
     assert counted["plants_expected"] == 2 and counted["plants_fired"] == 1, counted
     assert counted["silent"] == ["tests/fixtures/m07/s4-panel2/"], counted
+    full = count({plant: True for plant in named})  # both fired: nothing silent (cold review F3)
+    assert full["plants_expected"] == 2 and full["plants_fired"] == 2 and full["silent"] == [], full
