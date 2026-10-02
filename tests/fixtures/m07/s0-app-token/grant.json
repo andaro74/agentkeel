@@ -1,0 +1,25 @@
+{
+  "installation": {
+    "repository_selection": "selected",
+    "repositories": [
+      "agent-template",
+      "owner-check"
+    ],
+    "permissions": {
+      "administration": "write",
+      "checks": "write",
+      "contents": "read",
+      "metadata": "read",
+      "pull_requests": "read"
+    }
+  },
+  "environment": {
+    "branch_policies": [
+      {
+        "name": "main",
+        "type": "branch"
+      }
+    ],
+    "can_admins_bypass": false
+  }
+}

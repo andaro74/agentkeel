@@ -1,0 +1,20 @@
+{
+  "agent": "refagent",
+  "revert": {
+    "merged": true,
+    "merge_commit_sha": "1111111111111111111111111111111111111111"
+  },
+  "revert_deploy": {
+    "conclusion": "success",
+    "completed_at": "2026-10-06T10:00:00Z"
+  },
+  "tree_digest_at_revert": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "upgrade_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "runtime": {
+    "image_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "image_tags": [
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    ],
+    "read_at": "2026-10-06T10:05:00Z"
+  }
+}

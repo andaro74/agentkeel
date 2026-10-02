@@ -1,0 +1,25 @@
+{
+  "title": "agentkeel",
+  "uid": "agentkeel-registry",
+  "panels": [
+    {
+      "id": 2,
+      "title": "Verdict history",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-athena-datasource",
+        "uid": "envelopes"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-athena-datasource",
+            "uid": "envelopes"
+          },
+          "rawSQL": "SELECT commit, 'GREEN' AS verdict FROM \"agentkeel_envelopes\".\"default\".\"envelopes\" ORDER BY commit"
+        }
+      ]
+    }
+  ]
+}

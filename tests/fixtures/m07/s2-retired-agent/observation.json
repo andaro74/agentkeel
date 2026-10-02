@@ -1,0 +1,35 @@
+{
+  "agent": "premiere-desk",
+  "pull_request": {
+    "merged": true,
+    "merged_at": "2026-10-05T09:50:00Z"
+  },
+  "delete_event": {
+    "eventName": "DeleteAgentRuntime",
+    "eventTime": "2026-10-05T10:00:00Z"
+  },
+  "get_runtime": {
+    "found": true,
+    "status": "READY",
+    "read_at": "2026-10-05T12:00:00Z"
+  },
+  "invocation": {
+    "answered": true,
+    "error": null,
+    "at": "2026-10-05T10:01:00Z"
+  },
+  "answer_records": [
+    {
+      "key": "envelopes/agents/premiere-desk/0c0ffee.json",
+      "last_modified": "2026-10-05T11:00:00Z"
+    }
+  ],
+  "bundle": {
+    "found": true,
+    "key": "bundles/premiere-desk/0c0ffee.tar"
+  },
+  "registry_row": {
+    "name": "premiere-desk",
+    "retired_at": "2026-10-05T10:00:30Z"
+  }
+}

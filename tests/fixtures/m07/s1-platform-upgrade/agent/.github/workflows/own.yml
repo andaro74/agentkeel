@@ -1,0 +1,8 @@
+# The team's own workflow (fixture). A platform upgrade never touches a workflow (F7.1).
+name: own
+on: workflow_dispatch
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

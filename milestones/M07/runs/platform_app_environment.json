@@ -1,0 +1,21 @@
+{
+  "id": 23171652383,
+  "node_id": "EN_kwDOUgm8Fc8AAAAFZSNbHw",
+  "name": "platform-app",
+  "url": "https://api.github.com/repos/andaro74/agentkeel/environments/platform-app",
+  "html_url": "https://github.com/andaro74/agentkeel/deployments/activity_log?environments_filter=platform-app",
+  "created_at": "2026-10-01T03:29:30Z",
+  "updated_at": "2026-10-01T03:29:30Z",
+  "can_admins_bypass": true,
+  "protection_rules": [
+    {
+      "id": 67284228,
+      "node_id": "GA_kwDOUgm8Fc4EAq0E",
+      "type": "branch_policy"
+    }
+  ],
+  "deployment_branch_policy": {
+    "protected_branches": false,
+    "custom_branch_policies": true
+  }
+}

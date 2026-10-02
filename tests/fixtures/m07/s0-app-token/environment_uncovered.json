@@ -1,0 +1,14 @@
+{
+  "name": "platform-app",
+  "can_admins_bypass": true,
+  "branch_policies": [
+    {
+      "name": "main",
+      "type": "branch"
+    },
+    {
+      "name": "m07-*",
+      "type": "branch"
+    }
+  ]
+}

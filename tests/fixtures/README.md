@@ -218,3 +218,46 @@ section 5.1).
 | S2 | `milestones/M06/runs/f6_2_standin.yaml` | a pull request in an agent repository whose own workflow adds a job named as the platform check and drops the request to `agentkeel`, not yet attempted. There is no agent repository; in `agentkeel` today the same shape is answered by the pull request's own files (`infra/ruleset/main.json` requires checks by name, no `integration_id`) |
 | S3 | `milestones/M06/runs/f6_3_quickstart.yaml` | the timed quickstart by `floresinnovations` (id 336113686), not yet made; its preparation recorded, the agent's name not yet stated. There is no template and no quickstart |
 | S4 | `m06/s4-panel1/` | `dashboard.json`, a dashboard whose panel 1 merges the registry with a static list naming `ghost-agent`; `frame.json`, panel 1's rows as Grafana's `/api/ds/query` returns them, naming `refagent` and `ghost-agent`; `registry.json`, a registry scan naming `refagent` only. Two tests, one per reader (finding 10's rule): placed at `infra/grafana/panel1.json` the dashboard passes `validate`, and `build` has no `panel_not_in_registry` to find `ghost-agent`. The data source types are placeholders until Security reads where Grafana runs (SPEC/06 section 11) |
+
+## M07 (SPEC/07 section 5)
+
+Committed at M07 PR 1, one commit per seed, each with its tests in
+`tests/test_m07_seeds.py`, before any code that reads them. Each test is
+`xfail(strict=True, raises=AssertionError)` until its reader lands (the
+fixture tests, at PR 2) or its attempt is made (the run-file tests),
+asserts the planted reason, and was run once with `--runxfail` and its
+message read. Nothing here reaches `evals/history/`, calls AWS, calls a
+model or calls GitHub.
+
+A fixture test hands its fixture to the reader PR 2 must build, by a name
+the test fixes, and asks it to refuse the fixture. The run files are under
+`milestones/M07/runs/`, each the attempt to make with `observed: null`,
+made after M07 PR 2 merges (SPEC/07 section 5.1). SPEC/06's S3, the timed
+quickstart, is received at M07 and stays where M06 planted it.
+
+| Seed | File | What is wrong with it |
+|---|---|---|
+| S0 | `m07/s0-app-token/`; `milestones/M07/runs/f7_0_owner_test.yaml` | `grant.json`, a grant as a ruling would name it (the installation's repositories and permissions, the environment's branch policies and admin bypass). `installation_as_ruled.json` and `environment_as_ruled.json` are the App's installation and the `platform-app` environment as GitHub's API returns them, equal to it; `installation_uncovered.json` adds `members: write` and a repository `scratch-repo`; `environment_uncovered.json` adds a branch policy `m07-*` and `can_admins_bypass: true`. Nothing in the tree reads either back, and `app_token()` can be called with no repository, minting every permission on every repository. None is the live installation: that is read with the App's key, which no test holds. The run file is three attempts not yet made: the owner's test again on owner-check #1, the platform check dispatched from a branch, the App's token asked to relax a ruleset |
+| S1 | `m07/s1-platform-upgrade/`; `milestones/M07/runs/f7_1_platform_upgrade.yaml` | `agent/`, a fictional agent's folder at `platform_version: m06` with the guardrail at version 5, a workflow file of its own and an `agent.py` its team edited; `platform/`, the platform-owned files one version on (`platform.json`: `m07`, guardrail version 6, both invented for the fixture; `server.py`; `__init__.py`, unchanged). The upgrade must move the two manifest fields, bring `server.py`, and touch nothing else. Nothing computes it: there is no `scripts/platform_upgrade.py`. The run file is the template's re-make after M07 PR 2 merges, not yet made |
+| S2 | `m07/s2-retired-agent/`; `milestones/M07/runs/f7_2_retire.yaml` | `observation.json`, the records of a retirement that did not hold, in the shape the observer will write: the retirement pull request's merge, CloudTrail's `DeleteAgentRuntime` 10 minutes later, a `GetAgentRuntime` two hours after that still finding the runtime, the retire job's invocation answered, and an answer record dated after the deletion. `build` has no `f7_2` to read them. The run file is owner-check's retirement through a pull request the platform opens, not yet made; it deletes AWS resources |
+| S3 | `m07/s3-rollback/`; `milestones/M07/runs/f7_3_rollback.yaml` | `observation.json`: a revert whose deploy run completed, the digest the tree gives at the revert, the upgrade's digest, and a `GetAgentRuntime` answer whose image tags still hold the upgrade's. `build` has no `f7_3`, and nothing compares a runtime's digest with the tree's after a merge to `main`. The run file is `model-watch`'s swap to Haiku 4.5 and its rollback, with the fallback named before any run, not yet made |
+| S4 | `m07/s4-panel2/` | `dashboard.json`, a dashboard whose panel 2 selects the constant `'GREEN'` as its verdict column; `frame.json`, panel 2's rows as Grafana's `/api/ds/query` returns them, GREEN for `6f3d1618f42a…`, whose envelope on `main` (`evals/history/`, M01 PR 2) says RED. Two tests, one per reader: placed at `infra/grafana/panel2.json` the dashboard passes `validate`, which reads panel 1 only, and `build` has no `panel_verdict_mismatch`. The data source and table names are placeholders until Security rules where panel 2 reads envelopes (SPEC/07 section 11, R8) |
+| S5 | `m07/s5-silent-surface-plant/` | `results.json`, one run's results for the surfaces' plants: panel 1's plant (S4 of M06) fired, and panel 2's (S4 above) is missing. A counter must give 2 expected, 1 fired, and name the silent one. No control in `src/verdict/plants.py` names a surface's plants and `build` counts none. S5 is the test of the counter and is not itself counted |
+
+Added in M07 PR 1's repair of its own review, before any reader (cold
+review F1 to F3; security-reviewer 19, 20; legal-compliance 7). S0:
+`installation_raised.json` (no new permission name and no new repository:
+`contents` raised to write, `repository_selection` all) and
+`environment_tag.json` (one policy still named `main`, but a tag); the
+grant names the selection and each policy's type; and the `app_token()`
+test calls it with no repository against a stub and expects a refusal and
+no token asked for. S1: the platform side carries a workflow and an
+`agent.py`, which an upgrade must leave behind. S2: `observation_held.json`
+(a retirement that held), `observation_no_bundle.json` (held but for the
+bundle) and `observation_access_denied.json` (the invocation refused for
+access, not for the deletion). S3: `observation_held.json`. S4: a second
+row in `frame.json`, GREEN for an envelope that stores GREEN. Each fixture
+test now asks its reader to hold the held case as well as refuse the bad
+one. S0's grant is still one flat permission set: whether the platform has
+one App or several, and so the reader's shape, is Security's before PR 2
+(SPEC/07 section 11, R2).

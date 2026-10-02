@@ -1,0 +1,8 @@
+# A workflow on the platform side (fixture). An upgrade never brings a workflow (F7.1).
+name: platform
+on: workflow_dispatch
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
