@@ -526,7 +526,10 @@ def deployable(org: str, app_id: int) -> list[dict[str, Any]]:
         from src.validate.agent import NAME
 
         if isinstance(agent, str) and NAME.match(agent):
-            out.append({"repository": name, "repository_id": str(repo["id"]), "commit": head, "name": agent})
+            # `rollout` from M07 PR 2 (SPEC/07 section 6): at a head the App passed, `retired` is retired by
+            # deploy.yml's retire job and deployed by nothing. Any other value is deployed, as before.
+            out.append({"repository": name, "repository_id": str(repo["id"]), "commit": head, "name": agent,
+                        "rollout": "retired" if manifest.get("rollout") == "retired" else "all-at-once"})  # fmt: skip
     return out
 
 
@@ -574,6 +577,8 @@ def main(argv: list[str] | None = None) -> int:
         if name == "deployable":
             # As the deploy role, in deploy.yml's find-agents: drop a commit the registry already holds.
             one.add_argument("--skip-deployed", action="store_true")
+            # M07 PR 2: the heads that say `rollout: retired`, less the agents the registry says are retired.
+            one.add_argument("--retiring", type=Path)
     two = sub.add_parser("post")
     two.add_argument("--results", required=True, type=Path)
     # M07 PR 2: the reader of the grant, first in every keyed job (rulings/pr2-security.md item 6).
@@ -600,11 +605,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"posted {count} check runs")
         return 0
     found = find(org, app_id) if args.what == "find" else deployable(org, app_id)
-    if args.what == "deployable" and args.skip_deployed:
-        from scripts import registry
+    if args.what == "deployable":
+        # A retired head is never in the list that is deployed, with or without the registry.
+        retiring = [a for a in found if a.get("rollout") == "retired"]
+        found = [a for a in found if a.get("rollout") != "retired"]
+        if args.skip_deployed:
+            from scripts import registry
 
-        table = registry.client()
-        found = [a for a in found if registry.deployed(table, a["name"], a["commit"])[0] != 0]
+            table = registry.client()
+            found = [a for a in found if registry.deployed(table, a["name"], a["commit"])[0] != 0]
+            # Left to retire: the registry holds a row for this repository with no `retired_at` yet.
+            retiring = [a for a in retiring if registry.retiring(table, a["name"], a["repository_id"], None)[0] != 4
+                        and registry.holder(table, a["name"]) == a["repository_id"]]  # fmt: skip
+        if args.retiring:
+            args.retiring.write_text(json.dumps(retiring) + "\n", encoding="utf-8")
+            print(f"to retire, {len(retiring)}: {json.dumps(retiring)}")
     args.out.write_text(json.dumps(found) + "\n", encoding="utf-8")
     print(f"{len(found)}: {json.dumps(found)}")
     return 0
