@@ -111,8 +111,9 @@ quickstart:
 # or AWS's, never a runner's clock or a person's.
 # - arrive_max_seconds: from an upgrade's trigger (the template's push, the
 #   model-watch run, the retire run) to the `created_at` of the pull request
-#   the platform opened. platform-upgrade.yml and the retire job run every
-#   15 minutes, so one period plus an hour.
+#   the platform opened. platform-upgrade.yml runs every 15 minutes (the
+#   retire job every 10, model-watch daily), so one 15-minute period plus
+#   an hour.
 # - deploy_max_seconds: from a pull request's `merged_at` to the deploy run
 #   of that merge completed.
 # - retire_max_seconds: from the retirement pull request's `merged_at` to

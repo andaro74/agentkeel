@@ -399,9 +399,94 @@ there. **Recommended:** list only, no read of a bundle's bytes
 - A pull request the platform opens is opened once per branch name,
   ever. A closed draft is a seat's answer.
 
+**13h to 13n. Found by the seat reviews of `a2c5a61...1b376a3`, and not
+ruled.** Each is left as the code stands, named in SPEC/07 §12, and is
+the seat's to rule before the attempt it bears on.
+
+- **13h. The two new roles and the agent key policies** (platform-architect
+  F2). `agentkeel-model-watch` and `agentkeel-envelope-row-put` are not
+  in `PLATFORM_ROLES` (the construct) or in refagent's key policy list
+  (the bootstrap). The deploy boundary and no kms Allow hold R4 for
+  them. **Recommended:** add both to both lists in PR 3, before
+  owner-check's first deploy: no template agent's key exists yet, and
+  after one does the execution role cannot change its policy.
+  Alternative: leave the lists, as SPEC/07 §12 now says.
+- **13i. A retirement's head is not held to the deployed manifest**
+  (platform-architect F4; security-reviewer 17). **Recommended:** in PR
+  3, the retire job compares the retired head's manifest with the one at
+  the registry row's commit and refuses any move but `rollout`. The cost:
+  a head that failed to deploy before it was retired cannot be retired
+  until it is fixed. Alternative: the gap stays named in SPEC/07 §12.
+- **13j. The grant block and the reader are not on Security's paths**
+  (security-reviewer 5). **Recommended:** in PR 3 the block moves to
+  `infra/platform_grant.yaml`, and `.github/CODEOWNERS` gives
+  `scripts/platform_check.py` to Security. Alternative: named in §12.
+- **13k. What the `agentkeel-upgrades` key reaches on
+  `andaro74/agentkeel`** (security-reviewer 7): any branch but `main`,
+  and a pull request it opens runs `evals.yml` with that workflow's roles
+  and tokens. **Recommended:** accepted, and said in §12: it is what any
+  collaborator with write has. Alternative: 13a's fourth App.
+- **13l. The bytes a platform upgrade proposes** (security-reviewer 4;
+  cold review N7). The titles, bodies and drafted rulings are now the
+  keyed job's own. The content of `server.py` and `__init__.py` is still
+  the plan's, from the template repository's default branch.
+  **Recommended:** in PR 3 the `open` job fetches the template as data at
+  the commit the plan names and requires each proposed file to equal it,
+  and `guardrail` to equal `main`'s. Before S1.
+- **13m. `retired.json` is under `envelopes/`** (cold review F15), keyed
+  one per name (security-reviewer 8), and `agentkeel-answer-put` may put
+  under `bundles/*`, not `bundles/<name>/*` (security-reviewer 15).
+  **Recommended:** it stays where item 11 put it: it is the retire job's
+  record, not an envelope, it carries no verdict and the gate never
+  reads it; one per name fits a name retired once. `bundles/<name>/*`
+  cannot be said in a role's policy for names not yet known; left, and
+  named. Alternative: a prefix of its own, which is a grant.
+- **13n. The seeded relaxation after it is made** (security-reviewer 6).
+  It is now refused once the run file on `main` records it.
+  **Recommended:** PR 3 also removes the dispatch input and the step,
+  once the attempt is recorded.
+
+## 14. The seat reviews, and what was done
+
+Read on the diff `a2c5a61...1b376a3` (98 files), before the pull request
+was opened. Both reports are in the pull request's body, verbatim.
+Repairs are `b3196d6` (scripts and workflows) and `ccb2be8` (readers);
+the documents are the commit after them.
+
+**security-reviewer: BLOCK 1, FINDING 7, NOTE 12.**
+
+| # | Finding | Status |
+|---|---|---|
+| 1 BLOCK | `read_grant` minted a metadata token on every installation, a stranger's included, and three places said it did not; a stranger's suspended installation stopped every keyed job | **Repaired** (`b3196d6`): it mints only on an account the grant names; any other is recorded from the App's own listing; a stranger's suspension stops nothing. Tested through `check_grant`, live and suspended |
+| 2 | The installation list was read one page deep | **Repaired**: every page |
+| 3 | The environment was compared only inside a named installation's pass | **Repaired**: once, in `check_grant`. Still true: the "key was read in environment X" check cannot fire live, since the name read is the grant's own |
+| 4 | The keyed jobs re-check a plan's shape, not its content | **Part repaired**: titles, bodies and the drafted ruling are the keyed job's own. The files' bytes are not: item 13l, PR 3, before S1 |
+| 5 | The grant block, the seed's repository and the reader are on Product's and Engineering's paths | **Open**: item 13j. Named in SPEC/07 §12 |
+| 6 | "Made once" was a sentence | **Repaired**: refused once the run file on `main` records it. Item 13n for the rest |
+| 7 | What the `agentkeel-upgrades` key reaches on `andaro74/agentkeel` | **Open**: item 13k. Named in §12 |
+| 8 | A retirement's records did not survive a second deploy; the first reading was the only one kept | **Repaired**: `claim` and `write` refuse a retired name; nothing is recorded unless the runtime is gone, so the record put once is never of a runtime that answered. One record per name stays: item 13m |
+| 9 to 22 | Notes | 9: the repository name is now held to a character set before any request. 10: `check`, `open` and `observe` tokens are still not revoked; they never leave the process; kept. 12: the observer has no keyless half, and `artifact_json` sends its bearer token on a redirect; PR 3, before the first keyed observer run. 14: the row-put role's docstring and `surfaces.md` now say the once-only is the script's condition. 15: item 13m. 20: `pr2_by_hand.md` A3's words corrected; the by-hand read of the secrets' names is recorded when it is made. 21: within one App the two-token split is `main`'s code; stands as said. The rest need nothing |
+
+**platform-architect: BLOCK 1, FINDING 5, NOTE 9.**
+
+| # | Finding | Status |
+|---|---|---|
+| B1 | The retire job wrote `retired_at` and `retired.json` whatever the invocation returned | **Repaired** (`b3196d6`): `invoke` exits 5 unless the error is `ResourceNotFoundException`; `record` refuses any other invocation; the step fails, nothing is put, the row stays open and the next run asks again |
+| F1 | "No new IAM" rested on one action name | **Read** (2026-10-02, `pr2_reads.md` R7): the type's delete handler names five actions and the execution role holds all five; a test asserts them. What the service calls beyond the type's list is unread until S2 |
+| F2 | The two new roles are in neither key policy's list | **Open**: item 13h |
+| F3 | `f7_2_removed_and_kept.md`: four corrections | **Repaired**, all four, and the one-way section restated |
+| F4 | A retirement is a stack update from an unsigned head | **Open**: item 13i |
+| F5 | Controls with no seeded case that §12 did not name | **Repaired** in SPEC/07 §12; the construct's refusal of a retired refagent has a test; the row-put role's docstring is reworded |
+| N1 to N9 | Notes | N4 (the table's stack) is 13d's to rule. N8 reworded in `deploy.yml`. N9: the construct test still compares resource types, not properties; kept, said here. The five deferred items are landing-zone work (SPEC/00 §2, §12) |
+
 ## What a reader can run
 
 ```
+uv run pytest -q tests/test_m07_readers.py -k "stranger or page or made_once or environment_is_compared"
+uv run pytest -q tests/test_m07_platform.py -k "gone or retired_name or keyed_jobs_own or refagent"
+uv run pytest -q tests/test_m07_workflows.py -k "shared_reader or retirement"
+aws cloudformation describe-type --type RESOURCE --type-name AWS::BedrockAgentCore::Runtime --region us-west-2 --query Schema --output text | python -c "import json,sys;print(json.load(sys.stdin)['handlers']['delete']['permissions'])"
+gh api repos/andaro74/agentkeel/check-runs/110702392789/annotations --jq '.[].message'
 gh api repos/andaro74/agentkeel/actions/runs/36963543726/jobs --jq '.jobs[]|[.name,.conclusion]'
 gh api repos/andaro74/agentkeel/environments/platform-app --jq '.can_admins_bypass'      # false
 gh api orgs/agentkeel-studio/installations --jq '.installations[]|[.app_slug,.repository_selection,.permissions]'

@@ -299,6 +299,11 @@ Every reason PR 1 planted is still asked for (`members`, `scratch-repo`,
 each on the App where the ruling makes it a miss: with "all repositories"
 ruled for the organisation, a third repository is uncovered only where a
 selection is named, which is `agentkeel-upgrades` on `andaro74`.
+That is true by reason, not by App (cold review F9 on M07 PR 2):
+`scratch-repo` and `repository_selection` are no longer asked on
+`agentkeel-platform`, the App that will hold Administration: write. For
+it the grant bounds no repository of the organisation, by item 3 of the
+Security ruling, and no fixture can make one a miss.
 `grant_errors(installation, environment, grant)` keeps its three
 arguments and finds the App by the installation's `app_slug`. None of
 these is a live installation.

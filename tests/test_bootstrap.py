@@ -890,6 +890,13 @@ def test_panel_2s_rows_are_written_from_main_only_and_never_by_a_pull_requests_r
     assert not {a for a in allowed_actions(eval_role_policy(template)) if a.startswith("dynamodb:")} - {"dynamodb:Scan"}
 
 
+# The resource type's own delete handler, as `describe-type` gave it on 2026-10-02 (milestones/M07/runs/
+# pr2_reads.md, R7; platform-architect F1 on M07 PR 2: "no new IAM" rested on one action name).
+RUNTIME_DELETE_HANDLER = ("bedrock-agentcore:DeleteAgentRuntime", "bedrock-agentcore:DeleteAgentRuntimeEndpoint",
+                          "bedrock-agentcore:DeleteWorkloadIdentity", "bedrock-agentcore:GetAgentRuntime",
+                          "bedrock-agentcore:GetAgentRuntimeEndpoint")  # fmt: skip
+
+
 def test_a_retirement_needs_no_new_grant_on_the_deploy_plane(template):
     """rulings/pr2-security.md item 11: the deploy role updates a stack, the execution role deletes the runtime,
     and the registry row is put as before. No DeleteStack, no UpdateItem, no key deletion."""
@@ -898,3 +905,5 @@ def test_a_retirement_needs_no_new_grant_on_the_deploy_plane(template):
     assert {"dynamodb:GetItem", "dynamodb:PutItem"} <= granted and "dynamodb:UpdateItem" not in granted
     deleting = [s for s in role_statements(template, "ExecutionRole") if "bedrock-agentcore:DeleteAgentRuntime" in actions(s)]
     assert deleting and all("runtime/agentkeel_*" in json.dumps(s["Resource"]) for s in deleting)
+    # Every action the type's delete handler names, in that one statement: none is a new grant.
+    assert all(set(RUNTIME_DELETE_HANDLER) <= set(actions(s)) for s in deleting)

@@ -808,10 +808,82 @@ items 1 to 4; the reads in `runs/pr2_reads.md`):
 **Controls with no seeded case, added to §8 by this build:**
 
 - A public App installed by a stranger: recorded by the reader of the
-  grant, never minted for. No seed installs it elsewhere.
+  grant from the App's own listing, with no token asked for on that
+  account (repaired after security-reviewer BLOCK 1 on PR 2: until then
+  the reader minted a metadata token on every installation). No seed
+  installs it elsewhere.
 - The names of an environment's secrets: read by hand, by an admin. No job
   can list them.
 - The table panel 2 reads is a copy an admin of the agent account can
   edit. The comparison with the envelopes (F7.4) is what would notice.
 - A second run of a pull request that is RED on `F4_4` alone (SPEC/04
   §2): no gate reads whether the rule was followed.
+
+**After the seat reviews of PR 2** (the four reports read
+`a2c5a61...1b376a3`; `milestones/M07/rulings/pr2-engineering.md` and
+`pr2-security.md` carry each finding and what was done). What the build
+does differently from the text above, and what it still does not do:
+
+- **A retirement is recorded only when the runtime is gone.** The retire
+  job writes `retired.json` and `retired_at` only after one invocation is
+  refused with `ResourceNotFoundException`. On any other result it fails
+  and the next run asks again. A retired name is not deployed again:
+  the registry refuses it.
+- **The dispatch from a branch is a refusal only on GitHub's own word**:
+  the annotation on the `post` job that says the branch is not allowed to
+  deploy to `platform-app`. A relaxation is refused only on a 403.
+- **A pull request that has not merged is unread**, not held.
+- **Every word the platform writes as an App** (a title, a body, a
+  drafted ruling) is written by the keyed job from what it checked.
+- **Panel 2's table is written through `replay_history`**, by
+  `scripts/envelope_rows.py`, in a job of its own.
+
+**Controls with no seeded case, added to §8 after the reviews.** No
+document describes these as working:
+
+- **A person's edit, as §2 defines it, includes CI's own commit.**
+  `evals.yml` pushes `evals/history/<commit>.json` to every `agentkeel`
+  pull request as `github-actions[bot]`. By §2 that is a commit "whose
+  author is not the platform's App and which touches any path but a
+  ruling file". So the model upgrade cannot read as held, and
+  `upgrade.taken` is at most 2 of 3, until Product amends §2. The reader
+  keeps to §2 as written, and a test holds it there. Product rules,
+  before the swap is opened.
+- **"No person's edit" rests on a commit's author as GitHub attributes
+  it.** A commit made with the App's noreply address would read as the
+  App's. The observer now writes each commit's committer and GitHub's
+  verification; nothing rules on them until a commit by
+  `agentkeel-upgrades` exists to read.
+- **The bytes a platform upgrade proposes are the plan's.** The keyed
+  job holds the paths, the manifest's fields and the version, not the
+  content of `server.py`, which the plan job takes from the template
+  repository's default branch. Whoever can push there sets what is
+  proposed to every agent. It is a draft a seat still merges.
+- **A retirement is a stack update from a head nobody signed.** The
+  retire job checks that the head says `rollout: retired`; it does not
+  hold the rest of the manifest to the commit the registry holds, so
+  another field can move with it. No compute uses the result.
+- **Put-once on `bundles/` and `observations/`**, and **the trust of
+  `agentkeel-model-watch`, `agentkeel-envelope-row-put` and
+  `agentkeel-observation-put` to one workflow on `main`**: template
+  tests only. None has refused anything.
+- **A row of panel 2's table is put once by a condition in the script**,
+  not by IAM: the role holds `PutItem`.
+- **The two roles PR 2 adds are not in the agent key policies' list of
+  platform roles.** The deploy boundary and the absence of a kms Allow
+  hold R4 for them.
+- **The grant block, the seeded relaxation's repository and the reader
+  of the grant are on Product's and Engineering's paths**
+  (`milestones/**`, `scripts/**`), so a pull request that widens them
+  meets no Security gate. One person holds every seat (R1).
+- **The seeded relaxation is refused a second time only once the run
+  file on `main` records the first.**
+- **The `agentkeel-upgrades` key on `andaro74/agentkeel`** can push to
+  any branch but `main`, and a pull request it opens runs `evals.yml`
+  with that workflow's roles and tokens, as any collaborator's does.
+- **`two-key` does not read `deprecated_after`** (ADR-0009 amendment 1
+  says it does from M04 PR 2). `model-watch`'s own refusal is the only
+  thing that stops the platform proposing a later date.
+- **The App's stored observation may be older than the run's.** Where
+  the run read a commit or a merge the stored record lacks, the run's
+  own reading is used. Nothing else compares their times.

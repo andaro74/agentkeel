@@ -60,7 +60,9 @@ or `make ledger`).
 
 When a change lands on `main`, a job copies three fields from each
 recorded run (the commit, the verdict, the mode) into a table that panel
-2 reads. A row is written once and not changed. The table is a copy for
+2 reads. A row is written once and not changed by the workflow that writes it: each
+put carries the condition that the commit is not there. The role itself
+could replace a row; nothing in IAM stops that. The table is a copy for
 a person to look at. It is not the evidence: the envelope in the
 repository and its copy in the security account are. The comparison
 above is what holds the copy to them.

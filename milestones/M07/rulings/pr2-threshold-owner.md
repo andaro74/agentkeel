@@ -118,9 +118,28 @@ nothing to write for refagent. It opens no pull request to set a null to
 null. Moving the date later, or clearing it, with the model unchanged is
 two keys (ADR-0009 amendment 1), whoever opens the pull request.
 
+## 5. The threshold-owner review, and what was done
+
+Read on the diff `a2c5a61...1b376a3`, before the pull request was
+opened: BLOCK 0, FINDING 6, NOTE 13. The report is in the pull request's
+body, verbatim.
+
+| # | Finding | Status |
+|---|---|---|
+| F1 | `two-key` does not read `deprecated_after`, and ADR-0009 amendment 1 says it does from M04 PR 2 | **Open, the seat's.** Confirmed: `grep -rn deprecated src/gates` finds nothing. Item 4's "is two keys" is then true by rule and read by no gate. `scripts/model_watch.py` now says so, and its own refusal is what holds the platform. Recommended: the reader and a seeded case in PR 3 (Engineering builds), before model-watch first runs |
+| F2 | Item 3's "the revert is expected GREEN" names the wrong median | **The expectation is withdrawn** in `runs/f7_3_rollback.yaml`, from the code: the revert's Sonnet 4.6 p95 is held to 2.0 times the median of Haiku 4.5's one or two envelopes in that mode. The revert's verdict is not stated; the number is written once the swap's envelope exists and before the revert opens. **Item 3's own sentence above is left as ruled and is wrong on this point; the seat's to restate.** What follows a RED revert is as ruled |
+| F3 | This file reads DRAFT | The seat's line, at the end of the PR |
+| F4 | The "never later" guard was skipped for a date that is not a string | **Repaired** (`b3196d6`): refused in `plan` and in the keyed job, with a test on an unquoted date |
+| F5 | A swap leaves the old model's `deprecated_after` in place | **Open, the seat's.** Moot today: refagent's is null. Recommended: a swap also writes null, ruled before any pin carries a date |
+| F6 | The gate did not hold `deploy_max_seconds` again | **Repaired** (`ccb2be8`): each upgrade's `deployed_s` is kept in the envelope and the gate holds it to the bar at the envelope's commit |
+| N1 to N13 | Notes | N12: the comment in `thresholds.yaml` is corrected (15 minutes for the platform upgrade, 10 for the retire job, daily for model-watch); no value moves. N4: `runs/pr2_expected.md` now says which envelope rules if the head moves. N5 (the rule's list omits the workflows and build) and N9 (the manifest's stale judge comment) are the seat's, not changed here. N13: model-watch's `CANDIDATE_FILE` and `RULINGS` are fixed to M07; after tag `m07` its daily run would draft into a closed milestone; to M08's open list |
+
 ## What a reader can run
 
 ```
+grep -rn deprecated src/gates                                                                    # nothing
+uv run pytest -q tests/test_m07_platform.py -k "quoted or keyed_jobs_own"
+uv run pytest -q tests/test_m07_envelope.py -k "counts_each_kind"
 python -c "import json;[print(m['modelId'],m['modelLifecycle']) for m in json.load(open('milestones/M07/runs/model_lifecycle_2026-10-02.json'))]"
 python -c "import json;print(json.load(open('evals/history/9f2ce07c5499e245f34f7117cb928317164af437.json'))['p95_ms'])"   # 14281
 python -c "import json;print(json.load(open('evals/history/0f4b72ae8028b92d82b191391fb517f362c91c48.json'))['p95_ms'])"   # 5830

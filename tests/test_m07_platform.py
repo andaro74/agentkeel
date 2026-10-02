@@ -561,6 +561,12 @@ def test_a_retired_agents_stack_is_the_same_stack_without_its_runtime(tmp_path):
     assert not any(t.startswith("AWS::IAM::") and t not in types(live["template"]) for t in types(retired["template"]))  # no new IAM
 
 
+def test_the_construct_refuses_a_manifest_that_retires_refagent(tmp_path):
+    """platform-architect F5 on M07 PR 2: the refusal was in the construct with no test on it."""
+    with pytest.raises(RuntimeError, match="refagent is the platform's own agent and is never retired"):
+        synth(tmp_path, "retired", name="refagent")
+
+
 # --- panel 2's table: its writer opens no envelope (cold review B1 on M07 PR 2) ---------------------
 
 

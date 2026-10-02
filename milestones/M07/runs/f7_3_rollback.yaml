@@ -38,6 +38,19 @@
 # is merged:
 # - The revert is expected GREEN: it returns to Sonnet 4.6, whose envelopes
 #   are the long history F4_4's median is read over.
+#   **Corrected at M07 PR 2 after threshold-owner F2, before the swap is
+#   opened: that expectation does not follow from the code, and is
+#   withdrawn.** build and the gate read the incumbent as the pin at the
+#   merge-base with main (`build.incumbent_at`, thresholds.yaml's
+#   `delta_max` comment). For the revert, main's pin is Haiku 4.5. So the
+#   revert's Sonnet 4.6 p95 is held to 2.0 times the median of Haiku 4.5's
+#   envelopes in that mode: the one or two the swap left. If Haiku's median
+#   p95 is under half of Sonnet's, the revert is RED on F4_4; with no Haiku
+#   envelope in that mode it fails. Sonnet 4.6's median over its 16 runtime
+#   envelopes is 6,764.5 ms; Haiku 4.5 has never been run against the
+#   goldens. **The revert's verdict is not stated here.** The number it is
+#   held to is written in this file once the swap's envelope exists, and
+#   before the revert is opened. The two lines below then decide, as ruled.
 # - The revert RED on F4_4 alone: one second run of the revert, stated
 #   before in a run file and pushed first. The one exception to "a swap
 #   never gets a second run".

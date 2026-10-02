@@ -56,6 +56,32 @@ deployed by it.
   nothing in this PR deploys. The pull request would then be RED on
   `evals`, and what follows is the Threshold Owner's to rule.
 
+## Added after the seat reviews, still before the pull request exists
+
+The four reports read `a2c5a61...1b376a3`. Their repairs are commits on
+this branch before the pull request is opened. Nothing in the table
+above changes:
+
+- `upgrade.F7_0`'s `dispatch` part is still expected read and held. It
+  is now held on GitHub's own annotation on the `post` job of run
+  36963543726 ("is not allowed to deploy to platform-app"), which the
+  observer reads, not on the job having no steps.
+- The envelope's `upgrade.F7_1.upgrades` entries now carry `deployed_s`,
+  null on this run.
+- `tests/test_m07_seeds.py` is still 9 passed, 4 expected failures.
+
+Two things are stated now because the reviews found them:
+
+- **`taken` cannot reach 3 as SPEC/07 §2 stands.** CI's own envelope
+  commit on the swap pull request is a person's edit by that
+  definition. Until Product amends it, the most the close can read is 2
+  of 3. This run reads 0 of 3 either way.
+- **Which envelope rules if the head moves.** `evals.yml` measures every
+  head. If any head of this pull request is RED on `F4_4`, that is the
+  finding and it is recorded, whatever a later head reads. A later head
+  made for another reason is not the "one second run" of SPEC/04 §2,
+  which this diff does not qualify for.
+
 ## What this run cannot read
 
 The live grant, the three Apps, the environments' rules, a deploy, an

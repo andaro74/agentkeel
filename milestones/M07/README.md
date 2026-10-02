@@ -139,6 +139,23 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   replaced is read from its deploy run and its image.
 - **Stated before its run, and pushed first:** `runs/pr2_expected.md`.
   Every live reading unread, `taken` 0 of 3, refagent as at M06, GREEN.
+- **The seat reviews, read on `a2c5a61...1b376a3`, before the pull
+  request was opened:** engineering-cold-reviewer 2 BLOCK and 15
+  FINDING, security-reviewer 1 and 7, platform-architect 1 and 5,
+  threshold-owner 0 and 6. Three BLOCKs were code and are repaired
+  (`b3196d6`): the retire job recorded a retirement whatever its one
+  invocation returned; the reader of the grant minted a token on every
+  installation, a stranger's included, while three places said it did
+  not; `evals.yml` opened envelopes with `jq`. The fourth is the seats':
+  both ruling files are drafts and item 13 is not ruled. The readers the
+  cold review probed no longer hold on a missing record (`ccb2be8`).
+  Each finding and what was done with it:
+  `rulings/pr2-engineering.md`, `rulings/pr2-security.md` section 14,
+  `rulings/pr2-threshold-owner.md` section 5.
+- **Found and not repaired, Product's:** SPEC/07 §2 makes CI's own
+  envelope commit a person's edit, so the model upgrade cannot read as
+  held and `taken` is at most 2 of 3 as the definition stands (SPEC/07
+  §12).
 - **Still the human's:** before the merge, the two new Apps, their
   environments and keys, the two ids into the grant block, and each
   stack after reading its `cdk diff` (`runs/pr2_by_hand.md`). After the

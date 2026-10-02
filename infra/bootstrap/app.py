@@ -1004,8 +1004,10 @@ class BootstrapStack(cdk.Stack):
         """evals.yml on main, and only there: one row per envelope in panel 2's table.
 
         Not the eval role, which a pull request's run also assumes: a pull request must not be able to
-        write the row a surface shows for it. It reads which commits the table holds and puts a row that
-        is not there; it has no update and no delete."""
+        write the row a surface shows for it. It may scan the table and put an item; it has no UpdateItem
+        and no delete. `PutItem` can replace a row: that a row is put once is the condition
+        `scripts/envelope_rows.py` puts on each call, not anything IAM holds (platform-architect F5 and
+        security-reviewer 14 on M07 PR 2)."""
         role = iam.Role(
             self, "EnvelopeRowPutRole",
             role_name=ENVELOPE_ROW_PUT_ROLE_NAME,

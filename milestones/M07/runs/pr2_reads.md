@@ -98,7 +98,10 @@ From the tree at `a2c5a61`, and the account as listed 2026-10-02T11:13Z.
 - **No platform role may schedule the key's deletion**: the key policy's
   `NoPlatformRoleChangesThisKey` denies `kms:ScheduleKeyDeletion`,
   `DisableKey`, `PutKeyPolicy` and seven more to every agent role and
-  every platform role (R4). M07 PR 1's run file said the key is
+  to the four platform roles it names (R4). Corrected after
+  platform-architect F2 on M07 PR 2: this said "every platform role";
+  the two roles PR 2 adds are not in the list, and are held by the
+  deploy boundary and by having no kms Allow. M07 PR 1's run file said the key is
   "scheduled for deletion"; that was wrong and was corrected there to
   "R7's to rule". The key stays.
 - **What the key encrypts.** The agent's role may `Decrypt` and
@@ -120,6 +123,20 @@ From the tree at `a2c5a61`, and the account as listed 2026-10-02T11:13Z.
 - Not read: `DeleteAgentRuntime`'s behaviour on a runtime with an
   endpoint. It cannot be read without deleting one; S2's attempt is the
   first.
+- **The delete handler's own permission list** (platform-architect F1 on
+  M07 PR 2: "no new IAM" rested on one action name). Read 2026-10-02
+  with `aws cloudformation describe-type --type RESOURCE --type-name
+  AWS::BedrockAgentCore::Runtime --region us-west-2`, the schema's
+  `handlers.delete.permissions`:
+  `bedrock-agentcore:DeleteAgentRuntime`, `DeleteAgentRuntimeEndpoint`,
+  `DeleteWorkloadIdentity`, `GetAgentRuntime`, `GetAgentRuntimeEndpoint`.
+  The execution role's statement `TheRuntimeAndItsWorkloadIdentity`
+  holds all five on `runtime/agentkeel_*` and the workload identity
+  directory, and `tests/test_bootstrap.py` now asserts the five. The
+  handler names no `vpc-lattice` and no `ec2` action for a delete. So
+  the type's own list is covered and item 11's "no new IAM" stands as
+  far as the type says. What the service calls on the role's behalf
+  beyond that list is not read until S2.
 
 ## R8. Grafana
 

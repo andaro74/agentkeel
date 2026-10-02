@@ -150,7 +150,8 @@ infra/                CDK: bootstrap stack, GovernedAgent construct (eval-role/
                       workflows.sha256 (validate)
 scripts/seed_slate.py writes data/slate.json and data/rights_table.json
 tests/
-Makefile              Engineering; all five targets exist from M00 PR 1
+Makefile              Engineering; the first five targets exist from M00 PR 1,
+                      `upgrade` from M07 PR 2
 ```
 
 ## Commands

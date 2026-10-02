@@ -58,8 +58,8 @@ In `andaro74/agentkeel`, Settings, Environments, for each of
    `OBSERVER_APP_PRIVATE_KEY` in `platform-observer`. The value is the
    whole `.pem` file. Then delete the `.pem` from disk.
 
-Or, for steps 1 to 3, from the shell (step 4's secret is typed, not
-piped from a file left on disk):
+Or, for steps 1 to 3, from the shell (step 4's secret is read from the
+`.pem` once and the file removed in the same command):
 
 ```sh
 for env in platform-upgrades platform-observer; do
