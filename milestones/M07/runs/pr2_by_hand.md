@@ -6,7 +6,7 @@ and nothing here is done before that ruling file reads "Ruled by". None
 of it has been done as this file is written.
 
 Git Bash, from the repository's root. The agent account is 581208540944
-(the default profile, `hector.acevedo`); the security account is
+(the default profile, the account's admin user); the security account is
 897698239547 (profile `agentkeel-security`).
 
 **Not in this list, and not before PR 2 has merged:** raising

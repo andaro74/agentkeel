@@ -2,7 +2,7 @@
 
 Read-only. GitHub with `andaro74`'s own token (`gh`; an admin of
 `andaro74/agentkeel`, an owner of `agentkeel-studio`). AWS as
-`arn:aws:iam::581208540944:user/hector.acevedo` in the agent account,
+the agent account's admin user (account 581208540944),
 us-west-2. Nothing was changed by a read. Two things were changed by the
 human before these reads, each named below: one environment setting, and
 the Apps installed on a personal account. Each line is one reading by

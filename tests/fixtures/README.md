@@ -302,3 +302,13 @@ selection is named, which is `agentkeel-upgrades` on `andaro74`.
 `grant_errors(installation, environment, grant)` keeps its three
 arguments and finds the App by the installation's `app_slug`. None of
 these is a live installation.
+
+**Read from M07 PR 2.** Each fixture's reader landed in its own commit and
+its strict marker came off there: S0's three bounds (`580be7f`,
+`3b67946`), S1 (`10cf8eb`), S2, S3, S4's comparison and S5 (`95b485c`),
+S4's query (`d8f8118`). The four run-file tests keep their markers until
+each attempt is recorded, after M07 PR 2 merges. S4's source names in
+`dashboard.json` were placeholders and are left as planted: the table
+panel 2 reads is `agentkeel-envelopes`, through the data source `registry`
+(`infra/grafana/panel2.json`), and a test holds that the fixture is still
+refused for its computed verdict with the source put right.

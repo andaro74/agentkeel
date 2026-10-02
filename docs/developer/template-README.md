@@ -21,9 +21,10 @@ What you cannot change from here:
 - **The platform check.** Every pull request needs a passing check named
   `platform-check`, posted by agentkeel's GitHub App. A workflow in this
   repository can post a check with that name; GitHub documents that a
-  check bound to an App is accepted from that App only. That has not yet
-  been attempted here: it is M06's seed S2, made after this template is
-  published.
+  check bound to an App is accepted from that App only. It was attempted
+  once, as M06's seed S2: the stand-in's check did not let the pull
+  request merge. At that time the platform's own check was refusing every
+  head for a fault of its own, so the attempt is read again at M07.
 - **The deploy.** agentkeel deploys this agent from its own pipeline after
   a merge. Nothing in this repository holds a cloud credential.
 - **The guardrail.** Every agent from the template uses the platform's,

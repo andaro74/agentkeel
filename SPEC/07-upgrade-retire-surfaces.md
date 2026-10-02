@@ -7,7 +7,9 @@ as cut in §9 and as amended at this PR (§10) · Reviewed by
 `product-spec-reviewer` before the rest of PR 1 was written, but for
 M06's video and one read (3 BLOCK, 26 FINDING, 12 NOTE on `83eb558`;
 `milestones/M07/feasibility.md` §1) and revised once on the rulings in §2
-of that note, all made by the human on 2026-10-01, "as proposed".
+of that note, all made by the human on 2026-10-01, "as proposed". §12,
+added at M07 PR 2, says how §11's reads were ruled on 2026-10-02 and
+where the build differs from §6's words.
 
 ## 1. The claim
 
@@ -750,3 +752,66 @@ a code change and none is a grant.
 | R8 | Security | Where panel 2 reads envelopes: Athena over the audit bucket's `envelopes/` prefix in the security account, or a copy the deploy path writes in the agent account; the Grafana observer token's renewal before 2026-10-31 (`open.md` row 9) | panel 2's source; who renews the token and when |
 | R9 | Product | `milestones/M06/runs/f6_3_quickstart.yaml`'s "after M06 PR 3" and "PR 4's run"; SPEC/06 §7's "five records" against four | the restatements, pushed before S3 |
 | R10 | Product; Security | Which pull request carries the owner's test at M07 | proposed: a new head on `owner-check` #1 with the template's content (an empty commit), then the fix; S0's run file names it before the attempt |
+
+## 12. Ruled before PR 2, and what PR 2 built
+
+Added at M07 PR 2 (Product). §1 to §11 stand as PR 1 wrote them; this
+section says how §11's reads were ruled and where PR 2's build differs
+from §6's words. No claim, falsifier or seeded case changes. Where this
+section and §6 differ, this section is what was built.
+
+**Ruled on 2026-10-02, "as proposed", before any PR 2 code**
+(`rulings/pr2-security.md` items 1 to 12; `rulings/pr2-threshold-owner.md`
+items 1 to 4; the reads in `runs/pr2_reads.md`):
+
+| Read | Ruled |
+|---|---|
+| R1 | Admin bypass off on every environment that holds an App's key. The platform check dispatched from a branch was refused by the environment on 2026-10-02, before any grant (run 36963543726): S0's second attempt, made |
+| R2 | **Three Apps**, each key in its own environment limited to `main`: `agentkeel-platform` (5144253) posts the check; `agentkeel-upgrades` opens pull requests; `agentkeel-observer` reads. The installations stay on "all repositories". 5144253 is never installed on `andaro74`. §6's "one App and one key binds nothing" is therefore not the case built, and §8's "one key behind every permission set" does not apply |
+| R3 | `model-watch` opens its pull requests as `agentkeel-upgrades`, installed on `andaro74` for `agentkeel` alone |
+| R4 | The observer on `main` stores its observation under `observations/` in the audit bucket, through a role that trusts `main` only. §4's paragraph on which run the cell cites stands unchanged |
+| R5 | The owner pushes the re-made template, by hand, at M07 |
+| R6 | The candidate is Haiku 4.5. If its revert is RED on `F4_4` alone, one stated second run; if RED on a regressed golden or RED twice, refagent stays on Haiku 4.5 until a pin change passes, F7.3 is read on the fallback, and `taken` stays under 3 (`runs/f7_3_rollback.yaml`) |
+| R7 | **A retirement is a stack update that removes the runtime**, with no new IAM: §2's and §6's "the stack's deletion" is not built, and the stack stays. What is removed and what is kept is `runs/f7_2_removed_and_kept.md`. The retirement is also put once in the audit bucket. `bundles/` gets its put-once statement |
+| R8 | **Not ruled on 2026-10-02.** Panel 2's source is put to Security as item 13d of `rulings/pr2-security.md`: a table in the agent account, `agentkeel-envelopes`, written on a push to `main`. The Grafana token is renewed by the human before 2026-10-31 |
+| R9, R10 | Restated before S3 and before the owner's test, after PR 2 merges, as §5.1 says |
+| The bars | `upgrade.arrive_max_seconds` 4,500, `deploy_max_seconds` 3,600, `retire_max_seconds` 3,600, each relaxes up. The p95 bar stays at 2.0; the rule for a miss is SPEC/04 §2 |
+
+**Where the build differs from §6's words, each said in a ruling file:**
+
+- **"The token."** `app_token()` takes a repository and the *name* of a
+  permission set from one table, `PERMISSION_SETS`. `post` mints twice per
+  repository: `rulesets` (Administration: write) for the one read, revoked
+  after it, then `check`.
+- **"`platform-upgrade`."** It lists agents from GitHub (the heads the App
+  passed), not from the registry, so it holds no AWS credentials (item
+  13g).
+- **"`model-watch`."** It reads Bedrock as a role of its own,
+  `agentkeel-model-watch`, not as the eval role (item 13b).
+- **"Retirement."** As R7. The idle trigger (no answer record for 90 days)
+  is not built: nothing writes `idle_since`. The dispatch and a pin 30
+  days from `deprecated_after` are. refagent's own deploy does not put
+  its bundle under `bundles/`.
+- **"Live"** (§1 item 4), for an upgrade a later deploy has since
+  replaced: read from the deploy run of its merge and from the image its
+  tree's digest names, not from the runtime as it stands when the cell's
+  run reads it. A rollback (F7.3) is read from the runtime as it stands.
+- **The seeded relaxation.** The script refuses any repository but the one
+  S0's run file names on `main`.
+- **A pull request the platform opens is opened once per branch name**
+  (`platform-upgrade/<version>`, `platform-retire`, `model-watch/<role>`).
+  After a merged upgrade is reverted, the same upgrade is not opened a
+  second time.
+- **`agentkeel-upgrades` is a public App**, because GitHub installs a
+  private one on its owner alone (item 13a).
+
+**Controls with no seeded case, added to §8 by this build:**
+
+- A public App installed by a stranger: recorded by the reader of the
+  grant, never minted for. No seed installs it elsewhere.
+- The names of an environment's secrets: read by hand, by an admin. No job
+  can list them.
+- The table panel 2 reads is a copy an admin of the agent account can
+  edit. The comparison with the envelopes (F7.4) is what would notice.
+- A second run of a pull request that is RED on `F4_4` alone (SPEC/04
+  §2): no gate reads whether the rule was followed.

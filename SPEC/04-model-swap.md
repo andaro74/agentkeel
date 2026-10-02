@@ -130,6 +130,25 @@ never gated** (ADR-0004): its diff is F0.4 measured, not `F4_3`.
   `cost_cap.tokens_per_run` stays beside them: it is a budget, absolute
   and per run, not a quality bar. SPEC/00 §8 M04's "one policy, not
   both" is about quality bars (threshold-owner F5).
+  **The rule for a miss on p95, added at M07 PR 2** (the Threshold Owner,
+  ruled 2026-10-02, `milestones/M07/rulings/pr2-threshold-owner.md` item
+  2; written here by Product). The bar stays at 2.0 and the reading stays
+  as it is. M07 PR 1's first run was RED on `F4_4` alone at 14,281 ms,
+  2.06 times the incumbent's median, and GREEN 30 minutes later at 5,830
+  ms, on a diff that changed nothing refagent runs: with about nineteen
+  answers in a run, p95 is close to the slowest single call. So: when
+  `F4_4` alone fails on a pull request whose diff touches **nothing the
+  agent runs** (`agents/`, `src/agent/`, `infra/construct/`, the pin, the
+  guardrail, `rules/`, `data/`), **one** second run may be made. It is
+  stated before, in a run file under the milestone's `runs/`, and pushed
+  first. Both envelopes stay in `evals/history/`; the second rules. There
+  is no third. **A swap pull request never gets a second run**: its p95
+  is the thing under test. One exception, named with it (item 3): the
+  revert of a merged swap that is RED on `F4_4` alone, since a revert
+  restores the incumbent of record. Raising `p95_ratio_max` is not this
+  rule; it is a relaxation, with two keys. No gate reads this rule: the
+  run file and both envelopes are its record, and a second run made
+  outside it is a finding for the Threshold Owner.
 - **p95.** `p95_ms` on the envelope, from the per-answer `latency_ms` the
   runner or the runtime records (from M01 PR 2). Not k6 at M04 (§9). On
   the incumbent pin before the guardrail, six `runner` envelopes ranged
