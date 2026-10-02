@@ -34,6 +34,11 @@ reproducible: the Dockerfile's base image is pinned by tag and its packages by
 range, and `agents/__init__.py` is copied in from outside the bundle. That is
 recorded for M02 (PR 3 security-reviewer F3, cold review N3).
 
+From M07 PR 2 `runtime_image` gives steps 2 to 4 for any agent by name, an
+agent from the template's included: `scripts/observe_upgrade.py` reads a
+runtime's image tags with it after a revert's deploy, and `build.f7_3`
+compares them with the digest the tree gives at the revert (F7.3).
+
 What it does not do: prove the runtime answered. That is the run itself,
 whose envelope says `runtime` only if this found a match and the calls were
 made.
@@ -81,21 +86,33 @@ def marker(session: boto3.session.Session) -> str | None:
         return None
 
 
-def deployed(session: boto3.session.Session | None = None) -> tuple[str, list[str], str | None]:
-    """The runtime's ARN, the tags on the image it runs, and the table marker."""
-    session = session or boto3.session.Session(region_name=REGION)
-    outputs = session.client("cloudformation").describe_stacks(StackName=STACK)["Stacks"][0].get("Outputs", [])
+def names(agent: str) -> tuple[str, str]:
+    """An agent's stack and image repository: refagent's own, or an agent from the template's (SPEC/06 §6)."""
+    return (STACK, REPOSITORY) if agent == "refagent" else (f"agentkeel-{agent}", f"agentkeel/{agent}")
+
+
+def runtime_image(session: boto3.session.Session, agent: str = "refagent") -> tuple[str, str, list[str]]:
+    """Steps 2 to 4 for any agent (M07 PR 2; SPEC/07 §6, "The rollback reading"): its runtime's ARN, the
+    digest of the image that runtime runs, and that image's tags. Raises what the lookups raise."""
+    stack, repository = names(agent)
+    outputs = session.client("cloudformation").describe_stacks(StackName=stack)["Stacks"][0].get("Outputs", [])
     arn = next((o["OutputValue"] for o in outputs if o["OutputKey"] == "RuntimeArn"), None)
     if not arn:
-        raise LookupError(f"stack {STACK} has no RuntimeArn output")
+        raise LookupError(f"stack {stack} has no RuntimeArn output")
     runtime = session.client("bedrock-agentcore-control").get_agent_runtime(agentRuntimeId=arn.rsplit("/", 1)[-1])
     uri = runtime["agentRuntimeArtifact"]["containerConfiguration"]["containerUri"]
     if "@" not in uri:
         raise LookupError(f"the runtime's image is not pinned by digest: {uri}")
-    images = session.client("ecr").describe_images(
-        repositoryName=REPOSITORY, imageIds=[{"imageDigest": uri.split("@", 1)[1]}]
-    )["imageDetails"]
-    return arn, [tag for image in images for tag in image.get("imageTags", [])], marker(session)
+    digest = uri.split("@", 1)[1]
+    images = session.client("ecr").describe_images(repositoryName=repository, imageIds=[{"imageDigest": digest}])["imageDetails"]
+    return arn, digest, [tag for image in images for tag in image.get("imageTags", [])]
+
+
+def deployed(session: boto3.session.Session | None = None) -> tuple[str, list[str], str | None]:
+    """refagent's runtime's ARN, the tags on the image it runs, and the table marker."""
+    session = session or boto3.session.Session(region_name=REGION)
+    arn, _digest, tags = runtime_image(session)
+    return arn, tags, marker(session)
 
 
 def match(digest: str, table: str, lookup=deployed) -> tuple[str, str]:
