@@ -76,6 +76,11 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   under Product, and run once on the slate, the corpus and S2.
 - **Also in this PR:** M06's video (`1d18c2d`, `open.md` row 1); every
   `open.md` row placed in `feasibility.md` §6.
+- **This PR ran twice.** The first run (`9f2ce07`) was RED on `F4_4`
+  alone: p95 14,281 ms, 2.06 times the incumbent's median. The second
+  (`0f4b72a`), stated before it was made, was GREEN at 5,830 ms with the
+  same counts. The PR changes nothing refagent runs. Both envelopes stay,
+  and the bar was not moved (`rulings/pr1.md`, Unsure Q).
 - **What is live today, in the repo:** no agent from the template;
   `app_token()` callable with no repository; nothing that reads the
   installation or the key's environment; no `platform-upgrade`, no

@@ -119,6 +119,33 @@ stack, bar, golden, rule or manifest, and makes no grant.
     ceilings; recorded at tag `m06` (`57b9bf6`); committed as an LFS
     object whose oid is the file's sha256 (`d165a15b…`).
 
+## The two runs of this PR
+
+Read from the envelopes, not from this prose.
+
+| Run | Commit | Verdict | p95 | Counts |
+|---|---|---|---|---|
+| First (36960565903) | `9f2ce07` | **RED**, on `F4_4` alone | 14,281 ms, 2.06 times the incumbent's median of 6,946 ms over 15 runtime envelopes; the bar is 2.0 | ordinary 9/9, traps 2/2, guardrail 2/3, red team 5/5, plants 7/7, regressed 0, `never_passed` `g-014`; 49,615 tokens |
+| Second (36961169742) | `0f4b72a` | **GREEN**, 19 checks pass | 5,830 ms | the same counts; 48,676 tokens |
+
+Nothing was stated about p95 before the first run. The second was stated
+before it was made, in `runs/pr1_second_run.yaml`, pushed first (`0f4b72a`):
+GREEN at or under 13,892 ms. It read as stated. The PR changes nothing
+refagent runs, so the two runs measured the same bytes 30 minutes apart.
+Both envelopes stay; the first is RED in `evals/history/` for good. The
+run file's `observed` is left null: filling it would change a measured
+path and spend a third run. `template` on both: `F6_1` unread, `F6_2`
+held, `F6_3` unread, `F6_4` held, as at `245eb9b`. Neither says anything
+about claim 7.
+
+**The finding, for the Threshold Owner.** The last eight runtime
+envelopes read 10,679; 11,434; 7,338; 8,927; 12,277; 8,423; 14,281 and
+5,830 ms against a median of 6,946: seven of eight over it, one over the
+bar. One run's p95 over about nineteen answers is close to its slowest
+single call. A pull request that changes no code can go RED on it, and a
+second run can clear it. The bar is not moved here (a move upward is two
+keys); what to do about it is Unsure Q.
+
 ## For Product to rule with this file
 
 - **`open.md` rows placed** (`feasibility.md` §6). The placements not
@@ -149,6 +176,7 @@ stack, bar, golden, rule or manifest, and makes no grant.
 | M | `legal-compliance` ran through a general-purpose agent given its prompt; its first run under its own name is owed | Product | PR 2 |
 | N | A person's IAM user name and two account ids in written envelopes (legal-compliance 12) | Security | M08 open |
 | O | The framework lines in the draft map are from the specialist's memory, unverified | Product | before the page is committed |
+| Q | `F4_4`'s p95 bar went RED on a pull request that changes no code and GREEN 30 minutes later. Taking one stated second run was Engineering's choice here; whether a second run is allowed at all, and whether p95 is read over more calls or the bar restated, is the Threshold Owner's | Threshold Owner; Engineering | M07 PR 2, before its run |
 | P | The repairs after the reviews (`4240d9e`, `8337ad8` and this commit) were not read cold again | Engineering | M07 PR 2 |
 
 ## What a reader can run
