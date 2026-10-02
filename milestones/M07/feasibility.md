@@ -236,17 +236,19 @@ BLOCK: 3 · FINDING: 26 · NOTE: 12
 
 ## 2. Rulings on the report
 
-**None is ruled yet.** The three BLOCKs and the items marked **waits**
-change a claim, a falsifier, a seeded case, the ledger row's wording or
-the cut list, or grant a permission. They are the human's, in the seat
-named, before any seed is planted and before the PR opens. The rest are
-proposed and will be recorded as ruled or changed in `rulings/pr1.md`.
-The reviewer's facts in items 3 and 37 were checked against the tree and
-hold: no `evals/history/133959f*`; `"can_admins_bypass": true`.
+**Ruled by the human on 2026-10-01, in the seats named: "as proposed".**
+Each BLOCK is ruled as its option (a); each item in "The other items
+that wait" as its first option; each item in the last table as proposed.
+The rulings were made before any seed was planted (the first seed commit
+follows this one) and are recorded in `rulings/pr1.md`. SPEC/07 is
+revised once on them, and SPEC/00 amended, in the commits after this one.
+The options are kept below as they were put. The reviewer's facts in
+items 3 and 37 were checked against the tree and hold: no
+`evals/history/133959f*`; `"can_admins_bypass": true`.
 
 ### The BLOCKs
 
-**BLOCK 1 (item 1, with 23). Product. Waits.**
+**BLOCK 1 (item 1, with 23). Product. Ruled: (a).**
 
 - (a) *Recommended.* A retirement is carried by a pull request. The
   platform opens a draft pull request in the agent's repository that sets
@@ -262,7 +264,7 @@ hold: no `evals/history/133959f*`; `"can_admins_bypass": true`.
   §10.3 row 07 is reworded (a sixth amendment), and `taken` counts two
   pull requests and one retirement.
 
-**BLOCK 2 (item 2). Product. Waits.**
+**BLOCK 2 (item 2). Product. Ruled: (a).**
 
 - (a) *Recommended.* A ruling file under `milestones/*/rulings/` is not
   "a person's edit". A seat ruling a change is the gate working, as it
@@ -272,7 +274,7 @@ hold: no `evals/history/133959f*`; `"can_admins_bypass": true`.
 - (b) The model kind cannot count toward `taken`; the measured value is n
   of 2.
 
-**BLOCK 3 (item 26, with 27, 29, 31). Product. Waits.**
+**BLOCK 3 (item 26, with 27, 29, 31). Product. Ruled: (a).**
 
 - (a) *Recommended.* Cuts a, b, c and e are taken at open, by SPEC/00
   amendment, each recorded in SPEC/00 §12 as "not built in this project"
@@ -291,7 +293,7 @@ hold: no `evals/history/133959f*`; `"can_admins_bypass": true`.
   cuts are taken at PR 2 or PR 3 with the same contradictions.
 - (c) SPEC/00 §8 M08, R6, §10.2 and §15 are all amended now, in this PR.
 
-### The other items that wait
+### The other items that waited, each ruled as its option (a)
 
 | Item | Seat | Options, the first recommended |
 |---|---|---|
@@ -303,7 +305,7 @@ hold: no `evals/history/133959f*`; `"can_admins_bypass": true`.
 | 36, 33 | Security | The grant is made **after PR 2 merges**, when `main` no longer carries `scope = {}`. The mint points and permission sets per workflow are ruled in `pr2-security.md` before it; whether the App may hold `contents: write` and `pull_requests: write` on agent repositories at all is that ruling's (it is a grant) |
 | 38 | Product | Amendments 1 and 2 also change SPEC/00 §8 M07's build line "Playwright over the surfaces with a plants-fired list", its seeded line "a Playwright plant goes silent" (to "a surface plant goes silent"), §6's "pinned tag" and "on a platform tag" |
 
-### Proposed, to be recorded in `rulings/pr1.md`
+### Ruled as proposed, recorded in `rulings/pr1.md`
 
 | Item | Seat | Proposed |
 |---|---|---|
