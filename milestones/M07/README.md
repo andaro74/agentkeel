@@ -165,3 +165,51 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   platform check still refuses every head (the `rulesets` token cannot be
   minted until the grant), now saying so; no agent from the template
   exists; nothing has been upgraded, retired or rolled back.
+
+### PR 3 detail (the repair, 2026-10-02)
+
+- **What PR 3 is, ruled by Product on 2026-10-02** (`rulings/pr3.md`).
+  The row above says PR 3 "carries every attempt's `observed` entry to
+  `main`". That cannot hold. The first deploy of an agent from the
+  template failed in the platform's own `deploy.yml`; the deploy runs
+  from `main`; so no later attempt can be made until the fix is merged.
+  PR 3 is the workflow fix and every repair owed before the next
+  attempts, merged once. It carries one `observed` entry, the owner's
+  test's. PR 4 carries every other attempt's entry and is the close. A
+  fifth PR is a RED close.
+- **What that costs, said.** The observer on `main` reads the run files
+  as they are on `main`. An attempt recorded only on PR 4's branch is
+  read from the anonymous viewpoint alone (SPEC/07 §4). The repositories
+  are public, and nothing the attempts read is hidden from an anonymous
+  caller but a pull request's `mergeable_state`, which no M07 reading
+  rules on. The App's viewpoint will have read the owner's test, the
+  dispatch and SPEC/06's S2, whose run files are on `main`.
+- **The finding: the owner's test missed its deploy bar, because of the
+  platform's own workflow.** Made once, on 2026-10-02, as stated before
+  it, on `agentkeel-studio/owner-check` pull request 1. From GitHub's
+  record: the empty head `0f155ed` refused by the App at 14:27:33Z on
+  the seats and the goldens and nothing else; the fixed head `0c99008`
+  passed at 14:35:33Z; merged as `5249dec` at 14:39:32Z; the App passed
+  the merge commit at 14:47:11Z. The next deploy run, 37023118799
+  (14:54:00Z), signed the agent and failed at `deploy-agent`'s first
+  read: `sign-agent` uploaded three paths under two roots, GitHub rooted
+  the artifact at their common parent, and `bundle.cosign.json` was not
+  where `deploy-agent` reads it. M06 PR 2's code, never reached before,
+  because the App refused every head until the grant. Nothing was
+  deployed and nothing was written to AWS. Eleven more scheduled deploy
+  runs failed the same way by 17:22Z. The bar,
+  `upgrade.deploy_max_seconds` (3,600 s), passed at 15:39:32Z.
+- **So F7.0 fired, and row 7 is expected to close RED on it.** The
+  attempt is not re-made and not restated (Product, `rulings/pr3.md`):
+  it was stated before, made once, and what it measured is that the
+  platform could not deploy the first agent made from its template
+  within the hour. `runs/f7_0_owner_test.yaml` carries its one
+  `observed` entry; the observer reads GitHub and AWS, and `build` rules.
+  When the fix is on `main` the deploy is expected to complete, hours
+  late, and the reading stays a miss. The remaining attempts are still
+  made and measured, and `upgrade.taken` is still counted.
+- **The fix** (`f5d2f6c`, Security; Engineering for the test):
+  `sign-agent` stages the three files under one folder and uploads it
+  whole; `tests/test_m07_workflows.py` holds both jobs to that layout.
+  It has not run on `main`: the first run that reaches `deploy-agent`
+  after the merge is its measurement.
