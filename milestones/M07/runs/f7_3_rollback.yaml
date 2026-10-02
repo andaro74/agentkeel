@@ -31,15 +31,38 @@
 #
 # **If the revert does not go green** (security-reviewer 16 on M07 PR 1):
 # the revert is itself a pin move the M04 gate rules, and the first main
-# envelope after a merged swap may fail F4_4 (open.md row 58). What is
-# done then is not stated here yet. The Threshold Owner names it in this
-# file, pushed, before the swap is merged; the swap is not merged until it
-# is named. Whether the candidate's model access stays after the revert is
-# Security's, with it.
+# envelope after a merged swap may fail F4_4 (open.md row 58).
+#
+# **Named by the Threshold Owner on 2026-10-02, before the swap is opened**
+# (milestones/M07/rulings/pr2-threshold-owner.md, item 3), and so before it
+# is merged:
+# - The revert is expected GREEN: it returns to Sonnet 4.6, whose envelopes
+#   are the long history F4_4's median is read over.
+# - The revert RED on F4_4 alone: one second run of the revert, stated
+#   before in a run file and pushed first. The one exception to "a swap
+#   never gets a second run".
+# - The revert RED on a regressed golden, or RED twice: refagent stays on
+#   Haiku 4.5, which the gate passed, until a pin pull request is GREEN.
+#   That is the finding. F7.3 is then read on the fallback, owner-check's
+#   platform upgrade reverted, and `upgrade.taken` stays under 3.
+# No pin is moved by hand and no runtime is re-pointed by hand.
+# The first `main` envelope after the merged swap is recorded as read,
+# whatever F4_4 says (open.md row 58). The eval role keeps its access to the
+# candidate after the revert: it has held it since M04 PR 2
+# (infra/bootstrap, EVAL_CANDIDATES); refagent's runtime role loses it at
+# the revert's deploy, since the construct builds it from the pin.
+#
+# **Which App** (Security, ruled 2026-10-02, rulings/pr2-security.md item
+# 10): the pull request is opened by `agentkeel-upgrades`, not by
+# `agentkeel-platform` (5144253), which is never installed on `andaro74`.
+# "The App" in the attempts below is `agentkeel-upgrades`.
 seed: S3
 falsifiers: [F7.1, F7.3]  # the first attempt is the model upgrade arriving; the second is the rollback
-principal: the platform's App opens the pull request; andaro74 as Threshold Owner rules and merges
+principal: the platform's App agentkeel-upgrades opens the pull request; andaro74 as Threshold Owner rules and merges
 candidate: pinned_roles.m04_cheaper_swap
+if_the_revert_is_red:
+  on_f4_4_alone: one second run of the revert, stated before and pushed first
+  on_a_regressed_golden_or_twice: refagent stays on the candidate until a pin pull request is GREEN; F7.3 is read on owner-check's platform upgrade reverted; upgrade.taken stays under 3
 attempts:
   - what: model-watch's draft swap pull request on refagent
     command: nothing by hand but naming the candidate; model-watch.yml runs from main on its schedule and opens the draft; the Threshold Owner rules its ruling file; merged as a merge commit only if its envelope is GREEN and every required check is green

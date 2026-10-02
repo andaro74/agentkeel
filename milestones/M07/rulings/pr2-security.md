@@ -33,6 +33,32 @@ Each item is a recommendation with its alternative. Where the seat rules
 the alternative, the item's text is changed before the line above is.
 Nothing here has fired on a seeded case but item 1's dispatch.
 
+## Made on 2026-10-02, before any PR 2 code
+
+andaro74, as Security, ruled every item of this file as its recommended
+option on 2026-10-02 ("as proposed"), before PR 2's first code commit
+(`16d9f84` is the last commit before it). Recorded here by the session.
+The line above stays a draft until the seat changes it at the end of the
+PR, as in PR 1. No alternative was taken, so no item's text changes.
+
+| Item | As ruled, 2026-10-02 |
+|---|---|
+| 1 | Admin bypass stays off on every environment that holds an App's key; the reader fails on `true` |
+| 2 | Three Apps: `agentkeel-platform` (5144253, the check), `agentkeel-upgrades` (opens pull requests), `agentkeel-observer` (reads only). Each key in its own environment limited to `main`, admin bypass off. 5144253 is never installed on `andaro74` |
+| 3 | The organisation's installations stay on "all repositories" |
+| 4 | One keyed job per workflow, `main`'s code only, the earlier job's output taken as data; no key in `evals.yml` |
+| 5 | `app_token()` takes a repository and a named permission set and refuses a call without either; `post` mints twice |
+| 6 | The reader of the grant, run first in each keyed job, against the `grant:` block read from this file on `main` |
+| 7 | Administration: write is needed to read `bypass_actors`; bounded by items 2 to 6 |
+| 8 | The seeded relaxation is made once, from `main`, through a dispatch input on `platform-check.yml`'s `post` job |
+| 9 | The observer on `main` stores its observation under `observations/` in the audit bucket, through a role that trusts `main` only |
+| 10 | `model-watch` opens pull requests as `agentkeel-upgrades`; its drafted ruling never carries a line that starts "Ruled by" |
+| 11 | A retirement is a stack update that removes the runtime, with no new IAM; it is also written to the audit bucket; `bundles/` gets its one statement |
+| 12 | The order of the human's steps, as written. Nothing is granted to `agentkeel-platform` until PR 2 has merged |
+
+Items added after this ruling are marked "not ruled on 2026-10-02" where
+they stand, and wait for the seat.
+
 ## 1. The key's environment (R1; `open.md` row 20). Done, to confirm.
 
 Read back: one deployment branch policy, `main`; the key an environment

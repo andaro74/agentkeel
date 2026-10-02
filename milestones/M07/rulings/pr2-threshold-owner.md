@@ -24,6 +24,21 @@ DRAFT for andaro74 as Threshold Owner. Not ruled until this line reads "Ruled by
 
 Each item is a recommendation with its alternative.
 
+## Made on 2026-10-02, before any PR 2 code
+
+andaro74, as Threshold Owner, ruled every item of this file as its
+recommended option on 2026-10-02 ("as proposed"), before PR 2's first
+code commit (`16d9f84` is the last commit before it). Recorded here by
+the session. The line above stays a draft until the seat changes it at
+the end of the PR, as in PR 1. No alternative was taken.
+
+| Item | As ruled, 2026-10-02 |
+|---|---|
+| 1 | Three new bars under `upgrade:`: `arrive_max_seconds` 4,500, `deploy_max_seconds` 3,600, `retire_max_seconds` 3,600, each `relaxes: up` |
+| 2 | The p95 bar stays at 2.0. One stated second run is allowed only when the diff touches nothing the agent runs. A swap never gets one, but for a revert RED on `F4_4` alone |
+| 3 | The swap candidate is Haiku 4.5. If its revert is RED on a regressed golden, or RED twice, refagent stays on Haiku 4.5 until a pin change passes, and F7.3 is read on the fallback |
+| 4 | `model-watch` writes `deprecated_after` from Bedrock and opens nothing to set a null to null; a date moved later or cleared with the model unchanged is two keys |
+
 ## 1. Three new bars under `upgrade:` (Unsure I)
 
 Added before any attempt; adding a bar is not a relaxation (ADR-0009).

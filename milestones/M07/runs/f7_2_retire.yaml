@@ -15,10 +15,20 @@
 #
 # Made last (SPEC/07 §5.1): after owner-check has deployed, answered, been
 # listed and taken S1, and after S3's fallback rollback if it is needed.
-# **It deletes AWS resources**: owner-check's runtime and stack
-# (agentkeel-owner-check), or only its runtime if Security rules a stack
-# update (milestones/M07/runs/pr2_reads.md, R7: the deploy role cannot
-# delete a stack). Its key is not deleted: no platform role may schedule
+# **It deletes an AWS resource**: owner-check's runtime, and only that.
+# Restated at M07 PR 2 on Security's ruling of 2026-10-02
+# (rulings/pr2-security.md, item 11): a retirement is an update of the
+# stack agentkeel-owner-check to a template without the runtime, with no
+# new IAM; the stack stays (the deploy role cannot delete one,
+# milestones/M07/runs/pr2_reads.md, R7). What is removed and what is kept,
+# resource by resource, is milestones/M07/runs/f7_2_removed_and_kept.md;
+# the human reads it before the dispatch. The pull request is opened by
+# `agentkeel-upgrades`, not by `agentkeel-platform` (item 2); "the App" in
+# the attempt below is `agentkeel-upgrades` for the pull request and
+# `agentkeel-platform` (5144253) for the check on it. The retirement is
+# also written once to the audit bucket, as
+# envelopes/agents/owner-check/retired.json.
+# Its key is not deleted: no platform role may schedule
 # that, and the construct keeps the key, its alias and the rights table. The audit
 # bucket's records of it stay, locked for one day (R5 as amended at M05)
 # and after that kept by the security account's policies. **It is one-way:
