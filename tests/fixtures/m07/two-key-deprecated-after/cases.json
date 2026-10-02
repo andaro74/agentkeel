@@ -1,0 +1,14 @@
+{
+  "what": "A pin's deprecated_after relaxed with one key (ADR-0009 amendment 1, entry 6). refagent's manifest as the tree holds it, with the date below in place of null, is the base; each case is one change to that line.",
+  "base": "2027-06-30",
+  "relaxed_with_one_key": {
+    "moved later": "2027-12-31",
+    "set to null": null,
+    "removed": "<the line deleted>",
+    "moved later, unquoted": "<unquoted 2027-12-31>"
+  },
+  "not_a_relaxation": {
+    "moved earlier": "2027-03-31",
+    "unchanged": "2027-06-30"
+  }
+}
