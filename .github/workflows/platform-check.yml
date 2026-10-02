@@ -1,5 +1,7 @@
 # platform-check (SPEC/06 section 6, R2; M06 PR 2). Security seat.
-# Authorised by SPEC/00-overview.md#8-M06 and milestones/M06/rulings/pr2-security.md.
+# Authorised by SPEC/00-overview.md#8-M06 and milestones/M06/rulings/pr2-security.md;
+# changed at M07 PR 2 by SPEC/00-overview.md#8-M07 and
+# milestones/M07/rulings/pr2-security.md (items 1, 4, 5, 6 and 8).
 # Its hash is listed in infra/workflows.sha256, which `make validate` reads.
 #
 # The check every agent repository's ruleset requires (infra/ruleset/agent.json):
@@ -20,14 +22,42 @@
 #    nothing from it is imported, installed or run, and a symbolic link in it
 #    is refused before anything is read (src/validate/agent.py).
 # 2. `post` runs in the environment `platform-app`, whose deployment branch
-#    is main only and which holds the App's key. It runs agentkeel's code
-#    only: the seats' access to the repository, the repository's live
-#    ruleset against the export, then one check run on the head `evaluate`
-#    was given (scripts/platform_check.py).
+#    is main only, with admin bypass off, and which holds the App's key. It
+#    runs agentkeel's code only.
+#
+# **From M07 PR 2, what `post` does, in this order** (seed S0's readers):
+#
+# a. **Reads the App's grant back** (scripts/platform_check.py grant): what
+#    GitHub says agentkeel-platform holds, and the environment's own rules,
+#    against the `grant:` block of the ruled file under
+#    milestones/M07/rulings/ on main. Anything beyond it stops the job here,
+#    before any token with a write permission is minted. What it read is
+#    kept as the artifact `grant-agentkeel-platform`.
+# b. **Posts.** For each head, two tokens, each for that repository and one
+#    named permission set: `rulesets` (Administration: write, the only way
+#    GitHub shows bypass_actors) for the one read, revoked after it; then
+#    `check` for the seats, the visibility and the check run. No call mints
+#    the installation's whole grant: app_token() refuses one with no
+#    repository.
+# c. **The seeded relaxation, only when dispatched for it** (S0's third
+#    attempt): `gh workflow run platform-check.yml --ref main -f
+#    relax_seed=owner-check`. One call asks GitHub to remove the required
+#    status check from that repository's ruleset, with the token `post`
+#    mints for it, and GitHub's answer is kept as the artifact `relax-seed`.
+#    The input reaches the script through `env:`, never interpolated, and
+#    the script refuses any repository but the one seed S0's run file names
+#    on main. It is made once.
+#
+# **Dispatched from a branch, `post` does not start**: the environment
+# refuses the ref (read on 2026-10-02, run 36963543726, before any grant).
 #
 # What this does not do: run any test an agent repository brings, or the
 # agent itself; deploy (deploy.yml does, from main, after a merge); stop the
-# organisation's owner from removing the ruleset or the App (SPEC/06 section 8).
+# organisation's owner from removing the ruleset or the App (SPEC/06 section 8);
+# stop the App's write token being used for anything Administration: write
+# allows beyond the one seeded call (SPEC/07 section 8): the reader in (a)
+# reads the grant, not its use. The names of the environment's secrets are
+# not read by this job: no token it holds may list them.
 # GitHub may delay a scheduled run at busy times; the timed run counts that.
 name: platform-check
 
@@ -35,6 +65,12 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+    inputs:
+      relax_seed:
+        description: "Seed S0's third attempt only: the agent repository whose ruleset the App's token is asked to relax. Made once. Leave empty."
+        required: false
+        default: ""
+        type: string
 
 permissions: {}
 
@@ -120,12 +156,17 @@ jobs:
 
   post:
     needs: evaluate
-    if: needs.evaluate.result == 'success' || needs.evaluate.result == 'failure'
+    # always(): `evaluate` is skipped when no head waits, and the seeded relaxation is dispatched for
+    # itself. A dispatch from a branch still reaches this job, and the environment refuses it there.
+    if: >-
+      always() && (needs.evaluate.result == 'success' || needs.evaluate.result == 'failure'
+      || (github.event_name == 'workflow_dispatch' && inputs.relax_seed != ''))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: platform-app
     permissions:
       contents: read
+      actions: read # the environment's own rules, read back in (a)
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -141,7 +182,42 @@ jobs:
           pattern: result-*
           path: ${{ runner.temp }}/results
 
+      # (a) First, and before anything is minted with a write permission.
+      - name: The App's grant and its key's environment, read back against the ruling
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run python scripts/platform_check.py grant --app agentkeel-platform --out "$RUNNER_TEMP/grant.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: grant-agentkeel-platform
+          path: ${{ runner.temp }}/grant.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # (b)
       - name: Seats, the ruleset, and the check, as the App
         env:
           AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
-        run: uv run python scripts/platform_check.py post --results "$RUNNER_TEMP/results"
+        run: |
+          mkdir -p "$RUNNER_TEMP/results"
+          uv run python scripts/platform_check.py post --results "$RUNNER_TEMP/results"
+
+      # (c) Seed S0's third attempt. Only on a dispatch that names a repository; the script holds the
+      # name to the one the seed's run file names on main.
+      - name: The seeded relaxation, when dispatched for it
+        if: github.event_name == 'workflow_dispatch' && inputs.relax_seed != ''
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
+          RELAX_SEED: ${{ inputs.relax_seed }}
+        run: uv run python scripts/platform_check.py relax --agent "$RELAX_SEED" --out "$RUNNER_TEMP/relax-seed.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: github.event_name == 'workflow_dispatch' && inputs.relax_seed != ''
+        with:
+          name: relax-seed
+          path: ${{ runner.temp }}/relax-seed.json
+          if-no-files-found: error
+          retention-days: 90

@@ -4,6 +4,7 @@
     python scripts/platform_check.py grant --app SLUG --out READ.json  # the App's key: its grant, read back
     python scripts/platform_check.py post --results DIR               # the App's key: seats, ruleset, the check
     python scripts/platform_check.py deployable --out merged.json     # no secret: what deploy.yml may deploy
+    python scripts/platform_check.py relax --agent NAME --out ANSWER.json   # the App's key: seed S0's third attempt, once
 
 Nothing comes from an agent repository but what GitHub's API says about
 it. The organisation and the App are `infra/platform_identity.json`'s; while
@@ -449,6 +450,57 @@ def check_grant(slug: str, private_key_pem: str, root: Path = ROOT) -> tuple[dic
     return read, errors
 
 
+# --- the seeded relaxation (M07 PR 2; SPEC/07 section 6; rulings/pr2-security.md item 8; S0's third attempt) ----
+
+SEED_RUN_FILE = "milestones/M07/runs/f7_0_owner_test.yaml"
+
+
+def relax_seed(name: str, org: str, app_id: int, private_key_pem: str, root: Path = ROOT) -> dict[str, Any]:
+    """Ask GitHub, once, as the App, to remove the required status check from one agent repository's
+    ruleset, and return GitHub's answer as it came.
+
+    The App holds Administration: write because nothing less shows it `bypass_actors`. This is the
+    seeded attempt to use that for what it must not: relax the ruleset that binds its own check. It
+    is expected to be accepted, and then detected: the next platform check refuses every head of that
+    repository until its owner restores the export. Which it is comes from the attempt.
+
+    It can be pointed at one repository only: the one seed S0's run file names on `main`. Any other
+    name is refused before a token is minted, so this is not a tool for relaxing an agent's ruleset."""
+    from src.validate.agent import NAME
+
+    if not isinstance(name, str) or not NAME.match(name):
+        raise ValueError(f"{name!r} is not an agent's name")
+    seeded = (yaml.safe_load((root / SEED_RUN_FILE).read_text(encoding="utf-8")) or {}).get("repository")
+    repository = f"{org}/{name}"
+    if repository != seeded:
+        raise ValueError(f"the seeded relaxation is made on {seeded} and on no other repository; got {repository}")
+    record: dict[str, Any] = {"what": "the App's token asked to remove the required status check from the ruleset",
+                              "repository": repository, "ruleset": None, "status": None, "message": None,
+                              "at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")}  # fmt: skip
+    token = app_token(app_id, org, private_key_pem, repository, "rulesets")
+    try:
+        with _As(token):
+            mine = [r for r in live_rulesets(repository)
+                    if any(rule.get("type") == "required_status_checks" and any(
+                        c.get("context") == CHECK and c.get("integration_id") == app_id
+                        for c in (rule.get("parameters") or {}).get("required_status_checks") or [])
+                        for rule in r.get("rules") or [])]  # fmt: skip
+            if not mine:
+                record["message"] = "no ruleset of the repository requires the platform check from the App: nothing to ask"
+                return record
+            record["ruleset"] = mine[0]["id"]
+            body = {key: mine[0][key] for key in ("name", "target", "enforcement", "conditions") if key in mine[0]}
+            body["rules"] = [rule for rule in mine[0]["rules"] if rule.get("type") != "required_status_checks"]
+            try:
+                gh(f"/repos/{repository}/rulesets/{mine[0]['id']}", method="PUT", body=body)
+                record |= {"status": 200, "message": "GitHub accepted the change"}
+            except urllib.error.HTTPError as exc:
+                record |= {"status": exc.code, "message": (exc.read() or b"").decode("utf-8", "replace")[:500] if exc.fp else str(exc)}
+    finally:
+        revoke(token)
+    return record
+
+
 def post(results: Path, app_id: int, mint=None) -> int:
     """`mint(repository, permission_set)` gives the App's token for that repository and that set alone.
 
@@ -585,10 +637,28 @@ def main(argv: list[str] | None = None) -> int:
     three = sub.add_parser("grant")
     three.add_argument("--app", required=True)
     three.add_argument("--out", required=True, type=Path)
+    # M07 PR 2: seed S0's third attempt, made once, from main, by a dispatch input (item 8).
+    four = sub.add_parser("relax")
+    four.add_argument("--agent", required=True)
+    four.add_argument("--out", required=True, type=Path)
     args = parser.parse_args(argv)
 
     if args.what == "grant":
         return grant_command(args.app, args.out)
+    if args.what == "relax":
+        org, app_id = identity()
+        key = os.environ.pop("AGENTKEEL_APP_PRIVATE_KEY", None)
+        if not key or not org or not isinstance(app_id, int):
+            print("no AGENTKEEL_APP_PRIVATE_KEY, organisation or App: the seeded relaxation is made in the platform-app environment only")
+            return 1
+        try:
+            record = relax_seed(args.agent, org, app_id, key)
+        except ValueError as refusal:
+            print(f"REFUSED: {refusal}")
+            return 1
+        args.out.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        print(f"{record['repository']}: GitHub answered {record['status']} ({record['message']})")
+        return 0
 
     org, app_id = identity()
     if not org or not isinstance(app_id, int):

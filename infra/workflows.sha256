@@ -34,9 +34,16 @@
 # Rewritten again at M06 PR 2 after the seat reviews: deploy.yml reads the registry before signing and
 # claims a name first; evals.yml reads panel 1 in a step of its own (security-reviewer F2, F3, F7, F9, N5).
 # And after the cold review: deploy.yml puts the answer before it writes the registry row, and reads a 412 as put (F8, F2).
+# Rewritten at M07 PR 2 (SPEC/07 section 6; milestones/M07/rulings/pr2-security.md): platform-check.yml reads the App's grant back
+# first in post, mints per repository and per named set, and takes the seeded relaxation as a dispatch input; platform-upgrade.yml,
+# model-watch.yml and observe.yml added, each keyed job in its own environment on main's code; deploy.yml gains the retire jobs, the
+# bundle put and the 412 repair; evals.yml observes claim 7, reads panel 2, and its archive job writes panel 2's rows.
 bedf184401fe99b3e2e3d893c3e7e3569f7dc6eecc689d8585b12fd5ffb98d48  .github/workflows/cold-review-ruling.yml
-7f35c1bb992a6d0e6c9beeb927f7c1da5730b915cce035cac9206016235c9cea  .github/workflows/deploy.yml
-9eb11372c30a50eb4457b04d8cdd5c5ff1ee04a3b13c1c2b514408df14b0eadf  .github/workflows/evals.yml
+c4b792e20e76e7590ce264744e82239ce94e0d44dca4b05ec696e96e483bf283  .github/workflows/deploy.yml
+c3f754bd929f7b226e0058f254a0418123b5531a939e915ef6965c4573ebfded  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
-7559bd27b1f8aa2e3ae632355a2e6cfb593ef2ce733c82be56e72416146c3b50  .github/workflows/platform-check.yml
+977005d6918897772b83d279230d5febb4c3c35150d0037d08ed139af8727414  .github/workflows/model-watch.yml
+48d8372db65adee7827a06e8724289ddd425c04cb852dfea99ed952665759e8e  .github/workflows/observe.yml
+93e806287f79edf965928bda313709d60672465c5cfd4f451898a15ee789923b  .github/workflows/platform-check.yml
+b9d5de06062cb11337806311face403b19654ac1ffee0d61321bd3d74cb107a9  .github/workflows/platform-upgrade.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml

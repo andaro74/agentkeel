@@ -774,7 +774,10 @@ def observe(parts: list[str], observation: dict[str, Any], gh: GitHub) -> dict[s
         except Exception as exc:  # noqa: BLE001 - the observer never fails the job; an unread part is recorded
             observation["github_error"] = failed(exc)
     if "aws" in parts:
-        read_aws(observation)
+        try:
+            read_aws(observation)
+        except Exception as exc:  # noqa: BLE001 - as above: recorded, never raised
+            observation.setdefault("aws", {})["error"] = failed(exc)
     if "grafana" in parts:
         observation["panel2"] = panel("AGENTKEEL_PANEL2_FILE")
         observation["panel1"] = panel("AGENTKEEL_PANEL_FILE")

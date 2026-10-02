@@ -1,0 +1,130 @@
+# observe (SPEC/07 section 2 "The viewpoint", section 4, section 6; M07 PR 2). Security seat.
+# Authorised by SPEC/00-overview.md#8-M07 and milestones/M07/rulings/pr2-security.md
+# (items 2, 4, 6 and 9, ruled 2026-10-02).
+# Its hash is listed in infra/workflows.sha256, which `make validate` reads.
+#
+# GitHub's answer depends on who asks. A pull request's own `evals` run asks
+# with a token that has no rights in the organisation: it read S2 of SPEC/06
+# as `unstable` where the owner read `blocked` (M06's second finding;
+# milestones/M07/open.md row 3). This is the other viewpoint: on agentkeel's
+# main, every 30 minutes (and by hand), it reads claim 6's and claim 7's
+# GitHub records as the platform's observer App and stores what it read.
+#
+# One job, in the environment `platform-observer` (main only, admin bypass
+# off), which holds the key of `agentkeel-observer`. It runs agentkeel's
+# code only and checks out no pull request's code:
+#
+# 1. The App's grant read back against the ruling. Anything beyond it stops
+#    the job. `agentkeel-observer` holds read permissions and no write.
+# 2. scripts/observe_upgrade.py --read github --viewpoint app: the run files
+#    as they are on main; for each repository of the organisation's a token
+#    minted for that repository and the `observe` permission set. The App is
+#    not installed on this repository, which is read with the job's own
+#    token. Raw records: it rules on nothing.
+# 3. The observation is put once, as observations/<run id>.json, in the
+#    security account's audit bucket, through `agentkeel-observation-put`, a
+#    role that trusts this workflow on refs/heads/main and nothing else and
+#    may put under observations/ and nowhere else. The bucket refuses a put
+#    there without If-None-Match, and locks each object for its day.
+#
+# A pull request's `evals` run reads the latest object through the existing
+# read role and hands it to build, which rules on the App's record where it
+# found one and writes which viewpoint each reading was ruled on. Row 7's
+# cell cites M07 PR 4's run's envelope, which names the observation it
+# carries. An attempt's `observed` entry must be on main to be read here: PR
+# 3 carries them.
+#
+# The key is in the one step that uses it. The AWS credentials come after
+# it, in a later step. No key is in evals.yml.
+#
+# What this does not do: observe AWS (the pull request's run does, under its
+# own roles); tell a hand-made observation from its own, beyond the role's
+# trust and the bucket's put-once rule; prove what it stored was not changed
+# by this file being edited (ruling-cited holds a workflow change to a
+# Security ruling). Until `agentkeel-observer` exists and its id is in the
+# ruling's grant block, the job stops at step 1; until the role exists and
+# its variable is set, nothing is stored and the job says so. Nothing here
+# has fired on a seeded case.
+name: observe
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: observe
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: platform-observer
+    permissions:
+      contents: read
+      actions: read # the environment's own rules; a run's jobs and artifacts on this repository
+      id-token: write # OIDC to the security account, for the one put
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: The App's grant and its key's environment, read back against the ruling
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.OBSERVER_APP_PRIVATE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run python scripts/platform_check.py grant --app agentkeel-observer --out "$RUNNER_TEMP/grant.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: grant-agentkeel-observer
+          path: ${{ runner.temp }}/grant.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Read GitHub as the App
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.OBSERVER_APP_PRIVATE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          uv run python scripts/observe_upgrade.py --read github --viewpoint app --run-id "$GITHUB_RUN_ID"
+          --out "$RUNNER_TEMP/observation.json"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: vars.AWS_OBSERVATION_PUT_ROLE_ARN != ''
+        with:
+          role-to-assume: ${{ vars.AWS_OBSERVATION_PUT_ROLE_ARN }}
+          role-session-name: agentkeel-observation-put-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+
+      # git-free and code-free: the AWS CLI and the file the step above wrote.
+      - name: Put the observation under observations/ in the audit bucket, once
+        env:
+          PUT_ROLE: ${{ vars.AWS_OBSERVATION_PUT_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PUT_ROLE" ]; then
+            echo "::warning::AWS_OBSERVATION_PUT_ROLE_ARN is not set; the observation is not stored"
+            exit 0
+          fi
+          key="observations/$GITHUB_RUN_ID.json"
+          if aws s3api put-object --bucket agentkeel-audit-897698239547 --key "$key" --body "$RUNNER_TEMP/observation.json" \
+              --if-none-match '*' --checksum-algorithm SHA256 > /dev/null 2> "$RUNNER_TEMP/err"; then
+            echo "### Stored $key" >> "$GITHUB_STEP_SUMMARY"
+          elif grep -q PreconditionFailed "$RUNNER_TEMP/err"; then
+            echo "::notice::$key is already in the audit bucket; not overwritten"
+          else
+            cat "$RUNNER_TEMP/err"
+            exit 1
+          fi

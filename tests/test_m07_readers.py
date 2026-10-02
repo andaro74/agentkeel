@@ -647,3 +647,68 @@ def test_each_github_reading_of_claim_6_says_which_viewpoint_it_was_ruled_on():
     recorded = json.loads((ROOT / "evals" / "history" / "827ee8bc014b28f588e9b8f3e1d4a947be885f26.json").read_text(encoding="utf-8"))
     assert schema_errors({**recorded, "template": both}) == []
     assert gate.template_reading({"template": both})[1] == "F6_2 held"
+
+
+# --- the seeded relaxation (S0's third attempt; rulings/pr2-security.md item 8) ---
+
+EXPORT_RULESET = json.loads((ROOT / "infra" / "ruleset" / "agent.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def owner_check(github, monkeypatch):
+    github["pages"].update({
+        "/repos/agentkeel-studio/owner-check/installation": {"id": 77},
+        "/repos/agentkeel-studio/owner-check/rulesets?includes_parents=false&per_page=100": [{"id": 24310403}],
+        "/repos/agentkeel-studio/owner-check/rulesets/24310403": {**EXPORT_RULESET, "id": 24310403},
+    })  # fmt: skip
+    real = platform_check.gh
+
+    def gh(path, *, method="GET", body=None, raw=False):
+        if method == "PUT":
+            github["sent"].append((method, path, body, os.environ.get("GITHUB_TOKEN")))
+            if github.get("refuse"):
+                raise urllib.error.HTTPError(path, github["refuse"], "Forbidden", {}, None)
+            return {}
+        return real(path, method=method, body=body, raw=raw)
+
+    platform_check.gh = gh
+    return github
+
+
+def test_the_seeded_relaxation_asks_for_the_required_check_to_go_and_keeps_githubs_answer(owner_check, key):
+    record = platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key)
+    assert record["status"] == 200 and record["ruleset"] == 24310403 and record["repository"] == "agentkeel-studio/owner-check"
+    (path, body, token), = [(p, b, t) for method, p, b, t in owner_check["sent"] if method == "PUT"]
+    assert path == "/repos/agentkeel-studio/owner-check/rulesets/24310403" and token == "token-for-administration+metadata"
+    assert [rule["type"] for rule in body["rules"]] == ["deletion", "non_fast_forward", "pull_request"]  # the check is gone, nothing else
+    assert "bypass_actors" not in body  # it asks for one thing
+    minted = [b for method, p, b, _t in owner_check["sent"] if method == "POST" and p.endswith("/access_tokens")]
+    assert minted == [{"repositories": ["owner-check"], "permissions": platform_check.PERMISSION_SETS["rulesets"]}]
+    assert [method for method, *_ in owner_check["sent"]][-1] == "DELETE"  # the token is revoked after the one call
+
+
+def test_a_refusal_by_github_is_recorded_as_githubs_not_raised(owner_check, key):
+    owner_check["refuse"] = 403
+    record = platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key)
+    assert record["status"] == 403 and record["ruleset"] == 24310403
+
+
+@pytest.mark.parametrize("name, org, said", [
+    ("premiere-desk", "agentkeel-studio", "on no other repository"),
+    ("owner-check", "another-organisation", "on no other repository"),
+    ("agent-template", "agentkeel-studio", "on no other repository"),
+    ("../owner-check", "agentkeel-studio", "not an agent's name"),
+    ("", "agentkeel-studio", "not an agent's name"),
+])  # fmt: skip
+def test_the_seeded_relaxation_cannot_be_pointed_at_another_repository(github, key, name, org, said):
+    with pytest.raises(ValueError, match=said):
+        platform_check.relax_seed(name, org, APP, key)
+    assert github["sent"] == []  # refused before any token is asked for
+
+
+def test_a_repository_whose_ruleset_does_not_bind_the_check_gets_no_call(owner_check, key):
+    unbound = {**EXPORT_RULESET, "id": 24310403, "rules": [r for r in EXPORT_RULESET["rules"] if r["type"] != "required_status_checks"]}
+    owner_check["pages"]["/repos/agentkeel-studio/owner-check/rulesets/24310403"] = unbound
+    record = platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key)
+    assert record["status"] is None and "nothing to ask" in record["message"]
+    assert not any(method == "PUT" for method, *_ in owner_check["sent"])

@@ -116,6 +116,30 @@
 # may post any query the workspace's data source answers, which through the
 # connector is the registry.
 #
+# M07 PR 2 (SPEC/07 section 4): claim 7's records. `scripts/observe_upgrade.py`
+# reads them in parts, each under the credentials it needs, into one file: in
+# the security account's bucket (`agentkeel-audit-read`, before the eval role)
+# each agent's answer records, retirement record and bundles, and the latest
+# observation `observe.yml` stored from main, read as the platform's observer
+# App; then, as the eval role, GitHub (each attempt's pull request, its
+# trigger, its commits' authors and files, the dispatched runs), AWS (the
+# registry, a runtime's image tags, CloudTrail's DeleteAgentRuntime) and
+# Grafana (panel 2's rows, posted in a step of its own with the workspace's
+# viewer token, as panel 1's are). `make evals` hands build the observation
+# (UPGRADE_OBS) and the stored one (APP_OBS): build rules them into `upgrade`
+# and writes which viewpoint each GitHub reading was ruled on; the gate rules
+# nothing on it, and only the ledger's row 7 reading reads it. A part that
+# cannot be read is written as unread; it never fails the job. **No App key is
+# in this workflow**: it checks out pull-request code. F7_0 to F7_5 are read
+# from the fixture tests (the Makefile), and the surfaces' plants are counted
+# from this run's own JUnit file. On a push to main the `archive` job also
+# writes one row per envelope (commit, verdict, mode, as stored) to the table
+# panel 2 reads, `agentkeel-envelopes`, as `agentkeel-envelope-row-put`,
+# trusted on main only; with no role variable it says so and writes nothing.
+# That table and role are not among the items ruled on 2026-10-02: they are
+# put to Security in milestones/M07/rulings/pr2-security.md, and until they
+# are deployed panel 2's live read is unread.
+#
 # What this does not do:
 # - stop someone with write access from editing this file, or from adding
 #   a workflow that assumes the same role. `validate` fails on a workflow
@@ -382,6 +406,15 @@ jobs:
         if: steps.current.outputs.measured_at == ''
         run: uv run python scripts/observe_template.py --read bucket --out "$RUNNER_TEMP/template.json"
 
+      # M07 PR 2 (SPEC/07 section 4): each agent's answer records, retirement record and bundles, and the
+      # latest observation main's observer stored as the App; both as agentkeel-audit-read. A prefix this
+      # role cannot list yet is written as unread.
+      - name: Look up claim 7's records and the stored observation in the security account
+        if: steps.current.outputs.measured_at == ''
+        run: >-
+          uv run python scripts/observe_upgrade.py --read bucket,stored --out "$RUNNER_TEMP/upgrade.json"
+          --stored "$RUNNER_TEMP/app-observation.json"
+
       # The three claims the role's trust policy matches on: `aud` and `sub`
       # exactly, `job_workflow_ref` by pattern. When an assume is refused, look
       # here first: the first deploy trusted a `sub` this repo never issues
@@ -429,6 +462,29 @@ jobs:
           set -euo pipefail
           uv run python scripts/observe_template.py --read registry --out "$RUNNER_TEMP/template.json"
           uv run python scripts/observe_template.py --read github,grafana --out "$RUNNER_TEMP/template.json"
+
+      # M07 PR 2 (SPEC/07 section 4, F7.4): panel 2's rows, as panel 1's are read: curl and jq only, the
+      # workspace's viewer token in this step alone, the frame written to a file the observer reads.
+      - name: Read panel 2 as the workspace's viewer
+        if: steps.current.outputs.measured_at == '' && vars.AGENTKEEL_GRAFANA_URL != ''
+        continue-on-error: true
+        env:
+          GRAFANA_URL: ${{ vars.AGENTKEEL_GRAFANA_URL }}
+          GRAFANA_TOKEN: ${{ secrets.AGENTKEEL_GRAFANA_TOKEN }}
+        run: |
+          set -euo pipefail
+          body=$(jq -c '{queries: (.panels[] | select(.id == 2) | .targets), from: "now-1h", to: "now"}' infra/grafana/panel2.json)
+          curl -sS --fail-with-body -X POST -H "Authorization: Bearer $GRAFANA_TOKEN" -H "Content-Type: application/json" \
+            -d "$body" "${GRAFANA_URL%/}/api/ds/query" -o "$RUNNER_TEMP/panel2-frame.json"
+
+      # M07 PR 2: GitHub, AWS as the eval role, and the two panels' frames. It never fails the job.
+      - name: Look up claim 7's pull requests, runtimes and panel 2
+        if: steps.current.outputs.measured_at == ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AGENTKEEL_PANEL_FILE: ${{ runner.temp }}/panel1-frame.json
+          AGENTKEEL_PANEL2_FILE: ${{ runner.temp }}/panel2-frame.json
+        run: uv run python scripts/observe_upgrade.py --read github,aws,grafana --out "$RUNNER_TEMP/upgrade.json"
 
       # Item 18: one refused call on a denied action, and one through an
       # unpinned profile. Neither has a seeded case (SPEC/01 §9), so this is
@@ -527,7 +583,7 @@ jobs:
           AGENTKEEL_RUNTIME_ARN: ${{ steps.runtime.outputs.arn }}
           # Empty: one run of each subject. 1: two (M04 PR 2).
           A_VS_A: ${{ steps.a_vs_a.outputs.a_vs_a }}
-        run: make evals A_VS_A="$A_VS_A" F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" SEED_PRS_OBS="$RUNNER_TEMP/seed_prs.json" BYPASS_OBS="$RUNNER_TEMP/bypass.json" DOORS_OBS="$RUNNER_TEMP/doors.json" INGEST_OBS="$RUNNER_TEMP/f3_5.json" CONTAINMENT_OBS="$RUNNER_TEMP/containment.json" TEMPLATE_OBS="$RUNNER_TEMP/template.json" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
+        run: make evals A_VS_A="$A_VS_A" F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" SEED_PRS_OBS="$RUNNER_TEMP/seed_prs.json" BYPASS_OBS="$RUNNER_TEMP/bypass.json" DOORS_OBS="$RUNNER_TEMP/doors.json" INGEST_OBS="$RUNNER_TEMP/f3_5.json" CONTAINMENT_OBS="$RUNNER_TEMP/containment.json" TEMPLATE_OBS="$RUNNER_TEMP/template.json" UPGRADE_OBS="$RUNNER_TEMP/upgrade.json" APP_OBS="$RUNNER_TEMP/app-observation.json" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
 
       # Which refagent answered, as the runner printed it. From ADR-0007 the
       # envelope records the mode itself (`mode`, `runtime_arn`); this line is
@@ -704,3 +760,46 @@ jobs:
             fi
           done < "$RUNNER_TEMP/added.txt"
           echo "### Put under envelopes/ in the audit bucket: $(wc -l < "$RUNNER_TEMP/added.txt") file(s)" >> "$GITHUB_STEP_SUMMARY"
+
+      # M07 PR 2 (SPEC/07 section 2 "Panel 2", section 6): one row per envelope on main in the table panel 2
+      # reads, each written once: its commit, the verdict it stores and its mode, read from the file with
+      # jq. git, jq and the AWS CLI only. Every envelope on main, not only the ones this push added: a row
+      # that is there is left alone (a condition, not an overwrite), so the first run fills the history.
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: vars.AWS_ENVELOPE_ROW_PUT_ROLE_ARN != ''
+        with:
+          role-to-assume: ${{ vars.AWS_ENVELOPE_ROW_PUT_ROLE_ARN }}
+          role-session-name: agentkeel-envelope-row-put-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+          unset-current-credentials: true
+
+      - name: One row per envelope in the table panel 2 reads, once each
+        env:
+          ROW_ROLE: ${{ vars.AWS_ENVELOPE_ROW_PUT_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ROW_ROLE" ]; then
+            echo "::warning::AWS_ENVELOPE_ROW_PUT_ROLE_ARN is not set; panel 2's table is not written"
+            exit 0
+          fi
+          aws dynamodb scan --table-name agentkeel-envelopes --projection-expression "#c" \
+            --expression-attribute-names '{"#c":"commit"}' --query 'Items[].commit.S' --output text \
+            | tr '\t' '\n' | sort > "$RUNNER_TEMP/held.txt"
+          written=0
+          for f in evals/history/*.json; do
+            sha=$(basename "$f" .json)
+            case "$sha" in *[!0-9a-f]*) continue ;; esac
+            [ "${#sha}" -eq 40 ] || continue
+            grep -qx "$sha" "$RUNNER_TEMP/held.txt" && continue
+            item=$(jq -c --arg sha "$sha" 'select(.commit == $sha) | {commit: {S: .commit}, verdict: {S: .verdict}, mode: {S: (.mode // "not recorded")}}' "$f")
+            [ -n "$item" ] || { echo "::warning::$f does not name its own commit; no row"; continue; }
+            if aws dynamodb put-item --table-name agentkeel-envelopes --item "$item" \
+                --condition-expression "attribute_not_exists(#c)" --expression-attribute-names '{"#c":"commit"}' 2> "$RUNNER_TEMP/err"; then
+              written=$((written + 1))
+            elif ! grep -q ConditionalCheckFailed "$RUNNER_TEMP/err"; then
+              cat "$RUNNER_TEMP/err"
+              exit 1
+            fi
+          done
+          echo "### Rows written to agentkeel-envelopes: $written" >> "$GITHUB_STEP_SUMMARY"
