@@ -332,9 +332,17 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   at a time. The stack rolled back and kept a second key
   (`fcd9e973-0d4b-4828-8f7a-022d9b414c65`, this time with
   `alias/agentkeel-owner-check`) and the table.
+- **Deployed on the third create.** With `TagResource` added (B2 from
+  `81508ab`, 23:16Z) and the second stack, table, alias and key deleted,
+  run 37077850271 created the stack (23:31:39Z), the runtime
+  `agentkeel_owner_check-G4vMbRB3Dx` answered `g-001` and `g-002` in it
+  (2 observations, 0 errors, GREEN), the signed bundle and the answer
+  record were put in the security account, each a first put, and the
+  registry row `owner-check` was written at 23:37:12Z. That is 32,260 s
+  after pull request 1 merged (14:39:32Z); `upgrade.deploy_max_seconds`
+  is 3,600. The owner's test stays a miss.
 - **The second finding under F7.0, and a repair in the close.** The
   repair is two actions on `runtime/*` in the bootstrap stack, a widening
   of IAM, ruled by Security and deployed by hand (`runs/pr2_by_hand.md`
   B2, twice). It is in PR 4's branch from its first commit, before the
-  close is written. Whether a third action follows is not known until a
-  create passes. The owner's test stays a miss.
+  close is written.

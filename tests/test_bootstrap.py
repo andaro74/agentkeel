@@ -692,8 +692,8 @@ def test_no_agent_role_can_read_the_table_marker(template):
 
 def test_the_execution_role_holds_on_any_runtime_only_what_create_agent_runtime_checks_before_the_runtime_has_an_id(template):
     """M07, the second finding under F7.0 (runs 37066321605 and 37074759767): CreateAgentRuntime authorises the
-    DEFAULT endpoint, then the tags CloudFormation passes, against runtime/*. Those two actions on runtime/*;
-    every other runtime action stays on the two prefixes."""
+    DEFAULT endpoint, then the tags CloudFormation passes, against runtime/*; with both granted the create passed
+    (run 37077850271). Those two actions on runtime/*; every other runtime action stays on the two prefixes."""
     statements = [s for policy in of_type(template, "AWS::IAM::Policy").values()
                   if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
                   for s in policy["Properties"]["PolicyDocument"]["Statement"]]  # fmt: skip

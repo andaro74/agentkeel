@@ -1040,15 +1040,21 @@ deployed (B2, 22:49Z) and the stack deleted, the next create (run
 37074759767, 22:54Z) was refused one check further along:
 `bedrock-agentcore:TagResource` on `runtime/*`, for the three
 `aws:cloudformation:*` tags CloudFormation passes in the create. The
-service checks one action at a time, so each refusal hides the next;
-whether a third follows is not known until a create passes. That stack
-rolled back too and kept a second key, its alias and the table.
+service checks one action at a time, so each refusal hides the next.
+That stack rolled back too and kept a second key, its alias and the
+table. With both actions deployed (B2 again, 23:16Z) and the stack,
+table, alias and key gone, the third create passed: run 37077850271
+deployed owner-check's runtime, the agent answered its two goldens in
+it, the signed bundle and the answer record went to the security
+account (each a first put) and the registry row was written at
+23:37:12Z, 32,260 s after the merge of pull request 1. The list was
+these two actions.
 **The repair is a widening of IAM**: two actions,
 `CreateAgentRuntimeEndpoint` and `TagResource`, on `runtime/*`, in the
 bootstrap stack (`infra/bootstrap/app.py`), ruled by Security and
 deployed by hand; they are wider than the platform's own runtimes, and no
 condition narrows them. It is carried in PR 4, the close, and said there
-as a repair in the close. Until it is deployed no agent from the
-template can get a runtime, and every scheduled deploy run fails the
-same way. The owner's test stays a miss, by hours now, whatever the
-repair does.
+as a repair in the close. Until it was deployed no agent from the
+template could get a runtime, and every scheduled deploy run failed the
+same way. The owner's test stays a miss: `upgrade.deploy_max_seconds`
+is 3,600, and the deploy came 32,260 s after the merge.

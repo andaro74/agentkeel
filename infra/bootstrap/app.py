@@ -657,8 +657,8 @@ class BootstrapStack(cdk.Stack):
         # two prefixes: the execution role may also create an endpoint on, or tag, a runtime in this account
         # that is not the platform's. No condition narrows them: the service does not say which keys the
         # implicit check carries, and each refused create costs a stack rolled back and its retained key and
-        # table deleted by hand. Whether a third action follows is not known until a create passes. Every
-        # other runtime action stays on the two prefixes. Ruled by Security
+        # table deleted by hand. With these two deployed the third create passed (run 37077850271): the
+        # list is these two. Every other runtime action stays on the two prefixes. Ruled by Security
         # (milestones/M07/rulings/pr4-security.md).
         role.add_to_policy(iam.PolicyStatement(
             sid="WhatCreateAgentRuntimeChecksOnTheRuntimeItHasNotNamedYet",
