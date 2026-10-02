@@ -23,6 +23,8 @@ evidence:
   - milestones/M07/rulings/pr2-security.md
   - milestones/M07/runs/pr2_by_hand.md
   - https://github.com/andaro74/agentkeel/actions/runs/37023118799
+  - https://github.com/andaro74/agentkeel/actions/runs/37047341001
+  - evals/history/af8835fad82709e2385bf4eff97a175e069bf855.json
 pr: 40
 ---
 

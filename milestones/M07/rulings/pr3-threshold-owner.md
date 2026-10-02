@@ -14,6 +14,8 @@ evidence:
   - milestones/M07/rulings/pr2-threshold-owner.md
   - milestones/M07/runs/pr3_expected.md
   - tests/fixtures/m07/two-key-deprecated-after/cases.json
+  - https://github.com/andaro74/agentkeel/actions/runs/37047341001
+  - evals/history/af8835fad82709e2385bf4eff97a175e069bf855.json
 pr: 40
 ---
 

@@ -70,3 +70,31 @@ changes a measured path lands after it (the two App ids in
 `infra/platform_grant.yaml` do not: `infra/` is not a measured path of
 `evals.yml`, and if that is wrong the new run's envelope rules), the
 latest envelope of the pull request's head rules, and both stay.
+
+## What the run read (added after it; the statement above is not edited)
+
+Run https://github.com/andaro74/agentkeel/actions/runs/37047341001, on `af8835f`; envelope `evals/history/af8835fad82709e2385bf4eff97a175e069bf855.json`, written by CI.
+
+**As stated, but for one line.**
+
+- GREEN, mode runtime. 25 checks pass. refagent ordinary 9/9, traps 2/2,
+  guardrail 2/3, red team 5/5; plants 7/7; `never_passed` `g-014`;
+  `regressed` none. p95 8,223 ms. Tokens 43,617 in and 5,404 out.
+- `upgrade.F7_0`: unread as a whole. `dispatch` read and held.
+  **`owner_test` read and not held, one reason: "no deploy and answer
+  record 13862 s after the merge, over upgrade.deploy_max_seconds
+  3600".** `relaxation` and `timed_run` unread. Viewpoint anonymous.
+- `F7_1` to `F7_4` unread; `F7_5` read and held; surfaces 2 of 2;
+  `taken` 0 of 3; `app_observation` null.
+
+**The line that was wrong: `template.F6_2`.** Stated "held, as on
+`f57e1a5`". Read: **not held**, "S2's mergeable_state is 'behind', not
+'blocked' by its required check". S2 is `owner-check` pull request 2
+(head `e3a8083`, unchanged since 2026-10-01). Merging pull request 1 at
+14:39:32Z moved its base, and GitHub now answers `behind` before it
+answers `blocked`. SPEC/07 §5.1 step 2 said S2 was to be read on a new
+head "before owner-check #1 merges, so 'behind' cannot enter". No new
+head was pushed before the merge, so it entered. The statement should
+have said so: the merge was known when it was written. It gates
+nothing; claim 6's later reading in row 7's cell will read it. Pull
+request 2 is not touched.

@@ -288,6 +288,17 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
 - **This PR's own run gets no second run.** Its diff touches
   `infra/construct/`, so under ADR-0011 a p95 miss on it is RED
   (`runs/pr3_expected.md`).
+- **Measured at `af8835f`** (run 37047341001; envelope
+  `af8835fad82709e2385bf4eff97a175e069bf855`): GREEN, mode runtime, p95
+  8,223 ms, 25 checks pass, refagent 9/9, 2/2, 2/3, 5/5, plants 7/7.
+  `upgrade.F7_0`'s `owner_test` part read and **not held**: "no deploy
+  and answer record 13862 s after the merge, over
+  upgrade.deploy_max_seconds 3600". `taken` 0 of 3. As stated, but for
+  one line: `template.F6_2` read **not held**, where the statement said
+  held. SPEC/06's S2 (`owner-check` pull request 2) reads `behind` since
+  pull request 1 merged; no new head was pushed to it before that merge,
+  which SPEC/07 §5.1 step 2 asked for. The statement was wrong on a fact
+  known when it was written (`runs/pr3_expected.md`).
 - **`runs/pr2_by_hand.md` corrected** (`96f3cda`): no local profile
   reaches the security account. B1 was deployed on 2026-10-02 by
   `hector.flores` in the console. No put under `bundles/` or
