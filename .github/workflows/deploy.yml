@@ -436,13 +436,24 @@ jobs:
           test "$arch" = arm64 || { echo "::error::the image is $arch; AgentCore Runtime runs arm64 only"; exit 1; }
           docker save "agent:$COMMIT" -o "$RUNNER_TEMP/image.tar"
 
+      # One folder, uploaded whole, so the artifact holds agents/<name>/bundle.cosign.json,
+      # agents/<name>/dist/bundle.tar and image.tar, which is where deploy-agent reads them. Until M07 PR 3
+      # the three were uploaded as paths under two roots (the workspace and the runner's temp folder);
+      # GitHub roots an artifact at its paths' common parent, so they landed under agentkeel/agentkeel/ and
+      # _temp/, and deploy-agent's first read failed (run 37023118799, the first deploy of an agent from
+      # the template to get this far).
+      - name: Stage what deploy-agent reads, under one folder
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/signed/agents/$NAME/dist"
+          cp "agents/$NAME/bundle.cosign.json" "$RUNNER_TEMP/signed/agents/$NAME/"
+          cp "agents/$NAME/dist/bundle.tar" "$RUNNER_TEMP/signed/agents/$NAME/dist/"
+          mv "$RUNNER_TEMP/image.tar" "$RUNNER_TEMP/signed/image.tar"
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: agent-${{ strategy.job-index }}
-          path: |
-            agents/${{ matrix.name }}/bundle.cosign.json
-            agents/${{ matrix.name }}/dist/bundle.tar
-            ${{ runner.temp }}/image.tar
+          path: ${{ runner.temp }}/signed
           if-no-files-found: error
           retention-days: 30
 
