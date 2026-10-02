@@ -412,30 +412,48 @@ def artifact_json(gh: GitHub, run_id: Any, name: str) -> dict[str, Any] | None:
     return json.loads(archive.read(archive.namelist()[0]))
 
 
+def read_ruleset(gh: GitHub, repository: str, ruleset_id: Any) -> dict[str, Any]:
+    """One ruleset as GitHub returns it to this caller, with GitHub's own time of its last change. A field
+    GitHub does not show the caller (`bypass_actors`, to anyone who cannot administer it) is written None."""
+    out: dict[str, Any] = {"id": ruleset_id, "read_at": now(), "error": None}
+    try:
+        live = gh(repository, f"/rulesets/{int(ruleset_id)}")
+        out |= {key: live.get(key) for key in ("name", "target", "enforcement", "conditions", "rules", "bypass_actors",
+                                               "updated_at")}  # fmt: skip
+    except GITHUB_ERRORS as exc:
+        out["error"] = failed(exc)
+    return out
+
+
 def read_relaxation(gh: GitHub, entry: dict[str, Any], platform_app: int | None) -> dict[str, Any]:
-    """The seeded relaxation: GitHub's answer to the App's call, as the `post` job kept it; the new head's
-    check; what merged while the ruleset differed; and whether the App passed a head after the restore."""
+    """The seeded relaxation, as records and nothing else: GitHub's answer to the App's call, as the `post`
+    job kept it; GitHub's time of the run that made it; the new head's checks; the ruleset as it stands;
+    every pull request's merge time; every time the platform's App passed a head.
+
+    Which of them fall after the call, between it and the restore, or after the restore is build's to
+    say (`upgrade.relaxation`; cold review F6 on M07 PR 2: until M07 PR 3 this compared the times itself)."""
     repository = str(entry.get("repository"))
     out: dict[str, Any] = {"repository": repository, "run": entry.get("run"), "pull_request": entry.get("pull_request"),
-                           "found": False, "error": None, "answer": None, "new_head": None, "merges_between": None,
-                           "passed_after_restore": None}  # fmt: skip
+                           "found": False, "error": None, "answer": None, "asked": None, "new_head": None,
+                           "ruleset": None, "merges": None, "app_passes": None}  # fmt: skip
     try:
         answer = artifact_json(gh, entry["run"], "relax-seed")
         out |= {"found": answer is not None, "answer": answer}
         if answer is None or not isinstance(answer.get("status"), int) or answer["status"] >= 400:
             return out
-        asked_at = str(answer.get("at"))
+        out["asked"] = workflow_run(gh, entry["run"], "platform-check.yml")
         head = gh(repository, f"/pulls/{int(entry['pull_request'])}")["head"]["sha"]
         out["new_head"] = {"sha": head, "check_runs": check_runs(gh, repository, head)}
         pulls = gh.paged(repository, "/pulls?state=all&sort=updated&direction=desc")
         default = gh(repository, "")["default_branch"]
         heads = {p["head"]["sha"] for p in pulls} | {gh(repository, f"/branches/{default}")["commit"]["sha"]}
-        passes = sorted(run["completed_at"] for sha in heads for run in check_runs(gh, repository, sha)
-                        if run["app_id"] == platform_app and run["name"] == platform_check.CHECK
-                        and run["conclusion"] == "success" and str(run["completed_at"]) > asked_at)  # fmt: skip
-        out["passed_after_restore"] = bool(passes)
-        until = passes[0] if passes else now()
-        out["merges_between"] = sorted(p["number"] for p in pulls if p.get("merged_at") and asked_at <= p["merged_at"] <= until)
+        out["app_passes"] = sorted(({"sha": sha, "completed_at": run["completed_at"]}
+                                    for sha in heads for run in check_runs(gh, repository, sha)
+                                    if run["app_id"] == platform_app and run["name"] == platform_check.CHECK
+                                    and run["conclusion"] == "success"), key=lambda p: (str(p["completed_at"]), p["sha"]))  # fmt: skip
+        out["merges"] = sorted(({"number": p["number"], "merged_at": p["merged_at"]} for p in pulls if p.get("merged_at")),
+                               key=lambda m: m["number"])  # fmt: skip
+        out["ruleset"] = read_ruleset(gh, repository, answer.get("ruleset"))
     except GITHUB_ERRORS as exc:
         out["error"] = failed(exc)
     return out

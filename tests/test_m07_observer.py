@@ -249,6 +249,53 @@ def test_the_dispatch_already_recorded_is_read_from_githubs_jobs_as_refused():
     assert unread["jobs"][2]["annotations"] is None and upgrade.dispatch_from_a_branch(unread)["read"] is False
 
 
+def test_the_relaxation_is_written_as_records_and_build_compares_their_times(monkeypatch):
+    """Cold review F6 on M07 PR 2: the observer said which pass was "after the restore" and what merged
+    meanwhile. It now writes each record with GitHub's own time and no comparison; build makes them."""
+    export = json.loads((ROOT / "infra" / "ruleset" / "agent.json").read_text(encoding="utf-8"))
+    refused = f"- **{upgrade.RULESET_CHECK}**: rules differs from live ruleset 24310403"
+    passed = {**check("success"), "completed_at": "2026-10-06T10:40:00Z"}
+    pages = {
+        (observer.PLATFORM, "/actions/runs/5"): {"id": 5, "path": ".github/workflows/platform-check.yml", "head_branch": "main",
+                                                 "event": "workflow_dispatch", "created_at": "2026-10-06T10:00:00Z"},
+        (REPO, "/pulls/7"): {"head": {"sha": "5" * 40}},
+        (REPO, f"/commits/{'5' * 40}/check-runs"): {"check_runs": [check("failure", summary=refused)]},
+        (REPO, "/pulls?state=all&sort=updated&direction=desc"): [
+            {"number": 7, "head": {"sha": "5" * 40}, "merged_at": None},
+            {"number": 1, "head": {"sha": "3" * 40}, "merged_at": "2026-10-02T14:39:32Z"}],
+        (REPO, ""): {"default_branch": "main"},
+        (REPO, "/branches/main"): {"commit": {"sha": "4" * 40}},
+        (REPO, f"/commits/{'3' * 40}/check-runs"): {"check_runs": [check("success")]},
+        (REPO, f"/commits/{'4' * 40}/check-runs"): {"check_runs": [passed, check("success", app=15368)]},
+        # As GitHub returns it to a caller that cannot administer it: no bypass_actors.
+        (REPO, "/rulesets/24310403"): {"id": 24310403, **{k: v for k, v in export.items() if k != "bypass_actors"},
+                                       "updated_at": "2026-10-06T10:30:00Z", "created_at": "2026-10-01T13:06:00Z"},
+    }  # fmt: skip
+    answer = {"status": 200, "ruleset": 24310403, "at": "2026-10-06T10:00:20Z", "repository": REPO}
+    monkeypatch.setattr(observer, "artifact_json", lambda gh, run, name: answer if (run, name) == (5, "relax-seed") else None)
+    seen = observer.read_relaxation(FakeGitHub(pages), {"repository": REPO, "run": 5, "pull_request": 7}, APP)
+    assert seen["error"] is None and seen["asked"]["at"] == "2026-10-06T10:00:00Z"
+    # Raw: every App success on a head, before the call or after; every merge, whenever it was.
+    assert seen["app_passes"] == [{"sha": "3" * 40, "completed_at": "2026-10-06T09:30:00Z"},
+                                  {"sha": "4" * 40, "completed_at": "2026-10-06T10:40:00Z"}]  # fmt: skip
+    assert seen["merges"] == [{"number": 1, "merged_at": "2026-10-02T14:39:32Z"}]
+    assert seen["ruleset"]["updated_at"] == "2026-10-06T10:30:00Z" and seen["ruleset"]["bypass_actors"] is None
+    assert not {"passed_after_restore", "merges_between"} & set(seen)  # the comparisons it no longer makes
+    reading = upgrade.relaxation(seen, APP, "2026-10-06T12:00:00Z")
+    assert reading["held"] is True and reading["outcome"] == "detected" and reading["restored_at"] == "2026-10-06T10:30:00Z"
+    # A run that is not platform-check.yml on main gives the call no time, and build reads that as unread.
+    pages[(observer.PLATFORM, "/actions/runs/5")]["head_branch"] = "m07-pr3"
+    other = observer.read_relaxation(FakeGitHub(pages), {"repository": REPO, "run": 5, "pull_request": 7}, APP)
+    assert other["asked"]["at"] is None and upgrade.relaxation(other, APP, "2026-10-06T12:00:00Z")["read"] is False
+    # A ruleset that cannot be read is written with its error; a refusal is read from the answer alone.
+    del pages[(REPO, "/rulesets/24310403")]
+    unread = observer.read_relaxation(FakeGitHub(pages), {"repository": REPO, "run": 5, "pull_request": 7}, APP)
+    assert "HTTPError" in unread["ruleset"]["error"]
+    answer["status"] = 403
+    refused_by_github = observer.read_relaxation(FakeGitHub({}), {"repository": REPO, "run": 5, "pull_request": 7}, APP)
+    assert refused_by_github["asked"] is None and upgrade.relaxation(refused_by_github, APP, None)["outcome"] == "refused"
+
+
 def test_the_run_files_as_they_stand_name_two_attempts_made_the_dispatch_and_the_owners_test(monkeypatch):
     """PR 3's own run: S0's second attempt (PR 2 recorded it) and its first, the owner's test, made on
     2026-10-02 and recorded at PR 3. Only they are looked up."""

@@ -456,26 +456,76 @@ def test_a_skip_or_a_run_that_never_asked_for_the_key_is_not_a_refusal(change):
     assert reading["read"] is False and reading["held"] is None
 
 
+EXPORT = json.loads((ROOT / "infra" / "ruleset" / "agent.json").read_text(encoding="utf-8"))
+
+
+def ruleset(**more: Any) -> dict[str, Any]:
+    """owner-check's ruleset as GitHub returns it to a caller that cannot administer it, after a restore."""
+    return {"id": 24310403, "read_at": NOW, "error": None, **{key: EXPORT[key] for key in upgrade.RULESET_SHOWN},
+            "bypass_actors": None, "updated_at": "2026-10-06T10:30:00Z", **more}  # fmt: skip
+
+
 def relaxed(**more: Any) -> dict[str, Any]:
-    base = {"repository": "agentkeel-studio/owner-check", "run": 5, "found": True, "error": None, "answer": {"status": 200},
+    """The call at 10:00 (GitHub's time of the run), the restore at 10:30, the App's pass at 10:40."""
+    base = {"repository": "agentkeel-studio/owner-check", "run": 5, "found": True, "error": None,
+            "answer": {"status": 200, "ruleset": 24310403, "at": "2026-10-06T10:00:20Z"},
+            "asked": {"run": 5, "at": "2026-10-06T10:00:00Z", "error": None},
             "new_head": {"sha": "5" * 40, "check_runs": [app_check("failure", [upgrade.RULESET_CHECK])]},
-            "merges_between": [], "passed_after_restore": True}  # fmt: skip
+            "ruleset": ruleset(), "merges": [{"number": 1, "merged_at": "2026-10-02T14:39:32Z"}],
+            "app_passes": [{"sha": "4" * 40, "completed_at": "2026-10-06T09:00:00Z"},
+                           {"sha": "5" * 40, "completed_at": "2026-10-06T10:40:00Z"}]}  # fmt: skip
     return {**base, **more}
 
 
+def without_the_check() -> list[dict[str, Any]]:
+    return [rule for rule in EXPORT["rules"] if rule["type"] != "required_status_checks"]
+
+
 def test_a_relaxation_is_refused_or_detected_and_says_which():
-    assert upgrade.relaxation(relaxed(answer={"status": 403}), APP)["outcome"] == "refused"
-    detected = upgrade.relaxation(relaxed(), APP)
+    assert upgrade.relaxation(relaxed(answer={"status": 403}), APP, NOW)["outcome"] == "refused"
+    detected = upgrade.relaxation(relaxed(), APP, NOW)
     assert detected["held"] is True and detected["outcome"] == "detected"
+    assert detected["restored_at"] == "2026-10-06T10:30:00Z" and detected["bypass_actors_shown"] is False
     for change, said in (({"new_head": {"check_runs": [app_check("success")]}}, "did not fail the new head"),
                          ({"new_head": {"check_runs": [app_check("failure", [upgrade.SEAT_CHECK])]}}, "did not fail the new head"),
-                         ({"merges_between": [4]}, "merged while the ruleset differed: 4"),
-                         ({"passed_after_restore": False}, "passed no head")):  # fmt: skip
-        reading = upgrade.relaxation(relaxed(**change), APP)
+                         ({"merges": [{"number": 4, "merged_at": "2026-10-06T10:10:00Z"}]}, "merged while the ruleset differed: 4"),
+                         ({"app_passes": [{"sha": "4" * 40, "completed_at": "2026-10-06T10:20:00Z"}]}, "passed no head")):  # fmt: skip
+        reading = upgrade.relaxation(relaxed(**change), APP, NOW)
         assert reading["held"] is False and reading["outcome"] == "undetected" and said in reading["reasons"][0], reading
-    for unread in (None, relaxed(found=False), relaxed(answer=None), relaxed(merges_between=None),
-                   relaxed(new_head={"check_runs": []}), relaxed(passed_after_restore=None)):  # fmt: skip
-        assert upgrade.relaxation(unread, APP)["read"] is False, unread
+    for unread in (None, relaxed(found=False), relaxed(answer=None), relaxed(merges=None), relaxed(app_passes=None),
+                   relaxed(new_head={"check_runs": []}), relaxed(ruleset=None), relaxed(ruleset={"error": "HTTPError: 404"}),
+                   relaxed(asked={"run": 5, "at": None, "error": "run 5 is not platform-check.yml on main"})):  # fmt: skip
+        assert upgrade.relaxation(unread, APP, NOW)["read"] is False, unread
+
+
+def test_after_the_restore_is_read_from_the_ruleset_itself_and_the_times_are_compared_by_build():
+    """Cold review F6 on M07 PR 2: the observer compared the times, and "after the restore" was any App
+    success after the call. Here the restore is the ruleset's own last change, when it equals the export."""
+    # A pass after the call and before the restore is not a pass after the restore.
+    early = relaxed(app_passes=[{"sha": "5" * 40, "completed_at": "2026-10-06T10:20:00Z"}])
+    assert "after the restore (2026-10-06T10:30:00Z" in upgrade.relaxation(early, APP, NOW)["reasons"][0]
+    # Not restored: the ruleset as it stands still lacks the required check. No time makes that a restore.
+    standing = relaxed(ruleset=ruleset(rules=without_the_check(), updated_at="2026-10-06T10:00:30Z"))
+    reading = upgrade.relaxation(standing, APP, NOW)
+    assert reading["held"] is False and reading["restored_at"] is None
+    assert reading["reasons"] == ["the ruleset still differs from the export (rules): it has not been restored"]
+    # While it stands the interval runs to the reading, so a merge an hour after the call is inside it.
+    merged = upgrade.relaxation({**standing, "merges": [{"number": 6, "merged_at": "2026-10-06T11:00:00Z"}]}, APP, NOW)
+    assert any("merged while the ruleset differed: 6" in r for r in merged["reasons"])
+    # After a restore the same merge is outside it, and a merge before the call always was.
+    assert upgrade.relaxation(relaxed(merges=[{"number": 6, "merged_at": "2026-10-06T11:00:00Z"}]), APP, NOW)["held"] is True
+    # Equal to the export with no change after the call: GitHub said yes and nothing shows a restore.
+    never = upgrade.relaxation(relaxed(ruleset=ruleset(updated_at="2026-10-01T13:06:00Z")), APP, NOW)
+    assert never["held"] is False and "no restore is recorded" in never["reasons"][0]
+    # A bypass actor, where GitHub shows the field, is a difference; hidden, it is said and not guessed.
+    shown = upgrade.relaxation(relaxed(ruleset=ruleset(bypass_actors=[{"actor_id": 5, "actor_type": "RepositoryRole"}])), APP, NOW)
+    assert "bypass_actors" in shown["reasons"][0] and shown["bypass_actors_shown"] is True
+    assert upgrade.relaxation(relaxed(ruleset=ruleset(bypass_actors=[])), APP, NOW)["held"] is True
+    # The call's time is GitHub's record of the run, never the runner's own clock in the artifact.
+    late_clock = relaxed(answer={"status": 200, "ruleset": 24310403, "at": "2026-10-06T23:00:00Z"})
+    assert upgrade.relaxation(late_clock, APP, NOW)["held"] is True
+    # Not restored, and no time for the reading: unread, not a guess at the interval.
+    assert upgrade.relaxation(standing, APP, None)["read"] is False
 
 
 def test_the_timed_runs_agent_exists_whether_or_not_it_was_under_its_bar():

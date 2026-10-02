@@ -55,11 +55,12 @@ as RED.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
 
-from src.verdict import plants, replay_history
+from src.verdict import ROOT, plants, replay_history
 from src.verdict.template import (
     GOLDENS_CHECK,
     PLATFORM_CHECK,
@@ -81,6 +82,11 @@ BARS = ("arrive_max_seconds", "deploy_max_seconds", "retire_max_seconds")
 DISPATCHED_WORKFLOW = "/platform-check.yml"
 ENVIRONMENT_REFUSED = "is not allowed to deploy to platform-app"
 REFUSED_STATUS = 403  # GitHub's answer to a token that may not make the call
+# What an agent repository's ruleset is restored to after the seeded relaxation, and the fields GitHub
+# shows any caller. `bypass_actors` is shown only to a caller that can administer the ruleset (M06's
+# finding), which neither viewpoint here can: it is compared when shown and said when not.
+RULESET_EXPORT = ROOT / "infra" / "ruleset" / "agent.json"
+RULESET_SHOWN = ("name", "target", "enforcement", "conditions", "rules")
 KINDS = ("platform", "model", "retirement")
 RULING_FILE = ("milestones/", "/rulings/")
 # SPEC/07 §2 as amended at M07 PR 3: the one repository whose pull requests CI pushes an envelope to,
@@ -542,12 +548,31 @@ def dispatch_from_a_branch(run: dict[str, Any] | None) -> dict[str, Any]:
                         "the App's key was reached from a branch"])  # fmt: skip
 
 
-def relaxation(seen: dict[str, Any] | None, app_id: int | None) -> dict[str, Any]:
+def ruleset_differs(ruleset: dict[str, Any], export: dict[str, Any]) -> list[str]:
+    """The fields in which a ruleset, as GitHub returned it, is not the export. [] when it is the export
+    in everything GitHub showed the caller."""
+    differs = [key for key in RULESET_SHOWN if ruleset.get(key) != export.get(key)]
+    if ruleset.get("bypass_actors") not in (None, export.get("bypass_actors")):
+        differs.append("bypass_actors")
+    return differs
+
+
+def relaxation(seen: dict[str, Any] | None, app_id: int | None, now: Any = None,
+               export: dict[str, Any] | None = None) -> dict[str, Any]:  # fmt: skip
     """The App's token asked to relax an agent repository's ruleset (S0's third attempt).
 
     Held when GitHub refused the call (`outcome: refused`), or accepted it and the platform check then
     failed the new head for the ruleset, nothing merged while it differed, and the App passed a head
-    after the owner restored it (`outcome: detected`: detection, not refusal, and said so)."""
+    after the owner restored it (`outcome: detected`: detection, not refusal, and said so).
+
+    Every comparison of one record's time with another's is made here, on records the observer wrote
+    raw (cold review F6 on M07 PR 2: until M07 PR 3 the observer worked out "after the restore" and
+    "merged meanwhile" itself, and "after the restore" was any App success after the call). **The
+    restore is read from the ruleset itself**: it is restored when, as GitHub returns it, it equals
+    `infra/ruleset/agent.json` in every field GitHub shows, and GitHub's own `updated_at` on it is
+    after the call; that time is when. The call's time is GitHub's `created_at` of the run that made
+    it, on `main`, not the runner's clock. While the ruleset still differs there is no restore, and
+    the interval in which nothing may merge runs to `now`."""
     if not seen or not seen.get("found") or app_id is None:
         return entry(False, [f"unread: {(seen or {}).get('error') or 'the relaxation was not attempted'}"], outcome=None)
     status = (seen.get("answer") or {}).get("status")
@@ -560,19 +585,40 @@ def relaxation(seen: dict[str, Any] | None, app_id: int | None) -> dict[str, Any
         # refusing the App's token, as a refusal for access is not a deletion (cold review F2 on M07 PR 2).
         return entry(False, [f"unread: GitHub answered {status}, which does not say the token was refused "
                              f"({REFUSED_STATUS} does)"], outcome=None)  # fmt: skip
-    head = seen.get("new_head") or {}
-    run = app_run(head, app_id)
-    if run is None or seen.get("merges_between") is None or seen.get("passed_after_restore") is None:
-        return entry(False, ["unread: the new head's check, the merges in the interval or the restore were not read"],
+    run = app_run(seen.get("new_head") or {}, app_id)
+    ruleset, merges, passes = seen.get("ruleset"), seen.get("merges"), seen.get("app_passes")
+    asked = when((seen.get("asked") or {}).get("at"))
+    if run is None or not isinstance(merges, list) or not isinstance(passes, list):
+        return entry(False, ["unread: the new head's check, the merges or the App's passes were not read"], outcome=None)
+    if asked is None:
+        return entry(False, ["unread: the run that made the call was not read as platform-check.yml on main, so the "
+                             "call has no time of GitHub's"], outcome=None)  # fmt: skip
+    if not isinstance(ruleset, dict) or ruleset.get("error") or not isinstance(ruleset.get("rules"), list):
+        return entry(False, [f"unread: the ruleset as it stands was not read ({(ruleset or {}).get('error') or 'no record'})"],
                      outcome=None)  # fmt: skip
+    if export is None:
+        export = json.loads(RULESET_EXPORT.read_text(encoding="utf-8"))
+    differs, changed = ruleset_differs(ruleset, export), when(ruleset.get("updated_at"))
+    restored_at = changed if not differs and changed is not None and changed > asked else None
+    until = restored_at or when(now)
+    if until is None:
+        return entry(False, ["unread: the ruleset is not restored and the time of this reading is not known"], outcome=None)
     reasons = []
     if run.get("conclusion") != "failure" or RULESET_CHECK not in (run.get("refused") or []):
         reasons.append("GitHub accepted the call and the platform check did not fail the new head for the ruleset")
-    if seen["merges_between"]:
-        reasons.append(f"pull requests merged while the ruleset differed: {', '.join(map(str, seen['merges_between']))}")
-    if seen["passed_after_restore"] is not True:
-        reasons.append("after the restore the App passed no head: the ruleset was not read back equal to the export")
-    return entry(True, reasons, outcome="detected" if not reasons else "undetected")
+    between = sorted(m.get("number") for m in merges if (at := when(m.get("merged_at"))) is not None and asked <= at <= until)
+    if between:
+        reasons.append(f"pull requests merged while the ruleset differed: {', '.join(map(str, between))}")
+    if differs:
+        reasons.append(f"the ruleset still differs from the export ({', '.join(differs)}): it has not been restored")
+    elif restored_at is None:
+        reasons.append("the ruleset equals the export, and GitHub's record of its last change is not after the call: "
+                       "no restore is recorded")  # fmt: skip
+    elif not any((at := when(p.get("completed_at"))) is not None and at > restored_at for p in passes):
+        reasons.append(f"after the restore ({ruleset.get('updated_at')}, the ruleset's own last change) the App passed no head")
+    hidden = ruleset.get("bypass_actors") is None
+    return entry(True, reasons, outcome="detected" if not reasons else "undetected",
+                 restored_at=ruleset.get("updated_at") if restored_at else None, bypass_actors_shown=not hidden)
 
 
 def timed_run(template: dict[str, Any] | None) -> dict[str, Any]:
@@ -591,7 +637,7 @@ def f7_0(s0: dict[str, Any] | None, template: dict[str, Any] | None, app_id: int
     parts = {
         "owner_test": owner_test(s0.get("owner_test"), app_id, bars, now),
         "dispatch": dispatch_from_a_branch(s0.get("dispatch")),
-        "relaxation": relaxation(s0.get("relaxation"), app_id),
+        "relaxation": relaxation(s0.get("relaxation"), app_id, now),
         "timed_run": timed_run(template),
     }
     reasons = [f"{name}: {reason}" for name, part in parts.items() for reason in part["reasons"]]
