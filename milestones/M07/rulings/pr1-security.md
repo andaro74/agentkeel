@@ -19,7 +19,7 @@ pr: 38
 
 # Ruling: M07 PR 1, Security
 
-DRAFT for andaro74 as Security. Not ruled until this line reads "Ruled by".
+Ruled by andaro74 as Security, 2026-10-02, as written.
 
 ## What this authorises
 
