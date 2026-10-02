@@ -224,6 +224,22 @@ def test_the_grant_file_is_the_block_security_ruled_at_pr_2_word_for_word():
     assert platform_check.grant_file()["ruled_in"] == "milestones/M07/rulings/pr3-security.md"
 
 
+def test_the_ruling_the_grant_file_names_is_in_the_tree_and_is_securitys():
+    """security-reviewer 1 and cold review BLOCK 1 on M07 PR 3: the grant named a ruling file that was not in
+    the tree, and no test read the real file as a keyed job does. Merged like that, every keyed job on
+    `main` stops at its first step. Whether the file is ruled is the seat's line, which
+    `cold-review-ruling` holds the merge to; so this holds everything but that line: with it, the real
+    grant loads as a keyed job loads it, and without it the only refusal is "a draft"."""
+    named = ROOT / platform_check.grant_file()["ruled_in"]
+    assert named.is_file(), f"{named} is not in the tree"
+    try:
+        grant = platform_check.load_grant()
+    except platform_check.NoGrant as refusal:
+        assert "the grant is a draft" in str(refusal), refusal  # the seat has not ruled it yet: the one refusal allowed
+    else:
+        assert grant["agentkeel-platform"]["app_id"] == APP
+
+
 def test_the_rulings_own_block_is_the_fixtures_grant_but_for_the_ids_not_yet_made():
     """The fixture is the shape of the grant file's block: if either moves, this says so. The two new Apps'
     ids are null in it until each App exists, and the reader refuses a null id."""
