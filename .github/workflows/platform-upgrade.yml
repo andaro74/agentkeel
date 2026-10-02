@@ -48,7 +48,7 @@
 # deploy.yml reach every agent at its next deploy with no pull request;
 # SPEC/07 section 8). The agents are read from GitHub (the heads the App
 # passed), not from the registry: this workflow holds no AWS credentials.
-# Until `agentkeel-upgrades` exists and its id is in the ruling's grant
+# Until `agentkeel-upgrades` exists and its id is in infra/platform_grant.yaml's grant
 # block, `open` stops at its first step. Nothing here has fired on its
 # seeded case: S1's attempt is made after M07 PR 2 merges.
 # GitHub may delay a scheduled run at busy times; upgrade.arrive_max_seconds

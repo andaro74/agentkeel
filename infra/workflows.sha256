@@ -41,12 +41,13 @@
 # Rewritten at M07 PR 2 after the seat reviews: deploy.yml's retire job records nothing unless the runtime is gone (platform-architect B1); evals.yml's envelope-rows job writes panel 2's table through replay_history (cold review B1).
 # Rewritten at M07 PR 3: deploy.yml's sign-agent uploads one folder, so deploy-agent finds the signed files (run 37023118799).
 # Rewritten at M07 PR 3: observe.yml's header says what its keyed job now holds (tokens minted first, the key let go; security-reviewer 12 on M07 PR 2). No step changes.
+# Rewritten at M07 PR 3 (item 13j): platform-check.yml's and platform-upgrade.yml's headers name infra/platform_grant.yaml as where the grant is read from. No step changes.
 bedf184401fe99b3e2e3d893c3e7e3569f7dc6eecc689d8585b12fd5ffb98d48  .github/workflows/cold-review-ruling.yml
 d07d1042bf31480d48e5023753899e2b421e02f0812301a85023243d01c43d8b  .github/workflows/deploy.yml
 2801eb4da8a685088687f046b9ad6a461a352978e74e9f13e49ef2bcd420af7b  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 977005d6918897772b83d279230d5febb4c3c35150d0037d08ed139af8727414  .github/workflows/model-watch.yml
 f906d3c4f89f5a6e79f9eace017d7d878b371d321f8788396630daf9d8af50d0  .github/workflows/observe.yml
-93e806287f79edf965928bda313709d60672465c5cfd4f451898a15ee789923b  .github/workflows/platform-check.yml
-b9d5de06062cb11337806311face403b19654ac1ffee0d61321bd3d74cb107a9  .github/workflows/platform-upgrade.yml
+28505afb258751dd419f0eb18f8d064b0144036acf4869b01a8c76eb492bfbdb  .github/workflows/platform-check.yml
+637c93a4a1cc7ecdf203adc06aeef627975b68e148df5b8d84aec6c9e993d507  .github/workflows/platform-upgrade.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml

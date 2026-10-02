@@ -268,7 +268,7 @@ one App or several, and so the reader's shape, is Security's before PR 2
 above describes PR 1's files, and these replace them:
 
 - `grant.json` is one entry per App, in the shape of the ruling's `grant:`
-  block (`app_id`, `environment`, `installed_on`, `repository_selection`,
+  block, which from M07 PR 3 is `infra/platform_grant.yaml` (`app_id`, `environment`, `installed_on`, `repository_selection`,
   `permissions`), and `environments`, the rules every key's environment
   carries. The ids of `agentkeel-upgrades` and `agentkeel-observer`
   (5200001, 5200002) are invented for the fixture: the ruling's own block

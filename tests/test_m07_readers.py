@@ -146,41 +146,87 @@ def s0(name: str) -> Any:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
-def ruling(tmp_path, body: str, name: str = "pr2-security.md") -> None:
+FRONT = "---\nruling: pr3-security\nseat: {seat}\npr: 40\n---\n\n"
+GRANT_YAML = "ruled_in: {ruled_in}\ngrant:\n  agentkeel-observer:\n    app_id: 7\n    environment: platform-observer\n"
+
+
+def ruling(tmp_path, body: str, name: str = "pr3-security.md", seat: str = "Security") -> None:
     folder = tmp_path / "milestones" / "M07" / "rulings"
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / name).write_text(body, encoding="utf-8")
+    (folder / name).write_text(FRONT.format(seat=seat) + body, encoding="utf-8")
 
 
-GRANT_BLOCK = "```yaml\ngrant:\n  agentkeel-observer:\n    app_id: 7\n    environment: platform-observer\n```\n"
+def grant_yaml(tmp_path, text: str | None = None, ruled_in: str = "milestones/M07/rulings/pr3-security.md") -> None:
+    (tmp_path / "infra").mkdir(exist_ok=True)
+    (tmp_path / "infra" / "platform_grant.yaml").write_text(
+        GRANT_YAML.format(ruled_in=ruled_in) if text is None else text, encoding="utf-8")  # fmt: skip
 
 
-def test_a_draft_is_not_a_grant_and_two_blocks_are_refused(tmp_path):
-    ruling(tmp_path, f"DRAFT for a seat.\n\n{GRANT_BLOCK}")
+def test_a_draft_is_not_a_grant_and_the_ruling_that_rules_it_is_a_security_ruling(tmp_path):
+    """rulings/pr2-security.md item 13j, at M07 PR 3: the grant is a file on Security's path, and names the
+    ruling that rules it. A draft, a ruling of another seat's, or a ruling that is not there is no grant."""
+    grant_yaml(tmp_path)
+    with pytest.raises(platform_check.NoGrant, match="is not on this checkout"):
+        platform_check.load_grant(tmp_path)
+    ruling(tmp_path, "DRAFT for a seat.\n")
     with pytest.raises(platform_check.NoGrant, match="a draft"):
         platform_check.load_grant(tmp_path)
     assert platform_check.load_grant(tmp_path, ruled_only=False)["agentkeel-observer"]["app_id"] == 7
-    ruling(tmp_path, f"Ruled by andaro74 as Security, 2026-10-02.\n\n{GRANT_BLOCK}")
+    ruling(tmp_path, "Ruled by andaro74 as Security, 2026-10-02.\n")
     assert sorted(platform_check.load_grant(tmp_path)) == ["agentkeel-observer"]
     # "Ruled by" inside a sentence is not the line the gate reads.
-    ruling(tmp_path, f"Not ruled until this line reads \"Ruled by\".\n\n{GRANT_BLOCK}")
+    ruling(tmp_path, "Not ruled until this line reads \"Ruled by\".\n")
     with pytest.raises(platform_check.NoGrant, match="a draft"):
         platform_check.load_grant(tmp_path)
-    ruling(tmp_path, f"Ruled by andaro74 as Security.\n\n{GRANT_BLOCK}")
-    ruling(tmp_path, f"Ruled by andaro74 as Security.\n\n{GRANT_BLOCK}", name="pr3-security.md")
-    with pytest.raises(platform_check.NoGrant, match="found 2"):
+    # Product's ruling, ruled, does not rule Security's grant.
+    ruling(tmp_path, "Ruled by andaro74 as Product.\n", seat="Product")
+    with pytest.raises(platform_check.NoGrant, match="not a Security ruling"):
         platform_check.load_grant(tmp_path)
+    # ruled_in is a ruling file's path and nothing else: not a path out of the tree, not any file.
+    ruling(tmp_path, "Ruled by andaro74 as Security.\n")
+    for named in ("../outside.md", "milestones/M07/runs/pr2_by_hand.md", "", "infra/platform_grant.yaml"):
+        grant_yaml(tmp_path, ruled_in=named)
+        with pytest.raises(platform_check.NoGrant, match="names no ruling file"):
+            platform_check.load_grant(tmp_path)
 
 
-def test_no_ruling_with_a_block_is_no_grant(tmp_path):
-    ruling(tmp_path, "Ruled by andaro74 as Security.\n\nNo block here.\n")
-    with pytest.raises(platform_check.NoGrant, match="found 0"):
+def test_a_block_in_a_ruling_file_is_no_longer_the_grant(tmp_path):
+    """Until M07 PR 3 the block in a ruling file under milestones/, Product's path, was the grant."""
+    ruling(tmp_path, "Ruled by andaro74 as Security.\n\n```yaml\ngrant:\n  agentkeel-observer:\n    app_id: 7\n```\n")
+    with pytest.raises(platform_check.NoGrant, match="missing"):
         platform_check.load_grant(tmp_path)
+    for text, said in (("grant: [1, 2]\n", "carries no grant: mapping"), ("no: grant\n", "carries no grant: mapping"),
+                       ("grant: {a: [}\n", "does not parse")):  # fmt: skip
+        grant_yaml(tmp_path, text)
+        with pytest.raises(platform_check.NoGrant, match=said):
+            platform_check.load_grant(tmp_path)
+
+
+def test_the_grant_file_is_the_block_security_ruled_at_pr_2_word_for_word():
+    """The move changed where the grant is, not what it is: the block rulings/pr2-security.md carries, which
+    the Security seat ruled on 2026-10-02, is the file's `grant:`, but for the ids filled in since."""
+    import re as _re
+
+    import yaml as _yaml
+
+    text = (ROOT / "milestones" / "M07" / "rulings" / "pr2-security.md").read_text(encoding="utf-8").replace("\r\n", "\n")
+    (block,) = [doc["grant"] for doc in map(_yaml.safe_load, _re.findall(r"^```yaml\n(.*?)^```", text, _re.DOTALL | _re.MULTILINE))
+                if isinstance(doc, dict) and "grant" in doc]  # fmt: skip
+    live = platform_check.load_grant(ruled_only=False)
+    assert sorted(live) == sorted(block)
+    for slug in block:
+        if slug == "environments":
+            assert live[slug] == block[slug]
+            continue
+        assert {k: v for k, v in live[slug].items() if k != "app_id"} == {k: v for k, v in block[slug].items() if k != "app_id"}
+        assert block[slug]["app_id"] in (None, live[slug]["app_id"])  # an id filled in, never one changed
+    assert platform_check.seeded_repository() == "agentkeel-studio/owner-check"
+    assert platform_check.grant_file()["ruled_in"] == "milestones/M07/rulings/pr3-security.md"
 
 
 def test_the_rulings_own_block_is_the_fixtures_grant_but_for_the_ids_not_yet_made():
-    """The fixture is the shape of the ruling's block: if either moves, this says so. The two new Apps'
-    ids are null in the ruling until each App exists, and the reader refuses a null id."""
+    """The fixture is the shape of the grant file's block: if either moves, this says so. The two new Apps'
+    ids are null in it until each App exists, and the reader refuses a null id."""
     live = platform_check.load_grant(ruled_only=False)
     fixture = s0("grant.json")
     assert sorted(live) == sorted(fixture)
@@ -798,8 +844,30 @@ def test_the_seeded_relaxation_is_made_once(owner_check, key, tmp_path):
                         {"what": "the App's token asked to relax owner-check's ruleset", "repository": seed["repository"], "run": 1}]  # fmt: skip
     (tmp_path / platform_check.SEED_RUN_FILE).parent.mkdir(parents=True)
     (tmp_path / platform_check.SEED_RUN_FILE).write_text(_yaml.safe_dump(seed), encoding="utf-8")
+    # No grant file on that checkout: the repository cannot be read, and nothing is asked.
+    with pytest.raises(ValueError, match="cannot be read"):
+        platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key, root=tmp_path)
+    (tmp_path / "infra").mkdir()
+    (tmp_path / platform_check.GRANT_FILE).write_text((platform_check.ROOT / platform_check.GRANT_FILE).read_text(encoding="utf-8"),
+                                                      encoding="utf-8")  # fmt: skip
     with pytest.raises(ValueError, match="made once"):
         platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key, root=tmp_path)
+    assert owner_check["sent"] == []
+
+
+def test_the_seeded_relaxations_repository_is_the_grant_files_not_the_run_files(owner_check, key, tmp_path):
+    """Item 13j: the run file is on Product's path. A run file that names another repository moves nothing."""
+    import yaml as _yaml
+
+    seed = _yaml.safe_load((platform_check.ROOT / platform_check.SEED_RUN_FILE).read_text(encoding="utf-8"))
+    (tmp_path / platform_check.SEED_RUN_FILE).parent.mkdir(parents=True)
+    (tmp_path / platform_check.SEED_RUN_FILE).write_text(_yaml.safe_dump({**seed, "repository": "agentkeel-studio/premiere-desk"}),
+                                                         encoding="utf-8")  # fmt: skip
+    (tmp_path / "infra").mkdir()
+    (tmp_path / platform_check.GRANT_FILE).write_text((platform_check.ROOT / platform_check.GRANT_FILE).read_text(encoding="utf-8"),
+                                                      encoding="utf-8")  # fmt: skip
+    with pytest.raises(ValueError, match="on agentkeel-studio/owner-check and on no other repository"):
+        platform_check.relax_seed("premiere-desk", "agentkeel-studio", APP, key, root=tmp_path)
     assert owner_check["sent"] == []
 
 
