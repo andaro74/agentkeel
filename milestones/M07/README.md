@@ -308,3 +308,22 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   on every run since (twelve by 17:22Z on 2026-10-02); no agent from the template deployed; nothing upgraded,
   retired or rolled back. The first deploy run after the merge is the
   fix's measurement.
+
+### After PR 3 merged (2026-10-02)
+
+- **The fix held, and the deploy failed one step later.** PR 3 merged as
+  `cba3aac`. The first scheduled deploy run after it, 37066321605
+  (21:23Z), verified the bytes, pushed the image to `agentkeel/owner-check`
+  and created the stack `agentkeel-owner-check`. `CreateAgentRuntime` was
+  refused: the execution role may not `CreateAgentRuntimeEndpoint` on
+  `runtime/*`, which is how the service names a runtime's DEFAULT
+  endpoint before the runtime has an id. M06 PR 2 narrowed that grant to
+  the platform's two prefixes; refagent's runtime predates the narrowing
+  and no create ran between. The stack rolled back (`ROLLBACK_COMPLETE`)
+  and kept its key (`ce2d6f46-8088-4bd3-a57e-2c014278aa34`) and its table
+  (`agentkeel-owner-check-rights`), which a redeploy would collide with.
+- **The second finding under F7.0, and a repair in the close.** The
+  repair is one action on `runtime/*` in the bootstrap stack, a widening
+  of IAM, ruled by Security and deployed by hand (`runs/pr2_by_hand.md`
+  B2). It is in PR 4's branch from its first commit, before the close is
+  written. The owner's test stays a miss.

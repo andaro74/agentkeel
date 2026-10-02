@@ -645,6 +645,22 @@ class BootstrapStack(cdk.Stack):
                 "Null": {"bedrock-agentcore:subnets": "false"},
             },
         ))  # fmt: skip
+        # M07, the second finding under F7.0 (run 37066321605, 2026-10-02): CreateAgentRuntime also
+        # authorises the runtime's DEFAULT endpoint, and does so against runtime/* because the runtime has
+        # no id yet. The statement above held CreateAgentRuntimeEndpoint to the two prefixes from M06 PR 2
+        # (platform-architect F4 then), and no create ran after the narrowing until owner-check's, which
+        # the service refused: "not authorized to perform: bedrock-agentcore:CreateAgentRuntimeEndpoint
+        # on resource: ...:runtime/*". refagent's runtime was made on 2026-09-22, when the statement read
+        # runtime/*. This is one action on runtime/*, and it is wider than the two prefixes: the execution
+        # role may also create an endpoint on a runtime in this account that is not the platform's. No
+        # condition narrows it: the service does not say which keys the implicit check carries, and a
+        # second refused create would cost another stack rolled back by hand. Every other runtime action
+        # stays on the two prefixes. Ruled by Security (milestones/M07/rulings/pr4-security.md).
+        role.add_to_policy(iam.PolicyStatement(
+            sid="TheDefaultEndpointOfARuntimeBeingCreated",
+            actions=["bedrock-agentcore:CreateAgentRuntimeEndpoint"],
+            resources=[f"{agentcore}:runtime/*"],
+        ))  # fmt: skip
         # The Runtime create handler's VPC-mode calls (describe-type,
         # 2026-09-21). Not scoped further because the handler does not say
         # which lattice resources it names; flagged in pr3.md, Unsure 3.
@@ -1462,6 +1478,7 @@ APPLIES_TO = {
                           "Resource::*", f"Resource::arn:aws:s3:::{AUDIT_BUCKET}/agents/*"],
     "ExecutionRole/DefaultPolicy/Resource": ["Resource::*"] + [f"Resource::{_ARN.format(service, rest)}" for service, rest in (
         ("bedrock-agentcore", "runtime/agentkeel_*"), ("bedrock-agentcore", "runtime/refagent*"),
+        ("bedrock-agentcore", "runtime/*"),  # M07: the DEFAULT endpoint of a runtime being created
         ("bedrock-agentcore", "workload-identity-directory/default/workload-identity/*"),
         ("bedrock", "application-inference-profile/*"), ("dynamodb", "table/agentkeel-*-rights"),
         ("ec2", "network-interface/*"), ("ec2", "security-group-rule/*"), ("ec2", "security-group/*"),

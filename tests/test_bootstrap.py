@@ -690,6 +690,21 @@ def test_no_agent_role_can_read_the_table_marker(template):
     assert not any(a.startswith("ssm:") for a in allowed(named(template, "agentkeel-boundary")))
 
 
+def test_the_execution_role_may_make_the_default_endpoint_of_a_runtime_being_created_and_nothing_more_on_any_runtime(template):
+    """M07, the second finding under F7.0 (run 37066321605): CreateAgentRuntime authorises the DEFAULT endpoint
+    against runtime/*. One action on runtime/*; every other runtime action stays on the two prefixes."""
+    statements = [s for policy in of_type(template, "AWS::IAM::Policy").values()
+                  if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
+                  for s in policy["Properties"]["PolicyDocument"]["Statement"]]  # fmt: skip
+    wide = [s for s in statements if s.get("Effect") == "Allow"
+            and any("runtime/*" in json.dumps(r) and "bedrock-agentcore" in json.dumps(r) for r in
+                    (s["Resource"] if isinstance(s["Resource"], list) else [s["Resource"]]))]  # fmt: skip
+    assert len(wide) == 1 and wide[0]["Sid"] == "TheDefaultEndpointOfARuntimeBeingCreated"
+    assert actions(wide[0]) == {"bedrock-agentcore:CreateAgentRuntimeEndpoint"}
+    (narrow,) = [s for s in statements if s.get("Sid") == "TheRuntimeAndItsWorkloadIdentity"]
+    assert not any(":runtime/*" in json.dumps(r) for r in narrow["Resource"])
+
+
 def test_the_deploy_role_calls_the_platforms_runtimes_and_no_other(template):
     """refagent's, and from M06 PR 2 an agent from the template's (agentkeel_<name>, R7). Never runtime/*:
     the account holds other projects' runtimes (milestones/M06/feasibility.md section 8)."""

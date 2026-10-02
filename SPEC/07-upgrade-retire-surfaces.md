@@ -1024,3 +1024,23 @@ are not repaired; threshold-owner F2 on PR 2 (item 3's sentence on the
 revert's median, restated in ADR-0011 and not in the ruling), its F5 (a
 swap leaves the old model's date) and N9 (the manifest's stale judge
 comment), N13 (`model-watch`'s paths fixed to M07); item 13n.
+
+**After PR 3 merged: the second finding under F7.0** (Product, at M07
+PR 4). The first deploy run after the merge (37066321605, 2026-10-02
+21:23Z) got past the artifact: the bytes verified, the image was pushed,
+the stack `agentkeel-owner-check` was created. The runtime was refused:
+`CreateAgentRuntime` also authorises the runtime's DEFAULT endpoint,
+against `runtime/*` because the runtime has no id yet, and the execution
+role allowed `CreateAgentRuntimeEndpoint` on `runtime/refagent*` and
+`runtime/agentkeel_*` only. That statement read `runtime/*` when
+refagent's runtime was made (2026-09-22); M06 PR 2 narrowed it, and no
+create ran after the narrowing until this one. The stack rolled back and
+kept its key and its rights table. **The repair is a widening of IAM**:
+one action, `CreateAgentRuntimeEndpoint`, on `runtime/*`, in the
+bootstrap stack (`infra/bootstrap/app.py`), ruled by Security and
+deployed by hand; it is wider than the platform's own runtimes, and no
+condition narrows it. It is carried in PR 4, the close, and said there
+as a repair in the close. Until it is deployed no agent from the
+template can get a runtime, and every scheduled deploy run fails the
+same way. The owner's test stays a miss, by hours now, whatever the
+repair does.
