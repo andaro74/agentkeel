@@ -35,4 +35,26 @@ red_when: the first pull request is mergeable, or refused for a reason other tha
 # file (cold review F3). PR 3 re-exports `agent.json` from that ruleset;
 # the repository keeps the ruleset as made. Steps 2 to 4 wait for PR 3's
 # merge.
-observed: null
+# Recorded at M06 PR 4, the close. **Step 2 missed; steps 3 and 4 were
+# never possible.** After PR 3's merge (c7ef180) the owner opened pull
+# request 1 (branch first-pr, opened 2026-10-01T14:16:01Z, head 0c596c1,
+# the manifest's name only). The App's platform-check (app 5144253) failed
+# it at 14:24:31Z, as step 2 expected, on the unassigned seats and the
+# goldens under the minimum, and on a third reason step 2 excludes: "the
+# repository's ruleset is the export: infra/ruleset/agent.json: ruleset
+# 24310403's bypass_actors is not shown to the App's token". GitHub
+# returns a ruleset's bypass_actors only to a caller that can administer
+# it; the App's installation token asks Administration: read
+# (scripts/platform_check.py POST_PERMISSIONS), so src/validate/agent.py
+# reads the field as missing and refuses. Every head of every agent
+# repository is refused for it, a fixed one included, so step 3 could not
+# pass and nothing could be merged, deployed or listed (step 4). This is
+# finding 1, the reason row 6 closes RED; the repair (the App granted
+# Administration: write, a Security ruling, and the token and reader
+# changed with it) is carried to M07 (milestones/M07/open.md). The read
+# with the owner's token at about 2026-10-01T15:41Z gave mergeable_state
+# "blocked" on pull request 1. Pull request 1 is left open and untouched.
+observed:
+  - repository: agentkeel-studio/owner-check
+    pull_request: 1
+    merge_commit: null  # never merged: step 2 missed
