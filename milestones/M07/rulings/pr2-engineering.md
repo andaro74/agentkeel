@@ -19,6 +19,8 @@ evidence:
   - milestones/M07/README.md
   - milestones/M07/runs/pr2_expected.md
   - milestones/M07/runs/f7_0_dispatch_from_branch.json
+  - https://github.com/andaro74/agentkeel/actions/runs/37014361054
+  - evals/history/f57e1a5c379fb7abcf065460bbef2e59f9d19b92.json
 pr: 39
 ---
 
@@ -80,7 +82,7 @@ FINDING 15, NOTE 8. Its report is in the pull request's body, verbatim.
 | F10 | S4's query seed test did not ask for the planted reason | **Repaired**: it asserts a computed verdict is what was refused |
 | F11 | The grant reader minted a token with no repository on every installation | **Repaired** (`b3196d6`), as security-reviewer BLOCK 1. It still mints one metadata-only token with no repository on an installation the grant names, to list what it reaches, revoked after. Row 7's "no longer mints a token with no repository" is about `app_token()`; this one is said in `read_grant` and in `pr2-security.md` item 6 |
 | F12 | The dispatch's refusal was inferred, and the run's workflow was not checked | **Repaired**: held only on GitHub's annotation on the `post` job, on a run of `platform-check.yml`. Run 36963543726 carries it |
-| F13 | No envelope at this head | The pull request's own run. Cited here once CI has written it |
+| F13 | No envelope at this head | **Measured** at `f57e1a5` (run 37014361054): `evals/history/f57e1a5c379fb7abcf065460bbef2e59f9d19b92.json`, GREEN, mode runtime, p95 6,059 ms against 13,529; 25 checks pass, `F7_0` to `F7_5` among them; refagent 9/9, 2/2, 2/3, 5/5, plants 7/7; `upgrade`: F7_5 read and held, F7_0 to F7_4 unread (F7_0's `dispatch` part read and held), surfaces 2 of 2, `taken` 0 of 3. As `runs/pr2_expected.md` stated |
 | F14 | SPEC/04 §2's second-run rule has no ADR | **Open. Product with the Threshold Owner.** The rule is the Threshold Owner's item 2, and no gate reads it. Recommended: an ADR in PR 3. This PR's own run does not qualify for a second run, so the rule is not used before then |
 | F15 | A runner writes a file under `envelopes/` | **Open. Security's** (`pr2-security.md` item 13m). It is the retire job's record: no verdict, and the gate never reads it |
 

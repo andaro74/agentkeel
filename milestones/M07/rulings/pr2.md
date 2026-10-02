@@ -26,6 +26,8 @@ evidence:
   - milestones/M07/runs/pr2_expected.md
   - milestones/M07/runs/pr2_by_hand.md
   - milestones/M07/rulings/pr1.md
+  - https://github.com/andaro74/agentkeel/actions/runs/37014361054
+  - evals/history/f57e1a5c379fb7abcf065460bbef2e59f9d19b92.json
 pr: 39
 ---
 
