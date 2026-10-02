@@ -407,7 +407,6 @@ def validate_over(tree: Path) -> dict[str, list[str]]:
     return errors
 
 
-@expected_failure
 def test_s4_a_panel_2_query_that_computes_the_verdict_is_refused(worktree):  # noqa: F811
     """Panel 2 of S4's dashboard selects the constant 'GREEN' as its verdict column. `validate` must
     refuse a panel 2 query that does anything but select the verdict as stored (F7.4). Today nothing

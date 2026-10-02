@@ -429,4 +429,6 @@ CHECKS = {
     "an agent's goldens: one ordinary and one trap at least, citing its own data": agent_goldens.check,
     # M06 PR 2: S4's query reader (finding 11)
     "panel 1 queries the registry and nothing else": panel.check,
+    # M07 PR 2 (SPEC/07 section 6): S4's query reader. A check of its own, not panel 1's extended.
+    "panel 2 selects the verdict as stored, from the envelopes' table and nothing else": panel.check_panel_2,
 }

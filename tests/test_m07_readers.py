@@ -492,3 +492,78 @@ def test_nothing_is_opened_twice_and_nothing_against_a_base_that_moved(repo):
     repo["pages"]["/repos/org/a/git/ref/heads/platform-upgrade/m07"] = {"object": {"sha": "d" * 40}}
     assert platform_pr.already("org/a", "platform-upgrade/m07") == "the branch platform-upgrade/m07 exists"
     assert not any(method == "POST" for method, *_ in repo["sent"])
+
+
+# --- panel 2's query (S4's query reader; src/validate/panel.py) -----------------
+
+from src.validate import panel  # noqa: E402
+from src.verdict import ROOT  # noqa: E402
+
+GOOD_SQL = 'SELECT commit, verdict, mode FROM "agentkeel_registry"."default"."agentkeel-envelopes" ORDER BY commit'
+
+
+def place_panel_2(tmp_path, **target: Any) -> Path:
+    dashboard = json.loads((ROOT / panel.PANEL_2).read_text(encoding="utf-8"))
+    dashboard["panels"][0]["targets"][0] |= target
+    (tmp_path / "infra" / "grafana").mkdir(parents=True, exist_ok=True)
+    (tmp_path / panel.PANEL_2).write_text(json.dumps(dashboard), encoding="utf-8")
+    return tmp_path
+
+
+def test_panel_2_as_committed_passes_and_its_query_is_the_one_held_here(tmp_path):
+    assert panel.check_panel_2(ROOT) == []
+    dashboard = json.loads((ROOT / panel.PANEL_2).read_text(encoding="utf-8"))
+    assert dashboard["panels"][0]["targets"][0]["rawSQL"] == GOOD_SQL
+    assert panel.check_panel_2(tmp_path) == [f"{panel.PANEL_2}: missing; panel 2 has no query to read (SPEC/07 section 6)"]
+
+
+def test_s4s_fixture_is_refused_for_its_computed_verdict_whatever_its_source():
+    """The fixture's source names were placeholders (SPEC/07 section 11, R8). With the source put right,
+    the planted reason alone still refuses it."""
+    fixture_sql = json.loads((ROOT / "tests/fixtures/m07/s4-panel2/dashboard.json").read_text(encoding="utf-8"))[
+        "panels"][0]["targets"][0]["rawSQL"]  # fmt: skip
+    errors = panel.panel_2_sql_errors(fixture_sql, "A")
+    assert any("computes its verdict column ('GREEN' AS verdict)" in e for e in errors), errors
+    right_source = fixture_sql.replace('"agentkeel_envelopes"."default"."envelopes"', '"agentkeel_registry"."default"."agentkeel-envelopes"')
+    errors = panel.panel_2_sql_errors(right_source, "A")
+    assert errors and all("verdict" in e for e in errors) and not any("reads" in e for e in errors), errors
+
+
+@pytest.mark.parametrize("sql, said", [
+    (GOOD_SQL.replace("verdict,", "upper(verdict),"), "computes its verdict column"),
+    (GOOD_SQL.replace("verdict,", "CASE WHEN verdict = 'RED' THEN 'GREEN' ELSE verdict END AS verdict,"), "computes its verdict column"),
+    (GOOD_SQL.replace("verdict,", "verdict AS v,"), "computes its verdict column"),
+    (GOOD_SQL.replace("mode ", "length(mode) "), "computes a column"),
+    (GOOD_SQL.replace(" ORDER BY", " WHERE verdict = 'GREEN' ORDER BY"), "names verdict outside its select list"),
+    (GOOD_SQL.replace(" ORDER BY", " WHERE mode <> 'GREEN' ORDER BY"), "carries a verdict as a constant"),
+    (GOOD_SQL.replace("commit, verdict, mode", "commit, mode"), "does not select 'verdict' as stored"),
+    (GOOD_SQL.replace("commit, verdict, mode", "*"), "computes a column"),
+    (GOOD_SQL.replace("commit, verdict, mode", "commit, verdict, tag"), "selects 'tag'"),
+    (GOOD_SQL.replace("agentkeel-envelopes", "agentkeel-registry"), "reads 'agentkeel-registry'"),
+    (GOOD_SQL + " UNION SELECT 'x', 'y', 'z'", "reads a second source"),
+    ("", "names no table"),
+])  # fmt: skip
+def test_a_panel_2_query_that_is_not_the_stored_columns_from_the_one_table_is_refused(tmp_path, sql, said):
+    errors = panel.check_panel_2(place_panel_2(tmp_path, rawSQL=sql))
+    assert any(said in e for e in errors), errors
+    assert all(e.startswith(panel.PANEL_2) for e in errors)
+
+
+def test_a_panel_2_on_another_data_source_or_with_no_panel_is_refused(tmp_path):
+    errors = panel.check_panel_2(place_panel_2(tmp_path, datasource={"type": "grafana-athena-datasource", "uid": "other"}))
+    assert any("reads data source 'other'" in e for e in errors), errors
+    (tmp_path / panel.PANEL_2).write_text(json.dumps({"panels": [{"id": 1}]}), encoding="utf-8")
+    assert panel.check_panel_2(tmp_path) == [f"{panel.PANEL_2}: no panel with id 2"]
+    (tmp_path / panel.PANEL_2).write_text("{", encoding="utf-8")
+    assert "not JSON" in panel.check_panel_2(tmp_path)[0]
+
+
+def test_panel_1s_check_does_not_read_panel_2_and_the_other_way(tmp_path):
+    """Two checks, each with its own file: a panel 2 fault must be named by the panel 2 check alone."""
+    place_panel_2(tmp_path, rawSQL="SELECT commit, 'GREEN' AS verdict FROM x")
+    assert all(panel.PANEL_2 not in e for e in panel.check(tmp_path))
+    from src.validate import checks
+
+    names = [name for name in checks.CHECKS if "panel 2" in name]
+    assert names == ["panel 2 selects the verdict as stored, from the envelopes' table and nothing else"]
+    assert checks.CHECKS[names[0]] is panel.check_panel_2 and len(checks.CHECKS) == 20
