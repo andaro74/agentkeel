@@ -261,3 +261,59 @@ test now asks its reader to hold the held case as well as refuse the bad
 one. S0's grant is still one flat permission set: whether the platform has
 one App or several, and so the reader's shape, is Security's before PR 2
 (SPEC/07 section 11, R2).
+
+**S0's shape changed at M07 PR 2's first commit, before any reader**
+(`milestones/M07/feasibility.md` section 4). Security ruled three Apps on
+2026-10-02 (`milestones/M07/rulings/pr2-security.md`, item 2), so the row
+above describes PR 1's files, and these replace them:
+
+- `grant.json` is one entry per App, in the shape of the ruling's `grant:`
+  block (`app_id`, `environment`, `installed_on`, `repository_selection`,
+  `permissions`), and `environments`, the rules every key's environment
+  carries. The ids of `agentkeel-upgrades` and `agentkeel-observer`
+  (5200001, 5200002) are invented for the fixture: the ruling's own block
+  holds null until each App exists.
+- The checking App, `agentkeel-platform`: `installation_as_ruled.json`
+  (all repositories, as ruled); `installation_uncovered.json` (adds
+  `members: write`); `installation_raised.json` (`contents` raised to
+  write); `installation_on_personal_account.json` (installed on
+  `andaro74`, where it must never be).
+- The App that opens pull requests, `agentkeel-upgrades`:
+  `upgrades_as_ruled.json` (on `andaro74`, one repository, `agentkeel`);
+  `upgrades_org_as_ruled.json`; `upgrades_uncovered.json` (adds
+  `scratch-repo` and `checks: write`); `upgrades_widened.json` (the same
+  repository, `repository_selection` all).
+- The App that reads, `agentkeel-observer`: `observer_as_ruled.json`;
+  `observer_writes.json` (`pull_requests` raised to write).
+- `unnamed_app.json` (an App the grant does not name) and
+  `another_apps_id.json` (a named App's slug under another id).
+- The environments: `environment_as_ruled.json` now lists its secrets'
+  names and the repository's; `environment_upgrades_as_ruled.json` and
+  `environment_observer_as_ruled.json`;
+  `environment_key_in_the_repository.json` (a second secret in the
+  environment, and the key also a repository secret).
+  `environment_uncovered.json` and `environment_tag.json` are as planted.
+
+Every reason PR 1 planted is still asked for (`members`, `scratch-repo`,
+`contents`, `repository_selection`, `m07-*`, `can_admins_bypass`, `tag`),
+each on the App where the ruling makes it a miss: with "all repositories"
+ruled for the organisation, a third repository is uncovered only where a
+selection is named, which is `agentkeel-upgrades` on `andaro74`.
+That is true by reason, not by App (cold review F9 on M07 PR 2):
+`scratch-repo` and `repository_selection` are no longer asked on
+`agentkeel-platform`, the App that will hold Administration: write. For
+it the grant bounds no repository of the organisation, by item 3 of the
+Security ruling, and no fixture can make one a miss.
+`grant_errors(installation, environment, grant)` keeps its three
+arguments and finds the App by the installation's `app_slug`. None of
+these is a live installation.
+
+**Read from M07 PR 2.** Each fixture's reader landed in its own commit and
+its strict marker came off there: S0's three bounds (`580be7f`,
+`3b67946`), S1 (`10cf8eb`), S2, S3, S4's comparison and S5 (`95b485c`),
+S4's query (`d8f8118`). The four run-file tests keep their markers until
+each attempt is recorded, after M07 PR 2 merges. S4's source names in
+`dashboard.json` were placeholders and are left as planted: the table
+panel 2 reads is `agentkeel-envelopes`, through the data source `registry`
+(`infra/grafana/panel2.json`), and a test holds that the fixture is still
+refused for its computed verdict with the source put right.

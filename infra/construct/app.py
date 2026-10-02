@@ -12,6 +12,10 @@ the template: `AGENTKEEL_BUNDLE=agents/<name>` (deploy.yml places the agent
 repository's folder there) gives the stack `AgentkeelAgent`, deployed as
 `agentkeel-<name>`. Unset, it is refagent's, exactly as before.
 
+From M07 PR 2 (SPEC/07 section 6) an agent whose manifest says `rollout:
+retired` synthesises without its runtime: deployed over the agent's stack,
+that update is the retirement. Nothing else in the stack changes.
+
 The image digest comes from the deploy, not from here:
 `AGENTKEEL_IMAGE_DIGEST` is the digest of the image `deploy.yml` pushed in
 the same run. Without it the stack synthesises against a digest that
@@ -50,7 +54,9 @@ class RefagentStack(cdk.Stack):
             bundle=BUNDLE,
             image_digest=os.environ.get("AGENTKEEL_IMAGE_DIGEST"),
         )  # fmt: skip
-        cdk.CfnOutput(self, "RuntimeArn", value=self.agent.runtime.attr_agent_runtime_arn)
+        # A retired agent's stack has no runtime (M07 PR 2), and so no ARN to give.
+        if self.agent.runtime is not None:
+            cdk.CfnOutput(self, "RuntimeArn", value=self.agent.runtime.attr_agent_runtime_arn)
         cdk.CfnOutput(self, "AgentRoleArn", value=self.agent.role.role_arn)
 
 

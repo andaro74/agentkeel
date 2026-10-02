@@ -1,0 +1,18 @@
+{
+  "name": "platform-app",
+  "can_admins_bypass": false,
+  "branch_policies": [
+    {
+      "name": "main",
+      "type": "branch"
+    }
+  ],
+  "secrets": [
+    "PLATFORM_APP_PRIVATE_KEY",
+    "A_SECOND_SECRET"
+  ],
+  "repository_secrets": [
+    "PLATFORM_APP_PRIVATE_KEY",
+    "RULESET_TOKEN"
+  ]
+}

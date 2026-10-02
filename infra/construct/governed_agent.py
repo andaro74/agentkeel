@@ -80,6 +80,8 @@ PLATFORM_ROLES = ("agentkeel-deploy", "agentkeel-cfn-exec", "agentkeel-evals", "
 class GovernedAgent(Construct):
     """One agent: its role, its security group, its inference profile, its runtime.
 
+    A manifest that says `rollout: retired` gets all of them but the runtime (M07 PR 2).
+
     `bundle` is the agent's directory, e.g. `agents/refagent`. Everything
     the construct needs about the agent comes from the manifest in it: the
     name, the model profile, and the endpoints its security group may
@@ -146,7 +148,17 @@ class GovernedAgent(Construct):
         # Made before the role, whose grant names it.
         self.key = None if self.agent_name == PLATFORM_AGENT else self._agent_key()
         self.role = self._role(role, rules)
-        self.runtime = self._runtime(image_digest or UNPINNED)
+        # M07 PR 2 (SPEC/07 section 6; milestones/M07/rulings/pr2-security.md item 11): a retirement is
+        # this stack without its runtime. Read from the manifest, as everything else about the agent is:
+        # `rollout: retired`, which the platform's own pull request set and the agent's seats merged.
+        # Everything else stays in the stack, so the update removes the runtime (CloudFormation calls
+        # DeleteAgentRuntime as the execution role, which may already) and grants nothing new.
+        # refagent is never retired by this path.
+        self.retired = self.manifest.get("rollout") == "retired"
+        if self.retired and self.agent_name == PLATFORM_AGENT:
+            rules.refuse(f"{self.node.path}: {PLATFORM_AGENT} is the platform's own agent and is never retired "
+                         "by a manifest (SPEC/07 section 6).")
+        self.runtime = None if self.retired else self._runtime(image_digest or UNPINNED)
 
     # --- the network -------------------------------------------------------
 

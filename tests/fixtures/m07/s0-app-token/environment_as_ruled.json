@@ -6,5 +6,12 @@
       "name": "main",
       "type": "branch"
     }
+  ],
+  "secrets": [
+    "PLATFORM_APP_PRIVATE_KEY"
+  ],
+  "repository_secrets": [
+    "AGENTKEEL_GRAFANA_TOKEN",
+    "RULESET_TOKEN"
   ]
 }

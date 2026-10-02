@@ -10,7 +10,8 @@ day, 28,800 seconds, breaks included.
 
 What is not built, so do not look for it: no judge (answers are checked by
 code, field by field), no human-in-the-loop step, no knowledge base, no
-calls between agents, no FRAGILE marking. Each is M07's.
+calls between agents, no FRAGILE marking. None is built in this project
+(SPEC/00 section 12).
 
 ## 0. Before you start (the owner, not you)
 
@@ -120,8 +121,9 @@ tab:
 <https://github.com/andaro74/agentkeel/actions/workflows/deploy.yml>
 
 The run's summary says whether your agent answered. The answers are
-written once to the platform's audit account, which this project's
-workflows can add to and cannot overwrite.
+written once to the platform's audit account. Its bucket is built to
+refuse a second write under the same name; no planted case has tried one
+yet.
 
 ## 8. Find it in the registry
 

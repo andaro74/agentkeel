@@ -73,10 +73,40 @@ Then the workspace, in the console (Amazon Managed Grafana, us-west-2):
 
 ## What this does not do
 
-- Panel 2 (the verdict history) is cut to M07 (SPEC/06 section 9, cut 1).
+- Panel 2 (the verdict history) was cut to M07 (SPEC/06 section 9, cut 1)
+  and is below.
 - No gate reads the workspace's data source settings: a data source whose
   uid is `registry` but which reads something else would pass `validate`.
   The rows it returns are what `build` compares with a registry scan, so a
   row that is not in the registry still reads as F6.4 fired.
 - No seeded case attempts the connector reading a table other than the
   registry; its role names the registry alone.
+
+## M07 PR 2: panel 2, the verdict history
+
+`panel2.json` is a second dashboard with one panel, id 2: one row per
+envelope on `main`, with its commit, the verdict it stores and its mode.
+It reads the table `agentkeel-envelopes` (`infra/bootstrap/`) through the
+same connector, catalog, workgroup and data source (`registry`) as panel
+1. `validate` refuses a panel 2 query that computes a column, filters on
+the verdict or reads another table (seed S4's query reader, SPEC/07);
+`build.panel_verdict_mismatch` compares the rows Grafana returns with the
+envelopes in `evals/history/` (F7.4).
+
+**A GREEN on panel 2 is the run's own verdict, not a ledger row's.** The
+envelope for `245eb9b` stores GREEN and row 6 is RED, because row 6 reads
+that envelope's `template`. `docs/platform/surfaces.md` says so.
+
+Where panel 2 reads envelopes was not ruled on 2026-10-02
+(`milestones/M07/rulings/pr2-security.md` item 13d). This stack adds the
+table's Glue schema and lets the connector's role read that one table; the
+workspace's role does not change. By hand, after the bootstrap stack:
+`milestones/M07/runs/pr2_by_hand.md` step B3, then import `panel2.json`
+into the workspace. Not deployed as this is written; until it is, panel
+2's live read is unread.
+
+What it does not do: show a row for an envelope a pull request's run wrote
+and `main` never took (the rows are written on a push to `main`); stop the
+agent account's admin editing a row (the comparison with the envelopes is
+what would say so); render anything a test looks at: the query API is
+what is read, not the page (SPEC/07 section 8).

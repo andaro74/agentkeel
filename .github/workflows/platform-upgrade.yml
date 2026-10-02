@@ -1,0 +1,175 @@
+# platform-upgrade (SPEC/07 section 1, section 6; M07 PR 2). Security seat.
+# Authorised by SPEC/00-overview.md#8-M07 and milestones/M07/rulings/pr2-security.md
+# (items 2, 4, 5 and 6, ruled 2026-10-02).
+# Its hash is listed in infra/workflows.sha256, which `make validate` reads.
+#
+# A platform upgrade arrives as a pull request the platform opened. This
+# runs on agentkeel's main, every 15 minutes (and by hand). For each agent
+# repository of the organisation whose default-branch head the platform's
+# App passed and whose `platform_version` is behind the template's, it
+# opens one draft pull request in that repository with the platform-owned
+# files at the template's version, and nothing else. An agent's team edits
+# no pipeline and writes no upgrade: its seats read the draft and merge it
+# when the platform check passes it.
+#
+# Two jobs, as platform-check.yml has, so the key and an agent repository's
+# content are never in one place:
+#
+# 1. `plan` holds no secret. It checks the template repository out **as
+#    data**, reads each agent repository as data at the head the App passed
+#    (scripts/platform_upgrade.py plan), computes the diff of the
+#    platform-owned files, and runs the platform check at main over the
+#    agent's head as it stands to say whether the upgrade is major (the
+#    check refuses it) or minor. Nothing from either repository is imported,
+#    installed or run. Its output is an artifact of data.
+# 2. `open` runs in the environment `platform-upgrades`, whose deployment
+#    branch is main only, with admin bypass off, and which holds the key of
+#    the App that opens pull requests, `agentkeel-upgrades`. It runs
+#    agentkeel's code only: first the App's grant read back against the
+#    ruling (anything beyond it stops the job), then, for each entry of the
+#    plan, every bound checked again on main's code (the repository's owner,
+#    the paths, the manifest's two fields, the version, the branch) before a
+#    token is minted for that repository and the `open` permission set.
+#
+# What `agentkeel-upgrades` can do: push a branch and open a pull request.
+# What it cannot: post the platform check (no `checks`), read or change a
+# ruleset (no `administration`), or write a workflow file (no `workflows`;
+# scripts/platform_pr.py refuses a path under .github/ before any request).
+# It cannot merge into a default branch whose ruleset requires a check it
+# cannot post.
+#
+# One pull request per branch name, ever: `platform-upgrade/<version>`. A
+# draft that was closed, or an upgrade that was merged and reverted, is not
+# opened again.
+#
+# What this does not do: re-make the template (the owner pushes it, by hand,
+# at M07; SPEC/07 section 11 R5); merge anything; reach a platform change
+# that is not in the platform-owned files (agent.Dockerfile, the construct,
+# deploy.yml reach every agent at its next deploy with no pull request;
+# SPEC/07 section 8). The agents are read from GitHub (the heads the App
+# passed), not from the registry: this workflow holds no AWS credentials.
+# Until `agentkeel-upgrades` exists and its id is in the ruling's grant
+# block, `open` stops at its first step. Nothing here has fired on its
+# seeded case: S1's attempt is made after M07 PR 2 merges.
+# GitHub may delay a scheduled run at busy times; upgrade.arrive_max_seconds
+# counts that.
+name: platform-upgrade
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: platform-upgrade
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      any: ${{ steps.plan.outputs.any }}
+    steps:
+      # Full history and tags: "behind" is ancestry between the commits two versions name.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Is there a template to upgrade to?
+        id: identity
+        run: |
+          set -euo pipefail
+          org=$(python3 -c 'import json; print(json.load(open("infra/platform_identity.json")).get("organisation") or "")')
+          echo "org=$org" >> "$GITHUB_OUTPUT"
+
+      # The template, as data: the platform-owned files at the platform's version.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        if: steps.identity.outputs.org != ''
+        with:
+          repository: ${{ steps.identity.outputs.org }}/agent-template
+          path: template-src
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Which agents are behind, and what each upgrade changes
+        id: plan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ ! -d template-src ]; then
+            echo "[]" > "$RUNNER_TEMP/plan.json"
+          else
+            uv run python scripts/platform_upgrade.py plan --template template-src --out "$RUNNER_TEMP/plan.json"
+          fi
+          any=$(python3 -c 'import json, sys; print("true" if any(e.get("open") for e in json.load(open(sys.argv[1]))) else "false")' "$RUNNER_TEMP/plan.json")
+          echo "any=$any" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: upgrade-plan
+          path: ${{ runner.temp }}/plan.json
+          if-no-files-found: error
+          retention-days: 30
+
+  open:
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: platform-upgrades
+    permissions:
+      contents: read
+      actions: read # the environment's own rules, read back
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: upgrade-plan
+          path: ${{ runner.temp }}/plan
+
+      - name: The App's grant and its key's environment, read back against the ruling
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.UPGRADES_APP_PRIVATE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run python scripts/platform_check.py grant --app agentkeel-upgrades --out "$RUNNER_TEMP/grant.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: grant-agentkeel-upgrades
+          path: ${{ runner.temp }}/grant.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Open each draft pull request, as the App
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.UPGRADES_APP_PRIVATE_KEY }}
+        run: uv run python scripts/platform_upgrade.py open --plan "$RUNNER_TEMP/plan/plan.json" --out "$RUNNER_TEMP/opened.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: upgrade-opened
+          path: ${{ runner.temp }}/opened.json
+          if-no-files-found: ignore
+          retention-days: 90

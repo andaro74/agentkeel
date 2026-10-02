@@ -66,3 +66,25 @@ deletes a bucket policy) or remove this account or attach an SCP to it: not
 enabled when read on 2026-09-28 (IAM trusted access off), and nothing here
 stops it being enabled (the landing zone's, SPEC/00 §12); anything seven
 years (M08); a gate on the lock's retention (SPEC/05 §8).
+
+## M07 PR 2: two prefixes, each written once
+
+Ruled 2026-10-02 (`milestones/M07/rulings/pr2-security.md` items 9 and
+11); the read role's listing of `bundles/` is item 13e, not ruled then.
+Redeployed by hand after reading `cdk diff`: the steps, and what the diff
+should show and nothing else, are `milestones/M07/runs/pr2_by_hand.md`
+step B1. Not deployed as this is written.
+
+- `bundles/<name>/<commit>.tar` and its signature: the signed archive of
+  each deploy of an agent from the template, put by `agentkeel-answer-put`
+  (deploy.yml on `main`). The Actions artifact expires after 30 days; a
+  retired agent's bundle must outlast it.
+- `observations/<run id>.json`: what `observe.yml` read from GitHub as the
+  platform's observer App, put by `agentkeel-observation-put`, a new role
+  trusted for that workflow on `main` only.
+
+Each prefix has one statement in the bucket's policy that refuses a put
+without `If-None-Match`, as `envelopes/` has. The lock is still one day:
+after it an object is kept by this account's policies, not by the lock.
+The read role may list `bundles/` and may list and read `observations/`.
+Nothing here has put or refused anything yet.

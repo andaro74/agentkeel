@@ -1,0 +1,45 @@
+[
+  {
+    "modelId": "anthropic.claude-sonnet-4-6",
+    "modelLifecycle": {
+      "status": "ACTIVE",
+      "startOfLifeTime": "2026-02-17T18:00:00+00:00"
+    },
+    "inferenceTypesSupported": [
+      "INFERENCE_PROFILE"
+    ]
+  },
+  {
+    "modelId": "anthropic.claude-haiku-4-5-20251001-v1:0",
+    "modelLifecycle": {
+      "status": "ACTIVE",
+      "startOfLifeTime": "2025-10-15T17:00:00+00:00"
+    },
+    "inferenceTypesSupported": [
+      "INFERENCE_PROFILE"
+    ]
+  },
+  {
+    "modelId": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "modelLifecycle": {
+      "status": "ACTIVE",
+      "startOfLifeTime": "2025-09-29T00:00:00+00:00"
+    },
+    "inferenceTypesSupported": [
+      "INFERENCE_PROFILE"
+    ]
+  },
+  {
+    "modelId": "anthropic.claude-sonnet-4-20250514-v1:0",
+    "modelLifecycle": {
+      "status": "LEGACY",
+      "startOfLifeTime": "2025-05-22T00:00:00+00:00",
+      "endOfLifeTime": "2026-10-14T08:00:00+00:00",
+      "legacyTime": "2026-04-14T08:00:00+00:00",
+      "publicExtendedAccessTime": "2026-07-14T08:00:00+00:00"
+    },
+    "inferenceTypesSupported": [
+      "INFERENCE_PROFILE"
+    ]
+  }
+]

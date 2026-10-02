@@ -44,6 +44,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -93,10 +94,26 @@ def gh(path: str, *, raw: bool = False) -> Any:
     return body.decode("utf-8") if raw else json.loads(body)
 
 
+REFUSED = re.compile(r"^- \*\*(.+?)\*\*: ", re.MULTILINE)
+
+
+def refused_checks(run: dict[str, Any]) -> list[str] | None:
+    """The check names a check run's own summary says it refused the head under; None when GitHub gave no summary.
+
+    The platform's App writes one line per refused check, `- **<check>**: <errors>`
+    (`scripts/platform_check.py post`). Read raw from GitHub's record of the run, so "refused" can be
+    held to the fault that was planted and not to any failure at all (M07 PR 2; re-read of 69f8383, B)."""
+    if run.get("conclusion") == "success":
+        return []
+    summary = (run.get("output") or {}).get("summary")
+    return REFUSED.findall(summary) if isinstance(summary, str) else None
+
+
 def check_runs(repository: str, sha: str) -> list[dict[str, Any]]:
     runs = gh(f"/repos/{repository}/commits/{sha}/check-runs?per_page=100").get("check_runs") or []
     return [{"name": r.get("name"), "app_id": (r.get("app") or {}).get("id"), "app_slug": (r.get("app") or {}).get("slug"),
-             "conclusion": r.get("conclusion"), "completed_at": r.get("completed_at")} for r in runs]  # fmt: skip
+             "conclusion": r.get("conclusion"), "completed_at": r.get("completed_at"),
+             "title": (r.get("output") or {}).get("title"), "refused": refused_checks(r)} for r in runs]  # fmt: skip
 
 
 def required_checks(repository: str) -> list[dict[str, Any]] | None:

@@ -113,11 +113,14 @@
       "enum": ["public", "internal", "confidential", null]
     },
     "deprecated_after": {"type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
-    "rollout": {"enum": ["all-at-once"]},
+    "rollout": {
+      "description": "all-at-once, or retired (M07 PR 2; SPEC/07 section 1, BLOCK 1). A retirement arrives as a pull request from the platform that sets this to retired; at a head the platform's App passed, the deploy path then removes the agent's runtime and deploys nothing. One-way: nothing restores the runtime's ARN.",
+      "enum": ["all-at-once", "retired"]
+    },
     "platform_version": {
-      "description": "The pinned tag of the platform repo this bundle was built against.",
+      "description": "The platform tag or commit the template was made from (SPEC/00 section 6, amended at M07 PR 1): a milestone tag when the commit carries one, else the short commit (scripts/make_template.py, from M07 PR 2). An agent is behind when the commit this names is an ancestor of the template's and not equal to it.",
       "type": "string",
-      "pattern": "^m[0-9]{2}$"
+      "pattern": "^(m[0-9]{2}|[0-9a-f]{7,40})$"
     },
     "pinned_roles": {
       "description": "Threshold Owner: every other role's pinned id (baseline, swaps, deprecation plant, judge candidates), moved here from milestones/M00/README.md at M01 PR 1. Read by the milestone that names each role.",

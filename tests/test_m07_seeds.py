@@ -108,13 +108,15 @@ def made(run: dict[str, Any]) -> list[dict[str, Any]]:
 # --- S0: the template's repair, read by CI ------------------------------------
 
 
-@expected_failure
 def test_s0_app_token_refuses_a_call_with_no_repository(monkeypatch):
-    """`app_token()` with no repository mints the installation's token with `scope = {}`: every
+    """`app_token()` with no repository minted the installation's token with `scope = {}`: every
     permission the App holds, on every repository it reaches (open.md row 2). After the grant that
     token could relax any agent repository's ruleset. Called with None, it must refuse and send no
     request for a token: a signature with no default would not be a refusal (cold review F1,
-    security-reviewer 20 on M07 PR 1). GitHub is a stub here; the key is made for the test."""
+    security-reviewer 20 on M07 PR 1). GitHub is a stub here; the key is made for the test.
+
+    Read from M07 PR 2: `app_token()` raises ValueError on a missing repository before any request,
+    and the marker is off."""
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
 
@@ -142,40 +144,94 @@ def test_s0_app_token_refuses_a_call_with_no_repository(monkeypatch):
         f"repository (it asked for a token with scope {minted})")
 
 
-@expected_failure
 def test_s0_the_installations_grant_is_read_back():
-    """The installation as GitHub returns it to the App, twice: as `grant.json` names it, and with
-    `members: write` and a third repository that no ruling covers. A reader must pass the first and
-    refuse the second, naming what is not covered. Today nothing reads an installation."""
+    """An installation as GitHub returns it to its App, for each of the three Apps Security ruled on
+    2026-10-02 (milestones/M07/rulings/pr2-security.md, item 2): as `grant.json` names it, and with a
+    permission, a level, a repository, a selection or an account that no ruling covers. A reader must
+    pass the first and refuse each of the others, naming what is not covered. Today nothing reads an
+    installation.
+
+    **The shape changed at M07 PR 2's first commit, before the reader** (feasibility.md section 4): the
+    grant was one flat permission set and is now one entry per App, in the ruling's `grant:` block's
+    shape. `grant_errors(installation, environment, grant)` keeps its three arguments and finds the
+    App by the installation's `app_slug`. Every planted reason of PR 1 is still asked for (`members`,
+    `scratch-repo`, `contents`, `repository_selection`), each on the App where the ruling makes it one."""
     from scripts import platform_check
 
     grant = fixture("s0-app-token/grant.json")
+    holds(sorted(a for a in grant if a != "environments") == ["agentkeel-observer", "agentkeel-platform", "agentkeel-upgrades"],
+          "the grant names three Apps")  # fmt: skip
+    platform, upgrades = grant["agentkeel-platform"], grant["agentkeel-upgrades"]
     ruled, uncovered = fixture("s0-app-token/installation_as_ruled.json"), fixture("s0-app-token/installation_uncovered.json")
     environment = fixture("s0-app-token/environment_as_ruled.json")
-    holds(ruled["permissions"] == grant["installation"]["permissions"], "the first installation is the grant's")
-    holds("members" in uncovered["permissions"] and "members" not in grant["installation"]["permissions"],
+    holds(ruled["permissions"] == platform["permissions"] and ruled["app_id"] == platform["app_id"],
+          "the first installation is the grant's, for the App that posts the check")  # fmt: skip
+    holds("members" in uncovered["permissions"] and "members" not in platform["permissions"],
           "the second installation holds a permission the grant does not name")  # fmt: skip
     check = reader(platform_check, "grant_errors", "S0", "nothing reads the installation's grant back")
     assert check(ruled, environment, grant) == []
     errors = check(uncovered, environment, grant)
-    assert any("members" in e for e in errors) and any("scratch-repo" in e for e in errors), errors
-    # The same keys and the same names, one level raised and the selection widened (security-reviewer 19):
-    # a reader that compares key sets and ignores values would pass it.
+    assert any("members" in e for e in errors), errors
+    # The same keys and the same names, one level raised (security-reviewer 19): a reader that compares
+    # key sets and ignores values would pass it.
     raised = fixture("s0-app-token/installation_raised.json")
-    holds(set(raised["permissions"]) == set(grant["installation"]["permissions"]) and raised["repositories"] == ruled["repositories"],
+    holds(set(raised["permissions"]) == set(platform["permissions"]) and raised["repositories"] == ruled["repositories"],
           "the third installation holds no new permission name and no new repository")  # fmt: skip
-    holds(raised["permissions"]["contents"] == "write" and raised["repository_selection"] == "all",
-          "the third installation raises contents to write and reaches all repositories")  # fmt: skip
+    holds(raised["permissions"]["contents"] == "write", "the third installation raises contents to write")
     errors = check(raised, environment, grant)
-    assert any("contents" in e for e in errors) and any("repository_selection" in e for e in errors), errors
+    assert any("contents" in e for e in errors), errors
+    # 5144253 is never installed on the personal account, where main's required checks are names any App
+    # with checks: write could answer to (item 2; security-reviewer 2).
+    personal = fixture("s0-app-token/installation_on_personal_account.json")
+    holds(personal["app_id"] == 5144253 and personal["account"]["login"] == "andaro74",
+          "the fourth installation is the checking App on the personal account")  # fmt: skip
+    errors = check(personal, environment, grant)
+    assert any("andaro74" in e for e in errors), errors
+
+    # The App that opens pull requests: on the personal account it reaches one repository, by name.
+    upgrades_environment = fixture("s0-app-token/environment_upgrades_as_ruled.json")
+    opens = fixture("s0-app-token/upgrades_as_ruled.json")
+    holds(opens["permissions"] == upgrades["permissions"] and opens["repositories"] == upgrades["repository_selection"]["andaro74"],
+          "the upgrades App on the personal account is the grant's")  # fmt: skip
+    holds("checks" not in upgrades["permissions"] and "administration" not in upgrades["permissions"],
+          "the App that opens a pull request can neither post the check nor administer")  # fmt: skip
+    assert check(opens, upgrades_environment, grant) == []
+    assert check(fixture("s0-app-token/upgrades_org_as_ruled.json"), upgrades_environment, grant) == []
+    errors = check(fixture("s0-app-token/upgrades_uncovered.json"), upgrades_environment, grant)
+    assert any("scratch-repo" in e for e in errors) and any("checks" in e for e in errors), errors
+    widened = fixture("s0-app-token/upgrades_widened.json")
+    holds(widened["repository_selection"] == "all" and widened["repositories"] == opens["repositories"],
+          "the widened installation names no new repository and reaches all of them")  # fmt: skip
+    errors = check(widened, upgrades_environment, grant)
+    assert any("repository_selection" in e for e in errors), errors
+
+    # The App that reads: a write level on it is not covered.
+    observer_environment = fixture("s0-app-token/environment_observer_as_ruled.json")
+    assert check(fixture("s0-app-token/observer_as_ruled.json"), observer_environment, grant) == []
+    errors = check(fixture("s0-app-token/observer_writes.json"), observer_environment, grant)
+    assert any("pull_requests" in e for e in errors), errors
+
+    # An App the grant does not name, an id that is not the named App's, a grant with no id yet (the
+    # ruling's own block until the App exists), and an App's key read in another App's environment.
+    errors = check(fixture("s0-app-token/unnamed_app.json"), environment, grant)
+    assert any("agentkeel-other" in e for e in errors), errors
+    errors = check(fixture("s0-app-token/another_apps_id.json"), observer_environment, grant)
+    assert any("5200009" in e for e in errors), errors
+    no_id = {**grant, "agentkeel-observer": {**grant["agentkeel-observer"], "app_id": None}}
+    errors = check(fixture("s0-app-token/observer_as_ruled.json"), observer_environment, no_id)
+    assert any("app_id" in e for e in errors), errors
+    errors = check(ruled, upgrades_environment, grant)
+    assert any("platform-upgrades" in e for e in errors), errors
 
 
-@expected_failure
 def test_s0_the_key_environment_is_read_back():
     """The `platform-app` environment as GitHub returns it, twice: one branch policy, `main`, with no
     admin bypass, as `grant.json` names it; and with a second branch policy and `can_admins_bypass`
     true. A reader must pass the first and refuse the second for both. Today nothing reads it
-    (open.md row 20); the live value of `can_admins_bypass` is true (runs/platform_app_environment.json)."""
+    (open.md row 20). The live value of `can_admins_bypass` was true at M07 PR 1
+    (runs/platform_app_environment.json) and was switched off by Security on 2026-10-02
+    (runs/platform_app_environment_after.json). From M07 PR 2's first commit the grant names the
+    environments' rules once, under `environments`, for all three Apps' environments."""
     from scripts import platform_check
 
     grant = fixture("s0-app-token/grant.json")
@@ -194,6 +250,12 @@ def test_s0_the_key_environment_is_read_back():
     holds([(p["name"], p["type"]) for p in tag["branch_policies"]] == [("main", "tag")], "the third environment's one policy is a tag")
     errors = check(installation, tag, grant)
     assert any("tag" in e for e in errors), errors
+    # The key is one secret of its environment and not a secret of the repository, where any workflow
+    # on any branch could read it (item 6; security-reviewer 11).
+    holds(grant["environments"]["branch_policies"] == [{"name": "main", "type": "branch"}]
+          and grant["environments"]["can_admins_bypass"] is False, "the grant names main only, with no admin bypass")  # fmt: skip
+    errors = check(installation, fixture("s0-app-token/environment_key_in_the_repository.json"), grant)
+    assert any("A_SECOND_SECRET" in e for e in errors) and any("repository secret" in e for e in errors), errors
 
 
 @expected_failure
@@ -211,7 +273,6 @@ def test_s0_the_owners_test_was_read():
 PLATFORM_OWNED = {"manifest.yaml", "server.py", "__init__.py"}
 
 
-@expected_failure
 def test_s1_a_platform_upgrade_changes_platform_owned_files_only():
     """An agent folder at `platform_version: m06` that carries a workflow of its own and an edited
     `agent.py`, beside the platform-owned files at a later version. The upgrade's diff must move
@@ -253,7 +314,6 @@ def test_s1_the_platform_upgrade_was_made():
 # --- S2: a retired agent's target is gone -------------------------------------
 
 
-@expected_failure
 def test_s2_a_retired_agent_that_still_answers_is_found_by_build():
     """The records of a retirement that did not hold: CloudTrail's DeleteAgentRuntime, a GetAgentRuntime
     that still finds the runtime after the limit, the retire job's invocation answered, and an answer
@@ -295,7 +355,6 @@ def test_s2_the_retirement_was_made():
 # --- S3: a model-watch pull request is merged and rolled back -----------------
 
 
-@expected_failure
 def test_s3_a_rollback_that_leaves_the_new_digest_live_is_found_by_build():
     """After a revert's deploy completed, the runtime's image tags hold the upgrade's digest and not
     the digest the tree gives at the revert. `build.f7_3(observation)` must read it as not held and
@@ -348,7 +407,6 @@ def validate_over(tree: Path) -> dict[str, list[str]]:
     return errors
 
 
-@expected_failure
 def test_s4_a_panel_2_query_that_computes_the_verdict_is_refused(worktree):  # noqa: F811
     """Panel 2 of S4's dashboard selects the constant 'GREEN' as its verdict column. `validate` must
     refuse a panel 2 query that does anything but select the verdict as stored (F7.4). Today nothing
@@ -365,9 +423,12 @@ def test_s4_a_panel_2_query_that_computes_the_verdict_is_refused(worktree):  # n
     holds(not refusing & BASE_CHECKS, f"no check at the base refuses the fixture ({sorted(refusing & BASE_CHECKS)})")
     refused = sorted(name for name in refusing - BASE_CHECKS if "panel 2" in name)
     assert refused, "seed S4: no check that reads panel 2's query refused a computed verdict"
+    # And for the planted reason, not only for the fixture's source names (cold review F10 on M07 PR 2).
+    said = [e for name in refused for e in errors[name] if PANEL_2 in e.replace("\\", "/")]
+    assert any("verdict as a constant" in e or "selects each column as stored" in e for e in said), \
+        f"seed S4: panel 2's fixture was refused, and not for its computed verdict ({said})"
 
 
-@expected_failure
 def test_s4_a_green_row_for_a_red_envelope_is_found_by_build():
     """Panel 2's rows as Grafana's /api/ds/query returns them say GREEN for 6f3d161; the envelope on
     main says RED. `build.panel_verdict_mismatch(frame, history_dir)` must return that commit. Today
@@ -392,7 +453,6 @@ def test_s4_a_green_row_for_a_red_envelope_is_found_by_build():
 # --- S5: a surface plant goes silent ------------------------------------------
 
 
-@expected_failure
 def test_s5_a_silent_surface_plant_is_counted():
     """A run's results for the surfaces' plants with one reader's result missing: panel 1's plant
     fired, panel 2's did not report. `plants.SURFACE_PLANTS` must name the two, and

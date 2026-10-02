@@ -57,6 +57,26 @@ What it makes, each named in SPEC/05 §6 before this file:
   account is denied `sts:AssumeRole`, so neither is reached through it;
 - **the boundary** every role here carries, applied stack-wide.
 
+From M07 PR 2 (SPEC/07 section 6; `milestones/M07/rulings/pr2-security.md`
+items 9 and 11, ruled 2026-10-02), two more prefixes, each written once:
+
+- **`bundles/`**: every deploy of an agent from the template puts its signed
+  archive under `bundles/<name>/<commit>.tar`, with its signature beside it,
+  as `agentkeel-answer-put` (deploy.yml on `main`), because the Actions
+  artifact expires after 30 days and a retired agent's bundle must still be
+  there. One statement in the bucket's policy refuses a put there without
+  `If-None-Match`, as under `envelopes/`.
+- **`observations/`**: what `observe.yml` read from GitHub as the platform's
+  observer App, put as `agentkeel-observation-put`, a role that trusts that
+  workflow on `refs/heads/main` and nothing else and may put there and
+  nowhere else. The same put-once statement.
+
+The read role lists and reads `observations/`, and lists `bundles/` (it does
+not read a bundle's bytes: the observer asks only whether one is there). The
+trail logs both prefixes' object events. A retirement's own record goes
+under `envelopes/agents/<name>/retired.json`, which the answer-put role may
+already write. No retention changes: the lock is still one day.
+
 What it does not do: stop this account's own admin or root, who own the
 bucket (the lock stops them on an object's day, not on the policy); stop
 the organization's management account, which is the agent account, from
@@ -89,6 +109,8 @@ PUT_ROLE = "agentkeel-envelope-put"
 # M06 PR 2 (R7; security-reviewer F7): deploy.yml's own put role, under envelopes/agents/ and nothing else, so
 # the deploy, which handles an agent repository's data, can never write evals.yml's envelope keys first.
 ANSWER_PUT_ROLE = "agentkeel-answer-put"
+# M07 PR 2 (rulings/pr2-security.md item 9): observe.yml's own put role, under observations/ and nothing else.
+OBSERVATION_PUT_ROLE = "agentkeel-observation-put"
 AGENT_TRAIL = f"arn:aws:cloudtrail:{REGION}:{AGENT_ACCOUNT}:trail/agentkeel-audit"  # infra/audit/
 OWN_TRAIL_NAME = "agentkeel-audit-bucket"
 OWN_TRAIL = f"arn:aws:cloudtrail:{REGION}:{SECURITY_ACCOUNT}:trail/{OWN_TRAIL_NAME}"
@@ -109,15 +131,22 @@ EVAL_WORKFLOWS = [f"{REPO}/.github/workflows/evals.yml@refs/pull/*/merge",
 MAIN_EVALS = f"{REPO}/.github/workflows/evals.yml@refs/heads/main"
 # M06 PR 2 (SPEC/06 section 6, R7): deploy.yml on main puts an agent from the template's answer record.
 MAIN_DEPLOY = f"{REPO}/.github/workflows/deploy.yml@refs/heads/main"
+# M07 PR 2 (SPEC/07 section 6): observe.yml on main stores what it read as the platform's observer App.
+MAIN_OBSERVE = f"{REPO}/.github/workflows/observe.yml@refs/heads/main"
 # The tag an agent role carries (infra/construct/governed_agent.py, AGENT_TAG), as a policy variable.
 OWN_PREFIX = "agents/${aws:PrincipalTag/agentkeel:agent}/*"
 # GitHub's two published intermediate thumbprints. IAM no longer checks them for GitHub, and
 # CloudFormation still takes the list.
 THUMBPRINTS = ["6938fd4d98bab03faadb97b34396831e3780aea1", "1c58a3a8518e8759bf075b76b750d4f2df264fcd"]
 # What the observer reads (scripts/observe_containment.py), and nothing else.
-READ_PREFIXES = ["AWSLogs/", "agents/", "test/", "envelopes/agents/"]  # the last from M06 PR 2: item 4's records
+# envelopes/agents/ from M06 PR 2 (item 4's records); observations/ from M07 PR 2 (the App-viewpoint observation).
+READ_PREFIXES = ["AWSLogs/", "agents/", "test/", "envelopes/agents/", "observations/"]
+# Listed, not read (M07 PR 2): whether a retired agent's signed bundle is there. Its bytes are not the observer's.
+LIST_ONLY_PREFIXES = ["bundles/"]
 # The object events this account's trail logs: the attempts and the evidence, not the delivery.
-LOGGED_PREFIXES = ["agents/", "test/", "envelopes/"]
+LOGGED_PREFIXES = ["agents/", "test/", "envelopes/", "bundles/", "observations/"]
+# Written once (M07 PR 2): a put without If-None-Match is refused, as under envelopes/.
+PUT_ONCE = {"bundles/": "ABundleIsWrittenOnce", "observations/": "AnObservationIsWrittenOnce"}
 # Seed S6's two object actions, granted on test/ so that the lock is what refuses them.
 S6_OBJECT_ACTIONS = ["s3:DeleteObjectVersion", "s3:PutObjectRetention"]
 
@@ -137,11 +166,13 @@ class SecurityStack(cdk.Stack):
         read_role = self._read_role(provider)
         put_role = self._put_role(provider)
         answer_role = self._answer_put_role(provider)
+        observation_role = self._observation_put_role(provider)
 
         cdk.CfnOutput(self, "AuditBucket", value=bucket.bucket_name)
         cdk.CfnOutput(self, "AuditReadRoleArn", value=read_role.role_arn)
         cdk.CfnOutput(self, "EnvelopePutRoleArn", value=put_role.role_arn)
         cdk.CfnOutput(self, "AnswerPutRoleArn", value=answer_role.role_arn)
+        cdk.CfnOutput(self, "ObservationPutRoleArn", value=observation_role.role_arn)
         cdk.CfnOutput(self, "TrailArn", value=trail.attr_arn)
 
     # --- the boundary ------------------------------------------------------
@@ -255,6 +286,14 @@ class SecurityStack(cdk.Stack):
             actions=["s3:PutObject"], resources=[objects("envelopes/*")],
             conditions={"Null": {"s3:if-none-match": "true"}},
         ))  # fmt: skip
+        # M07 PR 2 (rulings/pr2-security.md items 9 and 11): a signed bundle and a stored observation are
+        # each written once too. One statement per prefix, so each can be read for what it holds.
+        for prefix, sid in PUT_ONCE.items():
+            bucket.add_to_resource_policy(iam.PolicyStatement(
+                sid=sid, effect=iam.Effect.DENY, principals=[iam.AnyPrincipal()],
+                actions=["s3:PutObject"], resources=[objects(f"{prefix}*")],
+                conditions={"Null": {"s3:if-none-match": "true"}},
+            ))  # fmt: skip
         bucket.add_to_resource_policy(iam.PolicyStatement(
             sid="NobodyOutsideThisAccountTurnsTheLockOff", effect=iam.Effect.DENY, principals=[iam.AnyPrincipal()],
             actions=["s3:PutBucketObjectLockConfiguration"], resources=[bucket.bucket_arn],
@@ -311,7 +350,7 @@ class SecurityStack(cdk.Stack):
         role.add_to_policy(iam.PolicyStatement(
             sid="ListTheObserversPrefixes", actions=["s3:ListBucket", "s3:ListBucketVersions"],
             resources=[f"arn:aws:s3:::{AUDIT_BUCKET}"],
-            conditions={"StringLike": {"s3:prefix": [f"{p}*" for p in READ_PREFIXES]}},
+            conditions={"StringLike": {"s3:prefix": [f"{p}*" for p in READ_PREFIXES + LIST_ONLY_PREFIXES]}},
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="ReadTheObserversPrefixes", actions=["s3:GetObject", "s3:GetObjectVersion", "s3:GetObjectRetention"],
@@ -340,6 +379,22 @@ class SecurityStack(cdk.Stack):
         role.add_to_policy(iam.PolicyStatement(
             sid="PutAnswerRecordsOnly", actions=["s3:PutObject"],
             resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/envelopes/agents/*"]))
+        # M07 PR 2 (item 11): the signed archive of what it just deployed, under bundles/<name>/, once.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="PutSignedBundlesOnly", actions=["s3:PutObject"],
+            resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/bundles/*"]))
+        return role
+
+    def _observation_put_role(self, provider: iam.CfnOIDCProvider) -> iam.Role:
+        """observe.yml on main, and only there: what it read as the observer App (SPEC/07 section 6, item 9)."""
+        role = iam.Role(
+            self, "ObservationPutRole", role_name=OBSERVATION_PUT_ROLE, max_session_duration=cdk.Duration.hours(1),
+            assumed_by=self._github(provider, [f"{SUBJECT}:ref:refs/heads/main"], MAIN_OBSERVE, exact=True),
+            description="agentkeel: observe.yml on main puts its App-viewpoint observation under observations/ as this.",
+        )  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="PutObservationsOnly", actions=["s3:PutObject"],
+            resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/observations/*"]))
         return role
 
 
@@ -367,13 +422,20 @@ SUPPRESSIONS = {
         "AwsSolutions-IAM5",
         "SPEC/05 §6: 'the read-only role reads the prefixes the observer needs and not *'. AWSLogs/*, agents/*, "
         "test/* and, from M06 PR 2, envelopes/agents/* (an agent from the template's answer records, SPEC/06 R7) "
-        "are those prefixes; the keys under them are written by AWS, by the agents and by deploy.yml at run time.",
+        "are those prefixes; the keys under them are written by AWS, by the agents and by deploy.yml at run time. "
+        "M07 PR 2 (SPEC/07 §6): observations/*, whose keys are observe.yml's run ids.",
+    ),
+    "ObservationPutRole/DefaultPolicy/Resource": (
+        "AwsSolutions-IAM5",
+        "SPEC/05 §6's 'envelopes to the audit bucket from main', as SPEC/07 §6 extends it to the observer's "
+        "observation: observations/* because each key is an observe.yml run id, which exists only when that run "
+        "writes it. Put only; the bucket refuses a put there without If-None-Match.",
     ),
     "AnswerPutRole/DefaultPolicy/Resource": (
         "AwsSolutions-IAM5",
         "SPEC/05 §6's envelopes to the audit bucket from main, for an agent from the template's answer record "
         "(SPEC/06 R7): envelopes/agents/* because each key is an agent repository's commit, which exists only "
-        "when deploy.yml writes it.",
+        "when deploy.yml writes it. M07 PR 2 (SPEC/07 §6): bundles/* likewise, the signed archive of that commit.",
     ),
     "PutRole/DefaultPolicy/Resource": (
         "AwsSolutions-IAM5",
@@ -387,7 +449,8 @@ APPLIES_TO = {
     "Boundary/Resource": [f"{_OBJECTS}*"],
     "ReadRole/DefaultPolicy/Resource": [f"{_OBJECTS}{p}*" for p in READ_PREFIXES],
     "PutRole/DefaultPolicy/Resource": [f"{_OBJECTS}envelopes/*"],
-    "AnswerPutRole/DefaultPolicy/Resource": [f"{_OBJECTS}envelopes/agents/*"],
+    "AnswerPutRole/DefaultPolicy/Resource": [f"{_OBJECTS}envelopes/agents/*", f"{_OBJECTS}bundles/*"],
+    "ObservationPutRole/DefaultPolicy/Resource": [f"{_OBJECTS}observations/*"],
 }
 for path, (rule, reason) in SUPPRESSIONS.items():
     applies = {"appliesTo": APPLIES_TO[path]} if path in APPLIES_TO else {}

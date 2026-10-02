@@ -1,0 +1,17 @@
+{
+  "id": 8,
+  "app_id": 5200001,
+  "app_slug": "agentkeel-upgrades",
+  "account": {
+    "login": "a-stranger"
+  },
+  "repository_selection": "all",
+  "permissions": {
+    "contents": "write",
+    "pull_requests": "write",
+    "metadata": "read"
+  },
+  "repositories": [
+    "their-own-repository"
+  ]
+}

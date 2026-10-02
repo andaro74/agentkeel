@@ -218,3 +218,27 @@ repository; who created it and when is not recorded anywhere, and its
 thumbprint and audience are landing-zone work (SPEC/00 §2). Until then
 no sentence here or anywhere else may call the deploy plane proven
 (SPEC/00 §10.5).
+
+## M07 PR 2: three reads, one read-only role, and panel 2's table
+
+Not ruled on 2026-10-02: `milestones/M07/rulings/pr2-security.md` items
+13b, 13c and 13d put each to the Security seat. Redeployed by hand after
+reading `cdk diff --strict`: `milestones/M07/runs/pr2_by_hand.md` step
+B2 has the commands and what the diff should show and nothing else. Not
+deployed as this is written.
+
+- `agentkeel-evals` gains three read-only statements on an agent from the
+  template (its stack, its runtime, its image's tags), so a pull request's
+  run can read whether a retired runtime is gone and which bytes a runtime
+  runs after a revert. It invokes no template agent.
+- `agentkeel-model-watch`: `model-watch.yml` on `main` asks Bedrock for a
+  model's lifecycle as this. One action, `bedrock:GetFoundationModel`.
+- `agentkeel-envelopes` and `agentkeel-envelope-row-put`: one row per
+  envelope on `main` (commit, verdict, mode), written once by `evals.yml`'s
+  `archive` job on `main`. Panel 2 reads the table (`infra/grafana/`). It
+  is a copy for a surface, not evidence.
+
+The deploy role and the execution role do not change: a retirement is an
+update of the agent's stack, and the execution role already may delete a
+template agent's runtime (`tests/test_bootstrap.py` holds that no
+`DeleteStack` and no `UpdateItem` was added).

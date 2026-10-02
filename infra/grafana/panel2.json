@@ -1,0 +1,24 @@
+{
+  "title": "agentkeel verdict history",
+  "uid": "agentkeel-verdicts",
+  "description": "Security (SPEC/07 section 6; SPEC/06 section 9 cut 1, received at M07). Panel 2 is the verdict history: one row per envelope on main, with its commit, the verdict it stores and the mode it ran in, read through Athena's DynamoDB connector from the table agentkeel-envelopes and nothing else. The verdict is the run's own, as stored: a GREEN here is not a ledger row's reading (the envelope for 245eb9b stores GREEN and row 6 is RED; docs/platform/surfaces.md). validate refuses a panel 2 target that computes a column, filters on the verdict, or reads any other table (src/validate/panel.py). Imported into the workspace by hand; the data source uid 'registry' is the workspace's one Athena data source, whose catalog holds both tables.",
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "id": 2,
+      "title": "Verdict history",
+      "type": "table",
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "grafana-athena-datasource", "uid": "registry"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-athena-datasource", "uid": "registry"},
+          "format": 1,
+          "connectionArgs": {"region": "us-west-2", "catalog": "agentkeel_registry", "database": "default"},
+          "rawSQL": "SELECT commit, verdict, mode FROM \"agentkeel_registry\".\"default\".\"agentkeel-envelopes\" ORDER BY commit"
+        }
+      ]
+    }
+  ]
+}

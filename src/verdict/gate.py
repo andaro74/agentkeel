@@ -80,7 +80,7 @@ from typing import Any
 import yaml
 
 from src.verdict import M04_READERS as verdict_m04_readers
-from src.verdict import M05_READERS, M06_READERS
+from src.verdict import M05_READERS, M06_READERS, M07_READERS
 from src.verdict import (
     ROOT,
     canonical_sha256,
@@ -146,6 +146,12 @@ CLAIM_5_CHECKS = ("F5_1",)
 # `template` by row 6 (READ_THE_TEMPLATE), never required here, as row 5's attempts are not. Held from
 # M06_READERS (c2a15d0), which wired them.
 CLAIM_6_CHECKS = ("F6_1", "F6_4")
+# What an agent envelope must carry from M07 PR 2 (SPEC/07 section 4): F7_0 to F7_5, from the nine fixture
+# tests of S0 to S5 (F7_5 joined by build's own count of the surfaces' plants). Test-only witnesses: each
+# says a reader refused its fixture in a copy of the tree, not that an agent was upgraded. The live
+# readings are in `upgrade`, read by row 7 (READ_THE_UPGRADE), never required here: an attempt that
+# missed must not make every later pull request's `evals` red. Held from M07_READERS, which wired them.
+CLAIM_7_CHECKS = ("F7_0", "F7_1", "F7_2", "F7_3", "F7_4", "F7_5")
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -184,6 +190,13 @@ CONTAINMENT_SEEDS = ("S1", "S2", "S3", "S4", "S6", "S7")
 # makes the row's reading RED whatever the run's own verdict, as READ_THE_CONTAINMENT does for row 5.
 READ_THE_TEMPLATE = {"M06"}
 TEMPLATE_READINGS = ("F6_1", "F6_2", "F6_3", "F6_4")
+# Rows whose claim is read from the upgrades an envelope keeps in `upgrade` (SPEC/07 §4, §7): F7.0 to F7.5
+# and `taken`, n of 3, with claim 6's later reading from `template` quoted beside it. Gated by nothing,
+# but a falsifier unread or not held, or fewer than three upgrades taken, makes the row's reading RED
+# whatever the run's own verdict, as READ_THE_TEMPLATE does for row 6.
+READ_THE_UPGRADE = {"M07"}
+UPGRADE_READINGS = ("F7_0", "F7_1", "F7_2", "F7_3", "F7_4", "F7_5")
+UPGRADE_BARS = ("arrive_max_seconds", "deploy_max_seconds", "retire_max_seconds")
 
 
 class Rejected(Exception):
@@ -335,7 +348,8 @@ def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
         claim_4 = CLAIM_4_CHECKS + (("F4_3",) if pin_moved(commit, AGENT_BUNDLE, root) else ())
     claim_5 = CLAIM_5_CHECKS if descends_from(commit, M05_READERS, root) else ()
     claim_6 = CLAIM_6_CHECKS if descends_from(commit, M06_READERS, root) else ()
-    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6
+    claim_7 = CLAIM_7_CHECKS if descends_from(commit, M07_READERS, root) else ()
+    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6 + claim_7
 
 
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:
@@ -553,6 +567,15 @@ def judge(
             reasons.append("checks.F4_3 without a_vs_a: an A-vs-A that names no goldens")
         elif a_vs_a is not None and a_vs_a["agent"] and said_f4_3["status"] == "pass":
             reasons.append(f"envelope says F4_3 is pass, and a_vs_a names {a_vs_a['agent']} for the agent")
+        # SPEC/07 §4 (S5): the surfaces' plant counts and F7_5 come together. The counts are build's; that
+        # a check which passed sits beside counts that differ is the gate's own reading (P5).
+        surfaces, said_f7_5 = (envelope.get("upgrade") or {}).get("surfaces"), envelope["checks"].get("F7_5")
+        if surfaces is not None and surfaces["plants_expected"] < 1:
+            reasons.append("upgrade.surfaces counts no plant: a count of none cannot say a reader fired")
+        if surfaces is not None and surfaces["plants_fired"] != surfaces["plants_expected"]:
+            reasons.append(f"silent surface plant: expected {surfaces['plants_expected']}, fired {surfaces['plants_fired']}")
+            if said_f7_5 is not None and said_f7_5["status"] == "pass":
+                reasons.append("envelope says F7_5 is pass, and upgrade.surfaces counts a silent plant")
     reasons += [
         f"check {name} failed: {check['url']}"
         for name, check in sorted(envelope["checks"].items())
@@ -603,7 +626,8 @@ def tallies(label: str, results: dict[str, dict[str, Any]]) -> str:
 def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any] | None = None,
              *, in_the_runtime: bool = False, read_the_swaps: bool = False,
              detection: tuple[float | None, str] | None = None,
-             quickstart: tuple[float | None, str] | None = None) -> str:
+             quickstart: tuple[float | None, str] | None = None,
+             upgrade: tuple[dict[str, float] | None, str] | None = None) -> str:
     """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's.
 
     An M00 envelope: its control tallies. From M01: the agent's tallies, then
@@ -627,6 +651,11 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     `quickstart` is `quickstart.max_seconds` and where it was read, for a row
     whose claim is read from `template` (`READ_THE_TEMPLATE`): each falsifier's
     reading and each miss are named, and a GREEN run reads RED (M06 PR 2).
+
+    `upgrade` is the `upgrade.*` bars and where they were read, for a row
+    whose claim is read from `upgrade` (`READ_THE_UPGRADE`): `taken`, each
+    falsifier's reading and each miss are named, claim 6's later reading is
+    quoted from `template` beside them, and a GREEN run reads RED (M07 PR 2).
     """
     results = envelope["goldens"]
     agent = {g: r for g, r in results.items() if r["scope"] == "agent"}
@@ -646,7 +675,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     misses = swap_misses(envelope.get("swaps") or []) if read_the_swaps and agent else []
     held = containment_misses(envelope, *detection) if detection is not None and agent else []
     shipped = template_misses(envelope, *quickstart) if quickstart is not None and agent else []
-    if (misses or held or shipped) and verdict == "GREEN":
+    upgraded = upgrade_misses(envelope, *upgrade) if upgrade is not None and agent else []
+    if (misses or held or shipped or upgraded) and verdict == "GREEN":
         verdict = "RED"
     parts = [
         *heads,
@@ -660,6 +690,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         *held,
         *(template_reading(envelope) if quickstart is not None and agent else []),
         *shipped,
+        *(upgrade_reading(envelope) if upgrade is not None and agent else []),
+        *upgraded,
         verdict,
         f"envelope `{envelope['commit']}`",
     ]
@@ -848,6 +880,108 @@ def template_reading(envelope: dict[str, Any]) -> list[str]:
     return parts
 
 
+def upgrade_bars_at(commit: str, root: Path = ROOT) -> tuple[dict[str, float] | None, str]:
+    """The three `upgrade.*` bars as they stood at the envelope's commit, and where they were read (SPEC/07 §2)."""
+    bars, where = thresholds_at(commit, root)
+    found = bars.get("upgrade")
+    if not isinstance(found, dict) or not all(
+        isinstance(found.get(name), (int, float)) and not isinstance(found.get(name), bool) and found[name] > 0
+        for name in UPGRADE_BARS
+    ):  # fmt: skip
+        return None, where
+    return {name: float(found[name]) for name in UPGRADE_BARS}, where
+
+
+def upgrade_misses(envelope: dict[str, Any], bars: dict[str, float] | None, where: str) -> list[str]:
+    """What row 7 finds wrong with the upgrades an envelope recorded; [] if nothing (SPEC/07 §4, §7).
+
+    build ruled each falsifier on GitHub's, AWS's and Grafana's records. This holds the bars again to
+    the ones read at the envelope's commit; counts `taken` again from its three kinds, and each kind
+    again from F7_1's upgrades of it; holds F7_0 again to its four parts; holds the retirement's, each
+    arrival's and each deploy's seconds again to their bars; and holds the surfaces' count to at least
+    one plant. Anything unread is a miss: row 7 is RED if F7.0 is unread, and an attempt nobody made
+    was not taken."""
+    reading = envelope.get("upgrade")
+    if reading is None:
+        return ["upgrade not read: the envelope records no attempt"]
+    misses = []
+    if bars is None:
+        misses.append(f"no upgrade bars in thresholds.yaml at {where}: the limits cannot be read")
+    elif reading.get("bars") != bars:
+        misses.append(f"upgrade was read against {reading.get('bars')}, the commit's bars are {bars} ({where})")
+    for name in UPGRADE_READINGS:
+        one = reading[name]
+        if not one["read"]:
+            misses.append(f"{name} unread: {'; '.join(one['reasons'][:2]) or 'no reason recorded'}")
+        elif one["held"] is not True:
+            misses.append(f"{name} not held: {'; '.join(one['reasons'][:3]) or 'no reason recorded'}")
+    taken = reading["taken"]
+    mine = sum(taken[kind] is True for kind in ("platform", "model", "retirement"))
+    if taken["n"] != mine:
+        misses.append(f"taken: the envelope says {taken['n']}, its three kinds count {mine}")
+    if mine < 3:
+        short = ", ".join(f"{kind} {'unread' if taken[kind] is None else 'not taken'}"
+                          for kind in ("platform", "model", "retirement") if taken[kind] is not True)  # fmt: skip
+        misses.append(f"taken {mine} of 3: {short}")
+    # A kind is taken only if every upgrade of it F7_1 lists was held and merged (cold review F8 on M07 PR 2).
+    for kind in ("platform", "model", "retirement"):
+        of_kind = [u for u in reading["F7_1"]["upgrades"] if u["kind"] == kind]
+        if taken[kind] is True and (not of_kind or not all(u["held"] is True and u["merged"] is True for u in of_kind)):
+            misses.append(f"taken: the envelope says the {kind} upgrade was taken, and F7_1 lists it as not held or not merged")
+    if taken["retirement"] is True and reading["F7_2"]["held"] is not True:
+        misses.append("taken: the envelope says the retirement was taken, and F7_2 is not held")
+    zero = reading["F7_0"]
+    if zero["held"] is True and not all(part["read"] and part["held"] is True for part in zero["parts"].values()):
+        misses.append("F7_0: the envelope says held, and one of its four parts is unread or not held")
+    elapsed = reading["F7_2"].get("elapsed_s")
+    if bars is not None and elapsed is not None and elapsed > bars["retire_max_seconds"] and reading["F7_2"]["held"] is True:
+        misses.append(f"F7_2: build held {elapsed:.0f} s, over the commit's bar {bars['retire_max_seconds']:.0f} s")
+    for u in reading["F7_1"]["upgrades"]:
+        late = bars is not None and u["arrived_s"] is not None and u["arrived_s"] > bars["arrive_max_seconds"]
+        if late and u["held"] is True:
+            misses.append(f"F7_1: build held the {u['kind']} upgrade at {u['arrived_s']:.0f} s, over the commit's bar "
+                          f"{bars['arrive_max_seconds']:.0f} s")  # fmt: skip
+        # The deploy's seconds, held again (threshold-owner F6 on M07 PR 2): build alone held this bar.
+        deployed = u.get("deployed_s")
+        if bars is not None and deployed is not None and deployed > bars["deploy_max_seconds"] and taken[u["kind"]] is True:
+            misses.append(f"taken: build took the {u['kind']} upgrade deployed at {deployed:.0f} s, over the commit's bar "
+                          f"{bars['deploy_max_seconds']:.0f} s")  # fmt: skip
+    surfaces = reading["surfaces"]
+    if surfaces["plants_fired"] != surfaces["plants_expected"]:
+        misses.append(f"surfaces: plants_expected {surfaces['plants_expected']}, plants_fired {surfaces['plants_fired']}")
+    if surfaces["plants_expected"] < 1:
+        misses.append("surfaces: no plant is counted, so none can have fired")
+    return misses
+
+
+def upgrade_reading(envelope: dict[str, Any]) -> list[str]:
+    """`taken`, each falsifier and claim 6's later reading in the Measured cell, as the envelope recorded
+    them: printed; the misses decide. Row 6's own cell stays on its own envelope (SPEC/07 §1)."""
+    reading = envelope.get("upgrade")
+    if reading is None:
+        return []
+    parts = [f"taken {reading['taken']['n']} of {reading['taken']['of']}"]
+    for name in UPGRADE_READINGS:
+        one = reading[name]
+        state = "unread" if not one["read"] else ("held" if one["held"] else "not held")
+        if name == "F7_0" and one.get("relaxation"):
+            state += f" (relaxation {one['relaxation']})"
+        if name == "F7_2" and one["read"] and one.get("elapsed_s") is not None:
+            state += f" {one['elapsed_s']:.0f} s"
+        parts.append(f"{name} {state}")
+    surfaces = reading["surfaces"]
+    parts.append(f"surface plants {surfaces['plants_fired']}/{surfaces['plants_expected']}")
+    later = envelope.get("template")
+    if later is not None:
+        for name in ("F6_1", "F6_3"):
+            one = later[name]
+            state = "unread" if not one["read"] else ("held" if one["held"] else "not held")
+            if name == "F6_3" and one.get("elapsed_s") is not None:
+                state += f" {one['elapsed_s']:.0f} s"
+            parts.append(f"claim 6 later {name} {state}")
+    return parts
+
+
 def latest(history_dir: Path = HISTORY) -> Path | None:
     """The envelope for the nearest commit at or behind HEAD."""
     have = {p.stem: p for p in replay_history.envelope_paths(history_dir)}
@@ -929,7 +1063,8 @@ def measured_at(path: Path, history_dir: Path = HISTORY, *, milestone: str | Non
                     in_the_runtime=milestone in READ_IN_THE_RUNTIME,
                     read_the_swaps=milestone in READ_THE_SWAPS,
                     detection=detection_at(envelope["commit"]) if milestone in READ_THE_CONTAINMENT else None,
-                    quickstart=quickstart_at(envelope["commit"]) if milestone in READ_THE_TEMPLATE else None)  # fmt: skip
+                    quickstart=quickstart_at(envelope["commit"]) if milestone in READ_THE_TEMPLATE else None,
+                    upgrade=upgrade_bars_at(envelope["commit"]) if milestone in READ_THE_UPGRADE else None)  # fmt: skip
 
 
 def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> str | None:

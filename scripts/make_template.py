@@ -10,7 +10,8 @@ repository holds it:
 
 - `manifest.yaml`: refagent's, renamed, **every seat null**, the
   platform's guardrail pinned (SPEC/06 section 6, item 6), no edges, and
-  none of refagent's swap pins;
+  none of refagent's swap pins; `platform_version` is the milestone tag
+  HEAD carries, else the short commit (M07 PR 2: it was the literal "m06");
 - `agent.py`, `server.py`, `__init__.py`, `prompt.txt`, `tools/`: refagent's
   code, with the one change the platform's image needs: the server imports
   its agent module relatively (`infra/construct/agent.Dockerfile` copies the
@@ -29,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -44,11 +46,29 @@ KEPT = ("model", "judge_model_id", "guardrail", "endpoint_allowlist", "ceilings"
 OWN_IMPORT = "from agents.refagent import agent"
 
 
-def manifest(name: str) -> str:
+MILESTONE_TAG = re.compile(r"^m[0-9]{2}$")
+
+
+def platform_version(root: Path = ROOT) -> str:
+    """The platform's version: the milestone tag HEAD carries, else the short commit (SPEC/07 section 2).
+
+    Until M07 PR 2 this was the literal "m06", whatever commit the template was made from, and nothing
+    read it. `scripts/platform_upgrade.py` reads it now: an agent is behind when the commit its version
+    names is an ancestor of the template's."""
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
+
+    tags = sorted(tag for tag in git("tag", "--points-at", "HEAD").split() if MILESTONE_TAG.match(tag))
+    return tags[-1] if tags else git("rev-parse", "--short=12", "HEAD")
+
+
+def manifest(name: str, version: str | None = None) -> str:
     source = yaml.safe_load((REFAGENT / "manifest.yaml").read_text(encoding="utf-8"))
     doc = {"name": name, "version": "1.0.0", **{k: source[k] for k in KEPT},
            "seats": {seat: None for seat in SEATS}, "may_call": [], "may_be_called_by": [],
-           "platform_version": "m06"}  # fmt: skip
+           "platform_version": version or platform_version()}  # fmt: skip
+    # The template is never made retired, whatever refagent's manifest says.
+    doc["rollout"] = "all-at-once"
     head = (
         "# Your agent's manifest (docs/developer/quickstart.md in agentkeel).\n"
         "# Every seat is a GitHub login with access to this repository; the platform\n"

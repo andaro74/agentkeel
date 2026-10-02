@@ -1,0 +1,20 @@
+{
+  "id": 5,
+  "app_id": 5200002,
+  "app_slug": "agentkeel-observer",
+  "account": {
+    "login": "agentkeel-studio"
+  },
+  "repository_selection": "all",
+  "permissions": {
+    "administration": "read",
+    "checks": "read",
+    "contents": "read",
+    "metadata": "read",
+    "pull_requests": "write"
+  },
+  "repositories": [
+    "agent-template",
+    "owner-check"
+  ]
+}

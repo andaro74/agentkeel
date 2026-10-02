@@ -12,7 +12,7 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
 | Seeded commit | `c870bca` (S0 the template's repair read by CI: the owner's test, the App token's bounds); `ef3d88a` (S1 a platform bump opens a draft pull request); `3872c13` (S2 a retired agent's target is gone); `ea53ef4`, its run file made to parse in `a46c98f` (S3 a `model-watch` pull request merged and rolled back); `e814efe` (S4 panel 2 forced to show GREEN on a RED envelope, two tests, one per reader); `f36adee` (S5 a surface plant goes silent); the fixtures given their held cases and three more uncovered ones in `4240d9e`, on the PR's own review, each its own commit before any reader (SPEC/07 §5). S0 to S3 are each a fixture and a run file with `observed: null`; S4 and S5 are fixtures. SPEC/06's S3 (`b4eb959`, the timed quickstart) is received, not re-planted |
 | Expected gate output | PR 1: refagent's envelope as at M06; it says nothing about claim 7. `make plants` lists S0 to S5 (seeded cases, not golden plants); `tests/test_m07_seeds.py` shows 13 expected failures, and `tests/test_m06_seeds.py` still 1 (S3's). PR 2, on the PR: the nine fixture tests pass, each by its reader, and the four run-file tests stay expected failures; from PR 2's merge the gate requires `F7_0` to `F7_5` on every agent envelope, **from the seed tests alone: test-only witnesses**. The live readings are **recorded in the envelope's `upgrade` and read by this row's cell, with `template`, not gated** (SPEC/07 §4): the observer writes raw observations with the viewpoint it read from, and `build` rules on them. **A named P3 exception (SPEC/07 §5.1):** the platform check, the deploy, `platform-upgrade`, `model-watch` and the retire job run from `agentkeel`'s `main`, and the App's grant is made by hand after PR 2 merges, when `main` no longer mints a token with no repository. The platform check dispatched from a branch is attempted first, before any grant, and must be read as refused. Then, after PR 2's merge, each stated before and pushed: the grant made and read back; SPEC/06's S2 read on a new head; the owner's test, steps 2 to 4; SPEC/06's S3 timed once by `floresinnovations`; the template re-made and S1's pull requests; the App's token asked to relax a ruleset; `model-watch`'s swap to Haiku 4.5 and its rollback (independent of the others; its two pull requests on `main` are outside the cap); `owner-check` retired, last. PR 3 is the repair and carries every attempt's `observed` entry to `main`; PR 4 is the close. **The cell cites PR 4's run's envelope**, which carries the App-viewpoint observation `main`'s scheduled observer made, named, beside its own anonymous one. Stated at open: the owner's test's new head refused on the seats and the goldens and nothing else, its fixed head merged, deployed within 3,600 s, answering and listed; S1's draft pull request from the App within 4,500 s, platform-owned files only, no person's edit, major or minor as read; S2 retired within 3,600 s of its pull request's merge, its one invocation refused; a revert leaving the tree's digest live. Haiku 4.5's envelope is **not stated**: it has never been run. If it is RED the swap is not merged, F7.3 is read on `owner-check`'s platform upgrade reverted, and `upgrade.taken` stays under 3. The measured value is `upgrade.taken`, n of 3. RED if F7.0 is unread or fired; if `taken` is under 3; if a trigger gets no pull request from the platform, or one that needed a workflow or a person's edit; if the retired agent answers or its runtime stands; if a revert leaves the upgrade's digest live; if panel 2 shows GREEN on a RED envelope or the surfaces' counts differ; if a seed's test passes but by its reader; if PR 4's run cannot read an attempt; or if `make ledger` stops matching rows 0 to 6 |
 | Measured | — |
-| PRs used / cap | 1 / 4 |
+| PRs used / cap | 2 / 4 |
 | State | OPEN |
 
 ### Open detail (PR 1, 2026-10-01)
@@ -86,3 +86,82 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   installation or the key's environment; no `platform-upgrade`, no
   `model-watch`, no retire job; `rollout` with one value; a registry with
   no `retired_at`; one Grafana panel; no plant list for the surfaces.
+
+### PR 2 detail (the measure, 2026-10-02)
+
+- **The reads SPEC/07 §11 owed, then the rulings.** The reads are
+  `runs/pr2_reads.md` (`16d9f84`). The human ruled every item of
+  `rulings/pr2-security.md` and `rulings/pr2-threshold-owner.md` on
+  2026-10-02, "as proposed", before any PR 2 code (`aaa57b5` records
+  them): three Apps, each key in its own environment on `main`; the
+  installations stay on "all repositories"; a retirement is a stack
+  update with no new IAM; the seeded relaxation is one dispatch from
+  `main`; the observer stores under `observations/`; three bars; the p95
+  bar stays at 2.0; the candidate is Haiku 4.5.
+- **S0's fixtures reshaped first, before any reader** (`4d12603`): one
+  grant per App, in the ruling's own block's shape. Every reason PR 1
+  planted is still asked for.
+- **The readers, each marker off in its own commit:** `app_token()`
+  refusing a call with no repository (`580be7f`); `grant_errors` for the
+  installation and the environment (`3b67946`);
+  `scripts/platform_upgrade.py` `diff` (`10cf8eb`); `build.f7_2`,
+  `build.f7_3`, `build.panel_verdict_mismatch` through
+  `replay_history.verdicts`, `plants.SURFACE_PLANTS` and
+  `build.surface_plants` (`95b485c`); `validate`'s panel 2 check
+  (`d8f8118`). Nine fixture tests pass; the four run-file markers stay.
+- **The envelope:** `upgrade` (F7.0 to F7.5, each read or not, held or
+  not, with its viewpoint; the surfaces' plant counts; `taken`, n of 3),
+  `F7_0` to `F7_5` required by the gate from `eed43f5`, and row 7's
+  reading of `upgrade` with `template` (`READ_THE_UPGRADE`). The three
+  bars are `a34bcfa`, with a two-key test on them and on
+  `quickstart.max_seconds` (`open.md` row 23).
+- **Built for the attempts, none of it run:** the observer
+  (`scripts/observe_upgrade.py`, `020553f`), which reads from the
+  viewpoint it says; `platform-upgrade.yml`, `model-watch.yml`,
+  `observe.yml` and `deploy.yml`'s retire jobs, each keyed job in its own
+  environment on `main`'s code with the grant read back first (`84a1eb3`);
+  `scripts/retire_agent.py`, `scripts/model_watch.py`, the registry's
+  `retire`, the construct's stack without a runtime (`fc8509e`); the
+  security account's `bundles/` and `observations/`, and the bootstrap's
+  and Grafana's changes (`9fdbfe2`); `docs/developer/upgrade.md`,
+  `docs/platform/surfaces.md`, `docs/compliance/map.md`.
+- **Inherited from PR 1's review, repaired:** `template.py` reads
+  `merged` before the unread return, and holds "refused first" to the
+  App's own reasons; `deploy.yml`'s 412 path says whose answer record
+  stands; `legal-compliance` run under its own name.
+- **Changed from SPEC/07 §6's words, and said so** (SPEC/07 §12;
+  `rulings/pr2-security.md` item 13, which the Security seat had not
+  ruled on 2026-10-02): `agentkeel-upgrades` is a public App; `model-watch`
+  reads Bedrock as a role of its own; the eval role reads a template
+  agent's runtime; panel 2 reads a table in the agent account;
+  `platform-upgrade` lists agents from GitHub, not the registry; the idle
+  trigger for a retirement is not built; "live" for an upgrade since
+  replaced is read from its deploy run and its image.
+- **Stated before its run, and pushed first:** `runs/pr2_expected.md`.
+  Every live reading unread, `taken` 0 of 3, refagent as at M06, GREEN.
+- **The seat reviews, read on `a2c5a61...1b376a3`, before the pull
+  request was opened:** engineering-cold-reviewer 2 BLOCK and 15
+  FINDING, security-reviewer 1 and 7, platform-architect 1 and 5,
+  threshold-owner 0 and 6. Three BLOCKs were code and are repaired
+  (`b3196d6`): the retire job recorded a retirement whatever its one
+  invocation returned; the reader of the grant minted a token on every
+  installation, a stranger's included, while three places said it did
+  not; `evals.yml` opened envelopes with `jq`. The fourth is the seats':
+  both ruling files are drafts and item 13 is not ruled. The readers the
+  cold review probed no longer hold on a missing record (`ccb2be8`).
+  Each finding and what was done with it:
+  `rulings/pr2-engineering.md`, `rulings/pr2-security.md` section 14,
+  `rulings/pr2-threshold-owner.md` section 5.
+- **Found and not repaired, Product's:** SPEC/07 §2 makes CI's own
+  envelope commit a person's edit, so the model upgrade cannot read as
+  held and `taken` is at most 2 of 3 as the definition stands (SPEC/07
+  §12).
+- **Still the human's:** before the merge, the two new Apps, their
+  environments and keys, the two ids into the grant block, and each
+  stack after reading its `cdk diff` (`runs/pr2_by_hand.md`). After the
+  merge, and only then: Administration: write for `agentkeel-platform`,
+  then each attempt, stated before and pushed first (SPEC/07 §5.1).
+- **What is live after this PR merges and before any grant:** the
+  platform check still refuses every head (the `rulesets` token cannot be
+  minted until the grant), now saying so; no agent from the template
+  exists; nothing has been upgraded, retired or rolled back.

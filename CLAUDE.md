@@ -132,6 +132,9 @@ src/baseline/         frozen control
 src/verdict/          schema.json, build.py, gate.py, replay_history
 src/gates/            ruling_cited.py, two_key.py (M02 PR 2; gates.yml runs them)
 src/validate/         checks.py and the M02 modules (codeowners, edges, golden_ids, semver, ruleset)
+scripts/              the observers (observe_*.py: raw records, never a verdict) and the platform's own
+                      (platform_check.py, platform_upgrade.py, platform_pr.py, retire_agent.py,
+                      model_watch.py, registry.py, make_template.py; M06, and M07 PR 2)
 .github/CODEOWNERS    the seat table as owner lines (Security); the gates read it from the base ref
 agents/refagent/      the reference agent (title availability): manifest.yaml,
                       prompt.txt, tools/, rules/ (ADR-0003 amendment 1)
@@ -147,7 +150,8 @@ infra/                CDK: bootstrap stack, GovernedAgent construct (eval-role/
                       workflows.sha256 (validate)
 scripts/seed_slate.py writes data/slate.json and data/rights_table.json
 tests/
-Makefile              Engineering; all five targets exist from M00 PR 1
+Makefile              Engineering; the first five targets exist from M00 PR 1,
+                      `upgrade` from M07 PR 2
 ```
 
 ## Commands
@@ -163,6 +167,8 @@ make plants           list plants and whether each fired on last run
 make ledger           print the ledger with measured values; exits 1 if a
                       Measured cell differs from its envelope
 make ledger-plain     the same, and writes docs/milestones/README.md
+make upgrade          AGENT=<folder> PLATFORM=<template checkout>: what a platform
+                      upgrade would change there, printed; it opens nothing (M07 PR 2)
 ```
 
 Until M00 PR 2, `evals`, `plants` and `ledger` exit 1 with

@@ -17,9 +17,15 @@
 # states by name which platform-owned files the pull request is expected to
 # change. The human fills `observed` with each repository and the pull
 # request's number; scripts/observe_upgrade.py reads GitHub.
+#
+# Restated at M07 PR 2 on Security's ruling of 2026-10-02
+# (rulings/pr2-security.md, item 2): the pull request is opened by
+# `agentkeel-upgrades`, the App that can open one and cannot post the
+# check. "Authored by the App" below is that App; "the App's
+# platform-check" is `agentkeel-platform`'s (5144253).
 seed: S1
 falsifiers: [F7.1]
-principal: the platform's App, agentkeel-platform (5144253); the owner re-makes the template and merges as the agent's seats
+principal: the platform's App agentkeel-upgrades opens the pull request, and agentkeel-platform (5144253) checks it; the owner re-makes the template and merges as the agent's seats
 repositories:
   - agentkeel-studio/owner-check
 attempts:

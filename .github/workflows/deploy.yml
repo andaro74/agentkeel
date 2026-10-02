@@ -62,6 +62,49 @@
 # the answer record once in the security account (`agentkeel-answer-put`, which
 # may put under `envelopes/agents/` and nothing else).
 # refagent's two jobs below are unchanged but for the registry row.
+#
+# **From M07 PR 2 it also retires an agent** (SPEC/07 section 1, section 6;
+# milestones/M07/rulings/pr2-security.md items 2, 4, 6 and 11, ruled
+# 2026-10-02). A retirement arrives as a pull request the platform opened,
+# and the deploy path, finding `rollout: retired` at a head the App passed,
+# retires instead of deploying:
+#
+# - `retire-plan` (no secret) writes the one change, `rollout: retired`, for
+#   the agent a dispatch names (`gh workflow run deploy.yml -f retire=<name>`,
+#   the seeded trigger) or, on the schedule, for each agent whose pin is 30
+#   days or fewer from its `deprecated_after`. The input reaches the script
+#   through `env:`, never interpolated, and is held to the agent name
+#   pattern; `refagent` is refused. `retire-open` runs in the environment
+#   `platform-upgrades` with the key of the App that opens pull requests:
+#   the grant read back first, the plan checked again (one file, one field),
+#   then one draft pull request in the agent's repository.
+# - `find-agents` lists a merged head that says `rollout: retired` apart: it
+#   is never signed or deployed. `retire-agent` (the deploy role) checks that
+#   head again with agentkeel's code, keeps the runtime's ARN on the registry
+#   row, and updates the agent's stack to the construct's template **without
+#   the runtime** (infra/construct/). That update is the retirement: the
+#   execution role already may delete a template agent's runtime, and
+#   nothing is granted for it. Then one invocation of the ARN, recorded raw.
+#   Only when it is refused with ResourceNotFoundException is the retirement
+#   put once under envelopes/agents/<name>/retired.json in the security
+#   account, and `retired_at` written on the registry row, which stays. On
+#   any other result the job fails and the next run asks again. A name with
+#   `retired_at` is not deployed again: `registry.py claim` refuses it.
+#   The stack, the role, the key, the table and the logs are kept
+#   (milestones/M07/runs/f7_2_removed_and_kept.md). It is one-way.
+#
+# And every deploy of an agent from the template puts its signed archive
+# once under bundles/<name>/<commit>.tar in the audit bucket, since the
+# Actions artifact expires after 30 days. refagent's own two jobs are not
+# changed: its bundle is not put there, and it is never retired.
+#
+# Repaired at M07 PR 2 (re-read of 52ebd57 at M07 PR 1): when the answer
+# record is already in the bucket (a 412), the registry row says the record
+# standing is an earlier run's (`answer_put: stood`), where it named this
+# run against a record this run did not write.
+#
+# None of the retirement has run: S2's attempt is made after M07 PR 2
+# merges, last.
 name: deploy
 
 on:
@@ -79,6 +122,12 @@ on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
+    inputs:
+      retire:
+        description: "An agent to retire: the platform opens a draft pull request in its repository that sets rollout: retired. Leave empty to deploy."
+        required: false
+        default: ""
+        type: string
 
 permissions: {}
 
@@ -290,6 +339,7 @@ jobs:
       id-token: write # OIDC to AWS, as the deploy role, for the registry read
     outputs:
       agents: ${{ steps.find.outputs.agents }}
+      retiring: ${{ steps.find.outputs.retiring }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -313,8 +363,11 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          uv run python scripts/platform_check.py deployable --skip-deployed --out "$RUNNER_TEMP/agents.json"
+          uv run python scripts/platform_check.py deployable --skip-deployed --out "$RUNNER_TEMP/agents.json" \
+            --retiring "$RUNNER_TEMP/retiring.json"
           echo "agents=$(cat "$RUNNER_TEMP/agents.json")" >> "$GITHUB_OUTPUT"
+          # M07 PR 2: the heads that say rollout: retired, which the registry does not yet call retired.
+          echo "retiring=$(cat "$RUNNER_TEMP/retiring.json")" >> "$GITHUB_OUTPUT"
 
   sign-agent:
     needs: find-agents
@@ -538,17 +591,48 @@ jobs:
           aws-region: us-west-2
           unset-current-credentials: true
 
-      # Once: the bucket refuses a put under envelopes/ without If-None-Match (infra/security/). A 412 is a
-      # record already put by an earlier run whose registry write failed; the run goes on to the row
-      # (second cold read, F2 on M06 PR 2). The first record stands; this run's answer is in its summary.
-      - name: Put the answer record in the security account, once
+      # M07 PR 2 (SPEC/07 section 2 "Retired", section 6; rulings/pr2-security.md item 11): the signed archive
+      # this job verified and deployed, put once under bundles/<name>/<commit>.tar with its signature beside
+      # it, because the Actions artifact expires after 30 days and a retired agent's bundle must still be
+      # there. Before the answer record, so a deploy whose bundle could not be kept writes no row and is
+      # asked again. A 412 is an object of that key already put by an earlier run: it stands. Nothing here
+      # reads its bytes back (no role of this job may get an object), so "the same bytes" is not claimed.
+      - name: Put the signed bundle in the security account, once
         if: steps.registry.outputs.skip == 'false'
         run: |
           set -uo pipefail
-          out=$(aws s3api put-object --bucket agentkeel-audit-897698239547 \
-            --key "envelopes/agents/$NAME/$COMMIT.json" --body "$RUNNER_TEMP/answer.json" --if-none-match '*' 2>&1) && exit 0
+          for pair in "dist/bundle.tar:tar" "bundle.cosign.json:cosign.json"; do
+            file="$RUNNER_TEMP/signed/agents/$NAME/${pair%%:*}"
+            key="bundles/$NAME/$COMMIT.${pair##*:}"
+            if out=$(aws s3api put-object --bucket agentkeel-audit-897698239547 --key "$key" --body "$file" \
+                --if-none-match '*' --checksum-algorithm SHA256 2>&1); then
+              echo "put $key"
+            elif echo "$out" | grep -q "PreconditionFailed"; then
+              echo "$key was already put; it stands" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "$out"
+              exit 1
+            fi
+          done
+
+      # Once: the bucket refuses a put under envelopes/ without If-None-Match (infra/security/). A 412 is a
+      # record already put by an earlier run whose registry write failed; the run goes on to the row
+      # (second cold read, F2 on M06 PR 2). The first record stands; this run's answer is in its summary.
+      # M07 PR 2 (re-read of 52ebd57): the step says which it was, and the registry row then says the
+      # record standing is an earlier run's, not this run's.
+      - name: Put the answer record in the security account, once
+        id: answer
+        if: steps.registry.outputs.skip == 'false'
+        run: |
+          set -uo pipefail
+          if out=$(aws s3api put-object --bucket agentkeel-audit-897698239547 \
+            --key "envelopes/agents/$NAME/$COMMIT.json" --body "$RUNNER_TEMP/answer.json" --if-none-match '*' 2>&1); then
+            echo "put=first" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if echo "$out" | grep -q "PreconditionFailed"; then
             echo "envelopes/agents/$NAME/$COMMIT.json was already put; the first record stands" >> "$GITHUB_STEP_SUMMARY"
+            echo "put=stood" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "$out"
@@ -569,6 +653,268 @@ jobs:
         if: steps.registry.outputs.skip == 'false'
         env:
           RUN_ID: ${{ github.run_id }}
+          ANSWER_PUT: ${{ steps.answer.outputs.put }}
         run: >-
           uv run python scripts/registry.py write --name "$NAME" --repository "$REPOSITORY"
-          --repository-id "$REPOSITORY_ID" --commit "$COMMIT" --run-id "$RUN_ID"
+          --repository-id "$REPOSITORY_ID" --commit "$COMMIT" --run-id "$RUN_ID" --answer-put "$ANSWER_PUT"
+
+  # --- M07 PR 2: a retirement (SPEC/07 section 6; rulings/pr2-security.md items 4 and 11) -----
+
+  # No secret. On a dispatch that names an agent, that agent's retirement; on the schedule, each agent
+  # whose pin is 30 days or fewer from its deprecated_after. The agent's manifest is read through GitHub's
+  # API, as data. The name comes through the environment and is held to the agent name pattern.
+  retire-plan:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.retire != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      any: ${{ steps.plan.outputs.any }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Which retirement to open
+        id: plan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RETIRE: ${{ inputs.retire }}
+        run: |
+          set -euo pipefail
+          if [ -n "$RETIRE" ]; then
+            uv run python scripts/retire_agent.py plan --name "$RETIRE" --out "$RUNNER_TEMP/retire-plan.json"
+          else
+            uv run python scripts/retire_agent.py plan --deprecating --out "$RUNNER_TEMP/retire-plan.json"
+          fi
+          any=$(python3 -c 'import json, sys; print("true" if any(e.get("open") for e in json.load(open(sys.argv[1]))) else "false")' "$RUNNER_TEMP/retire-plan.json")
+          echo "any=$any" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: retire-plan
+          path: ${{ runner.temp }}/retire-plan.json
+          if-no-files-found: error
+          retention-days: 30
+
+  # The key of the App that opens pull requests, in its own environment (main only). agentkeel's code,
+  # on the artifact above: the grant read back first, the plan checked again, then one draft.
+  retire-open:
+    needs: retire-plan
+    if: needs.retire-plan.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: platform-upgrades
+    permissions:
+      contents: read
+      actions: read # the environment's own rules, read back
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: retire-plan
+          path: ${{ runner.temp }}/plan
+
+      - name: The App's grant and its key's environment, read back against the ruling
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.UPGRADES_APP_PRIVATE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run python scripts/platform_check.py grant --app agentkeel-upgrades --out "$RUNNER_TEMP/grant.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: grant-agentkeel-upgrades
+          path: ${{ runner.temp }}/grant.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Open the draft retirement, as the App
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.UPGRADES_APP_PRIVATE_KEY }}
+        run: uv run python scripts/retire_agent.py open --plan "$RUNNER_TEMP/plan/retire-plan.json"
+
+  # The deploy role, from main: a merged head the App passed that says rollout: retired. The stack is
+  # updated to the construct's template without the runtime. No job here signs, builds or deploys an image.
+  retire-agent:
+    needs: find-agents
+    if: needs.find-agents.outputs.retiring != '[]' && needs.find-agents.outputs.retiring != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # OIDC to AWS, as the deploy role, then as the answer put role, then the deploy role again
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include: ${{ fromJSON(needs.find-agents.outputs.retiring) }}
+    env:
+      NAME: ${{ matrix.name }}
+      REPOSITORY: ${{ matrix.repository }}
+      REPOSITORY_ID: ${{ matrix.repository_id }}
+      COMMIT: ${{ matrix.commit }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.commit }}
+          path: agent-src
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      # Again, at the commit being retired, with agentkeel's code: the App passed it, and it says retired.
+      - name: The head is still what the platform check passed, and it says rollout retired
+        run: |
+          set -euo pipefail
+          test "$NAME" != "refagent"
+          uv run python -m src.validate.agent evaluate --agent agent-src --repository "$REPOSITORY" \
+            --head "$COMMIT" --defer-seat-access --out "$RUNNER_TEMP/check.json"
+          uv run python -c 'import sys, yaml; sys.exit(0 if yaml.safe_load(open("agent-src/manifest.yaml", encoding="utf-8")).get("rollout") == "retired" else "manifest.yaml does not say rollout: retired")'
+
+      - name: Place the agent at agents/<name>, without its git or workflow files
+        run: |
+          set -euo pipefail
+          mkdir -p "agents/$NAME"
+          rsync -a --exclude .git --exclude .github agent-src/ "agents/$NAME/"
+          rm -rf agent-src
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: agentkeel-retire-agent-${{ github.run_id }}
+          role-duration-seconds: 3600
+          aws-region: us-west-2
+
+      # The ARN is kept on the registry row before anything is removed, so the one invocation after the
+      # deletion, and a rerun of a retirement that failed halfway, still know which ARN to ask. Exit 4 is
+      # "already retired"; 3 is another repository's agent, refagent, or no ARN known: refused.
+      - name: Keep the runtime's ARN, before it is removed
+        id: arn
+        run: |
+          set -uo pipefail
+          from_stack=$(aws cloudformation describe-stacks --stack-name agentkeel-"$NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='RuntimeArn'].OutputValue" --output text 2>/dev/null || true)
+          [ "$from_stack" = "None" ] && from_stack=""
+          arn=$(uv run python scripts/registry.py retiring --name "$NAME" --repository-id "$REPOSITORY_ID" --arn "$from_stack")
+          code=$?
+          if [ "$code" = "4" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [ "$code" = "0" ] || exit "$code"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "arn=$arn" >> "$GITHUB_OUTPUT"
+
+      # The retirement: the same stack, synthesised from a manifest that says retired, has no runtime. The
+      # update removes it as the execution role, which may already delete a template agent's runtime.
+      - name: Update agentkeel-<name> to the stack without its runtime
+        if: steps.arn.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          AGENTKEEL_BUNDLE="agents/$NAME" uv run python -m infra.construct.app
+          if grep -q '"AWS::BedrockAgentCore::Runtime"' infra/construct/cdk.out/AgentkeelAgent.template.json; then
+            echo "::error::the synthesised stack still has a runtime; nothing is deployed"
+            exit 1
+          fi
+          aws cloudformation deploy \
+            --stack-name agentkeel-"$NAME" \
+            --template-file "infra/construct/cdk.out/AgentkeelAgent.template.json" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --role-arn "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/agentkeel-cfn-exec" \
+            --no-fail-on-empty-changeset
+
+      # One call, after the deletion, written raw. Only ResourceNotFoundException says the runtime is gone.
+      # Anything else, an answer included, fails the job here: nothing is put in the audit bucket, the row
+      # gets no retired_at, and the next run asks again with the ARN the row kept. CloudFormation deletes a
+      # removed resource after the update has succeeded, so an update that exited 0 does not say the
+      # runtime is gone (platform-architect B1 on M07 PR 2). What was returned is kept with the run.
+      - name: One invocation of the retired runtime; anything but ResourceNotFoundException stops here
+        id: invocation
+        if: steps.arn.outputs.skip == 'false'
+        env:
+          ARN: ${{ steps.arn.outputs.arn }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          uv run python scripts/retire_agent.py invoke --arn "$ARN" --out "$RUNNER_TEMP/invocation.json"
+          code=$?
+          cat "$RUNNER_TEMP/invocation.json" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" != "0" ]; then
+            echo "::error::the runtime of $NAME is not gone: no retirement is recorded, and the registry row stays open"
+            exit 1
+          fi
+          set -e
+          uv run python scripts/retire_agent.py record --name "$NAME" --repository "$REPOSITORY" --commit "$COMMIT" \
+            --arn "$ARN" --run-url "$RUN_URL" --invocation "$RUNNER_TEMP/invocation.json" --out "$RUNNER_TEMP/retired.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always() && steps.arn.outputs.skip == 'false'
+        with:
+          name: retire-invocation-${{ matrix.name }}
+          path: ${{ runner.temp }}/invocation.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: steps.arn.outputs.skip == 'false'
+        with:
+          role-to-assume: ${{ vars.AWS_ANSWER_PUT_ROLE_ARN }}
+          role-session-name: agentkeel-retired-put-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+          unset-current-credentials: true
+
+      # Once, in the security account: the registry row is in the agent account and is not write-once.
+      - name: Put the retirement in the security account, once
+        if: steps.arn.outputs.skip == 'false'
+        run: |
+          set -uo pipefail
+          out=$(aws s3api put-object --bucket agentkeel-audit-897698239547 \
+            --key "envelopes/agents/$NAME/retired.json" --body "$RUNNER_TEMP/retired.json" --if-none-match '*' 2>&1) && exit 0
+          if echo "$out" | grep -q "PreconditionFailed"; then
+            echo "envelopes/agents/$NAME/retired.json was already put; the first record stands" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "$out"
+          exit 1
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: steps.arn.outputs.skip == 'false'
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: agentkeel-retire-agent-row-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+          unset-current-credentials: true
+
+      # Last: a put that failed leaves the row without retired_at, so the next run finishes the retirement.
+      - name: retired_at on the agent's row, which stays
+        if: steps.arn.outputs.skip == 'false'
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: >-
+          uv run python scripts/registry.py retire --name "$NAME" --repository-id "$REPOSITORY_ID"
+          --commit "$COMMIT" --run-id "$RUN_ID"

@@ -5,7 +5,7 @@
   "account": {
     "login": "agentkeel-studio"
   },
-  "repository_selection": "selected",
+  "repository_selection": "all",
   "permissions": {
     "administration": "write",
     "checks": "write",
@@ -16,7 +16,6 @@
   },
   "repositories": [
     "agent-template",
-    "owner-check",
-    "scratch-repo"
+    "owner-check"
   ]
 }

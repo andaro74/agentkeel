@@ -7,6 +7,8 @@
 # milestones/M01/rulings/pr1.md (ruling B; M01 open items 5, 22, 23).
 # M04 PR 2: `relative` added (SPEC/04 §2; milestones/M04/rulings/
 # pr2-threshold-owner.md). Adding a bar is not a relaxation (ADR-0009).
+# M07 PR 2: `upgrade` added, three bars (SPEC/07 §2; milestones/M07/rulings/
+# pr2-threshold-owner.md, item 1, ruled 2026-10-02). No existing bar moves.
 
 # cost-cap: total tokens, in plus out, for one `make evals` run.
 # A budget, not a quality bar. Relaxes upward: a higher number needs two keys.
@@ -103,6 +105,30 @@ detection:
 quickstart:
   max_seconds: 28800
 
+# Threshold Owner (M07 PR 2; SPEC/07 section 2 "The limits"; ruled
+# 2026-10-02, milestones/M07/rulings/pr2-threshold-owner.md item 1): claim
+# 7's three limits. Each is a time between two records, every time GitHub's
+# or AWS's, never a runner's clock or a person's.
+# - arrive_max_seconds: from an upgrade's trigger (the template's push, the
+#   model-watch run, the retire run) to the `created_at` of the pull request
+#   the platform opened. platform-upgrade.yml runs every 15 minutes (the
+#   retire job every 10, model-watch daily), so one 15-minute period plus
+#   an hour.
+# - deploy_max_seconds: from a pull request's `merged_at` to the deploy run
+#   of that merge completed.
+# - retire_max_seconds: from the retirement pull request's `merged_at` to
+#   `DeleteAgentRuntime` in CloudTrail.
+# Absolute, not relative: none is a quality bar and none has an incumbent
+# (as quickstart.max_seconds; threshold-owner F1 on M06 PR 2). Read by build
+# into `upgrade` and by row 7's reading of it; they gate no pull request.
+# GitHub may delay a scheduled run: a miss is the finding, not a bar to
+# move. Added before any attempt; adding a bar is not a relaxation
+# (ADR-0009). Each relaxes upward.
+upgrade:
+  arrive_max_seconds: 4500
+  deploy_max_seconds: 3600
+  retire_max_seconds: 3600
+
 # Threshold Owner (M02 PR 2): which direction relaxes each bar, read by
 # `two-key` (src/gates/two_key.py) instead of the comments above. A bar is a
 # numeric leaf under the mappings in this file; `baseline_card` is a pin,
@@ -119,3 +145,6 @@ relaxes:
   relative.agent_tokens_ratio_max: up
   detection.max_seconds: up
   quickstart.max_seconds: up
+  upgrade.arrive_max_seconds: up
+  upgrade.deploy_max_seconds: up
+  upgrade.retire_max_seconds: up

@@ -1,0 +1,169 @@
+# model-watch (SPEC/07 section 1, section 6; SPEC/04 section 9 cut a; M07 PR 2). Security seat.
+# Authorised by SPEC/00-overview.md#8-M07 and milestones/M07/rulings/pr2-security.md
+# (items 2, 4, 6 and 10, ruled 2026-10-02).
+# Its hash is listed in infra/workflows.sha256, which `make validate` reads.
+#
+# A model upgrade arrives as a pull request the platform opened. This runs
+# on agentkeel's main, once a day (and by hand). It asks Bedrock for the
+# lifecycle of every model the manifest pins, and opens at most two draft
+# pull requests on this repository, each one change to
+# agents/refagent/manifest.yaml with a drafted Threshold Owner ruling:
+#
+# - `deprecated_after`, from Bedrock's end-of-life date for refagent's pin,
+#   when Bedrock gives one and it is not later than the manifest's. It never
+#   delays or clears a date: that is a relaxation, with two keys, and a
+#   person's to propose.
+# - the swap to the candidate the Threshold Owner named (the run file
+#   milestones/M07/runs/f7_3_rollback.yaml, `candidate:`), when Bedrock
+#   calls that model ACTIVE and refagent's pin is another. A person names
+#   the candidate; the platform opens the pull request.
+#
+# The pull request's own `evals` run is the shadow run, and M04's gate rules
+# it. It is opened as an App, so it starts evals.yml; one opened with
+# GITHUB_TOKEN would not. Nothing is skipped for it: it merges only when a
+# seat has ruled its ruling file and every required check is green.
+#
+# Two jobs (item 4):
+#
+# 1. `read` holds no App key. It assumes `agentkeel-model-watch`, a role
+#    that may ask Bedrock for a model's lifecycle and nothing else, trusted
+#    for this workflow on main only, and writes what Bedrock said and what
+#    would be opened, as data.
+# 2. `open` runs in the environment `platform-upgrades` (main only, admin
+#    bypass off), with the key of `agentkeel-upgrades`. First the App's
+#    grant read back against the ruling; then the plan held again to main's
+#    own manifest and main's own run file (one file, one field, the named
+#    candidate's pin) before a token is minted for this repository and the
+#    `open` permission set. The ruling draft is written by this job itself,
+#    never taken from the plan, and carries a "Drafted" line and no line
+#    that starts "Ruled by": a seat rules it, the platform does not
+#    (security-reviewer 8 on M07 PR 1).
+#
+# On this repository `agentkeel-upgrades` can push a branch and open a pull
+# request. It cannot merge to main (the ruleset requires five checks and a
+# pull request, bypass_actors []), cannot post a check, and holds no
+# `workflows` permission, so it cannot push a change under
+# .github/workflows/. The App that posts the platform check, 5144253, is
+# never installed here.
+#
+# One pull request per branch name, ever: `model-watch/<role>` for the
+# swap. After the swap merged and was reverted the pin differs from the
+# candidate again, and nothing is opened a second time.
+#
+# What this does not do: choose the candidate (SPEC/07 section 8); catch a
+# model that changed under an unchanged pin; retire an agent whose pin is
+# near its date (deploy.yml's retire jobs open that pull request in an agent
+# repository). No model is called by this workflow. Until the role, the App
+# and its id exist it opens nothing. Nothing here has fired on its seeded
+# case: S3's attempt is made after M07 PR 2 merges.
+name: model-watch
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: model-watch
+  cancel-in-progress: false
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # OIDC to AWS, as agentkeel-model-watch
+    outputs:
+      any: ${{ steps.plan.outputs.any }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        if: vars.AWS_MODEL_WATCH_ROLE_ARN != ''
+        with:
+          role-to-assume: ${{ vars.AWS_MODEL_WATCH_ROLE_ARN }}
+          role-session-name: agentkeel-model-watch-${{ github.run_id }}
+          role-duration-seconds: 900
+          aws-region: us-west-2
+
+      - name: Bedrock's lifecycle for the pinned models, and what it sets off
+        id: plan
+        env:
+          ROLE: ${{ vars.AWS_MODEL_WATCH_ROLE_ARN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ROLE" ]; then
+            echo "::warning::AWS_MODEL_WATCH_ROLE_ARN is not set; Bedrock is not asked and nothing is opened"
+            echo "[]" > "$RUNNER_TEMP/plan.json"
+          else
+            uv run python scripts/model_watch.py read --out "$RUNNER_TEMP/lifecycle.json"
+            uv run python scripts/model_watch.py plan --lifecycle "$RUNNER_TEMP/lifecycle.json" --base "$GITHUB_SHA" \
+              --run-url "$RUN_URL" --out "$RUNNER_TEMP/plan.json"
+          fi
+          any=$(python3 -c 'import json, sys; print("true" if any(e.get("open") for e in json.load(open(sys.argv[1]))) else "false")' "$RUNNER_TEMP/plan.json")
+          echo "any=$any" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: model-watch-plan
+          path: |
+            ${{ runner.temp }}/plan.json
+            ${{ runner.temp }}/lifecycle.json
+          if-no-files-found: error
+          retention-days: 90
+
+  open:
+    needs: read
+    if: needs.read.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: platform-upgrades
+    permissions:
+      contents: read
+      actions: read # the environment's own rules, read back
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: model-watch-plan
+          path: ${{ runner.temp }}/plan
+
+      - name: The App's grant and its key's environment, read back against the ruling
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.UPGRADES_APP_PRIVATE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run python scripts/platform_check.py grant --app agentkeel-upgrades --out "$RUNNER_TEMP/grant.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: grant-agentkeel-upgrades
+          path: ${{ runner.temp }}/grant.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # The checkout is main at this run's commit; a plan made against another commit is refused by
+      # scripts/platform_pr.py (the base moved), and the next run plans again.
+      - name: Open each draft pull request and its ruling draft, as the App
+        env:
+          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.UPGRADES_APP_PRIVATE_KEY }}
+        run: uv run python scripts/model_watch.py open --plan "$RUNNER_TEMP/plan/plan.json"

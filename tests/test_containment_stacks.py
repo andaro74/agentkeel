@@ -138,12 +138,17 @@ def test_the_read_role_reads_its_prefixes_and_the_put_role_trusts_main_only(secu
     assert answer["token.actions.githubusercontent.com:sub"] == ["repo:andaro74@3157440/agentkeel@1376369685:ref:refs/heads/main"]
     answer_put = next(p for k, p in {json.dumps(p["Roles"]): p for p in of_type(security, "AWS::IAM::Policy")}.items()
                       if "AnswerPutRole" in k)["PolicyDocument"]["Statement"]  # fmt: skip
-    assert [s["Action"] for s in answer_put] == ["s3:PutObject"]
-    assert "envelopes/agents/*" in json.dumps(answer_put[0]["Resource"])
+    # M07 PR 2 (rulings/pr2-security.md item 11): and the signed bundle of what it deployed, under bundles/.
+    assert [s["Action"] for s in answer_put] == ["s3:PutObject", "s3:PutObject"]
+    assert "envelopes/agents/*" in json.dumps(answer_put[0]["Resource"]) and "bundles/*" in json.dumps(answer_put[1]["Resource"])
     policies = {json.dumps(p["Roles"]): p for p in of_type(security, "AWS::IAM::Policy")}
     read = next(p for k, p in policies.items() if "ReadRole" in k)["PolicyDocument"]["Statement"]
     listed = next(s for s in read if "s3:ListBucket" in s["Action"])
-    assert listed["Condition"] == {"StringLike": {"s3:prefix": ["AWSLogs/*", "agents/*", "test/*", "envelopes/agents/*"]}}
+    # M07 PR 2: observations/ is listed and read; bundles/ is listed only.
+    assert listed["Condition"] == {"StringLike": {"s3:prefix": ["AWSLogs/*", "agents/*", "test/*", "envelopes/agents/*",
+                                                               "observations/*", "bundles/*"]}}  # fmt: skip
+    reading = next(s for s in read if "s3:GetObject" in s["Action"])
+    assert "observations/*" in json.dumps(reading["Resource"]) and "bundles/" not in json.dumps(reading["Resource"])
     assert all(r.get("PermissionsBoundary") for r in both.values())
 
 
@@ -183,3 +188,36 @@ def test_s1s_origin_is_removed_once_it_showed_the_finding(audit):
     has no route out (rulings/pr2.md ruling 9). S1_ORIGIN = False: the stack makes neither the function nor its role."""
     assert of_type(audit, "AWS::Lambda::Function") == []
     assert "agentkeel-seed-s1-role" not in roles(audit)
+
+
+# --- M07 PR 2: bundles/ and observations/ (SPEC/07 section 6; rulings/pr2-security.md items 9 and 11) ----
+
+
+def test_a_bundle_and_an_observation_are_each_put_once(security):
+    statements = bucket_policy(security)
+    for sid, prefix in (("ABundleIsWrittenOnce", "bundles/*"), ("AnObservationIsWrittenOnce", "observations/*")):
+        once = statements[sid]
+        assert once["Effect"] == "Deny" and once["Action"] == "s3:PutObject" and once["Principal"] == {"AWS": "*"}
+        assert once["Condition"] == {"Null": {"s3:if-none-match": "true"}} and json.dumps(once["Resource"]).endswith(f'/{prefix}"]]}}')
+    # No Allow in the bucket's policy for either prefix: the two roles that put there are this account's own.
+    assert not [s for s in statements.values() if s["Effect"] == "Allow" and ("bundles/" in json.dumps(s["Resource"])
+                                                                               or "observations/" in json.dumps(s["Resource"]))]  # fmt: skip
+
+
+def test_the_observation_put_role_trusts_observe_yml_on_main_and_puts_under_observations_only(security):
+    role = roles(security)["agentkeel-observation-put"]
+    on_main = role["AssumeRolePolicyDocument"]["Statement"][0]["Condition"]["StringEquals"]
+    assert on_main["token.actions.githubusercontent.com:sub"] == ["repo:andaro74@3157440/agentkeel@1376369685:ref:refs/heads/main"]
+    assert on_main["token.actions.githubusercontent.com:job_workflow_ref"] == "andaro74/agentkeel/.github/workflows/observe.yml@refs/heads/main"
+    assert role.get("PermissionsBoundary")
+    policy = next(p for k, p in {json.dumps(p["Roles"]): p for p in of_type(security, "AWS::IAM::Policy")}.items()
+                  if "ObservationPutRole" in k)["PolicyDocument"]["Statement"]  # fmt: skip
+    assert [s["Action"] for s in policy] == ["s3:PutObject"] and json.dumps(policy[0]["Resource"]).endswith('/observations/*"')
+
+
+def test_the_trail_logs_the_two_new_prefixes_and_still_not_its_own_delivery(security):
+    (trail,) = of_type(security, "AWS::CloudTrail::Trail")
+    logged = json.dumps(trail["AdvancedEventSelectors"])
+    assert f"{BUCKET}/bundles/" in logged and f"{BUCKET}/observations/" in logged and f"{BUCKET}/AWSLogs/" not in logged
+    (bucket,) = of_type(security, "AWS::S3::Bucket")
+    assert bucket["ObjectLockConfiguration"]["Rule"]["DefaultRetention"] == {"Mode": "COMPLIANCE", "Days": 1}  # no retention changed

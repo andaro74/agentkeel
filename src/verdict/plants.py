@@ -154,6 +154,19 @@ SEEDS_M07: dict[str, tuple[str, str, str]] = {
     "S5": ("F7.5", "tests/fixtures/m07/s5-silent-surface-plant/", "src/verdict/upgrade.py"),
 }
 
+# The surfaces' control (M07 PR 2; SPEC/07 section 2 "The surfaces", F7.5; seed S5's reader). A surface's
+# plant is a seeded case its reader must refuse: panel 1's (S4 of SPEC/06) and panel 2's (S4 of SPEC/07).
+# Each names the tests that hand it to its readers: the plant fired in a run when every one of them ran
+# and passed (`upgrade.surface_results`, from the run's JUnit file, as F0_2 is read). They are not golden
+# plants and never enter `plants_expected`: they are counted apart, in `upgrade.surfaces`, and
+# `checks.F7_5` fails when the two counts differ. S5 is the test of the counter and is not counted.
+SURFACE_PLANTS: dict[str, tuple[str, ...]] = {
+    "tests/fixtures/m06/s4-panel1/": ("test_s4_a_panel_1_query_with_a_second_source_is_refused",
+                                      "test_s4_a_panel_row_with_no_registry_row_is_found_by_build"),
+    "tests/fixtures/m07/s4-panel2/": ("test_s4_a_panel_2_query_that_computes_the_verdict_is_refused",
+                                      "test_s4_a_green_row_for_a_red_envelope_is_found_by_build"),
+}  # fmt: skip
+
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
 SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/01 section 5", SEEDS),

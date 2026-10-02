@@ -94,8 +94,11 @@ BOUND = [{"context": "platform-check", "integration_id": APP}]  # the agent repo
 
 
 def runs(conclusion: str | None, stand_in: bool = False) -> list[dict[str, Any]]:
+    # From M07 PR 2 the observer keeps the App's own reasons beside each run: a failure here is for the
+    # template's two planted faults, as the App names them.
     out = [] if conclusion is None else [{"name": shipped.PLATFORM_CHECK, "app_id": APP, "app_slug": "agentkeel-platform",
-                                           "conclusion": conclusion}]  # fmt: skip
+                                           "conclusion": conclusion,
+                                           "refused": [shipped.SEAT_CHECK, shipped.GOLDENS_CHECK] if conclusion == "failure" else []}]  # fmt: skip
     if stand_in:
         out.append({"name": shipped.PLATFORM_CHECK, "app_id": 15368, "app_slug": "github-actions", "conclusion": "success"})
     return out
@@ -463,7 +466,10 @@ def test_the_observer_writes_what_github_returned_and_build_rules_on_it(monkeypa
         f"/repos/org/premiere-desk/contents/goldens/g-001.yaml?ref={'b' * 40}": "kind: ordinary\nretired: null\n",
         f"/repos/org/premiere-desk/contents/goldens/g-002.yaml?ref={'b' * 40}": "kind: trap\nretired: null\n",
         f"/repos/org/premiere-desk/commits/{'a' * 40}/check-runs?per_page=100":
-            {"check_runs": [{"name": "platform-check", "app": {"id": APP, "slug": "p"}, "conclusion": "failure"}]},
+            {"check_runs": [{"name": "platform-check", "app": {"id": APP, "slug": "p"}, "conclusion": "failure",
+                             "output": {"title": "2 refused", "summary": (
+                                 f"- **{shipped.SEAT_CHECK}**: manifest.yaml: seat product is null\n"
+                                 f"- **{shipped.GOLDENS_CHECK}**: goldens/: no live ordinary")}}]},
         "/repos/org/premiere-desk/rulesets?includes_parents=false&per_page=100": [{"id": 5}],
         "/repos/org/premiere-desk/rulesets/5": {"rules": [{"type": "required_status_checks", "parameters": {
             "required_status_checks": [{"context": "platform-check", "integration_id": APP}]}}]},
@@ -476,7 +482,8 @@ def test_the_observer_writes_what_github_returned_and_build_rules_on_it(monkeypa
     assert [c["seats"]["product"] for c in commits] == [None, "andaro74"]
     assert [g["kind"] for g in commits[1]["goldens"]] == ["ordinary", "trap"]
     reading = shipped.record(observation, 28800.0)
-    assert reading["F6_1"] == {"read": True, "held": True, "reasons": [], "faulty_commits": 1}
+    assert commits[0]["check_runs"][0]["refused"] == [shipped.SEAT_CHECK, shipped.GOLDENS_CHECK]  # the App's own words
+    assert reading["F6_1"] == {"read": True, "held": True, "reasons": [], "faulty_commits": 1, "viewpoint": "anonymous"}
     assert reading["F6_3"]["read"] is False  # no deploy, answer or registry row read in this part
 
 
@@ -621,7 +628,7 @@ class FakeTable:
 
         held = self.items.get(Item["name"]["S"])
         same = ExpressionAttributeValues is not None and held and held["repository_id"] == ExpressionAttributeValues[":id"]
-        if held and not same:
+        if held and (not same or ("attribute_not_exists(retired_at)" in ConditionExpression and "retired_at" in held)):
             raise ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
         self.items[Item["name"]["S"]] = Item
 
@@ -654,13 +661,14 @@ def test_the_app_token_is_minted_from_a_jwt_the_apps_key_signs(monkeypatch):
 
     def gh(path, *, method="GET", body=None, raw=False):
         seen.append(os.environ["GITHUB_TOKEN"])
-        return {"id": 77} if path == "/orgs/org/installation" else {"token": "ghs_installation"}
+        return {"id": 77} if path == "/repos/org/a/installation" else {"token": "ghs_installation"}
 
     import os
 
     monkeypatch.setattr(platform_check, "gh", gh)
     monkeypatch.setenv("GITHUB_TOKEN", "before")
-    assert platform_check.app_token(APP, "org", pem) == "ghs_installation"
+    # From M07 PR 2 a token is minted for one repository and one named permission set (seed S0's reader).
+    assert platform_check.app_token(APP, "org", pem, "org/a", "check") == "ghs_installation"
     assert os.environ["GITHUB_TOKEN"] == "before"  # the JWT never outlives the call
     head, body, signature = seen[0].split(".")
     pad = lambda s: s + "=" * (-len(s) % 4)  # noqa: E731

@@ -18,7 +18,7 @@
 # writes the card, refagent writes the envelope, and cost-cap adds the two
 # up against one cap (ruling l).
 
-.PHONY: evals evals-local validate plants ledger ledger-plain
+.PHONY: evals evals-local validate plants ledger ledger-plain upgrade
 
 COMMIT := $(shell git rev-parse HEAD)
 HISTORY := evals/history
@@ -98,6 +98,26 @@ CONTAINMENT_OBS ?=
 F6_1_CASES := test_s1a_an_unassigned_seat_is_refused,test_s1a_reader_does_not_refuse_s1b,test_s1b_goldens_under_the_minimum_are_refused,test_s1b_reader_does_not_refuse_s1a
 F6_4_CASES := test_s4_a_panel_1_query_with_a_second_source_is_refused,test_s4_a_panel_row_with_no_registry_row_is_found_by_build
 TEMPLATE_OBS ?=
+# M07 PR 2 (SPEC/07 section 4). F7_0 to F7_5: each fixture of S0 to S5 refused by its
+# own reader, read from the nine fixture tests; test-only witnesses, the only
+# claim 7 checks on an envelope. F7_5 is joined by build's own count of the
+# surfaces' plants in this run (JUNIT again, as --surfaces). The four run-file
+# tests are in no list: they read what the human typed, and stay expected
+# failures until each attempt is recorded. The live records are UPGRADE_OBS,
+# scripts/observe_upgrade.py's reading of GitHub, AWS and Grafana: build rules
+# them into `upgrade`, and only the ledger's row 7 reading reads it.
+# APP_OBS is what main's scheduled observer stored, read as the platform's
+# observer App; with it `template` and `upgrade` say which viewpoint each
+# GitHub reading was ruled on. Empty, the envelope has no upgrade, and row 7
+# reads it as not read.
+F7_0_CASES := test_s0_app_token_refuses_a_call_with_no_repository,test_s0_the_installations_grant_is_read_back,test_s0_the_key_environment_is_read_back
+F7_1_CASES := test_s1_a_platform_upgrade_changes_platform_owned_files_only
+F7_2_CASES := test_s2_a_retired_agent_that_still_answers_is_found_by_build
+F7_3_CASES := test_s3_a_rollback_that_leaves_the_new_digest_live_is_found_by_build
+F7_4_CASES := test_s4_a_panel_2_query_that_computes_the_verdict_is_refused,test_s4_a_green_row_for_a_red_envelope_is_found_by_build
+F7_5_CASES := test_s5_a_silent_surface_plant_is_counted
+UPGRADE_OBS ?=
+APP_OBS ?=
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \
           $(if $(F0_3_OBS),--check-pr F0_3 "$(F0_3_OBS)") \
           $(if $(JUNIT),--check-cases F1_1 "$(F1_1_CASES)" "$(JUNIT)") \
@@ -120,6 +140,12 @@ CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)")
           $(if $(JUNIT),--check-cases F5_1 "$(F5_1_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F6_1 "$(F6_1_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F6_4 "$(F6_4_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F7_0 "$(F7_0_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F7_1 "$(F7_1_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F7_2 "$(F7_2_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F7_3 "$(F7_3_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F7_4 "$(F7_4_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F7_5 "$(F7_5_CASES)" "$(JUNIT)") \
           $(if $(RUN_URL),--run-url "$(RUN_URL)")
 # CI passes a file path; the gate's exit code is written there, so a REJECTED
 # envelope (exit 2) is told from a RED one and is not recorded (M01 item 9).
@@ -152,7 +178,7 @@ define chain
 	$(if $(A_VS_A),-uv run python -m src.agent.run --out $(1)/$(2).agent-raw-b.json --recheck-runtime)
 	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json $(A_VS_A_RUNS)
 	$(if $(SWAPS_OBS),uv run python scripts/rule_swaps.py "$(SWAPS_OBS)" --out "$(SWAPS_RULED)")
-	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)") $(if $(TEMPLATE_OBS),--template "$(TEMPLATE_OBS)")
+	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)") $(if $(TEMPLATE_OBS),--template "$(TEMPLATE_OBS)") $(if $(UPGRADE_OBS),--upgrade "$(UPGRADE_OBS)" $(if $(JUNIT),--surfaces "$(JUNIT)")) $(if $(APP_OBS),--app-observation "$(APP_OBS)")
 	uv run python -m src.verdict.gate $(1)/$(2).json; code=$$?; $(if $(GATE_EXIT),echo $$code > "$(GATE_EXIT)";) exit $$code
 endef
 else
@@ -185,6 +211,13 @@ plants:
 
 ledger:
 	@uv run python -m src.ledger
+
+# M07 PR 2 (SPEC/07 section 6): what a platform upgrade would change in an agent
+# folder, printed. It opens nothing: the pull request arrives from the platform
+# (platform-upgrade.yml, on main). AGENT is the agent's folder, PLATFORM the
+# template's checkout.
+upgrade:
+	@uv run python scripts/platform_upgrade.py diff --agent "$(AGENT)" --platform "$(PLATFORM)"
 
 # Writes docs/milestones/README.md from the ledger. Never hand-edit that file.
 ledger-plain:

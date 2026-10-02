@@ -38,6 +38,10 @@ from datetime import datetime
 from typing import Any
 
 PLATFORM_CHECK = "platform-check"  # the required context's name (infra/ruleset/agent.json)
+# The names the platform's App posts its two planted refusals under (src/validate/agent.py), so that
+# "refused" can be read as refused for the fault that was planted (M07 PR 2; re-read of 69f8383, B).
+SEAT_CHECK = "seats assigned, each a login that administers the repository"
+GOLDENS_CHECK = "an agent's goldens: one ordinary and one trap at least, citing its own data"
 SEAT_SLUGS = ("product", "rule-owner", "data-owner", "tool-owner", "threshold-owner", "security", "engineering")
 
 
@@ -106,6 +110,13 @@ def bound_to_the_app(rulesets: Any, app_id: int) -> bool:
         r.get("context") == PLATFORM_CHECK and r.get("integration_id") == app_id for r in rulesets)
 
 
+def planted_checks(commit: dict[str, Any]) -> set[str]:
+    """The App's check names a commit's planted faults must be refused under."""
+    faults = planted_fault(commit)
+    return ({SEAT_CHECK} if any(f.startswith(("seats", "no seats")) for f in faults) else set()) | (
+        {GOLDENS_CHECK} if any(f.startswith("goldens") for f in faults) else set())
+
+
 def planted_fault(commit: dict[str, Any]) -> list[str]:
     """What is wrong with a commit's agent folder as F6.1 counts it; [] if nothing."""
     faults = []
@@ -143,10 +154,18 @@ def f6_1(s3: dict[str, Any] | None, app_id: int | None) -> dict[str, Any]:
     # Refused first (second cold read, F4; S3's run file): its first commit carries a planted fault and the App
     # failed it. A fault pushed over before the App reached it was never refused.
     first = commits[0]
+    failed = next((r for r in first.get("check_runs") or []
+                   if r.get("app_id") == app_id and r.get("conclusion") == "failure"), None)  # fmt: skip
     if not planted_fault(first):
         reasons.append("the first pull request's first commit carried no planted fault: nothing was refused")
-    elif not any(r.get("app_id") == app_id and r.get("conclusion") == "failure" for r in first.get("check_runs") or []):
+    elif failed is None:
         reasons.append("the first commit's planted fault has no failure from the platform's App: it was never refused")
+    elif not isinstance(failed.get("refused"), list):
+        # Any failure from the App used to count (M07 PR 2; re-read of 69f8383, B): a head refused for the
+        # hidden bypass_actors alone was read as refused for its seats. The App's reasons are read now.
+        return entry(False, ["unread: the App's reasons for refusing the first commit were not read"])
+    elif missing := sorted(planted_checks(first) - set(failed["refused"])):
+        reasons.append(f"the first commit was refused, and not for its planted fault: the App did not refuse it on {'; '.join(missing)}")
     for c in faulty:
         if app_success(c.get("check_runs") or [], app_id):
             reasons.append(f"{str(c.get('sha'))[:12]} passed the platform check with {'; '.join(planted_fault(c))}")
@@ -164,8 +183,12 @@ def f6_2(s2: dict[str, Any] | None, app_id: int | None) -> dict[str, Any]:
         return entry(False, [f"unread: {(s2 or {}).get('error') or 'no S2 observation or no platform App id'}"])
     runs = s2.get("check_runs") or []
     reasons = []
+    # Read before the unread return below (M07 PR 2; re-read of 69f8383, A): GitHub gives a merged pull
+    # request the state "unknown", so a merged S2 was read as unread, not as the miss it is.
+    if s2.get("merged") is True:
+        return entry(True, ["S2's pull request merged"])
     if s2.get("merged") is not False:
-        reasons.append("S2's pull request merged")
+        return entry(False, ["unread: whether S2's pull request merged was not read"])
     # Mergeable, not only merged (cold review F3 on M06 PR 2): GitHub's own reading. Held on `blocked` alone:
     # `clean`, `unstable` and `has_hooks` can merge, and `dirty`, `behind` or `draft` block for another reason
     # (second cold read, F1). `unknown` is GitHub still computing, and is unread, as no reading is.
@@ -227,13 +250,33 @@ def f6_4(panel: dict[str, Any] | None, registry: dict[str, Any] | None) -> dict[
                  not_in_registry=missing)  # fmt: skip
 
 
-def record(observation: dict[str, Any], max_seconds: float) -> dict[str, Any]:
-    """The envelope's `template` from the observer's raw observation."""
+def as_the_app_saw(own: Any, app: Any) -> tuple[Any, str]:
+    """One GitHub record, and the viewpoint it is ruled on (SPEC/07 section 2 "The viewpoint").
+
+    The App's stored record where `main`'s scheduled observer found it, laid over the run's own, so
+    what only the run reads (AWS's records, under its own roles) stays the run's. Otherwise the run's
+    own, read with a token that has no rights in the organisation."""
+    if isinstance(app, dict) and app.get("found"):
+        mine = own if isinstance(own, dict) else {}
+        return {**mine, **{k: v for k, v in app.items() if v is not None}}, "app"
+    return own, "anonymous"
+
+
+def record(observation: dict[str, Any], max_seconds: float, app: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The envelope's `template` from the observer's raw observation.
+
+    `app` (M07 PR 2; milestones/M07/open.md row 3) is the observation `main`'s scheduled observer
+    stored, read as the platform's observer App. A pull request's own run asks GitHub with a token
+    that has no rights in the organisation, and GitHub's `mergeable_state` depends on who asks: the
+    owner read `blocked` where CI read `unstable` (M06's second finding). Each GitHub reading now says
+    which viewpoint it was ruled on, and F6.2 keeps the raw state beside its verdict."""
     if not isinstance(observation, dict) or "looked_up_at" not in observation:
         raise Unreadable("not scripts/observe_template.py's observation (no looked_up_at)")
     app_id = observation.get("platform_app_id")
     app_id = app_id if isinstance(app_id, int) and not isinstance(app_id, bool) else None
-    s2, s3 = observation.get("s2"), observation.get("s3")
+    stored = (app or {}).get("template")
+    stored = stored if isinstance(stored, dict) else {}
+    (s2, s2_seen), (s3, s3_seen) = (as_the_app_saw(observation.get(name), stored.get(name)) for name in ("s2", "s3"))
     panel = observation.get("panel") or {}
     try:
         names = panel_names(panel["frame"]) if panel.get("frame") and not panel.get("error") else None
@@ -243,8 +286,11 @@ def record(observation: dict[str, Any], max_seconds: float) -> dict[str, Any]:
         "looked_up_at": observation["looked_up_at"],
         "max_seconds": max_seconds,
         "platform_app_id": app_id,
-        "F6_1": f6_1(s3, app_id),
-        "F6_2": f6_2(s2, app_id),
-        "F6_3": f6_3(s3, max_seconds, names),
+        "app_observation": None if not app else {"run_id": app.get("run_id"), "read_at": app.get("read_at"),
+                                                 "key": app.get("key")},
+        "F6_1": {**f6_1(s3, app_id), "viewpoint": s3_seen},
+        "F6_2": {**f6_2(s2, app_id), "viewpoint": s2_seen,
+                 "mergeable_state": s2.get("mergeable_state") if isinstance(s2, dict) else None},
+        "F6_3": {**f6_3(s3, max_seconds, names), "viewpoint": s3_seen},
         "F6_4": f6_4(observation.get("panel"), observation.get("registry")),
-    }
+    }  # fmt: skip

@@ -195,6 +195,15 @@ EVAL_WORKFLOWS = [
     f"{REPO}/.github/workflows/evals.yml@refs/heads/main",
 ]
 DEPLOY_WORKFLOW = f"{REPO}/.github/workflows/deploy.yml@refs/heads/main"
+# M07 PR 2 (SPEC/07 section 6): model-watch.yml on main asks Bedrock for a model's lifecycle; evals.yml on
+# main, and only on main, writes panel 2's rows.
+MODEL_WATCH_WORKFLOW = f"{REPO}/.github/workflows/model-watch.yml@refs/heads/main"
+MAIN_EVALS_WORKFLOW = f"{REPO}/.github/workflows/evals.yml@refs/heads/main"
+MODEL_WATCH_ROLE_NAME = "agentkeel-model-watch"
+ENVELOPE_ROW_PUT_ROLE_NAME = "agentkeel-envelope-row-put"
+ENVELOPES_TABLE = "agentkeel-envelopes"  # panel 2's source: one row per envelope on main (infra/grafana/)
+TEMPLATE_STACKS = "stack/agentkeel-*/*"
+TEMPLATE_IMAGES = "repository/agentkeel/*"
 # The seven service names a manifest may list (ruling d, amended at M01 PR 3).
 # Interface endpoints, except s3 and dynamodb, which AWS offers as gateway
 # endpoints (ruling e).
@@ -251,6 +260,9 @@ class BootstrapStack(cdk.Stack):
         self._deploy_role(provider)
         self._developer_role()
         eval_role = self._eval_role(provider)
+        model_watch_role = self._model_watch_role(provider)
+        envelopes = self._envelopes()
+        row_put_role = self._envelope_row_put_role(provider, envelopes)
         self._guardrail(eval_role)
         self._agent_key(eval_role)
         self._budget(eval_role)
@@ -264,6 +276,8 @@ class BootstrapStack(cdk.Stack):
         cdk.CfnOutput(self, "VpcId", value=vpc.vpc_id)
         cdk.CfnOutput(self, "BoundaryArn", value=boundary.managed_policy_arn)
         cdk.CfnOutput(self, "DeployBoundaryArn", value=deploy_boundary.managed_policy_arn)
+        cdk.CfnOutput(self, "ModelWatchRoleArn", value=model_watch_role.role_arn)
+        cdk.CfnOutput(self, "EnvelopeRowPutRoleArn", value=row_put_role.role_arn)
 
     # --- the boundary ------------------------------------------------------
 
@@ -881,6 +895,26 @@ class BootstrapStack(cdk.Stack):
             actions=["ecr:DescribeImages"],
             resources=[f"arn:aws:ecr:{REGION}:{self.account}:repository/agentkeel-refagent"],
         ))  # fmt: skip
+        # M07 PR 2 (SPEC/07 section 6, "The rollback reading"; F7.2, F7.3): the same three reads for an agent
+        # from the template, so `scripts/observe_upgrade.py` can say which bytes its runtime runs after a
+        # merge or a revert, and whether a retired agent's runtime is gone. Reads only, on the platform's
+        # stacks, runtimes and image repositories, not every one in this shared account. Nothing here can
+        # change what it reads, and it invokes no template agent: InvokeRefagentRuntimeOnly is unchanged.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadWhichBytesATemplateAgentsRuntimeRuns",
+            actions=["cloudformation:DescribeStacks"],
+            resources=[f"arn:aws:cloudformation:{REGION}:{self.account}:{TEMPLATE_STACKS}"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadATemplateAgentsRuntime",
+            actions=["bedrock-agentcore:GetAgentRuntime"],
+            resources=[f"arn:aws:bedrock-agentcore:{REGION}:{self.account}:{TEMPLATE_RUNTIMES}"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadATemplateAgentsImageTags",
+            actions=["ecr:DescribeImages"],
+            resources=[f"arn:aws:ecr:{REGION}:{self.account}:{TEMPLATE_IMAGES}"],
+        ))  # fmt: skip
         # M03 PR 2 (S1's reader): and which rights table the runtime answers
         # from. Read only; unreadable or "loading" means the run is in the runner.
         # M06 PR 2 (SPEC/06 section 4): scripts/observe_template.py scans the registry, read only.
@@ -917,6 +951,80 @@ class BootstrapStack(cdk.Stack):
             actions=DENY, resources=["*"],
         ))  # fmt: skip
         cdk.CfnOutput(self, "EvalRoleArn", value=role.role_arn)
+        return role
+
+    # --- model-watch, and panel 2's rows (M07 PR 2) -------------------------
+
+    def _model_watch_role(self, provider: iam.IOpenIdConnectProvider) -> iam.Role:
+        """What model-watch.yml's first job runs as: it may ask Bedrock for a model's lifecycle, and nothing else.
+
+        Not the eval role (SPEC/07 section 6; rulings/pr2-security.md item 4 names "the eval role"): that
+        role may invoke models and is trusted for a pull request's run, and this read needs neither. One
+        action, read-only, on foundation models; trusted for model-watch.yml on main only. It invokes
+        nothing: the swap it proposes is measured by the pull request's own `evals` run."""
+        role = iam.Role(
+            self, "ModelWatchRole",
+            role_name=MODEL_WATCH_ROLE_NAME,
+            max_session_duration=cdk.Duration.hours(1),
+            assumed_by=self._github_principal(
+                provider, [f"{SUBJECT}:ref:refs/heads/main"], [MODEL_WATCH_WORKFLOW], exact=True),
+            description="agentkeel: model-watch.yml on main reads Bedrock's modelLifecycle for the pinned models.",
+        )  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadAModelsLifecycle",
+            actions=["bedrock:GetFoundationModel"],
+            resources=[f"arn:aws:bedrock:{REGION}::foundation-model/*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="DenyEscalationAndEvidenceDeletion", effect=iam.Effect.DENY,
+            actions=DENY, resources=["*"],
+        ))  # fmt: skip
+        return role
+
+    def _envelopes(self) -> dynamodb.Table:
+        """Panel 2's source (SPEC/07 section 2 "Panel 2", section 6): one row per envelope on main.
+
+        Key `commit`. Each row: the commit, the verdict the envelope stores and the mode it ran in, written
+        once by evals.yml's `archive` job on a push to main, from the file. A copy for a surface to read, not
+        evidence: the envelope in `evals/history/` and its copy in the security account's audit bucket are.
+        `build.panel_verdict_mismatch` holds panel 2's rows to the envelopes. Panel 2 reads it through
+        Athena's DynamoDB connector, as panel 1 reads the registry (infra/grafana/)."""
+        return dynamodb.Table(
+            self, "Envelopes",
+            table_name=ENVELOPES_TABLE,
+            partition_key=dynamodb.Attribute(name="commit", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            encryption=dynamodb.TableEncryption.DEFAULT,
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True),
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )  # fmt: skip
+
+    def _envelope_row_put_role(self, provider: iam.IOpenIdConnectProvider, table: dynamodb.Table) -> iam.Role:
+        """evals.yml on main, and only there: one row per envelope in panel 2's table.
+
+        Not the eval role, which a pull request's run also assumes: a pull request must not be able to
+        write the row a surface shows for it. It may scan the table and put an item; it has no UpdateItem
+        and no delete. `PutItem` can replace a row: that a row is put once is the condition
+        `scripts/envelope_rows.py` puts on each call, not anything IAM holds (platform-architect F5 and
+        security-reviewer 14 on M07 PR 2)."""
+        role = iam.Role(
+            self, "EnvelopeRowPutRole",
+            role_name=ENVELOPE_ROW_PUT_ROLE_NAME,
+            max_session_duration=cdk.Duration.hours(1),
+            assumed_by=self._github_principal(
+                provider, [f"{SUBJECT}:ref:refs/heads/main"], [MAIN_EVALS_WORKFLOW], exact=True),
+            description="agentkeel: evals.yml on main writes one row per envelope to the table panel 2 reads.",
+        )  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="PutARowThatIsNotThere",
+            actions=["dynamodb:Scan", "dynamodb:PutItem"],
+            resources=[table.table_arn],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="DenyEscalationAndEvidenceDeletion", effect=iam.Effect.DENY,
+            actions=DENY, resources=["*"],
+        ))  # fmt: skip
         return role
 
     # --- the guardrail (M03 PR 2) -----------------------------------------
@@ -1330,7 +1438,16 @@ SUPPRESSIONS = {
         "only cloudtrail action granted, so the instrument may read the record and may not change it. "
         "ADR-0007 (P1): stack/agentkeel-refagent/* is the stack id suffix AWS appends, and runtime/refagent* "
         "the versioned name; DescribeStacks, GetAgentRuntime and ecr:DescribeImages are reads on refagent alone. "
+        "M07 PR 2 (SPEC/01 §6's eval role, as SPEC/07 §6's rollback reading extends it): the same three reads on "
+        "stack/agentkeel-*/*, runtime/agentkeel_* and repository/agentkeel/*, an agent from the template's, whose "
+        "names exist only once it is deployed; reads only, and no invoke. "
         f"{CEILING}"
+    ),
+    "ModelWatchRole/DefaultPolicy/Resource": (
+        "SPEC/01 §6's roles, 'trusted with StringEquals on aud, the immutable sub for refs/heads/main, and "
+        "job_workflow_ref', added at M07 PR 2 for SPEC/07 §6's model-watch: bedrock:GetFoundationModel on "
+        "foundation-model/*, because the models read are every pin the manifest names and the candidates a seat "
+        "names later; one read-only action, no invoke."
     ),
 }
 # Each suppression names the findings it covers (open.md row 4, M06 PR 2 for every stack PR 2 edits;
@@ -1359,7 +1476,10 @@ APPLIES_TO = {
                                              "Action::logs:Describe*", "Action::logs:Get*", "Resource::*"],
     "EvalRole/DefaultPolicy/Resource": ["Resource::*", "Resource::<RefagentGuardrail.GuardrailArn>:*"] + [
         f"Resource::{_ARN.format(service, rest)}" for service, rest in (
-            ("bedrock-agentcore", "runtime/refagent*"), ("cloudformation", "stack/agentkeel-refagent/*"))],
+            ("bedrock-agentcore", "runtime/agentkeel_*"), ("bedrock-agentcore", "runtime/refagent*"),
+            ("cloudformation", "stack/agentkeel-*/*"), ("cloudformation", "stack/agentkeel-refagent/*"),
+            ("ecr", "repository/agentkeel/*"))],
+    "ModelWatchRole/DefaultPolicy/Resource": [f"Resource::arn:aws:bedrock:{REGION}::foundation-model/*"],
 }
 for path, reason in SUPPRESSIONS.items():
     NagSuppressions.add_resource_suppressions_by_path(
