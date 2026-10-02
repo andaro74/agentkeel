@@ -41,4 +41,12 @@ attempts:
     command: "made after owner-check has merged, deployed and taken S1, and before it is retired. Where the token is minted is Security's to rule before this attempt and is restated here, pushed, when ruled (SPEC/07 §11, R2): the key never leaves the platform-app environment, so either a dispatch input on platform-check.yml's `post` job on main makes the one call, or the attempt is not made and F7.0's reading says so. The call asks GitHub to remove the required status check from ruleset 24310403. Then the owner pushes one empty commit to a new branch of owner-check and opens a pull request, so that the App has a new head to check while the ruleset is changed. Then the owner, with the owner's own token, restores the ruleset from infra/ruleset/agent.post.json and reads it back equal to infra/ruleset/agent.json"
     refused_when: GitHub refused the call; or, if GitHub accepted it, the App's platform-check failed the new head for the ruleset differing from the export, no pull request merged in owner-check while it differed, and after the restore the ruleset read back equal to the export and the App passed a head. The second is detection, not refusal, and is recorded as that. A head the App passed before the call stays passed (open.md row 21); this attempt does not read that
     recorded_when: the observer reads the ruleset's history, the new head's check run and its reasons, owner-check's merges in the interval, and the ruleset after the restore
-observed: null
+# The second attempt was made on 2026-10-02, before any grant, with admin
+# bypass switched off on the environment (milestones/M07/runs/pr2_reads.md).
+# The first and third are not made: this list holds one entry of three, so
+# the run-file test still reads the seed as not made.
+observed:
+  - what: platform-check.yml dispatched from a branch
+    repository: andaro74/agentkeel
+    run: 36963543726
+    at: '2026-10-02T04:12:44Z'
