@@ -314,7 +314,6 @@ def test_s1_the_platform_upgrade_was_made():
 # --- S2: a retired agent's target is gone -------------------------------------
 
 
-@expected_failure
 def test_s2_a_retired_agent_that_still_answers_is_found_by_build():
     """The records of a retirement that did not hold: CloudTrail's DeleteAgentRuntime, a GetAgentRuntime
     that still finds the runtime after the limit, the retire job's invocation answered, and an answer
@@ -356,7 +355,6 @@ def test_s2_the_retirement_was_made():
 # --- S3: a model-watch pull request is merged and rolled back -----------------
 
 
-@expected_failure
 def test_s3_a_rollback_that_leaves_the_new_digest_live_is_found_by_build():
     """After a revert's deploy completed, the runtime's image tags hold the upgrade's digest and not
     the digest the tree gives at the revert. `build.f7_3(observation)` must read it as not held and
@@ -428,7 +426,6 @@ def test_s4_a_panel_2_query_that_computes_the_verdict_is_refused(worktree):  # n
     assert refused, "seed S4: no check that reads panel 2's query refused a computed verdict"
 
 
-@expected_failure
 def test_s4_a_green_row_for_a_red_envelope_is_found_by_build():
     """Panel 2's rows as Grafana's /api/ds/query returns them say GREEN for 6f3d161; the envelope on
     main says RED. `build.panel_verdict_mismatch(frame, history_dir)` must return that commit. Today
@@ -453,7 +450,6 @@ def test_s4_a_green_row_for_a_red_envelope_is_found_by_build():
 # --- S5: a surface plant goes silent ------------------------------------------
 
 
-@expected_failure
 def test_s5_a_silent_surface_plant_is_counted():
     """A run's results for the surfaces' plants with one reader's result missing: panel 1's plant
     fired, panel 2's did not report. `plants.SURFACE_PLANTS` must name the two, and

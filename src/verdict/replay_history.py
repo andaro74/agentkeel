@@ -69,6 +69,27 @@ def load(history_dir: Path, *, exclude_commit: str | None = None, ancestors_of: 
     return history
 
 
+STORED_VERDICTS = ("GREEN", "RED", "UNMEASURED")
+
+
+def verdicts(history_dir: Path) -> dict[str, str]:
+    """commit -> the verdict each envelope in `history_dir` stores, as stored (M07 PR 2; SPEC/07 §4, F7.4).
+
+    What a surface that shows "the verdict as stored" is held to: the run's own verdict, not a row's
+    reading of it (the envelope for `245eb9b` stores GREEN and row 6 is RED). Every envelope, not the
+    ancestors only: a panel shows them all. A file whose commit is not its name, or whose verdict is
+    not one build writes, stops the read, as a bad file stops `load`."""
+    stored: dict[str, str] = {}
+    for path in envelope_paths(history_dir):
+        envelope = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(envelope, dict) or envelope.get("commit") != path.stem:
+            raise ValueError(f"{path}: its commit is not the file name")
+        if envelope.get("verdict") not in STORED_VERDICTS:
+            raise ValueError(f"{path}: verdict {envelope.get('verdict')!r} is not one build writes")
+        stored[path.stem] = envelope["verdict"]
+    return stored
+
+
 def ever_passed(history: History, scope: str, golden_id: str) -> bool:
     """A control pass is not an agent pass: the baseline's luck is not the agent's bar."""
     return any(passed for _, passed in history.get((scope, golden_id), []))

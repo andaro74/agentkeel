@@ -80,9 +80,12 @@ from typing import Any
 
 import yaml
 
-from src.verdict import containment, template
+from src.verdict import containment, template, upgrade
 # M06 PR 2 (SPEC/06 §4, BLOCK 3): build is the comparer of panel 1's rows with the registry's.
 from src.verdict.template import panel_not_in_registry  # noqa: F401  (S4's reader, by this name)
+# M07 PR 2 (SPEC/07 §4): build is the reader of a retirement's records, of a rollback's digests, of panel
+# 2's rows against the envelopes (through replay_history) and of the surfaces' plants.
+from src.verdict.upgrade import f7_2, f7_3, panel_verdict_mismatch, surface_plants  # noqa: F401  (the seeds' readers, by these names)
 from src.verdict import (
     M04_READERS,
     ROOT,
