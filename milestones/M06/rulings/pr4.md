@@ -35,7 +35,7 @@ pr: 37
 
 # Ruling: M06 PR 4, Product
 
-DRAFT for andaro74 as Product. Not ruled until this line reads "Ruled by".
+Ruled by andaro74 as Product, 2026-10-02, as written.
 
 ## 1. What this PR is
 
@@ -182,3 +182,19 @@ gh api repos/agentkeel-studio/owner-check/commits/e3a8083/check-runs --jq '.chec
 grep -c "^| [0-9]" milestones/M07/open.md      # 75
 grep -n "governed\|secure\|proven" docs/milestones/M06.md   # nothing
 ```
+
+## The PR's Unsure items (#37), ruled
+
+Ruled by andaro74, each in the seat named (one person, R1):
+
+| Item | Ruling |
+|---|---|
+| A. No video row (Product) | As proposed: none written; the plan is `milestones/M07/open.md` row 1 |
+| B. S2 counts as made (Product) | Counts as made at M06. Read again, not remade, after M07 rows 2 and 3, when the App's refusal can rest on S2's own null seats |
+| C. The stated reading was wrong (Product; Engineering) | As proposed. The cell stays on `245eb9b`. The second run, `a83d2ef` (envelope committed in `6814c6c`), read the same: F6.2 held |
+| D. SPEC/00 and SPEC/06 amended at the close (Product) | As proposed: S3 and Acts 1 and 2 move to M07, not cut |
+| E. Line 2's reads uncommitted (Security) | As proposed; from M07 the outputs of such reads are committed under `runs/` (row 16) |
+| F. The full suite before the repairs (Engineering) | As proposed: the repairs touched no code; the M06 tests and CI's `checks` passed after them |
+| G. The repairs not read cold again (Engineering) | Accepted; `3d749fb` added to `milestones/M07/open.md` row 15 |
+| H. Finding 1's repair (Security; Engineering) | As proposed: ruled at M07 open, after row 20's read, within row 2's bounds; no grant before |
+| I. The Grafana token (Security) | As proposed: Security renews it before 2026-10-31 |

@@ -42,7 +42,7 @@ was wrong ("unstable"; the run read "blocked"), and no reader was changed
 to make it right. At the close the seed tests read 7 passed and 1 xfailed
 (S3, not attempted).
 
-Signed: ____________  Date: __________
+Signed: andaro74  Date: 2026-10-02
 
 ---
 
@@ -84,7 +84,7 @@ deploy removed the stand-in's Allow (the human's word, read by nothing:
 for a template agent (none was deployed); and any control in SPEC/06 §8
 that no seed attempted.
 
-Signed: ____________  Date: __________
+Signed: andaro74  Date: 2026-10-02
 
 ---
 
@@ -96,7 +96,7 @@ it. It was not moved. No elapsed time was measured against it: S3 was not
 attempted, so `F6_3` reads unread and the bar has never been compared with
 a quickstart. Whether eight hours is the right bar is unread.
 
-Signed: ____________  Date: __________
+Signed: andaro74  Date: 2026-10-02
 
 ---
 
@@ -113,4 +113,4 @@ second developer's one clean attempt is kept for M07. Every finding and
 every Unsure item of #34 to #37 is ruled in M06 or carried to
 `milestones/M07/open.md` with a seat and a milestone (`rulings/pr4.md`).
 
-Signed: ____________  Date: __________
+Signed: andaro74  Date: 2026-10-02

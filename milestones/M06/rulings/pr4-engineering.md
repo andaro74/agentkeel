@@ -16,7 +16,7 @@ pr: 37
 
 # Ruling: M06 PR 4, Engineering, with the cold review
 
-DRAFT for andaro74 as Engineering. Not ruled until this line reads "Ruled by".
+Ruled by andaro74 as Engineering, 2026-10-02, as written.
 
 ## What this authorises
 
