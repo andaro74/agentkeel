@@ -138,6 +138,21 @@ reading as a dated note. A quickstart over its bar does not fire F7.0
   files. GitHub's record of each commit's author and paths is what is
   read. Agent repositories ask for no ruling (SPEC/06 §8), so there any
   person's commit on an upgrade pull request is an edit.
+  **Amended at M07 PR 3 (Product, `rulings/pr3.md`), before any swap pull
+  request exists.** On a pull request in `agentkeel`, and in no agent
+  repository, CI's own envelope commit is not a person's edit, and its
+  files are not paths the upgrade changes. It is that commit only when
+  GitHub records all of these: its author and its committer are both
+  `github-actions[bot]`; every file it touches is
+  `evals/history/<commit>.json`, `<commit>.baseline-card.json` or
+  `<commit>.baseline-raw.json`; and `<commit>` is the full id of another
+  commit of the same pull request. A commit by that login that touches
+  one path more, or names a commit the pull request does not hold, is a
+  person's edit as before. What this rests on: GitHub does not sign that
+  commit (`evals.yml` pushes it with the job's token), so the login is a
+  name a person's commit can carry; the paths are what bound it. A
+  hand-made file under `evals/history/` is `two-key`'s to refuse
+  (SPEC/02 §2), not F7.1's.
 - **The trigger** and **live**, per kind, every time GitHub's or AWS's,
   none a runner's clock or a pusher's (item 9):
 
