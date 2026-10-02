@@ -73,6 +73,7 @@
 # seat: Product
 /.claude/agents/product-spec-reviewer.md @andaro74
 /.claude/agents/docs-writer.md @andaro74
+/.claude/agents/legal-compliance.md @andaro74
 # seat: Rule Owner
 /.claude/agents/rule-owner.md @andaro74
 /.claude/agents/red-teamer.md @andaro74
