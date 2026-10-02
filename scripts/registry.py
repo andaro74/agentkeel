@@ -33,6 +33,11 @@ From M07 PR 2 (SPEC/07 section 6):
   listed as retired, not forgotten. Both hold the row to its repository id,
   and neither will touch `refagent`. The table is not write-once; the
   retirement is also put once in the audit bucket (`scripts/retire_agent.py`).
+- A retirement is one-way: `claim` exits 3 for a name whose row says
+  `retired_at`, before the stack is touched, and `write` carries the same
+  condition, so a later head that drops `rollout: retired` is not deployed
+  and cannot replace the row (security-reviewer 8 on M07 PR 2: `write` puts
+  a whole item, and would have dropped `retired_at`).
 """
 
 from __future__ import annotations
@@ -79,9 +84,12 @@ def claim(dynamodb: Any, name: str, repository: str, repository_id: str) -> tupl
     except ClientError as exc:
         if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
             raise
-    held = holder(dynamodb, name)
+    item = dynamodb.get_item(TableName=TABLE, Key={"name": {"S": name}}, ConsistentRead=True).get("Item") or {}
+    held = (item.get("repository_id") or {}).get("S")
     if held != repository_id:
         return 3, f"{name} is held by repository {held}, not {repository_id}: refused before the stack is touched"
+    if "retired_at" in item:
+        return 3, f"{name} was retired at {item['retired_at']['S']}: a retirement is one-way, and nothing is deployed under it"
     return 0, f"{name}: already this repository's"
 
 
@@ -96,13 +104,13 @@ def write(dynamodb: Any, name: str, repository: str, repository_id: str, commit:
             TableName=TABLE,
             Item={"name": {"S": name}, "repository": {"S": repository}, "repository_id": {"S": repository_id},
                   "commit_sha": {"S": commit}, "deploy_run_id": {"S": run_id}, "deployed_at": {"S": now}, **said},
-            ConditionExpression="attribute_not_exists(#n) OR repository_id = :id",
+            ConditionExpression="attribute_not_exists(#n) OR (repository_id = :id AND attribute_not_exists(retired_at))",
             ExpressionAttributeNames={"#n": "name"},
             ExpressionAttributeValues={":id": {"S": repository_id}},
         )  # fmt: skip
     except ClientError as exc:
         if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
-            return 3, f"{name} was taken by another repository between the claim and the write"
+            return 3, f"{name} was taken by another repository, or retired, between the claim and the write"
         raise
     return 0, f"{name}: {repository}@{commit[:12]}, run {run_id}, {now}" + (f", answer record {answer_put}" if answer_put else "")
 

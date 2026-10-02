@@ -79,15 +79,26 @@ def verdicts(history_dir: Path) -> dict[str, str]:
     reading of it (the envelope for `245eb9b` stores GREEN and row 6 is RED). Every envelope, not the
     ancestors only: a panel shows them all. A file whose commit is not its name, or whose verdict is
     not one build writes, stops the read, as a bad file stops `load`."""
-    stored: dict[str, str] = {}
+    return {row["commit"]: row["verdict"] for row in rows(history_dir)}
+
+
+def rows(history_dir: Path) -> list[dict[str, str]]:
+    """One row per envelope in `history_dir`, as stored: its commit, its verdict and its mode.
+
+    What panel 2's table is written from (`scripts/envelope_rows.py`), so the table's writer opens no
+    envelope of its own (cold review B1 on M07 PR 2). An envelope from before `mode` existed says
+    "not recorded"."""
+    found = []
     for path in envelope_paths(history_dir):
         envelope = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(envelope, dict) or envelope.get("commit") != path.stem:
             raise ValueError(f"{path}: its commit is not the file name")
         if envelope.get("verdict") not in STORED_VERDICTS:
             raise ValueError(f"{path}: verdict {envelope.get('verdict')!r} is not one build writes")
-        stored[path.stem] = envelope["verdict"]
-    return stored
+        mode = envelope.get("mode")
+        found.append({"commit": path.stem, "verdict": envelope["verdict"],
+                      "mode": mode if isinstance(mode, str) else "not recorded"})  # fmt: skip
+    return found
 
 
 def ever_passed(history: History, scope: str, golden_id: str) -> bool:

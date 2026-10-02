@@ -118,6 +118,20 @@ def test_the_jobs_that_read_an_agent_repository_hold_no_secret():
     assert not secrets_in(read) and "environment" not in read  # Bedrock's lifecycle, as a role that may read it and no more
 
 
+INVOCATION = "One invocation of the retired runtime; anything but ResourceNotFoundException stops here"
+
+
+def test_the_table_panel_2_reads_is_written_through_the_shared_reader_of_envelopes():
+    """Cold review B1 on M07 PR 2: the archive job read each envelope with jq, a second reader (P5)."""
+    jobs = load("evals.yml")["jobs"]
+    assert "agentkeel-envelopes" not in str(jobs["archive"]) and "ROW_PUT" not in str(jobs["archive"])
+    rows = jobs["envelope-rows"]
+    assert "github.event_name == 'push'" in rows["if"] and "refs/heads/main" in rows["if"]
+    runs = [s["run"] for s in rows["steps"] if "run" in s]
+    assert runs[-1].startswith("uv run python scripts/envelope_rows.py --history evals/history")
+    assert "jq" not in str(rows) and not secrets_in(rows) and "environment" not in rows
+
+
 def test_refagents_own_deploy_jobs_are_as_m06_left_them_and_a_retirement_deploys_no_image():
     deploy = load("deploy.yml")["jobs"]
     assert deploy["sign"]["if"] == "github.event_name == 'push'" and deploy["deploy"]["needs"] == "sign"
@@ -127,7 +141,15 @@ def test_refagents_own_deploy_jobs_are_as_m06_left_them_and_a_retirement_deploys
     assert 'test "$NAME" != "refagent"' in said and "AWS::BedrockAgentCore::Runtime" in said
     names = [s.get("name") for s in retire["steps"] if s.get("name")]
     assert names.index("Keep the runtime's ARN, before it is removed") < names.index("Update agentkeel-<name> to the stack without its runtime") \
-        < names.index("One invocation of the retired runtime, recorded") < names.index("retired_at on the agent's row, which stays")  # fmt: skip
+        < names.index(INVOCATION) < names.index("Put the retirement in the security account, once") \
+        < names.index("retired_at on the agent's row, which stays")  # fmt: skip
+    # platform-architect B1 on M07 PR 2: the record and retired_at only after an invocation that says the
+    # runtime is gone. The step fails on the script's exit code, and no later step runs on a failure.
+    invocation = next(s for s in retire["steps"] if s.get("name") == INVOCATION)
+    assert 'if [ "$code" != "0" ]; then' in invocation["run"] and "exit 1" in invocation["run"]
+    assert invocation["run"].index("exit 1") < invocation["run"].index("retire_agent.py record")
+    after = retire["steps"][retire["steps"].index(invocation) + 1:]
+    assert all("always()" not in str(s.get("if", "")) for s in after if "upload-artifact" not in str(s.get("uses", "")))
     agent = [s.get("name") for s in deploy["deploy-agent"]["steps"] if s.get("name")]
     assert agent.index("Put the signed bundle in the security account, once") < agent.index("Put the answer record in the security account, once") \
         < agent.index("The agent's row in the registry")  # fmt: skip

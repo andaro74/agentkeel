@@ -132,10 +132,10 @@
 # cannot be read is written as unread; it never fails the job. **No App key is
 # in this workflow**: it checks out pull-request code. F7_0 to F7_5 are read
 # from the fixture tests (the Makefile), and the surfaces' plants are counted
-# from this run's own JUnit file. On a push to main the `archive` job also
+# from this run's own JUnit file. On a push to main the `envelope-rows` job
 # writes one row per envelope (commit, verdict, mode, as stored) to the table
 # panel 2 reads, `agentkeel-envelopes`, as `agentkeel-envelope-row-put`,
-# trusted on main only; with no role variable it says so and writes nothing.
+# trusted on main only; with no role variable the job does not run.
 # That table and role are not among the items ruled on 2026-10-02: they are
 # put to Security in milestones/M07/rulings/pr2-security.md, and until they
 # are deployed panel 2's live read is unread.
@@ -761,45 +761,36 @@ jobs:
           done < "$RUNNER_TEMP/added.txt"
           echo "### Put under envelopes/ in the audit bucket: $(wc -l < "$RUNNER_TEMP/added.txt") file(s)" >> "$GITHUB_STEP_SUMMARY"
 
-      # M07 PR 2 (SPEC/07 section 2 "Panel 2", section 6): one row per envelope on main in the table panel 2
-      # reads, each written once: its commit, the verdict it stores and its mode, read from the file with
-      # jq. git, jq and the AWS CLI only. Every envelope on main, not only the ones this push added: a row
-      # that is there is left alone (a condition, not an overwrite), so the first run fills the history.
+  # M07 PR 2 (SPEC/07 section 2 "Panel 2", section 6): one row per envelope on main in the table panel 2
+  # reads, each written once: its commit, the verdict it stores and its mode. The envelopes are read by
+  # `src/verdict/replay_history.py`, the shared reader of past ones, and by nothing in this file (cold
+  # review B1 on M07 PR 2: a workflow that opens an envelope with jq is a second reader). Its own job, so
+  # the role that puts envelopes in the audit bucket is never in a job that installs dependencies. Every
+  # envelope on main, not only the ones this push added: a row that is there is left alone (a condition,
+  # not an overwrite), so the first run fills the history. main's code only.
+  envelope-rows:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_ENVELOPE_ROW_PUT_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # OIDC to the agent account, as agentkeel-envelope-row-put
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Install
+        run: uv sync --frozen
+
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
-        if: vars.AWS_ENVELOPE_ROW_PUT_ROLE_ARN != ''
         with:
           role-to-assume: ${{ vars.AWS_ENVELOPE_ROW_PUT_ROLE_ARN }}
           role-session-name: agentkeel-envelope-row-put-${{ github.run_id }}
           role-duration-seconds: 900
           aws-region: us-west-2
-          unset-current-credentials: true
 
       - name: One row per envelope in the table panel 2 reads, once each
-        env:
-          ROW_ROLE: ${{ vars.AWS_ENVELOPE_ROW_PUT_ROLE_ARN }}
-        run: |
-          set -euo pipefail
-          if [ -z "$ROW_ROLE" ]; then
-            echo "::warning::AWS_ENVELOPE_ROW_PUT_ROLE_ARN is not set; panel 2's table is not written"
-            exit 0
-          fi
-          aws dynamodb scan --table-name agentkeel-envelopes --projection-expression "#c" \
-            --expression-attribute-names '{"#c":"commit"}' --query 'Items[].commit.S' --output text \
-            | tr '\t' '\n' | sort > "$RUNNER_TEMP/held.txt"
-          written=0
-          for f in evals/history/*.json; do
-            sha=$(basename "$f" .json)
-            case "$sha" in *[!0-9a-f]*) continue ;; esac
-            [ "${#sha}" -eq 40 ] || continue
-            grep -qx "$sha" "$RUNNER_TEMP/held.txt" && continue
-            item=$(jq -c --arg sha "$sha" 'select(.commit == $sha) | {commit: {S: .commit}, verdict: {S: .verdict}, mode: {S: (.mode // "not recorded")}}' "$f")
-            [ -n "$item" ] || { echo "::warning::$f does not name its own commit; no row"; continue; }
-            if aws dynamodb put-item --table-name agentkeel-envelopes --item "$item" \
-                --condition-expression "attribute_not_exists(#c)" --expression-attribute-names '{"#c":"commit"}' 2> "$RUNNER_TEMP/err"; then
-              written=$((written + 1))
-            elif ! grep -q ConditionalCheckFailed "$RUNNER_TEMP/err"; then
-              cat "$RUNNER_TEMP/err"
-              exit 1
-            fi
-          done
-          echo "### Rows written to agentkeel-envelopes: $written" >> "$GITHUB_STEP_SUMMARY"
+        run: uv run python scripts/envelope_rows.py --history evals/history >> "$GITHUB_STEP_SUMMARY"

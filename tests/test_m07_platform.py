@@ -92,6 +92,19 @@ def test_deprecated_after_is_written_from_bedrock_and_never_relaxed_by_the_platf
         assert model_watch.entry_errors(dated, text, None) == []
 
 
+def test_a_date_that_is_not_a_quoted_string_is_compared_with_nothing_and_opens_nothing():
+    """threshold-owner F4 on M07 PR 2: an unquoted date loads as a date, both "never later" guards asked
+    `isinstance(stated, str)`, and a later date was opened."""
+    text = MANIFEST_TEXT.replace("deprecated_after: null", "deprecated_after: 2027-01-01")
+    assert not isinstance(yaml.safe_load(text)["deprecated_after"], str)
+    dated, _swap = model_watch.plan(text, lifecycle(**{PIN: {"status": "ACTIVE", "endOfLifeTime": "2027-06-01T00:00:00+00:00",
+                                                             "error": None}}), None, BASE, RUN)  # fmt: skip
+    assert dated["open"] is False and "not a quoted" in dated["why"]
+    entry = {"kind": "deprecated_after", "repository": model_watch.REPOSITORY, "branch": "model-watch/deprecated-after-2027-06-01",
+             "files": {model_watch.MANIFEST: text.replace("deprecated_after: 2027-01-01", 'deprecated_after: "2027-06-01"')}}  # fmt: skip
+    assert any("not a quoted date" in e for e in model_watch.entry_errors(entry, text, None))
+
+
 def test_a_lifecycle_that_was_not_read_writes_nothing():
     dated, _ = model_watch.plan(MANIFEST_TEXT, lifecycle(**{PIN: {"status": None, "endOfLifeTime": None, "error": "Throttled"}}),
                                 None, BASE, RUN)  # fmt: skip
@@ -190,6 +203,26 @@ def test_model_watch_opens_the_swap_then_commits_the_ruling_draft_as_the_app(mon
     assert results == [{"kind": "swap", "opened": True, "number": 41, "ruling": "c" * 40}]
 
 
+def test_every_word_model_watch_writes_as_the_app_is_the_keyed_jobs_own(monkeypatch):
+    """security-reviewer 4 on M07 PR 2: the body and the drafted ruling took `from`, `to`, `why`, `model`,
+    `date` and `run_url` from the plan, so a drafted ruling could describe a change the diff does not make."""
+    monkeypatch.setenv("GITHUB_RUN_ID", "77")
+    entry = swap_entry()
+    entry |= {"why": "[merge me](https://example.invalid)", "run_url": "https://example.invalid/run",
+              "from": {"id": "not-the-pin"}, "to": {"id": "not-the-candidate"}}  # fmt: skip
+    assert model_watch.entry_errors(entry, MANIFEST_TEXT, "m04_cheaper_swap") == []  # the diff itself is as ruled
+    mine = model_watch.checked(entry, MANIFEST_TEXT, "m04_cheaper_swap")
+    assert mine["from"]["id"] == PIN and mine["to"] == {f: HAIKU[f] for f in model_watch.PIN_FIELDS}
+    assert mine["run_url"] == "https://github.com/andaro74/agentkeel/actions/runs/77"
+    for text in (model_watch.body_of(mine), model_watch.draft_ruling(mine, 41)):
+        assert "example.invalid" not in text and "not-the-" not in text and HAIKU["id"] in text
+    text = MANIFEST_TEXT.replace("deprecated_after: null", 'deprecated_after: "2027-06-01"')
+    dated = {"kind": "deprecated_after", "branch": "model-watch/deprecated-after-2027-03-01", "date": "1999-01-01",
+             "model": "another-model", "why": "x", "files": {model_watch.MANIFEST: text.replace("2027-06-01", "2027-03-01")}}  # fmt: skip
+    mine = model_watch.checked(dated, text, None)
+    assert (mine["date"], mine["model"]) == ("2027-03-01", PIN) and "2027-06-01" in mine["why"]
+
+
 # --- the retirement's pull request ------------------------------------------------------------
 
 AGENT_MANIFEST = (ROOT / "tests/fixtures/m07/s1-platform-upgrade/agent/manifest.yaml").read_text(encoding="utf-8")
@@ -247,6 +280,32 @@ def test_the_keyed_job_opens_a_retirement_only_for_rollout_retired_and_nothing_e
     assert any(said in e for e in errors), errors
 
 
+def test_the_retirements_title_and_body_are_the_keyed_jobs_own(monkeypatch):
+    """security-reviewer 4 on M07 PR 2: the title and the body were posted as the artifact gave them."""
+    from scripts import platform_pr
+
+    opened: list[dict[str, Any]] = []
+    monkeypatch.setenv("GITHUB_RUN_ID", "88")
+    monkeypatch.setattr(platform_check, "identity", lambda: ("agentkeel-studio", 5144253))
+    monkeypatch.setattr(platform_check, "load_grant", lambda root=None: {"agentkeel-upgrades": {"app_id": 5200001}})
+    monkeypatch.setattr(platform_check, "app_token", lambda *a: "t")
+    monkeypatch.setattr(platform_check, "gh", lambda path, **k: AGENT_MANIFEST if k.get("raw") else {"default_branch": "main"})
+    monkeypatch.setattr(platform_pr, "open_draft", lambda *a, **k: opened.append(k) or {"number": 3})
+    (entry,) = retire_agent.plan([AGENT], "premiere-desk", manifest_reader())
+    entry |= {"title": "Urgent: approve", "body": "[merge me](https://example.invalid)", "why": "because I said so"}
+    (result,) = retire_agent.open_all([entry], "key")
+    assert result["opened"] is True
+    assert opened[0]["title"] == "Retire premiere-desk"
+    assert "example.invalid" not in opened[0]["body"] and "because I said so" not in opened[0]["body"]
+    assert retire_agent.DISPATCHED in opened[0]["body"] and "run 88" in opened[0]["body"]
+
+
+def test_a_retirement_is_not_opened_on_a_repository_name_that_is_not_one():
+    (entry,) = retire_agent.plan([AGENT], "premiere-desk", manifest_reader())
+    entry["repository"] = "agentkeel-studio/premiere-desk?ref=x"
+    assert any("not an agent repository" in e for e in retire_agent.entry_errors(entry, "agentkeel-studio", AGENT_MANIFEST))
+
+
 # --- after the deletion ----------------------------------------------------------------------------
 
 
@@ -282,6 +341,29 @@ def test_the_one_invocation_after_the_deletion_is_written_raw_and_never_raises()
         retire_agent.record("refagent", "andaro74/agentkeel", "c" * 40, arn, RUN, gone)
 
 
+def test_nothing_is_recorded_as_retired_unless_the_invocation_says_the_runtime_is_gone(tmp_path, monkeypatch):
+    """platform-architect B1 on M07 PR 2: CloudFormation deletes a removed resource after the update has
+    succeeded, so the job's update exiting 0 does not say the runtime is gone. Until this, the record
+    put once in the audit bucket, and `retired_at`, were written whatever the invocation returned."""
+    arn = "arn:aws:bedrock-agentcore:us-west-2:1:runtime/agentkeel_premiere_desk-x"
+    for client in (Runtime(), Runtime(Gone("AccessDeniedException")), Runtime(TimeoutError("slow"))):
+        seen = retire_agent.invoke(arn, client)
+        with pytest.raises(retire_agent.Refused, match="does not say the runtime is gone"):
+            retire_agent.record("premiere-desk", AGENT["repository"], AGENT["commit"], arn, RUN, seen)
+    gone = retire_agent.invoke(arn, Runtime(Gone("ResourceNotFoundException")))
+    with pytest.raises(retire_agent.Refused, match="another ARN"):
+        retire_agent.record("premiere-desk", AGENT["repository"], AGENT["commit"], arn + "-other", RUN, gone)
+    # And the command's exit code is what the job stops on: 0 for the deletion's error, 5 for anything else.
+    out = tmp_path / "invocation.json"
+    for client, code in ((Runtime(Gone("ResourceNotFoundException")), 0), (Runtime(), 5), (Runtime(Gone("AccessDeniedException")), 5)):
+        monkeypatch.setattr(retire_agent, "invoke", lambda arn, client=client: retire_agent_invoke(arn, client))
+        assert retire_agent.main(["invoke", "--arn", arn, "--out", str(out)]) == code
+        assert json.loads(out.read_text(encoding="utf-8"))["arn"] == arn
+
+
+retire_agent_invoke = retire_agent.invoke
+
+
 # --- the registry ------------------------------------------------------------------------------------
 
 
@@ -303,7 +385,8 @@ class Table:
         assert (ExpressionAttributeNames is None) == ("#n" not in ConditionExpression), ConditionExpression
         held = self.items.get(Item["name"]["S"])
         same = ExpressionAttributeValues is not None and held and held["repository_id"] == ExpressionAttributeValues[":id"]
-        if (held and not same) or (not held and "attribute_not_exists" not in ConditionExpression):
+        retired = held and "attribute_not_exists(retired_at)" in ConditionExpression and "retired_at" in held
+        if (held and not same) or retired or (not held and "attribute_not_exists(#n)" not in ConditionExpression):
             raise ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
         self.items[Item["name"]["S"]] = Item
 
@@ -343,6 +426,20 @@ def test_refagent_another_repositorys_agent_and_a_name_never_deployed_are_not_re
     for code, why in (registry.retiring(table, name, repository_id, ARN), registry.retire(table, name, repository_id, "c" * 40, "9")):
         assert code == 3 and said in why
     assert "retired_at" not in table.items["premiere-desk"] and "retiring_arn" not in table.items["premiere-desk"]
+
+
+def test_a_retired_name_is_not_deployed_again_and_its_row_is_not_replaced():
+    """security-reviewer 8 on M07 PR 2: `write` puts a whole item, so a later head that dropped
+    `rollout: retired` would have been deployed and would have dropped `retired_at` from the row."""
+    table = deployed_table()
+    registry.retiring(table, "premiere-desk", "111", ARN)
+    registry.retire(table, "premiere-desk", "111", "c" * 40, "9")
+    row = dict(table.items["premiere-desk"])
+    code, said = registry.claim(table, "premiere-desk", "org/a", "111")
+    assert code == 3 and "one-way" in said  # refused before the stack is touched
+    code, said = registry.write(table, "premiere-desk", "org/a", "111", "d" * 40, "10", "first")
+    assert code == 3 and "retired" in said
+    assert table.items["premiere-desk"] == row
 
 
 def test_a_retirement_with_no_arn_anywhere_is_refused_before_anything_is_removed():
@@ -462,3 +559,48 @@ def test_a_retired_agents_stack_is_the_same_stack_without_its_runtime(tmp_path):
     assert runtime not in types(retired["template"]) and retired["agent"].runtime is None and retired["agent"].retired
     assert [t for t in types(live["template"]) if t != runtime] == types(retired["template"])  # nothing else goes
     assert not any(t.startswith("AWS::IAM::") and t not in types(live["template"]) for t in types(retired["template"]))  # no new IAM
+
+
+# --- panel 2's table: its writer opens no envelope (cold review B1 on M07 PR 2) ---------------------
+
+
+class Envelopes:
+    """DynamoDB's scan, in pages, and conditional put_item on `commit`."""
+
+    def __init__(self, held: list[str]) -> None:
+        self.items = {commit: {"commit": {"S": commit}} for commit in held}
+        self.scans = 0
+
+    def scan(self, TableName, ProjectionExpression, ExpressionAttributeNames, ExclusiveStartKey=None):  # noqa: N803
+        self.scans += 1
+        commits = sorted(self.items)
+        start = commits.index(ExclusiveStartKey["commit"]["S"]) + 1 if ExclusiveStartKey else 0
+        page = commits[start:start + 1]
+        more = {"LastEvaluatedKey": {"commit": {"S": page[-1]}}} if start + 1 < len(commits) else {}
+        return {"Items": [{"commit": {"S": c}} for c in page], **more}
+
+    def put_item(self, TableName, Item, ConditionExpression, ExpressionAttributeNames):  # noqa: N803
+        assert ConditionExpression == "attribute_not_exists(#c)" and TableName == "agentkeel-envelopes"
+        assert Item["commit"]["S"] not in self.items
+        self.items[Item["commit"]["S"]] = Item
+
+
+def test_panel_2s_rows_are_what_the_shared_reader_gives_each_put_once(tmp_path):
+    from scripts import envelope_rows
+    from src.verdict import replay_history
+
+    a, b, c = "a" * 40, "b" * 40, "c" * 40
+    for commit, verdict, mode in ((a, "GREEN", "runtime"), (b, "RED", None), (c, "GREEN", "runner")):
+        (tmp_path / f"{commit}.json").write_text(json.dumps({"commit": commit, "verdict": verdict, **({"mode": mode} if mode else {})}), encoding="utf-8")  # fmt: skip
+    (tmp_path / f"{a}.baseline-card.json").write_text("{}", encoding="utf-8")  # not an envelope: not read
+    assert replay_history.rows(tmp_path)[1] == {"commit": b, "verdict": "RED", "mode": "not recorded"}
+    assert replay_history.verdicts(tmp_path) == {a: "GREEN", b: "RED", c: "GREEN"}
+    table = Envelopes([a, "d" * 40])
+    assert envelope_rows.put_rows(table, tmp_path) == [b, c] and table.scans == 2  # every page of the scan
+    assert table.items[b] == {"commit": {"S": b}, "verdict": {"S": "RED"}, "mode": {"S": "not recorded"}}
+    assert table.items[a] == {"commit": {"S": a}}  # a row that is there is left alone
+    assert envelope_rows.put_rows(table, tmp_path) == []
+    # An envelope whose commit is not its name stops the write: no row is guessed.
+    (tmp_path / f"{'e' * 40}.json").write_text(json.dumps({"commit": a, "verdict": "GREEN"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="not the file name"):
+        envelope_rows.put_rows(table, tmp_path)

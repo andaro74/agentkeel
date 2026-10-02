@@ -29,13 +29,20 @@ names, a registry row idle for 90 days, is not built: nothing writes
 template without the runtime (`infra/construct/`, no new IAM), and then:
 
 - `invoke`: one invocation of the runtime's ARN, after the deletion, written
-  raw: answered or not, and the error's code. It never fails the job. Only
+  raw: answered or not, and the error's code. Only
   `ResourceNotFoundException` says the runtime is gone; a refusal for access
-  does not, and `build.f7_2` reads it that way.
+  does not, and `build.f7_2` reads it that way. It exits 0 on that error
+  and 5 on anything else, an answer included: the job then fails, nothing
+  is recorded and the row stays open, so the next run asks again
+  (platform-architect B1 on M07 PR 2: CloudFormation deletes a removed
+  resource after the update has succeeded, and a delete that fails there
+  leaves the runtime answering under an update that exited 0).
 - `record`: the retirement as one JSON document, put once under
   `envelopes/agents/<name>/retired.json` in the security account's audit
   bucket, because the registry row is in the agent account and is not
-  write-once (rulings/pr2-security.md item 11).
+  write-once (rulings/pr2-security.md item 11). It refuses an invocation
+  that does not say the runtime is gone: a record put once must not be
+  the record of a runtime that still answered.
 
 Nothing from an agent repository is imported or run. `refagent` is refused
 by name at every step.
@@ -46,6 +53,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 from datetime import UTC, date, datetime, timedelta
@@ -64,6 +72,9 @@ PLATFORM_AGENT = "refagent"
 DEPRECATION_DAYS = 30  # as `validate`'s lifecycle check (src/validate/lifecycle.py)
 REGION = "us-west-2"
 GONE = "ResourceNotFoundException"
+
+
+DISPATCHED = "the owner dispatched the retire workflow for this agent"
 
 
 class Refused(Exception):
@@ -136,7 +147,7 @@ def plan(agents: list[dict[str, Any]], name: str | None, read_manifest, today: d
         if not found:
             return [{"repository": None, "name": name, "base": None, "open": False,
                      "why": f"no agent named {name} has a head the platform's App passed, or it is already retired"}]  # fmt: skip
-        return [plan_one(found[0], "the owner dispatched the retire workflow for this agent", read_manifest)]
+        return [plan_one(found[0], DISPATCHED, read_manifest)]
     entries = []
     for agent in live:
         try:
@@ -157,7 +168,7 @@ def entry_errors(entry: Any, organisation: str, current_manifest: str | None) ->
     repository = str(entry.get("repository"))
     owner, _, repo = repository.partition("/")
     errors = []
-    if owner != organisation or not repo or repo == platform_upgrade.TEMPLATE_REPOSITORY:
+    if owner != organisation or not re.fullmatch(r"[A-Za-z0-9._-]+", repo) or repo == platform_upgrade.TEMPLATE_REPOSITORY:
         errors.append(f"{repository} is not an agent repository of {organisation}'s")
     name = entry.get("name")
     if not isinstance(name, str) or not NAME.match(name) or name == PLATFORM_AGENT:
@@ -201,8 +212,15 @@ def open_all(entries: list[Any], key: str) -> list[dict[str, Any]]:
                 manifest = platform_check.gh(f"/repos/{repository}/contents/manifest.yaml?ref={entry['base']}", raw=True)
                 if errors := entry_errors(entry, str(organisation), manifest):
                     raise platform_pr.Refused("; ".join(errors))
+                # The title and the body are written here, from the name checked above and the manifest
+                # this job read at the base: the artifact's own text is never posted as the App
+                # (security-reviewer 4 on M07 PR 2). Why: the pin's date when the manifest gives one that
+                # is due, and the dispatch otherwise.
+                why = deprecating(yaml.safe_load(manifest), date.today()) or DISPATCHED
+                run = os.environ.get("GITHUB_RUN_ID", "")
+                said = {"name": entry["name"], "why": why, "run": run if run.isdigit() else None}
                 result |= platform_pr.open_draft(repository, default, entry["base"], BRANCH, entry["files"],
-                                                 title=str(entry.get("title")), body=str(entry.get("body")),
+                                                 title=f"Retire {entry['name']}", body=body_of(said),
                                                  message=f"Retire {entry['name']}: rollout: retired")  # fmt: skip
                 result["opened"] = True
         except (platform_pr.Refused, urllib.error.URLError, KeyError, TimeoutError, OSError) as exc:
@@ -237,6 +255,10 @@ def record(name: str, repository: str, commit: str, arn: str, run_url: str, invo
     bucket and the registry against it."""
     if name == PLATFORM_AGENT:
         raise Refused(f"{PLATFORM_AGENT} is never retired by this path")
+    if not isinstance(invocation, dict) or invocation.get("answered") is not False or invocation.get("error") != GONE:
+        raise Refused(f"the invocation does not say the runtime is gone ({GONE}): nothing is recorded as retired")
+    if invocation.get("arn") != arn:
+        raise Refused("the invocation is of another ARN: nothing is recorded as retired")
     return {"what": "agent retired", "agent": name, "repository": repository, "commit": commit, "runtime_arn": arn,
             "recorded_at": now(), "run_url": run_url, "invocation": invocation,
             "kept": ["the stack", "the agent's role", "its key and alias", "its rights table", "its image repository",
@@ -269,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
         gone = result["error"] == GONE
         print(f"{args.arn}: {'answered' if result['answered'] else 'refused: ' + str(result['error'])}"
               f"{'' if gone or result['answered'] else ' (not the deletion: ' + GONE + ' is)'}")  # fmt: skip
-        return 0
+        return 0 if gone else 5
     if args.what == "record":
         try:
             document = record(args.name, args.repository, args.commit, args.arn, args.run_url,

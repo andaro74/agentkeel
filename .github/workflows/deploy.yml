@@ -84,9 +84,12 @@
 #   row, and updates the agent's stack to the construct's template **without
 #   the runtime** (infra/construct/). That update is the retirement: the
 #   execution role already may delete a template agent's runtime, and
-#   nothing is granted for it. Then one invocation of the ARN, recorded raw;
-#   the retirement put once under envelopes/agents/<name>/retired.json in the
-#   security account; and `retired_at` on the registry row, which stays.
+#   nothing is granted for it. Then one invocation of the ARN, recorded raw.
+#   Only when it is refused with ResourceNotFoundException is the retirement
+#   put once under envelopes/agents/<name>/retired.json in the security
+#   account, and `retired_at` written on the registry row, which stays. On
+#   any other result the job fails and the next run asks again. A name with
+#   `retired_at` is not deployed again: `registry.py claim` refuses it.
 #   The stack, the role, the key, the table and the logs are kept
 #   (milestones/M07/runs/f7_2_removed_and_kept.md). It is one-way.
 #
@@ -592,7 +595,8 @@ jobs:
       # this job verified and deployed, put once under bundles/<name>/<commit>.tar with its signature beside
       # it, because the Actions artifact expires after 30 days and a retired agent's bundle must still be
       # there. Before the answer record, so a deploy whose bundle could not be kept writes no row and is
-      # asked again. A 412 is the same bytes already put by an earlier run of this commit: it stands.
+      # asked again. A 412 is an object of that key already put by an earlier run: it stands. Nothing here
+      # reads its bytes back (no role of this job may get an object), so "the same bytes" is not claimed.
       - name: Put the signed bundle in the security account, once
         if: steps.registry.outputs.skip == 'false'
         run: |
@@ -842,19 +846,37 @@ jobs:
             --role-arn "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/agentkeel-cfn-exec" \
             --no-fail-on-empty-changeset
 
-      # One call, after the deletion, written raw. It never fails the job: an answer is the finding, and
-      # build reads it. Only ResourceNotFoundException says the runtime is gone.
-      - name: One invocation of the retired runtime, recorded
+      # One call, after the deletion, written raw. Only ResourceNotFoundException says the runtime is gone.
+      # Anything else, an answer included, fails the job here: nothing is put in the audit bucket, the row
+      # gets no retired_at, and the next run asks again with the ARN the row kept. CloudFormation deletes a
+      # removed resource after the update has succeeded, so an update that exited 0 does not say the
+      # runtime is gone (platform-architect B1 on M07 PR 2). What was returned is kept with the run.
+      - name: One invocation of the retired runtime; anything but ResourceNotFoundException stops here
+        id: invocation
         if: steps.arn.outputs.skip == 'false'
         env:
           ARN: ${{ steps.arn.outputs.arn }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           uv run python scripts/retire_agent.py invoke --arn "$ARN" --out "$RUNNER_TEMP/invocation.json"
+          code=$?
+          cat "$RUNNER_TEMP/invocation.json" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" != "0" ]; then
+            echo "::error::the runtime of $NAME is not gone: no retirement is recorded, and the registry row stays open"
+            exit 1
+          fi
+          set -e
           uv run python scripts/retire_agent.py record --name "$NAME" --repository "$REPOSITORY" --commit "$COMMIT" \
             --arn "$ARN" --run-url "$RUN_URL" --invocation "$RUNNER_TEMP/invocation.json" --out "$RUNNER_TEMP/retired.json"
-          cat "$RUNNER_TEMP/invocation.json" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always() && steps.arn.outputs.skip == 'false'
+        with:
+          name: retire-invocation-${{ matrix.name }}
+          path: ${{ runner.temp }}/invocation.json
+          if-no-files-found: ignore
+          retention-days: 90
 
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         if: steps.arn.outputs.skip == 'false'

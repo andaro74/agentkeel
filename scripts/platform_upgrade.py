@@ -215,6 +215,10 @@ def kind_of(agent: Path, repository: str) -> tuple[str, list[str]]:
     return ("major" if refused else "minor"), refused
 
 
+# A check's name as the platform check posts it: words, no markup. What the keyed job will write in a body.
+CHECK_NAME = re.compile(r"[A-Za-z0-9 ,.'/:_-]{1,160}")
+
+
 def body_of(entry: dict[str, Any]) -> str:
     refused = "".join(f"\n- {name}" for name in entry["refused"]) or "\n- none"
     return (
@@ -324,6 +328,11 @@ def entry_errors(entry: Any, organisation: str, current_manifest: str | None, ro
         errors.append(f"branch {entry.get('branch')!r} is not platform-upgrade/{to}")
     if entry.get("kind") not in ("major", "minor"):
         errors.append(f"kind {entry.get('kind')!r} is neither major nor minor")
+    refused = entry.get("refused")
+    if not isinstance(refused, list) or not all(isinstance(r, str) and CHECK_NAME.fullmatch(r) for r in refused):
+        errors.append("the checks that refused the default branch are not a list of check names")
+    elif bool(refused) != (entry.get("kind") == "major"):
+        errors.append(f"kind {entry.get('kind')!r} does not agree with {len(refused)} refusing checks")
     if "manifest.yaml" in entry["files"] and isinstance(entry["files"]["manifest.yaml"], str):
         try:
             before = yaml.safe_load(current_manifest or "")
@@ -362,9 +371,14 @@ def open_all(entries: list[Any], key: str) -> list[dict[str, Any]]:
                 manifest = platform_check.gh(f"/repos/{repository}/contents/manifest.yaml?ref={entry['base']}", raw=True)
                 if errors := entry_errors(entry, str(organisation), manifest):
                     raise platform_pr.Refused("; ".join(errors))
+                # The title and the body are written here, from the fields checked above and the manifest
+                # this job read at the base: the artifact's own text is never posted as the App
+                # (security-reviewer 4 on M07 PR 2).
+                said = {"from": (yaml.safe_load(manifest) or {}).get("platform_version"), "to": entry["to"],
+                        "kind": entry["kind"], "base": entry["base"], "refused": entry["refused"], "files": entry["files"]}  # fmt: skip
                 result |= platform_pr.open_draft(
                     repository, default, entry["base"], entry["branch"], entry["files"],
-                    title=str(entry.get("title")), body=str(entry.get("body")),
+                    title=f"Platform upgrade to {entry['to']} ({entry['kind']})", body=body_of(said),
                     message=f"Platform upgrade to {entry['to']} ({entry['kind']})")  # fmt: skip
                 result["opened"] = True
         except (platform_pr.Refused, urllib.error.URLError, KeyError, TimeoutError, OSError) as exc:

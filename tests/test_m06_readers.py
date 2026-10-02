@@ -628,7 +628,7 @@ class FakeTable:
 
         held = self.items.get(Item["name"]["S"])
         same = ExpressionAttributeValues is not None and held and held["repository_id"] == ExpressionAttributeValues[":id"]
-        if held and not same:
+        if held and (not same or ("attribute_not_exists(retired_at)" in ConditionExpression and "retired_at" in held)):
             raise ClientError({"Error": {"Code": "ConditionalCheckFailedException"}}, "PutItem")
         self.items[Item["name"]["S"]] = Item
 

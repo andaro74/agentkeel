@@ -190,7 +190,7 @@ def app_token(app_id: int, account: str, private_key_pem: str, repository: str |
     A JWT the App's key signs, then the token of the installation that reaches `repository`, for that
     repository alone and that set alone. No third-party action holds the key (SPEC/06 section 6: each
     key is in its own environment, limited to `main`)."""
-    if not isinstance(repository, str) or repository.count("/") != 1 or not all(repository.split("/")):
+    if not isinstance(repository, str) or not re.fullmatch(r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+", repository):
         raise ValueError(f"app_token() mints for one repository, owner/name; got {repository!r}: no token is asked for")
     owner, name = repository.split("/")
     if owner != account:
@@ -328,9 +328,11 @@ def grant_errors(installation: dict[str, Any], environment: dict[str, Any], gran
     if account not in (app.get("installed_on") or []):
         # An App installed on two accounts has to be public on GitHub, so anybody may install it on an
         # account of their own. That gives this platform's key reach into their repositories and gives
-        # them nothing here: no token is ever minted for an account the callers do not name. The grant
-        # says which App is public; for it, such an installation is recorded and is not an error, or a
-        # stranger could stop every keyed job by installing the App. For every other App it is one.
+        # them nothing here: no token is minted for an account the grant does not name, by `app_token`
+        # or by `read_grant` (security-reviewer BLOCK 1 on M07 PR 2: until then `read_grant` minted a
+        # metadata token on every installation). The grant says which App is public; for it, such an
+        # installation is recorded from the App's own listing and is not an error, suspended or not,
+        # or a stranger could stop every keyed job by installing the App. For every other App it is one.
         if app.get("public") is True:
             return errors
         errors.append(f"{slug} is installed on {account}, which the grant does not name "
@@ -351,6 +353,21 @@ def grant_errors(installation: dict[str, Any], environment: dict[str, Any], gran
         errors.append(f"{who}: the grant names no repository_selection for {account}")
     errors += permission_errors(who, installation.get("permissions"), app.get("permissions") or {})
     return errors + environment_errors(slug, app, environment, grant.get("environments"))
+
+
+def installations_of_the_app() -> list[dict[str, Any]]:
+    """Every installation of the App whose JWT is the caller's credential, each page (security-reviewer 2
+    on M07 PR 2: one page of a public App's list can leave a named account's installation unread)."""
+    found: list[dict[str, Any]] = []
+    page = 1
+    while True:
+        got = gh(f"/app/installations?per_page=100&page={page}")
+        if not isinstance(got, list):
+            raise KeyError("the App's installations did not come back as a list")
+        found += got
+        if len(got) < 100:
+            return found
+        page += 1
 
 
 def read_environment(name: str, repository: str = PLATFORM_REPOSITORY) -> dict[str, Any]:
@@ -378,25 +395,31 @@ def read_environment(name: str, repository: str = PLATFORM_REPOSITORY) -> dict[s
     return out
 
 
-def read_grant(slug: str, app_id: int, private_key_pem: str) -> dict[str, Any]:
+def read_grant(slug: str, app_id: int, private_key_pem: str, named: Any = None) -> dict[str, Any]:
     """What GitHub says one App holds, read with the App's own JWT: its registered permissions, each of
-    its installations with the repositories it reaches, and its key's environment.
+    its installations, and, for an installation on an account in `named` (the grant's `installed_on`),
+    the repositories it reaches.
 
-    The repository list of an installation is read with a token that holds `metadata: read` and
-    nothing else, revoked after the read (item 6). The environment is read with the job's own token."""
+    That repository list is read with a token that holds `metadata: read` and nothing else, revoked
+    after the read (item 6). **No token is asked for on any other account**: an installation the grant
+    does not name is recorded as the App's own listing gives it (id, account, selection, permissions)
+    and its repositories are left unread. The environment is read with the job's own token."""
+    named = set(named or [])
     read: dict[str, Any] = {"app": slug, "app_id": app_id, "registered": None, "installations": [], "error": None}
     try:
         with _As(app_jwt(app_id, private_key_pem)):
             registered = gh("/app")
             read["registered"] = {"slug": registered.get("slug"), "id": registered.get("id"),
                                   "permissions": registered.get("permissions")}  # fmt: skip
-            listed = gh("/app/installations?per_page=100")
-            for one in listed:
+            for one in installations_of_the_app():
                 installation = {"id": one.get("id"), "app_id": one.get("app_id"), "app_slug": one.get("app_slug"),
                                 "account": {"login": (one.get("account") or {}).get("login")},
                                 "repository_selection": one.get("repository_selection"),
                                 "permissions": one.get("permissions"), "suspended_at": one.get("suspended_at"),
                                 "repositories": None}  # fmt: skip
+                if installation["account"]["login"] not in named:
+                    read["installations"].append(installation)
+                    continue
                 token = gh(f"/app/installations/{one['id']}/access_tokens", method="POST",
                            body={"permissions": {"metadata": "read"}})["token"]  # fmt: skip
                 try:
@@ -425,7 +448,8 @@ def check_grant(slug: str, private_key_pem: str, root: Path = ROOT) -> tuple[dic
         raise NoGrant(f"the grant names no App {slug!r}")
     if not isinstance(app.get("app_id"), int):
         raise NoGrant(f"{slug}: the grant holds no app_id for it yet; the App is made, and its id pushed, first")
-    read = read_grant(slug, app["app_id"], private_key_pem)
+    named = list(app.get("installed_on") or [])
+    read = read_grant(slug, app["app_id"], private_key_pem, named)
     read["environment"] = read_environment(str(app.get("environment")))
     errors = []
     if read["error"]:
@@ -439,10 +463,15 @@ def check_grant(slug: str, private_key_pem: str, root: Path = ROOT) -> tuple[dic
     errors += permission_errors(f"{slug} as registered", registered.get("permissions"), app.get("permissions") or {})
     if not read["installations"] and not read["error"]:
         errors.append(f"{slug}: no installation was read")
+    # The key's environment, once, whatever was installed where (security-reviewer 3 on M07 PR 2: inside
+    # an installation's pass alone, a read that found only unnamed accounts never compared it).
+    errors += environment_errors(slug, app, read["environment"], grant.get("environments"))
     for installation in read["installations"]:
         errors += [e for e in grant_errors(installation, read["environment"], grant) if e not in errors]
-        if installation.get("suspended_at"):
-            errors.append(f"{slug} on {installation['account']['login']}: the installation is suspended")
+        account = installation["account"]["login"]
+        # A stranger's installation of the public App, suspended or not, is theirs and stops nothing here.
+        if installation.get("suspended_at") and (account in named or app.get("public") is not True):
+            errors.append(f"{slug} on {account}: the installation is suspended")
     # Narrower than the grant is not an error; it is what a grant not yet made, or not yet accepted, reads as.
     narrower = []
     for installation in read["installations"]:
@@ -473,15 +502,23 @@ def relax_seed(name: str, org: str, app_id: int, private_key_pem: str, root: Pat
     repository until its owner restores the export. Which it is comes from the attempt.
 
     It can be pointed at one repository only: the one seed S0's run file names on `main`. Any other
-    name is refused before a token is minted, so this is not a tool for relaxing an agent's ruleset."""
+    name is refused before a token is minted, so this is not a tool for relaxing an agent's ruleset.
+    And it is made once: when the run file on `main` already records the attempt (an `observed` entry
+    whose `what` names the relaxation, as the observer matches it), it is refused before a token is minted (security-reviewer 6 on M07 PR 2:
+    "made once" was a sentence, not a check). Between the attempt and the commit that records it,
+    nothing but the dispatch's own log stops a second one."""
     from src.validate.agent import NAME
 
     if not isinstance(name, str) or not NAME.match(name):
         raise ValueError(f"{name!r} is not an agent's name")
-    seeded = (yaml.safe_load((root / SEED_RUN_FILE).read_text(encoding="utf-8")) or {}).get("repository")
+    seed = yaml.safe_load((root / SEED_RUN_FILE).read_text(encoding="utf-8")) or {}
+    seeded = seed.get("repository")
     repository = f"{org}/{name}"
     if repository != seeded:
         raise ValueError(f"the seeded relaxation is made on {seeded} and on no other repository; got {repository}")
+    made = [o for o in seed.get("observed") or [] if isinstance(o, dict) and "relax" in str(o.get("what", ""))]
+    if made:
+        raise ValueError(f"the seeded relaxation was already made ({SEED_RUN_FILE} records it): it is made once")
     record: dict[str, Any] = {"what": "the App's token asked to remove the required status check from the ruleset",
                               "repository": repository, "ruleset": None, "status": None, "message": None,
                               "at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")}  # fmt: skip
@@ -597,7 +634,8 @@ def grant_command(slug: str, out: Path) -> int:
     """Read one App's grant back and write what was read; exit 1 on anything beyond the ruled grant.
 
     The key is taken from the environment and removed from it. Nothing with a write permission is
-    minted here: the JWT, and one `metadata: read` token per installation for its repository list."""
+    minted here: the JWT, and one `metadata: read` token per installation on an account the grant
+    names, for its repository list."""
     key = os.environ.pop("AGENTKEEL_APP_PRIVATE_KEY", None)
     if not key:
         print(f"no AGENTKEEL_APP_PRIVATE_KEY: {slug}'s grant is read in its key's environment only")
@@ -616,7 +654,8 @@ def grant_command(slug: str, out: Path) -> int:
     out.write_text(json.dumps(read, indent=2) + "\n", encoding="utf-8")
     for installation in read["installations"]:
         print(f"{slug} on {installation['account']['login']}: {installation['repository_selection']}, "
-              f"{len(installation['repositories'] or [])} repositories, {json.dumps(installation['permissions'], sort_keys=True)}")
+              f"{'repositories not read' if installation['repositories'] is None else str(len(installation['repositories'])) + ' repositories'}, "
+              f"{json.dumps(installation['permissions'], sort_keys=True)}")
     environment = read["environment"]
     print(f"environment {environment['name']}: policies {environment['branch_policies']}, "
           f"can_admins_bypass {environment['can_admins_bypass']}; its secrets' names are not read by a job")

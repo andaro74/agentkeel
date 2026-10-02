@@ -224,11 +224,13 @@ def test_an_unknown_level_and_an_unread_list_are_refused_not_passed():
     assert platform_check.grant_errors({"app_slug": "environments"}, {}, grant)[0].startswith("the grant names no App")
 
 
-def live_pages(github, installation: dict[str, Any], registered: dict[str, str], environment: dict[str, Any]) -> None:
+def live_pages(github, installation: dict[str, Any], registered: dict[str, str], environment: dict[str, Any],
+               others: tuple[dict[str, Any], ...] = ()) -> None:  # fmt: skip
     name = environment["name"]
     github["pages"].update({
         "/app": {"slug": installation["app_slug"], "id": installation["app_id"], "permissions": registered},
-        "/app/installations?per_page=100": [{k: v for k, v in installation.items() if k != "repositories"}],
+        "/app/installations?per_page=100&page=1": [{k: v for k, v in one.items() if k != "repositories"}
+                                                   for one in (installation, *others)],
         "/installation/repositories?per_page=100&page=1": {
             "total_count": len(installation["repositories"]),
             "repositories": [{"name": n} for n in installation["repositories"]]},
@@ -412,6 +414,10 @@ def test_an_agent_that_is_not_behind_or_is_retired_gets_no_pull_request(tmp_path
     ({"branch": "main"}, "is not platform-upgrade/"),
     ({"kind": "tiny"}, "neither major nor minor"),
     ({"name": "refagent/../x"}, "not a name"),
+    # security-reviewer 4 on M07 PR 2: what the body will say is held to check names, and to the kind.
+    ({"refused": ["[click](https://example.invalid)"]}, "not a list of check names"),
+    ({"refused": "the files"}, "not a list of check names"),
+    ({"refused": []}, "does not agree with 0 refusing checks"),
 ])  # fmt: skip
 def test_the_keyed_job_checks_the_artifact_again_before_it_mints(tmp_path, versions, monkeypatch, change, said):
     """The plan is data from a job that read an agent repository. Each bound is held again on main's code."""
@@ -730,6 +736,71 @@ def test_a_strangers_installation_of_the_public_app_is_recorded_and_stops_nothin
     # A stranger's installation that holds more than the App's own permissions is still said.
     more = {**s0("upgrades_on_a_strangers_account.json"), "permissions": {"contents": "write", "administration": "write"}}
     assert platform_check.grant_errors(more, environment, grant) == []  # their account, their grant: not this platform's to refuse
+
+
+@pytest.mark.parametrize("suspended_at", [None, "2026-10-02T00:00:00Z"])
+def test_the_reader_of_the_grant_mints_nothing_on_a_strangers_installation(github, key, monkeypatch, suspended_at):
+    """security-reviewer BLOCK 1 on M07 PR 2: `read_grant` minted a metadata token on every installation,
+    a stranger's included, and listed their repositories into an artifact; and a stranger who suspended
+    their installation stopped every keyed job. Through `check_grant`, with the stranger's beside ours."""
+    fixture = s0("grant.json")
+    monkeypatch.setattr(platform_check, "load_grant", lambda root=None: fixture)
+    monkeypatch.setenv("GITHUB_TOKEN", "the-jobs-own-token")
+    ours = s0("upgrades_org_as_ruled.json")
+    theirs = {**s0("upgrades_on_a_strangers_account.json"), "suspended_at": suspended_at}
+    live_pages(github, ours, ours["permissions"], s0("environment_upgrades_as_ruled.json"), others=(theirs,))
+    read, errors = platform_check.check_grant("agentkeel-upgrades", key)
+    assert errors == []
+    assert read["not_ours"] == ["a-stranger"]
+    mine, stranger = read["installations"]
+    assert mine["repositories"] == sorted(ours["repositories"])
+    assert stranger["account"]["login"] == "a-stranger" and stranger["repositories"] is None  # not read: no token
+    minted = [path for method, path, _b, _t in github["sent"] if method == "POST"]
+    assert minted == [f"/app/installations/{ours['id']}/access_tokens"]  # one token, on the account the grant names
+
+
+def test_the_environment_is_compared_when_only_unnamed_accounts_hold_the_app(github, key, monkeypatch):
+    """security-reviewer 3 on M07 PR 2: inside an installation's pass alone, a public App read with only
+    a stranger's installation never had its key's environment compared."""
+    fixture = s0("grant.json")
+    monkeypatch.setattr(platform_check, "load_grant", lambda root=None: fixture)
+    monkeypatch.setenv("GITHUB_TOKEN", "the-jobs-own-token")
+    theirs = s0("upgrades_on_a_strangers_account.json")
+    environment = {**s0("environment_upgrades_as_ruled.json"), "can_admins_bypass": True}
+    live_pages(github, theirs, theirs["permissions"], environment)
+    _read, errors = platform_check.check_grant("agentkeel-upgrades", key)
+    assert any("can_admins_bypass" in e for e in errors)
+    assert not [1 for method, *_ in github["sent"] if method == "POST"]
+
+
+def test_every_page_of_the_apps_installations_is_read(github, key, monkeypatch):
+    """security-reviewer 2 on M07 PR 2: one page of a public App's list can leave ours unread."""
+    fixture = s0("grant.json")
+    monkeypatch.setattr(platform_check, "load_grant", lambda root=None: fixture)
+    monkeypatch.setenv("GITHUB_TOKEN", "the-jobs-own-token")
+    ours = {**s0("upgrades_org_as_ruled.json"), "permissions": {"contents": "write", "administration": "write", "metadata": "read"}}
+    theirs = s0("upgrades_on_a_strangers_account.json")
+    live_pages(github, theirs, s0("upgrades_org_as_ruled.json")["permissions"], s0("environment_upgrades_as_ruled.json"),
+               others=tuple({**theirs, "id": 1000 + n, "account": {"login": f"stranger-{n}"}} for n in range(99)))  # fmt: skip
+    github["pages"]["/app/installations?per_page=100&page=2"] = [{k: v for k, v in ours.items() if k != "repositories"}]
+    github["pages"]["/installation/repositories?per_page=100&page=1"] = {
+        "total_count": len(ours["repositories"]), "repositories": [{"name": n} for n in ours["repositories"]]}  # fmt: skip
+    _read, errors = platform_check.check_grant("agentkeel-upgrades", key)
+    assert any("administration" in e for e in errors)  # ours, widened, on the second page: found and refused
+
+
+def test_the_seeded_relaxation_is_made_once(owner_check, key, tmp_path):
+    """security-reviewer 6 on M07 PR 2: once the run file on main records the attempt, it is refused."""
+    import yaml as _yaml
+
+    seed = _yaml.safe_load((platform_check.ROOT / platform_check.SEED_RUN_FILE).read_text(encoding="utf-8"))
+    seed["observed"] = [*(seed.get("observed") or []),
+                        {"what": "the App's token asked to relax owner-check's ruleset", "repository": seed["repository"], "run": 1}]  # fmt: skip
+    (tmp_path / platform_check.SEED_RUN_FILE).parent.mkdir(parents=True)
+    (tmp_path / platform_check.SEED_RUN_FILE).write_text(_yaml.safe_dump(seed), encoding="utf-8")
+    with pytest.raises(ValueError, match="made once"):
+        platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key, root=tmp_path)
+    assert owner_check["sent"] == []
 
 
 def test_no_token_is_minted_for_an_account_the_caller_does_not_name(github, key):

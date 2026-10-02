@@ -18,7 +18,10 @@ ruling beside it:
   manifest's. It opens nothing to set a null to null, and nothing to clear
   or delay a date the manifest holds: moving it later, or clearing it, with
   the model unchanged is a relaxation with two keys (ADR-0009 amendment 1),
-  and is a person's to propose.
+  and is a person's to propose. No gate reads that today: `src/gates/two_key.py`
+  does not read `deprecated_after` (threshold-owner F1 on M07 PR 2), so this
+  script's own refusal is the only thing that holds it for a pull request
+  the platform opens.
 - **the swap**: refagent's pin moved to the candidate the Threshold Owner
   named. A person names the candidate; the platform opens the pull request
   (SPEC/07 §8). The name is read from the run file the Threshold Owner
@@ -154,9 +157,14 @@ def plan(manifest_text: str, lifecycle: dict[str, Any], role: str | None, base: 
     elif read is None:
         dated["why"] = (f"Bedrock gives {pin['id']} no end-of-life date; nothing is written"
                         + ("" if stated is None else f", and the manifest's {stated} is a person's to clear, with two keys"))  # fmt: skip
+    elif stated is not None and not isinstance(stated, str):
+        # An unquoted date loads as a date, not a string, and would pass every comparison below
+        # (threshold-owner F4 on M07 PR 2). Nothing is compared with it, and nothing is opened.
+        dated["why"] = (f"the manifest's deprecated_after ({stated!r}) is not null and not a quoted YYYY-MM-DD date: "
+                        "nothing is compared with it, and nothing is opened")  # fmt: skip
     elif read == stated:
         dated["why"] = f"the manifest already says {stated}"
-    elif isinstance(stated, str) and read > stated:
+    elif stated is not None and read > stated:
         dated["why"] = f"Bedrock's date {read} is later than the manifest's {stated}: moving it later is two keys, a person's to propose"
     else:
         dated |= {"open": True, "why": f"Bedrock's end-of-life for {pin['id']} is {read}; the manifest says {stated}",
@@ -213,9 +221,12 @@ def entry_errors(entry: Any, manifest_text: str, role: str | None) -> list[str]:
             errors.append(f"a swap sets `model` to pinned_roles.{role}'s pin and nothing else; this moves {', '.join(moved) or 'nothing'}")
     elif entry.get("kind") == "deprecated_after":
         new = after.get("deprecated_after")
+        stated = before.get("deprecated_after")
         if moved != ["deprecated_after"] or not isinstance(new, str) or not DATE.match(new):
             errors.append(f"this sets deprecated_after to a date and nothing else; it moves {', '.join(moved) or 'nothing'}")
-        elif isinstance(before.get("deprecated_after"), str) and new > before["deprecated_after"]:
+        elif stated is not None and not isinstance(stated, str):
+            errors.append(f"main's deprecated_after ({stated!r}) is not null and not a quoted date: nothing is compared with it")
+        elif isinstance(stated, str) and new > stated:
             errors.append("this moves deprecated_after later, which is two keys and a person's to propose")
         if entry.get("branch") != f"model-watch/deprecated-after-{new}":
             errors.append(f"branch {entry.get('branch')!r} does not name the date")
@@ -224,13 +235,32 @@ def entry_errors(entry: Any, manifest_text: str, role: str | None) -> list[str]:
     return errors
 
 
+def checked(entry: dict[str, Any], manifest_text: str, role: str | None) -> dict[str, Any]:
+    """The entry as the keyed job itself reads it, for every word it writes as the App: the title, the
+    body and the drafted ruling. Called after `entry_errors` passed. Each value is from `main`'s own
+    manifest, the proposed manifest `entry_errors` held to it, or this run; none is the plan's text
+    (security-reviewer 4 on M07 PR 2: a drafted ruling could describe a change other than the diff's)."""
+    before, after = yaml.safe_load(manifest_text), yaml.safe_load(entry["files"][MANIFEST])
+    pin = before["model"]
+    run = os.environ.get("GITHUB_RUN_ID", "")
+    out = {"kind": entry["kind"], "branch": entry["branch"], "base": entry.get("base"), "files": entry["files"],
+           "run_url": f"https://github.com/{REPOSITORY}/actions/runs/{run}" if run.isdigit() else None}  # fmt: skip
+    if entry["kind"] == "swap":
+        return out | {"role": role, "from": {field: pin.get(field) for field in PIN_FIELDS},
+                      "to": {field: after["model"].get(field) for field in PIN_FIELDS},
+                      "why": f"the Threshold Owner named pinned_roles.{role}, and refagent's pin is {pin['id']}"}  # fmt: skip
+    date = after["deprecated_after"]
+    return out | {"model": pin["id"], "date": date,
+                  "why": f"Bedrock's end-of-life for {pin['id']} is {date}; the manifest says {before.get('deprecated_after')}"}  # fmt: skip
+
+
 def ruling_slug(entry: dict[str, Any]) -> str:
     return "model-watch-" + str(entry["branch"]).split("/", 1)[1].replace("_", "-")
 
 
 def draft_ruling(entry: dict[str, Any], number: int) -> str:
-    """The Threshold Owner's ruling for this pull request, as a draft. Written here, from fields this job
-    checked, and with no line a gate would read as a seat's ruling."""
+    """The Threshold Owner's ruling for this pull request, as a draft. Written here, from `checked`'s
+    entry, and with no line a gate would read as a seat's ruling."""
     slug = ruling_slug(entry)
     if entry["kind"] == "swap":
         change = (f"refagent's pin moves from `{entry['from']['id']}` to `{entry['to']['id']}` "
@@ -309,6 +339,7 @@ def open_all(entries: list[Any], key: str, root: Path = ROOT) -> list[dict[str, 
         try:
             if errors := entry_errors(entry, manifest_text, role):
                 raise platform_pr.Refused("; ".join(errors))
+            entry = checked(entry, manifest_text, role)
             with platform_check._As(platform_check.app_token(app_id, owner, key, REPOSITORY, "open")):
                 default = platform_check.gh(f"/repos/{REPOSITORY}")["default_branch"]
                 what = f"refagent's pin to pinned_roles.{entry['role']}" if entry["kind"] == "swap" else f"deprecated_after {entry['date']}"
