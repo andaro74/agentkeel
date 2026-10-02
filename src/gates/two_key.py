@@ -59,7 +59,7 @@ import argparse
 import re
 import sys
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -222,6 +222,8 @@ def _version_key(value: Any) -> tuple[int, ...]:
 
 def _day(value: Any) -> date | None:
     """A manifest's `deprecated_after` as a date: YAML's own date for an unquoted one, or a quoted YYYY-MM-DD."""
+    if isinstance(value, datetime):
+        return value.date()  # an unquoted YAML timestamp: its day, so two values always compare
     if isinstance(value, date):
         return value
     try:

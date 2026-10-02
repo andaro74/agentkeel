@@ -81,6 +81,13 @@ def test_a_value_that_is_not_a_date_and_changed_is_read_as_relaxed():
     assert "which is later is unknown" in two_key.date_relaxation({**pin, "deprecated_after": "2027-06-30"}, {**pin, "deprecated_after": 20280101})
     assert two_key.date_relaxation({**pin, "deprecated_after": "soon"}, {**pin, "deprecated_after": "soon"}) is None
     assert two_key.date_relaxation({"model": None, "deprecated_after": "2027-06-30"}, {"model": None}) is not None
+    # An unquoted timestamp loads as a datetime. Against a date the comparison raised TypeError, and the gate
+    # ended on a traceback with no reason (cold review N1, threshold-owner N3 on M07 PR 3). It is read by its day.
+    import yaml
+
+    stamp = yaml.safe_load("deprecated_after: 2027-12-31T00:00:00Z")["deprecated_after"]
+    assert "moved later" in two_key.date_relaxation({**pin, "deprecated_after": "2027-06-30"}, {**pin, "deprecated_after": stamp})
+    assert two_key.date_relaxation({**pin, "deprecated_after": stamp}, {**pin, "deprecated_after": "2027-06-30"}) is None
 
 
 @pytest.mark.parametrize("case", sorted(CASES["not_a_relaxation"]))
