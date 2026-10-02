@@ -367,7 +367,11 @@ class GovernedAgent(Construct):
         ]}  # fmt: skip
         key = kms.CfnKey(
             self, "Key",
-            description=f"agentkeel: {self.agent_name}'s key. No role the platform creates may administer it (R4).",
+            # The roles named in PLATFORM_ROLES and every agent role by path: not every role a stack of the
+            # platform's makes (the Grafana connector's, the ingest's and the audit's are not in the list;
+            # they hold no kms Allow). Until M07 PR 3 this said "no role the platform creates"
+            # (platform-architect 5 on M07 PR 3).
+            description=f"agentkeel: {self.agent_name}'s key. No platform role its policy names may administer it (R4).",
             enable_key_rotation=True,
             # The execution role may make, rotate and alias a key that carries this tag, and no other.
             tags=[cdk.CfnTag(key=AGENT_TAG, value=self.agent_name)],
