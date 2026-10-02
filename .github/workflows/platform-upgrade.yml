@@ -34,7 +34,7 @@
 #    asks git for the template's default-branch head, with no token, refuses
 #    a plan made from any other commit, fetches the template as data at that
 #    commit, and requires each proposed server.py and __init__.py to equal
-#    the template's, and the proposed guardrail to be the one main pins.
+#    the template's text, and the proposed guardrail to be the one main pins.
 #
 # What `agentkeel-upgrades` can do: push a branch and open a pull request.
 # What it cannot: post the platform check (no `checks`), read or change a

@@ -43,7 +43,8 @@ value, from the plan). `plan` writes the template commit it read. `open`
 asks git for the template repository's default-branch head, with no token,
 refuses a plan made from any other commit, fetches the template as data at
 that commit, and requires each proposed `server.py` and `__init__.py` to
-equal the template's byte for byte, the proposed `platform_version` to be
+equal the template's text (as UTF-8, with line endings read as one: the
+plan carries text, not bytes), the proposed `platform_version` to be
 the template's, and the proposed `guardrail` to be the one `main` pins
 (`agents/refagent/manifest.yaml`). What it does not hold: who may push to
 the template repository's default branch. That is the owner, by hand, at
@@ -424,7 +425,13 @@ def content_errors(entry: dict[str, Any], template: Path, platform_manifest: Any
         source = template / name
         if not source.is_file():
             errors.append(f"{name}: the template at {at} has no such file")
-        elif source.read_text(encoding="utf-8") != entry["files"][name]:
+            continue
+        try:
+            theirs = source.read_text(encoding="utf-8")
+        except ValueError:  # not UTF-8: refused for this entry, never raised past the job's loop
+            errors.append(f"{name}: the template's {name} at {at} is not UTF-8 text")
+            continue
+        if theirs != entry["files"][name]:
             errors.append(f"{name}: the proposal is not the template's {name} at {at}")
     if isinstance(entry["files"].get("manifest.yaml"), str):
         pinned = platform_manifest.get("guardrail") if isinstance(platform_manifest, dict) else None

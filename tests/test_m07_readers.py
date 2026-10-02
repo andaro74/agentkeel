@@ -539,6 +539,9 @@ def test_the_guardrail_is_held_to_mains_pin_not_to_the_templates(tmp_path, versi
     bare.mkdir()
     (bare / "platform.json").write_text((S1 / "platform" / "platform.json").read_text(encoding="utf-8"), encoding="utf-8")
     assert any("has no such file" in e for e in platform_upgrade.content_errors(entry, bare, S1_PIN))
+    # A template file that is not UTF-8 is a refusal of this entry, not a crash of the job (security-reviewer 10).
+    (bare / "server.py").write_bytes(b"\xff\xfe not text")
+    assert any("is not UTF-8 text" in e for e in platform_upgrade.content_errors(entry, bare, S1_PIN))
 
 
 def test_open_reads_the_template_itself_before_any_token_and_refuses_a_plan_made_from_another_commit(tmp_path, versions, monkeypatch):
