@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from scripts import platform_check
 
@@ -291,3 +292,203 @@ def test_the_grant_command_stops_on_a_draft_a_missing_key_and_a_missing_id(tmp_p
     assert platform_check.main(["grant", "--app", "agentkeel-upgrades", "--out", str(out)]) == 1
     assert "holds no app_id" in capsys.readouterr().out
     assert "AGENTKEEL_APP_PRIVATE_KEY" not in os.environ and not out.exists()  # the key is taken out of the environment
+
+
+# --- the platform upgrade (S1; SPEC/07 section 6) -------------------------------
+
+from scripts import platform_pr, platform_upgrade  # noqa: E402
+
+S1 = Path(__file__).parent / "fixtures" / "m07" / "s1-platform-upgrade"
+MANIFEST = """# the team's own comment
+name: premiere-desk
+guardrail:
+  id: 1088aw3ujhyd  # the platform's
+  version: "5"
+seats:
+  product: andaro74
+rollout: all-at-once
+platform_version: m06  # written by the template
+"""
+
+
+def test_the_manifest_edit_moves_two_fields_and_keeps_every_other_byte():
+    edited = platform_upgrade.set_fields(MANIFEST, {"platform_version": "m07", "guardrail": {"id": "1088aw3ujhyd", "version": "6"}})
+    assert edited == MANIFEST.replace('version: "5"', 'version: "6"').replace("platform_version: m06", "platform_version: m07")
+    assert platform_upgrade.set_fields(MANIFEST, {"platform_version": "m06"}) == MANIFEST  # nothing to move
+    # A version that is a commit is a string of digits and letters; all digits must stay a string.
+    assert 'platform_version: "1234567"  # written' in platform_upgrade.set_fields(MANIFEST, {"platform_version": "1234567"})
+    # A field that changes shape, or is not there, is written whole.
+    nulled = MANIFEST.replace('guardrail:\n  id: 1088aw3ujhyd  # the platform\'s\n  version: "5"', "guardrail: null")
+    whole = platform_upgrade.set_fields(nulled, {"guardrail": {"id": "1088aw3ujhyd", "version": "6"}})
+    assert yaml.safe_load(whole)["guardrail"] == {"id": "1088aw3ujhyd", "version": "6"} and "seats:" in whole
+    added = platform_upgrade.set_fields(MANIFEST.replace("rollout: all-at-once\n", ""), {"rollout": "retired"})
+    assert yaml.safe_load(added)["rollout"] == "retired"
+    with pytest.raises(platform_upgrade.Refused, match="not a mapping"):
+        platform_upgrade.set_fields("- a list\n", {"platform_version": "m07"})
+
+
+def test_the_upgrade_reads_the_templates_own_manifest_when_no_platform_json_is_given(tmp_path):
+    """Live, the platform side is the template repository's checkout: its manifest carries both fields."""
+    template = tmp_path / "template"
+    template.mkdir()
+    (template / "manifest.yaml").write_text(MANIFEST.replace("m06", "m07").replace('"5"', '"6"'), encoding="utf-8")
+    (template / "server.py").write_text("NEW = True\n", encoding="utf-8")
+    (template / "agent.py").write_text("NOT_THE_PLATFORMS = True\n", encoding="utf-8")
+    changed = platform_upgrade.diff(S1 / "agent", template)
+    assert sorted(changed) == ["manifest.yaml", "server.py"]
+    assert yaml.safe_load(changed["manifest.yaml"])["platform_version"] == "m07"
+    (template / "manifest.yaml").write_text("name: x\n", encoding="utf-8")
+    with pytest.raises(platform_upgrade.Refused, match="names no platform_version"):
+        platform_upgrade.diff(S1 / "agent", template)
+
+
+def test_behind_is_ancestry_in_agentkeel_not_a_comparison_of_names():
+    assert platform_upgrade.behind("m05", "m06")[0] is True
+    assert platform_upgrade.behind("m06", "m06") == (False, "at m06")
+    assert platform_upgrade.behind("m06", "m05")[0] is False  # ahead is not behind
+    assert platform_upgrade.behind("m99", "m06")[0] is False  # a tag that is not there is not read as behind
+    assert platform_upgrade.behind("not-a-version", "m06")[0] is False
+    head = platform_upgrade.commit_of("m06")
+    assert head and platform_upgrade.behind("m05", head[:12])[0] is True  # a short commit is a version too
+
+
+def plan_entry(tmp_path, **more: Any) -> dict[str, Any]:
+    def fetch(repository: str, commit: str, into: Path) -> Path:
+        return S1 / "agent"
+
+    entry = platform_upgrade.plan_one({"repository": "agentkeel-studio/premiere-desk", "commit": "c" * 40,
+                                       "name": "premiere-desk"}, more.pop("template", S1 / "platform"), tmp_path, fetch)  # fmt: skip
+    return {**entry, **more}
+
+
+@pytest.fixture
+def versions(monkeypatch):
+    """The fixture's versions, m06 and m07: m07 is no tag yet, so ancestry is given here, not read."""
+    order = {"m06": "6" * 40, "m07": "7" * 40}
+    monkeypatch.setattr(platform_upgrade, "commit_of", lambda version, root=None: order.get(version))
+    monkeypatch.setattr(platform_upgrade, "behind", lambda mine, theirs, root=None: (
+        (mine, theirs) == ("m06", "m07"), f"{mine} is behind {theirs}" if (mine, theirs) == ("m06", "m07") else f"at {theirs}"))
+
+
+def test_the_plan_names_the_branch_the_kind_and_the_files_and_reads_the_agent_as_data(tmp_path, versions):
+    entry = plan_entry(tmp_path)
+    assert entry["open"] is True and entry["branch"] == "platform-upgrade/m07" and (entry["from"], entry["to"]) == ("m06", "m07")
+    assert sorted(entry["files"]) == ["manifest.yaml", "server.py"]
+    # The fixture's agent has no goldens, no prompt and no tool: the check at main refuses its head as it stands.
+    assert entry["kind"] == "major" and "the files the platform's image copies" in entry["refused"]
+    assert "**Kind: major.**" in entry["body"] and "`manifest.yaml`, `server.py`" in entry["body"]
+
+
+def test_an_agent_that_is_not_behind_or_is_retired_gets_no_pull_request(tmp_path, versions, monkeypatch):
+    template = tmp_path / "at-m06"
+    template.mkdir()
+    (template / "platform.json").write_text(json.dumps({"platform_version": "m06", "guardrail": {"id": "1088aw3ujhyd", "version": "5"}}), encoding="utf-8")
+    entry = plan_entry(tmp_path, template=template)
+    assert entry["open"] is False and entry["why"] == "at m06" and "files" not in entry
+
+    retired = tmp_path / "retired"
+    retired.mkdir()
+    (retired / "manifest.yaml").write_text((S1 / "agent" / "manifest.yaml").read_text(encoding="utf-8").replace(
+        "rollout: all-at-once", "rollout: retired"), encoding="utf-8")  # fmt: skip
+    entry = platform_upgrade.plan_one({"repository": "agentkeel-studio/gone", "commit": "c" * 40, "name": "gone"},
+                                      S1 / "platform", tmp_path, lambda *a: retired)  # fmt: skip
+    assert entry["open"] is False and "retired" in entry["why"]
+
+    def unreadable(*_a):
+        raise platform_upgrade.Refused("could not be read as data: not found")
+
+    entry = platform_upgrade.plan_one({"repository": "agentkeel-studio/gone", "commit": "c" * 40, "name": "gone"},
+                                      S1 / "platform", tmp_path, unreadable)  # fmt: skip
+    assert entry["open"] is False and "could not be read" in entry["why"]
+
+
+@pytest.mark.parametrize("change, said", [
+    ({"repository": "someone-else/premiere-desk"}, "not an agent repository"),
+    ({"repository": "agentkeel-studio/agent-template"}, "not an agent repository"),
+    ({"files": {".github/workflows/own.yml": "on: push"}}, "does not own"),
+    ({"files": {"agent.py": "x = 1"}}, "does not own"),
+    ({"base": "main"}, "not a commit"),
+    ({"to": "m99", "branch": "platform-upgrade/m99"}, "not a commit of main's history"),
+    ({"branch": "main"}, "is not platform-upgrade/"),
+    ({"kind": "tiny"}, "neither major nor minor"),
+    ({"name": "refagent/../x"}, "not a name"),
+])  # fmt: skip
+def test_the_keyed_job_checks_the_artifact_again_before_it_mints(tmp_path, versions, monkeypatch, change, said):
+    """The plan is data from a job that read an agent repository. Each bound is held again on main's code."""
+    monkeypatch.setattr(platform_upgrade.subprocess, "run", lambda *a, **k: type("Done", (), {"returncode": 0})())
+    monkeypatch.setattr(platform_upgrade, "commit_of", lambda version, root=None: {"m06": "6" * 40, "m07": "7" * 40}.get(version))
+    entry = plan_entry(tmp_path)
+    current = (S1 / "agent" / "manifest.yaml").read_text(encoding="utf-8")
+    assert platform_upgrade.entry_errors(entry, "agentkeel-studio", current) == []
+    errors = platform_upgrade.entry_errors({**entry, **change}, "agentkeel-studio", current)
+    assert any(said in e for e in errors), errors
+
+
+def test_a_proposed_manifest_that_moves_another_field_is_refused_by_the_keyed_job(tmp_path, versions, monkeypatch):
+    monkeypatch.setattr(platform_upgrade.subprocess, "run", lambda *a, **k: type("Done", (), {"returncode": 0})())
+    monkeypatch.setattr(platform_upgrade, "commit_of", lambda version, root=None: {"m06": "6" * 40, "m07": "7" * 40}.get(version))
+    entry = plan_entry(tmp_path)
+    current = (S1 / "agent" / "manifest.yaml").read_text(encoding="utf-8")
+    entry["files"]["manifest.yaml"] = entry["files"]["manifest.yaml"].replace("security: andaro74", "security: someone-else")
+    errors = platform_upgrade.entry_errors(entry, "agentkeel-studio", current)
+    assert errors == ["manifest.yaml: the proposal moves seats"]
+
+
+# --- the one place a draft pull request is opened (scripts/platform_pr.py) ------
+
+
+@pytest.fixture
+def repo(github):
+    github["pages"].update({
+        "/repos/org/a/git/ref/heads/main": {"object": {"sha": "b" * 40}},
+        f"/repos/org/a/git/commits/{'b' * 40}": {"tree": {"sha": "t" * 40}},
+        "/repos/org/a/pulls?state=all&head=org:platform-upgrade/m07&per_page=100": [],
+    })  # fmt: skip
+    github["fail"][("GET", "/repos/org/a/git/ref/heads/platform-upgrade/m07")] = 404
+    real = platform_check.gh
+
+    def gh(path, *, method="GET", body=None, raw=False):
+        if method == "POST":
+            github["sent"].append((method, path, body, os.environ.get("GITHUB_TOKEN")))
+            return {"sha": "n" * 40, "number": 7, "html_url": "https://github.com/org/a/pull/7"}
+        return real(path, method=method, body=body, raw=raw)
+
+    platform_check.gh = gh  # the fixture's monkeypatch restores it
+    return github
+
+
+def test_a_draft_is_one_commit_on_a_new_branch_and_one_pull_request(repo):
+    opened = platform_pr.open_draft("org/a", "main", "b" * 40, "platform-upgrade/m07", {"manifest.yaml": "x: 1\n"},
+                                    title="t", body="b", message="m")  # fmt: skip
+    posts = [(path, body) for method, path, body, _t in repo["sent"] if method == "POST"]
+    assert [path.rsplit("/", 1)[-1] for path, _b in posts] == ["trees", "commits", "refs", "pulls"]
+    assert posts[1][1]["parents"] == ["b" * 40] and posts[2][1]["ref"] == "refs/heads/platform-upgrade/m07"
+    assert posts[3][1]["draft"] is True and posts[3][1]["base"] == "main"
+    assert opened["number"] == 7 and opened["files"] == ["manifest.yaml"]
+
+
+@pytest.mark.parametrize("branch, files, said", [
+    ("platform-upgrade/m07", {".github/workflows/x.yml": "on: push"}, "never writes this path"),
+    ("platform-upgrade/m07", {"../outside": "x"}, "never writes this path"),
+    ("platform-upgrade/m07", {}, "empty diff"),
+    ("main", {"manifest.yaml": "x"}, "not a branch the platform opens"),
+    ("feature/anything", {"manifest.yaml": "x"}, "not a branch the platform opens"),
+])  # fmt: skip
+def test_no_workflow_path_no_empty_change_and_no_other_branch(repo, branch, files, said):
+    with pytest.raises(platform_pr.Refused, match=said):
+        platform_pr.open_draft("org/a", "main", "b" * 40, branch, files, title="t", body="b", message="m")
+    assert not any(method == "POST" for method, *_ in repo["sent"])
+
+
+def test_nothing_is_opened_twice_and_nothing_against_a_base_that_moved(repo):
+    with pytest.raises(platform_pr.Refused, match="computed at"):
+        platform_pr.open_draft("org/a", "main", "c" * 40, "platform-upgrade/m07", {"manifest.yaml": "x"},
+                               title="t", body="b", message="m")  # fmt: skip
+    repo["pages"]["/repos/org/a/pulls?state=all&head=org:platform-upgrade/m07&per_page=100"] = [{"number": 3, "state": "closed"}]
+    with pytest.raises(platform_pr.Refused, match="#3 was opened from platform-upgrade/m07 .closed."):
+        platform_pr.open_draft("org/a", "main", "b" * 40, "platform-upgrade/m07", {"manifest.yaml": "x"},
+                               title="t", body="b", message="m")  # fmt: skip
+    del repo["fail"][("GET", "/repos/org/a/git/ref/heads/platform-upgrade/m07")]
+    repo["pages"]["/repos/org/a/git/ref/heads/platform-upgrade/m07"] = {"object": {"sha": "d" * 40}}
+    assert platform_pr.already("org/a", "platform-upgrade/m07") == "the branch platform-upgrade/m07 exists"
+    assert not any(method == "POST" for method, *_ in repo["sent"])

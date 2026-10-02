@@ -273,7 +273,6 @@ def test_s0_the_owners_test_was_read():
 PLATFORM_OWNED = {"manifest.yaml", "server.py", "__init__.py"}
 
 
-@expected_failure
 def test_s1_a_platform_upgrade_changes_platform_owned_files_only():
     """An agent folder at `platform_version: m06` that carries a workflow of its own and an edited
     `agent.py`, beside the platform-owned files at a later version. The upgrade's diff must move
