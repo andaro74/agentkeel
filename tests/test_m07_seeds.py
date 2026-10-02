@@ -108,13 +108,15 @@ def made(run: dict[str, Any]) -> list[dict[str, Any]]:
 # --- S0: the template's repair, read by CI ------------------------------------
 
 
-@expected_failure
 def test_s0_app_token_refuses_a_call_with_no_repository(monkeypatch):
-    """`app_token()` with no repository mints the installation's token with `scope = {}`: every
+    """`app_token()` with no repository minted the installation's token with `scope = {}`: every
     permission the App holds, on every repository it reaches (open.md row 2). After the grant that
     token could relax any agent repository's ruleset. Called with None, it must refuse and send no
     request for a token: a signature with no default would not be a refusal (cold review F1,
-    security-reviewer 20 on M07 PR 1). GitHub is a stub here; the key is made for the test."""
+    security-reviewer 20 on M07 PR 1). GitHub is a stub here; the key is made for the test.
+
+    Read from M07 PR 2: `app_token()` raises ValueError on a missing repository before any request,
+    and the marker is off."""
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
 

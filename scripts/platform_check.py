@@ -109,17 +109,28 @@ def live_rulesets(repository: str) -> list[dict[str, Any]]:
     return [gh(f"/repos/{repository}/rulesets/{r['id']}") for r in listed]
 
 
-# What one post needs, on one repository (security-reviewer N6 on PR 2): the token is minted per repository
-# with these permissions only, not every permission the App holds on every repository.
-POST_PERMISSIONS = {"checks": "write", "administration": "read", "contents": "read", "metadata": "read"}
+# The one table of what a token may be minted for (M07 PR 2; milestones/M07/rulings/pr2-security.md, item 5,
+# ruled 2026-10-02; S0's reader). A token is minted for one repository and one of these sets, by name; a set
+# that is not here cannot be minted, and no call mints the installation's whole grant. Each set belongs to
+# one App, whose key is in one environment (item 2): the key that can post the check cannot open a pull
+# request, and the key that can open one cannot post the check.
+PERMISSION_SETS: dict[str, dict[str, str]] = {
+    # agentkeel-platform (5144253), platform-check.yml's `post` job. Two tokens, never one (item 5):
+    # GitHub shows a ruleset's bypass_actors only to a caller that can administer it (M06's finding,
+    # milestones/M07/open.md row 2), so the ruleset is read with `rulesets` and that token is revoked
+    # after the read; the seats, the visibility and the check run are `check`'s, which cannot administer.
+    "rulesets": {"administration": "write", "metadata": "read"},
+    "check": {"checks": "write", "contents": "read", "metadata": "read", "pull_requests": "read"},
+    # agentkeel-upgrades: platform-upgrade.yml, the retire job's pull request, model-watch.yml.
+    "open": {"contents": "write", "pull_requests": "write", "metadata": "read"},
+    # agentkeel-observer: the scheduled observer on main. It writes nothing.
+    "observe": {"administration": "read", "checks": "read", "contents": "read", "metadata": "read",
+                "pull_requests": "read"},
+}  # fmt: skip
 
 
-def app_token(app_id: int, org: str, private_key_pem: str, repository: str | None = None) -> str:
-    """The App's installation token, minted here so it never leaves this process.
-
-    A JWT the App's key signs (RS256, ten minutes), then the organisation's installation's token, for
-    `repository` alone and POST_PERMISSIONS when one is named. No third-party action holds the key
-    (SPEC/06 section 6: the key is in the `platform-app` environment)."""
+def app_jwt(app_id: int, private_key_pem: str) -> str:
+    """A JWT the App's key signs (RS256, ten minutes). It names the App and nothing else."""
     import base64
     import time
 
@@ -134,32 +145,94 @@ def app_token(app_id: int, org: str, private_key_pem: str, repository: str | Non
     body = b64(json.dumps({"iat": now - 60, "exp": now + 540, "iss": str(app_id)}).encode())
     key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
     signature = b64(key.sign(f"{head}.{body}".encode(), padding.PKCS1v15(), hashes.SHA256()))  # type: ignore[union-attr]
-    jwt = f"{head}.{body}.{signature}"
-    saved = os.environ.get("GITHUB_TOKEN")
-    os.environ["GITHUB_TOKEN"] = jwt
-    try:
-        installation = gh(f"/orgs/{org}/installation")
-        scope = {} if repository is None else {"repositories": [repository.split("/", 1)[1]],
-                                                 "permissions": POST_PERMISSIONS}  # fmt: skip
-        return gh(f"/app/installations/{installation['id']}/access_tokens", method="POST", body=scope)["token"]
-    finally:
-        if saved is None:
+    return f"{head}.{body}.{signature}"
+
+
+class _As:
+    """`GITHUB_TOKEN` set to one credential for the block, and put back after it: it never outlives the call."""
+
+    def __init__(self, token: str) -> None:
+        self.token = token
+
+    def __enter__(self) -> None:
+        self.saved = os.environ.get("GITHUB_TOKEN")
+        os.environ["GITHUB_TOKEN"] = self.token
+
+    def __exit__(self, *exc: object) -> None:
+        if self.saved is None:
             os.environ.pop("GITHUB_TOKEN", None)
         else:
-            os.environ["GITHUB_TOKEN"] = saved
+            os.environ["GITHUB_TOKEN"] = self.saved
+
+
+def app_token(app_id: int, account: str, private_key_pem: str, repository: str | None,
+              permission_set: str | None = None) -> str:  # fmt: skip
+    """The App's installation token for one repository and one named permission set, minted here so it
+    never leaves this process.
+
+    It refuses, before any request, a call with no repository, a repository that is not `account`'s, or
+    a permission set that is not in PERMISSION_SETS. Until M07 PR 2 a call with no repository minted
+    the installation's token with no scope: every permission the App holds on every repository it
+    reaches (seed S0; milestones/M07/open.md row 2). That call is gone, not defaulted.
+
+    A JWT the App's key signs, then the token of the installation that reaches `repository`, for that
+    repository alone and that set alone. No third-party action holds the key (SPEC/06 section 6: each
+    key is in its own environment, limited to `main`)."""
+    if not isinstance(repository, str) or repository.count("/") != 1 or not all(repository.split("/")):
+        raise ValueError(f"app_token() mints for one repository, owner/name; got {repository!r}: no token is asked for")
+    owner, name = repository.split("/")
+    if owner != account:
+        raise ValueError(f"app_token() was asked for {repository}, which is not {account}'s: no token is asked for")
+    if not isinstance(permission_set, str) or permission_set not in PERMISSION_SETS:
+        raise ValueError(f"app_token() mints a named permission set ({', '.join(sorted(PERMISSION_SETS))}); "
+                         f"got {permission_set!r}: no token is asked for")  # fmt: skip
+    with _As(app_jwt(app_id, private_key_pem)):
+        installation = gh(f"/repos/{repository}/installation")
+        scope = {"repositories": [name], "permissions": PERMISSION_SETS[permission_set]}
+        return gh(f"/app/installations/{installation['id']}/access_tokens", method="POST", body=scope)["token"]
+
+
+def revoke(token: str) -> None:
+    """Revoke an installation token GitHub would otherwise keep for an hour. Never raises: an unrevoked
+    token is narrower than the key the job already holds, and the read it was for is done."""
+    try:
+        with _As(token):
+            gh("/installation/token", method="DELETE")
+    except (urllib.error.URLError, TimeoutError, OSError):
+        print("note: a token could not be revoked; it expires within the hour")
 
 
 def post(results: Path, app_id: int, mint=None) -> int:
-    """`mint(repository)` gives the App's token for that repository alone; each post runs under its own."""
+    """`mint(repository, permission_set)` gives the App's token for that repository and that set alone.
+
+    Each repository is read and posted under its own tokens: `rulesets`, for the one read that needs
+    Administration, revoked as soon as the ruleset is read; then `check`, for the seats, the visibility
+    and the check run. With no `mint` (a test), the caller's own GITHUB_TOKEN is used throughout."""
     from src.validate import agent as platform
     from src.validate import seats
 
+    ruleset_check = "the repository's ruleset is the export"
     posted = 0
     for path in sorted(results.rglob("result.json")):
         result = json.loads(path.read_text(encoding="utf-8"))
         repository, head = result["repository"], result["head"]
+        ruleset_errors: list[str]
+        administer = None
+        try:
+            if mint is not None:
+                administer = mint(repository, "rulesets")
+                os.environ["GITHUB_TOKEN"] = administer
+            ruleset_errors = platform.ruleset_errors(live_rulesets(repository))
+        except urllib.error.HTTPError as exc:
+            # 422 before the grant: the installation does not hold Administration: write, so no such token
+            # exists. The head is refused, as a hidden bypass_actors is: closed, never open.
+            ruleset_errors = [f"the live rulesets could not be read ({exc.code})"]
+        finally:
+            if administer is not None:
+                os.environ.pop("GITHUB_TOKEN", None)
+                revoke(administer)
         if mint is not None:
-            os.environ["GITHUB_TOKEN"] = mint(repository)
+            os.environ["GITHUB_TOKEN"] = mint(repository, "check")
         errors: dict[str, list[str]] = dict(result["errors"])
         os.environ["AGENTKEEL_SEAT_REPOSITORY"] = repository
         seats.login_holds_seat.cache_clear()
@@ -172,10 +245,7 @@ def post(results: Path, app_id: int, mint=None) -> int:
             errors[PUBLIC_CHECK] = [] if public else [f"{repository} is private: its ruleset is not enforced"]
         except urllib.error.HTTPError as exc:
             errors[PUBLIC_CHECK] = [f"the repository's visibility could not be read ({exc.code})"]
-        try:
-            errors["the repository's ruleset is the export"] = platform.ruleset_errors(live_rulesets(repository))
-        except urllib.error.HTTPError as exc:
-            errors["the repository's ruleset is the export"] = [f"the live rulesets could not be read ({exc.code})"]
+        errors[ruleset_check] = ruleset_errors
         failed = {name: errs for name, errs in errors.items() if errs}
         summary = "\n".join(f"- **{name}**: " + "; ".join(errs) for name, errs in failed.items()) or "Every check passed."
         gh(f"/repos/{repository}/check-runs", method="POST", body={
@@ -237,7 +307,8 @@ def main(argv: list[str] | None = None) -> int:
         if not key:
             print("no AGENTKEEL_APP_PRIVATE_KEY: the posting job runs in the platform-app environment only")
             return 1
-        print(f"posted {post(args.results, app_id, mint=lambda repo: app_token(app_id, org, key, repo))} check runs")
+        count = post(args.results, app_id, mint=lambda repo, named: app_token(app_id, org, key, repo, named))
+        print(f"posted {count} check runs")
         return 0
     found = find(org, app_id) if args.what == "find" else deployable(org, app_id)
     if args.what == "deployable" and args.skip_deployed:

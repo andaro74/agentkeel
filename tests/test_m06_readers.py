@@ -654,13 +654,14 @@ def test_the_app_token_is_minted_from_a_jwt_the_apps_key_signs(monkeypatch):
 
     def gh(path, *, method="GET", body=None, raw=False):
         seen.append(os.environ["GITHUB_TOKEN"])
-        return {"id": 77} if path == "/orgs/org/installation" else {"token": "ghs_installation"}
+        return {"id": 77} if path == "/repos/org/a/installation" else {"token": "ghs_installation"}
 
     import os
 
     monkeypatch.setattr(platform_check, "gh", gh)
     monkeypatch.setenv("GITHUB_TOKEN", "before")
-    assert platform_check.app_token(APP, "org", pem) == "ghs_installation"
+    # From M07 PR 2 a token is minted for one repository and one named permission set (seed S0's reader).
+    assert platform_check.app_token(APP, "org", pem, "org/a", "check") == "ghs_installation"
     assert os.environ["GITHUB_TOKEN"] == "before"  # the JWT never outlives the call
     head, body, signature = seen[0].split(".")
     pad = lambda s: s + "=" * (-len(s) % 4)  # noqa: E731
