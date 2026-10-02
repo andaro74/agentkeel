@@ -5,11 +5,13 @@ never edit a pipeline to take an upgrade: your repository has none. The
 platform opens a pull request in your repository, and you read it and
 merge it.
 
-**What has run, as this page is written (M07 PR 2): nothing.** The parts
-below are built and tested against planted cases in the platform's own
-repository. No agent has yet taken an upgrade. The first ones are made
-after M07 PR 2 merges, and this page is corrected at the close if they
-show it wrong.
+**What has run, as this page is written (M07 PR 3): no upgrade.** The
+parts below are built and tested against planted cases in the platform's
+own repository. No agent has yet taken an upgrade. One agent repository
+made from the template has merged its first pull request; its first
+deploy failed in the platform's own pipeline and is repaired at M07 PR 3.
+The upgrades are made after that merges, and this page is corrected at
+the close if they show it wrong.
 
 ## The three kinds
 
@@ -88,6 +90,13 @@ The audit bucket locks each record for one day. After that the records
 are kept by the security account's own rules, not by a lock.
 
 If your agent should not be retired, close the pull request.
+
+A retirement changes one line and must stay one line. When the platform
+retires your agent it compares your manifest with the one it last
+deployed, and refuses if anything but `rollout` differs. So do not change
+another field in the retirement pull request, and do not merge another
+manifest change just before it: let that change deploy first. If your
+agent's last deploy failed, it cannot be retired until a deploy succeeds.
 
 ## How long it takes
 

@@ -147,6 +147,7 @@ data/                 slate.json, rights_table.json, clause_index.json (M00);
 infra/                CDK: bootstrap stack, GovernedAgent construct (eval-role/
                       was M00's, absorbed at M01 PR 2, removed at M02 PR 3);
                       ruleset/main.json (the exported main ruleset);
+                      platform_grant.yaml (what the three Apps may hold, M07 PR 3);
                       workflows.sha256 (validate)
 scripts/seed_slate.py writes data/slate.json and data/rights_table.json
 tests/
