@@ -20,7 +20,7 @@ pr: 39
 
 # Ruling: M07 PR 2, Threshold Owner
 
-DRAFT for andaro74 as Threshold Owner. Not ruled until this line reads "Ruled by".
+Ruled by andaro74 as Threshold Owner, 2026-10-02, as written.
 
 Each item is a recommendation with its alternative.
 

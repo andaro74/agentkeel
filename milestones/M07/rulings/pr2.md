@@ -33,7 +33,7 @@ pr: 39
 
 # Ruling: M07 PR 2, Product
 
-DRAFT for andaro74 as Product. Not ruled until this line reads "Ruled by".
+Ruled by andaro74 as Product, 2026-10-02, as written.
 
 ## What this pull request is
 

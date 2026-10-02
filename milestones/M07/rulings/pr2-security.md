@@ -34,7 +34,7 @@ pr: 39
 
 # Ruling: M07 PR 2, Security
 
-DRAFT for andaro74 as Security. Not ruled until this line reads "Ruled by".
+Ruled by andaro74 as Security, 2026-10-02, as written.
 
 Each item is a recommendation with its alternative. Where the seat rules
 the alternative, the item's text is changed before the line above is.
