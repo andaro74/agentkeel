@@ -325,3 +325,157 @@ items 3 and 37 were checked against the tree and hold: no
 | 37 | Security | Whether `can_admins_bypass: true` is inside the bound is ruled under R1; the run files gain their read time and SPEC/07 names both |
 | 39 | Product | The header is made true by this file and by `rulings/pr1.md` |
 | 40 | Product | `legal-compliance` is also run on S2's retirement: the compliance map's row for a retired agent's records and their retention |
+
+## 2.5 SPEC/07 revised on the rulings
+
+Once, in `addd8cc`, before the first seed. SPEC/00 amended in `956fdc2`
+(§6 `platform_version`; §8 M07's seeded cases, falsifiers and cut list;
+§12 "Not built in this project"; §13 Playwright). The six contradictions
+with M08's text, R6 and §15 are recorded in SPEC/00 §8 M07 and owed to
+M08's `open.md` at M07's close.
+
+## 3. The false state
+
+SPEC/07 §3 names eight things on `main` at `57b9bf6` that make claim 7
+false; each is a file or a record a reader can open. Planted as six
+seeds, one commit each, before any reader. Each test was run once with
+`--runxfail` and its message read:
+
+| Seed | Commit | `--runxfail` messages |
+|---|---|---|
+| S0 | `c870bca` | `seed S0: app_token() can be called with no repository, and then mints every permission on every repository`; `seed S0: nothing reads the installation's grant back`; `seed S0: nothing reads the key's environment back`; `seed S0: the attempt has not been made` |
+| S1 | `ef3d88a` | `seed S1: nothing computes an agent's platform upgrade`; `seed S1: the attempt has not been made` |
+| S2 | `3872c13` | `seed S2: nothing reads a retired agent's records against each other`; `seed S2: the attempt has not been made` |
+| S3 | `ea53ef4`, `a46c98f` | `seed S3: nothing compares the runtime's digest with the tree's after a revert`; `seed S3: the attempt has not been made` |
+| S4 | `e814efe` | `seed S4: no check that reads panel 2's query refused a computed verdict`; `seed S4: nothing compares panel 2's verdicts with the envelopes` |
+| S5 | `f36adee` | `seed S5: no control names a surface's plants` |
+
+Thirteen expected failures. S3's run file did not parse when first
+committed (`ea53ef4`: a colon in a plain YAML value), so its run-file
+test failed on a `ScannerError`, which the strict marker does not accept;
+`a46c98f` repaired the file and the message is as above. `git show <seed>
+--stat` shows each seed with its fixture or run file, its tests, its
+README row and its `SEEDS_M07` line, and no reader. S4's query test runs
+seventeen of `validate`'s nineteen checks over a worktree with the
+dashboard placed (not the cdk-nag synth or the live ruleset; CODEOWNERS'
+logins through M06's stand-in), and none names the file. A refusal counts
+only from a check added since the base (`BASE_CHECKS`, the nineteen names
+at `57b9bf6`) whose name holds "panel 2".
+
+## 4. The code that reads the answer
+
+SPEC/07 §6, one seat and one path each, all in PR 2. The seed tests fix
+these names, so PR 2 does not choose them:
+
+| Name | Where | Called as |
+|---|---|---|
+| `app_token` | `scripts/platform_check.py` | `repository` has no default |
+| `grant_errors` | `scripts/platform_check.py` | `grant_errors(installation, environment, grant) -> list[str]`; `[]` when both equal the grant; names each uncovered permission, repository, branch policy and `can_admins_bypass` |
+| `diff` | `scripts/platform_upgrade.py` (new) | `diff(agent: Path, platform: Path) -> dict[str, str]`, path to new content, platform-owned files only |
+| `f7_2` | `src/verdict/build.py` (from `src/verdict/upgrade.py`, new) | `f7_2(observation, max_seconds) -> {read, held, reasons}`; reasons say "invocation", "still exists", "answer record" |
+| `f7_3` | the same | `f7_3(observation) -> {read, held, reasons}`; a reason carries the first 12 characters of the digest still live |
+| `panel_verdict_mismatch` | the same | `panel_verdict_mismatch(frame, history_dir) -> list[str]`, the commits whose row says GREEN and whose envelope does not |
+| `SURFACE_PLANTS` | `src/verdict/plants.py` | the two fixture paths |
+| `surface_plants` | `src/verdict/build.py` | `surface_plants(results) -> {plants_expected, plants_fired, silent}` |
+| a `validate` check whose name holds "panel 2" | `src/validate/checks.CHECKS` | refuses `infra/grafana/panel2.json` when its query computes the verdict; a new check, not panel 1's extended |
+
+The observer (`scripts/observe_upgrade.py`) must write S2's and S3's
+observations in the fixtures' shape, or PR 2 changes the fixtures' shape
+and says so; never what is wrong with them.
+
+## 5. Falsifiers, and what each would look like in the repo
+
+SPEC/07 §4. Test-only witnesses on every envelope from PR 2's merge:
+`F7_0` (S0's three bounds), `F7_1` (S1's diff), `F7_2`, `F7_3`, `F7_4`
+(S4's two readers), `F7_5` (S5). Recorded in `upgrade` and read by row
+7's cell, with `template`: every live reading, each with the viewpoint it
+was read from.
+
+## 6. What M06 carried in (`milestones/M07/open.md`), row by row
+
+Every row is answered here or moved on with a seat. None is dropped.
+"Not built" means SPEC/07 §9's cuts a to e, taken at open: M08 adds no
+code path, so the item is recorded in SPEC/00 §12 and is not owed by any
+milestone. "Named gap" means no M07 falsifier reads it and M07 builds
+nothing for it: it stays in SPEC/06 §8 or SPEC/07 §8 as a control with
+no seeded case, and is carried to M08's `open.md` at M07's close as a gap
+to re-rule there, not as work. The placements not ruled in §2 are
+Product's at open, proposed, and ruled in `rulings/pr1.md`.
+
+| # | Seat | Now |
+|---|---|---|
+| 1 | Product | **Done here** (`1d18c2d`): M06's video as an LFS object, its row filled, the explainer's Watch line; Product's confirmation of 2026-10-02 in `rulings/pr1.md` |
+| 2 | Security; Engineering | **S0.** The bounds ruled in `rulings/pr2-security.md` before PR 2's first commit (SPEC/07 §11, R2); the code in PR 2; the grant by hand **after PR 2 merges** (ruled, item 36) |
+| 3 | Engineering; Security | **M07 PR 2**: every GitHub reading carries its viewpoint and the raw state; the App-viewpoint observer runs `main`'s code (R4) |
+| 4 | Product; Threshold Owner | **M07, after PR 2's merge**, step 4 of SPEC/07 §5.1; the run file restated and pushed first (R9). Never cut |
+| 5 | Product; Engineering | **Ruled at open**: a new head on `s2-standin` by the owner's empty commit, read before owner-check #1 merges; `floresinnovations` not touched |
+| 6 | Product; Security | **S0's first attempt**, after the grant, read by CI |
+| 7 | Product | **Ruled at open**: SPEC/00 §10.5 stands as M06 PR 4 wrote it |
+| 8 | Product | **Ruled at open**: row 6's claim keeps its wording; no M07 prose uses "governed", "secure" or "proven" of F6.1 to F6.3, F7.0 to F7.5 or the grant |
+| 9 | Security | **Before 2026-10-31**, by the human (R8); until renewed, panel 1's and panel 2's live reads are unread after that date |
+| 10 | Security | **M07 PR 2** if panel 2's table gets a database of its own (R8); otherwise a named gap |
+| 11 | Product; Security | **Ruled at open**: NOTE 23 extends to S3's attempt at M07 |
+| 12 | Security | **M07**, read at the owner's test's fixed head (S0's first attempt), recorded under `runs/` |
+| 13 | Security | **M07**, at the owner's test: each of the three reads recorded under `runs/` |
+| 14 | Product; Threshold Owner | **M07, with S3**: the schedules' delays count; said in the run file's restatement (R9) |
+| 15 | Engineering | **Done here**: the commits are read cold in this PR's review (`rulings/pr1-engineering.md`) |
+| 16 | Security | **M07**: read under R7 and at the owner's test's first answer record; outputs committed under `runs/` |
+| 17 | Security | Named gap |
+| 18 | Security | Named gap |
+| 19 | Security | **M07 PR 2**, with `infra/grafana/`'s change for panel 2 |
+| 20 | Security | **Read here** (`runs/platform_app_*.json`): one branch policy, `main`; `can_admins_bypass: true`, ruled under R1. The seeded refusal is S0's second attempt. N13 and N14 are named gaps |
+| 21 | Security | Named gap (SPEC/07 §8, first bullet) |
+| 22 | Engineering | **M07 PR 2** for pagination in the new observer; N4 to N7 are named gaps |
+| 23 | Engineering; Threshold Owner | **M07 PR 2**, with the `upgrade.*` bars |
+| 24 | Data Owner; Engineering | Named gap: `ratings-helper`'s code is not built, so the exemption stays by name |
+| 25 | Data Owner | **Unsure**, by M07 PR 2: proposed that a retired golden's citations stay checked, since the file stays |
+| 26 | Rule Owner | Named gap (SPEC/07 §8) |
+| 27 | Security; Engineering | Named gap; the CLI is not built |
+| 28 | Product | Each of SPEC/06 §8's five is a named gap; the shared account is row 75's |
+| 29 | Product | Panel 2: **M07 PR 2** (S4). A retired agent's registry row: **S2**. Act 3: cut 3. The three guides: cut 4 |
+| 30 | Product | Act 1 during S3, never cut; Act 2 at the close, never cut |
+| 31 | Product | SPEC/00 §8 M07 restated **here** (`956fdc2`); SPEC/06 §7 and the run file before S3 (R9) |
+| 32 | Product; Security; Data Owner | **Not built** (cuts a, b) |
+| 33 | Security | **M07 PR 2** for each stack it edits; the rest a named gap |
+| 34 | Engineering | M08, as dated |
+| 35 | Rule Owner; Data Owner; Engineering | **Not built** (cut e); S5 of SPEC/05's live half is not measured in this project |
+| 36 | Security; Engineering | Named gap (SPEC/07 §8) |
+| 37 | Engineering; Security | **M07 PR 2**, with `runtime_for_tree`'s change for F7.3 |
+| 38 | Engineering | Named gap |
+| 39 | Rule Owner | Promptfoo: **not built** (cut e). The examples against the attacks: named gap |
+| 40 | Security | Named gap |
+| 41 | Security | Named gap |
+| 42 | Security | Named gap |
+| 43 | Security; Engineering | Named gap |
+| 44 | Engineering | **M07 PR 2** if `model-watch` reuses the swap read; otherwise a named gap |
+| 45 | Data Owner | **Not built** (cut a) |
+| 46 | Data Owner; Tool Owner; Product | Named gap: no absence form without the second tool |
+| 47 | Security; Engineering | Named gap |
+| 48 to 51 | as carried | **Not built** (cut a) |
+| 52 | Data Owner | **Not built** (cut b) |
+| 53, 54 | Threshold Owner; Tool Owner | **Not built** (cut e) |
+| 55 | Engineering; Security | Named gap; Identity is not built |
+| 56 | Security | **Not built** (cut e): no second agent's code |
+| 57 | Security; Engineering | **F7.3's reader** compares a runtime's digest with the tree's (PR 2); the guardrail's description and the promoter's version are named gaps |
+| 58 | Threshold Owner | **Read at S3's merge**, if the swap merges: the first `main` envelope's `F4_4`, recorded |
+| 59 to 61 | as carried | **Not built** (cut e) |
+| 62 | Engineering; Security | **M07 PR 2**: `model-watch`. Catching a model that changed under an unchanged pin is a named gap |
+| 63 | Threshold Owner; Data Owner | **Not built** (cut b) |
+| 64 | Engineering; Security | **Not built** (cut c) |
+| 65 | Threshold Owner | **M07 PR 2**: `model-watch` writes it; no seed has a pin with an end-of-life date (SPEC/07 §8) |
+| 66 | Threshold Owner | **S3**: Haiku 4.5 is the candidate |
+| 67 | Threshold Owner | **Ruled at open**: Sonnet 4.5 is not the candidate; R6 starts from its finding |
+| 68 to 73 | as carried | M08, as dated |
+| 74 | Rule Owner | M08, as dated; a recorded contradiction: there is no judge (SPEC/07 §9, item 2) |
+| 75 | Security | Deferred with the landing zone; re-ruled at M08 open |
+
+## 7. What PR 1 does not do
+
+No reader, no workflow, no stack, no deploy, no grant, no setting in
+GitHub or AWS, and no attempt. Its calls to GitHub are reads: the
+`platform-app` environment and its branch policies (committed under
+`runs/`), owner-check's pull requests and the organisation's
+repositories. It made no call to AWS. `POST_PERMISSIONS`, `app_token()`,
+the observer's token, the manifest schema and every workflow are as M06
+left them. Owner-check's pull requests 1 and 2 and the `floresinnovations`
+account are untouched.
