@@ -24,7 +24,7 @@ pr: 40
 
 # Ruling: M07 PR 3, Engineering, with the cold review
 
-DRAFT for andaro74 as Engineering. Not ruled until this line is replaced by one that starts with the two words the gate reads.
+Ruled by andaro74 as Engineering, 2026-10-02, as written.
 
 ## What this authorises
 

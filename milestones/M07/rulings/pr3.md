@@ -30,7 +30,7 @@ pr: 40
 
 # Ruling: M07 PR 3, Product
 
-DRAFT for andaro74 as Product. Not ruled until this line is replaced by one that starts with the two words the gate reads.
+Ruled by andaro74 as Product, 2026-10-02, as written.
 
 Four things in this file were ruled by the seat in the session, on
 2026-10-02, before the code that depends on them. They are recorded

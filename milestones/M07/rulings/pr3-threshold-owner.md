@@ -21,7 +21,7 @@ pr: 40
 
 # Ruling: M07 PR 3, Threshold Owner
 
-DRAFT for andaro74 as Threshold Owner. Not ruled until this line is replaced by one that starts with the two words the gate reads.
+Ruled by andaro74 as Threshold Owner, 2026-10-02, as written.
 
 No relaxation is in this pull request, so no second key is owed and this
 file gives none.

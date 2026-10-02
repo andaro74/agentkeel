@@ -30,7 +30,7 @@ pr: 40
 
 # Ruling: M07 PR 3, Security
 
-DRAFT for andaro74 as Security. Not ruled until this line is replaced by one that starts with the two words the gate reads.
+Ruled by andaro74 as Security, 2026-10-02, as written.
 
 Each item is a recommendation with its alternative. Nothing here has
 fired on a seeded case or run live. No document may say otherwise.
