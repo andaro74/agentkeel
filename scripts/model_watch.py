@@ -18,10 +18,10 @@ ruling beside it:
   manifest's. It opens nothing to set a null to null, and nothing to clear
   or delay a date the manifest holds: moving it later, or clearing it, with
   the model unchanged is a relaxation with two keys (ADR-0009 amendment 1),
-  and is a person's to propose. No gate reads that today: `src/gates/two_key.py`
-  does not read `deprecated_after` (threshold-owner F1 on M07 PR 2), so this
-  script's own refusal is the only thing that holds it for a pull request
-  the platform opens.
+  and is a person's to propose. `src/gates/two_key.py` reads it from M07 PR 3
+  (threshold-owner F1 on M07 PR 2: until then no gate did, and this script's
+  own refusal was the only thing that held it for a pull request the
+  platform opens). Both now refuse it.
 - **the swap**: refagent's pin moved to the candidate the Threshold Owner
   named. A person names the candidate; the platform opens the pull request
   (SPEC/07 §8). The name is read from the run file the Threshold Owner

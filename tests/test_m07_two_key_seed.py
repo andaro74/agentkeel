@@ -10,7 +10,8 @@ Planted at M07 PR 3 in its own commit, before the reader: `tests/fixtures/m07/tw
 cases.json` names a dated base and each change to it. Each test puts refagent's manifest, as this tree
 holds it, with that date, in a repository as the base ref, makes the one change with the Threshold
 Owner's ruling alone, and asks `two-key` to refuse it. Until the reader is in the tree the gate passes
-every case, and the marker says so; it comes off in the commit that lands the reader.
+every case, and the marker said so; it came off in the commit that landed the reader
+(`two_key.date_relaxation`), the commit after the plant.
 
 It is not one of row 7's seeds (S0 to S5, `plants.SEEDS_M07`): it reads no falsifier of claim 7. It is
 the false state of a rule M04 wrote and M07's `model-watch` leans on.
@@ -59,7 +60,6 @@ def dated(tmp_path: Path):
     git(root, "worktree", "remove", "--force", str(repo.base))
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="planted at M07 PR 3: two-key does not read deprecated_after")
 @pytest.mark.parametrize("case", sorted(CASES["relaxed_with_one_key"]))
 def test_a_pins_date_relaxed_with_one_key_is_refused(dated, case):
     dated.write(MANIFEST, manifest(CASES["relaxed_with_one_key"][case]))
@@ -70,6 +70,17 @@ def test_a_pins_date_relaxed_with_one_key_is_refused(dated, case):
     # The planted reason is the second key, not the change: with it the same diff passes.
     dated.write("milestones/M07/rulings/b.md", ruling("Product", ["milestones/**"], keys=[MANIFEST]))
     assert dated.keys() is None
+
+
+def test_a_value_that_is_not_a_date_and_changed_is_read_as_relaxed():
+    """Not in the fixture: what the reader does when it cannot say which is later. It does not pass it."""
+    from src.gates import two_key
+
+    pin = {"model": {"id": "m"}}
+    assert "which is later is unknown" in two_key.date_relaxation({**pin, "deprecated_after": "soon"}, {**pin, "deprecated_after": "later"})
+    assert "which is later is unknown" in two_key.date_relaxation({**pin, "deprecated_after": "2027-06-30"}, {**pin, "deprecated_after": 20280101})
+    assert two_key.date_relaxation({**pin, "deprecated_after": "soon"}, {**pin, "deprecated_after": "soon"}) is None
+    assert two_key.date_relaxation({"model": None, "deprecated_after": "2027-06-30"}, {"model": None}) is not None
 
 
 @pytest.mark.parametrize("case", sorted(CASES["not_a_relaxation"]))
