@@ -30,6 +30,11 @@
 #    plan, every bound checked again on main's code (the repository's owner,
 #    the paths, the manifest's two fields, the version, the branch) before a
 #    token is minted for that repository and the `open` permission set.
+#    From M07 PR 3 (rulings/pr2-security.md item 13l) the bytes too: `open`
+#    asks git for the template's default-branch head, with no token, refuses
+#    a plan made from any other commit, fetches the template as data at that
+#    commit, and requires each proposed server.py and __init__.py to equal
+#    the template's text, and the proposed guardrail to be the one main pins.
 #
 # What `agentkeel-upgrades` can do: push a branch and open a pull request.
 # What it cannot: post the platform check (no `checks`), read or change a
@@ -48,7 +53,7 @@
 # deploy.yml reach every agent at its next deploy with no pull request;
 # SPEC/07 section 8). The agents are read from GitHub (the heads the App
 # passed), not from the registry: this workflow holds no AWS credentials.
-# Until `agentkeel-upgrades` exists and its id is in the ruling's grant
+# Until `agentkeel-upgrades` exists and its id is in infra/platform_grant.yaml's grant
 # block, `open` stops at its first step. Nothing here has fired on its
 # seeded case: S1's attempt is made after M07 PR 2 merges.
 # GitHub may delay a scheduled run at busy times; upgrade.arrive_max_seconds

@@ -119,6 +119,32 @@ def test_the_jobs_that_read_an_agent_repository_hold_no_secret():
 
 
 INVOCATION = "One invocation of the retired runtime; anything but ResourceNotFoundException stops here"
+SAME = "The retired head's manifest is the deployed one's, but for rollout"
+
+
+def test_deploy_agent_reads_nothing_of_sign_agents_from_outside_the_one_folder():
+    """Cold review N2 on M07 PR 3: the layout test read only paths under the staged folder, so a step that
+    still read the old `$RUNNER_TEMP/image.tar` would not have been seen."""
+    import re
+
+    steps = load("deploy.yml")["jobs"]["deploy-agent"]["steps"]
+    read = [path for step in steps for path in re.findall(r"\$RUNNER_TEMP/[A-Za-z0-9_./$-]+", str(step.get("run", "")))]
+    signed = [path for path in read if path.endswith((".tar", ".cosign.json"))]
+    assert signed and all(path.startswith("$RUNNER_TEMP/signed/") for path in signed), signed
+
+
+def test_a_retirement_is_held_to_the_deployed_manifest_before_the_registry_or_the_stack_is_touched():
+    """rulings/pr2-security.md item 13i: a retirement is a stack update from a head nobody signed."""
+    steps = load("deploy.yml")["jobs"]["retire-agent"]["steps"]
+    names = [s.get("name") or s.get("uses", "").split("@")[0] for s in steps]
+    held = names.index(SAME)
+    assert names.index("aws-actions/configure-aws-credentials") < held  # the registry is read as the deploy role
+    assert held < names.index("Keep the runtime's ARN, before it is removed") \
+        < names.index("Update agentkeel-<name> to the stack without its runtime")
+    step = steps[held]
+    assert "if" not in step  # never skipped
+    assert "retire_agent.py same" in step["run"] and '--retired "agents/$NAME/manifest.yaml"' in step["run"]
+    assert step["env"] == {"GITHUB_TOKEN": "${{ github.token }}"}  # no App key, no other secret
 
 
 def test_the_table_panel_2_reads_is_written_through_the_shared_reader_of_envelopes():
@@ -173,3 +199,29 @@ def test_evals_hands_build_the_observation_and_the_stored_one():
         < names.index("Look up claim 7's pull requests, runtimes and panel 2") < names.index("make evals")  # fmt: skip
     panel2 = next(s for s in evals if s.get("name") == "Read panel 2 as the workspace's viewer")
     assert panel2["continue-on-error"] is True and "infra/grafana/panel2.json" in panel2["run"]
+
+
+# --- M07 PR 3: the artifact sign-agent hands to deploy-agent (run 37023118799) -----------------------
+
+
+def test_deploy_agent_reads_the_signed_files_where_sign_agent_put_them():
+    """The first deploy of an agent from the template to reach deploy-agent failed at its first read
+    (owner-check, run 37023118799): sign-agent uploaded three paths under two roots, GitHub rooted the
+    artifact at their common parent, and nothing was at the paths deploy-agent reads. One folder is
+    uploaded whole now; every path deploy-agent reads under it is one the staging step writes."""
+    jobs = load("deploy.yml")["jobs"]
+    sign, deploy = jobs["sign-agent"]["steps"], jobs["deploy-agent"]["steps"]
+    upload = next(s for s in sign if str(s.get("uses", "")).startswith("actions/upload-artifact@"))
+    download = next(s for s in deploy if str(s.get("uses", "")).startswith("actions/download-artifact@"))
+    assert upload["with"]["path"] == "${{ runner.temp }}/signed" == download["with"]["path"]  # one root, not three paths
+    assert upload["with"]["name"] == download["with"]["name"]
+    stage = next(s for s in sign if s.get("name") == "Stage what deploy-agent reads, under one folder")
+    assert sign.index(stage) == sign.index(upload) - 1
+    written = {"agents/$NAME/bundle.cosign.json", "agents/$NAME/dist/bundle.tar", "image.tar"}
+    for path in written:
+        assert f"$RUNNER_TEMP/signed/{path}" in stage["run"] or f"$RUNNER_TEMP/signed/{path.rsplit('/', 1)[0]}/" in stage["run"], path
+    read = set()
+    for step in deploy:
+        read |= set(re.findall(r"\$RUNNER_TEMP/signed/([A-Za-z0-9_./$-]+)", str(step.get("run", ""))))
+    read = {p.removesuffix("$") for p in read}  # the bundle put names its two files through a shell variable
+    assert read and all(any(w.startswith(p) or p == w for w in written) for p in read), read

@@ -138,6 +138,21 @@ reading as a dated note. A quickstart over its bar does not fire F7.0
   files. GitHub's record of each commit's author and paths is what is
   read. Agent repositories ask for no ruling (SPEC/06 §8), so there any
   person's commit on an upgrade pull request is an edit.
+  **Amended at M07 PR 3 (Product, `rulings/pr3.md`), before any swap pull
+  request exists.** On a pull request in `agentkeel`, and in no agent
+  repository, CI's own envelope commit is not a person's edit, and its
+  files are not paths the upgrade changes. It is that commit only when
+  GitHub records all of these: its author and its committer are both
+  `github-actions[bot]`; every file it touches is
+  `evals/history/<commit>.json`, `<commit>.baseline-card.json` or
+  `<commit>.baseline-raw.json`; and `<commit>` is the full id of another
+  commit of the same pull request. A commit by that login that touches
+  one path more, or names a commit the pull request does not hold, is a
+  person's edit as before. What this rests on: GitHub does not sign that
+  commit (`evals.yml` pushes it with the job's token), so the login is a
+  name a person's commit can carry; the paths are what bound it. A
+  hand-made file under `evals/history/` is `two-key`'s to refuse
+  (SPEC/02 §2), not F7.1's.
 - **The trigger** and **live**, per kind, every time GitHub's or AWS's,
   none a runner's clock or a pusher's (item 9):
 
@@ -887,3 +902,125 @@ document describes these as working:
 - **The App's stored observation may be older than the run's.** Where
   the run read a commit or a merge the stored record lacks, the run's
   own reading is used. Nothing else compares their times.
+
+**At M07 PR 3 (the repair; Product, `milestones/M07/rulings/pr3.md`,
+2026-10-02).** §1 to §11 stand as written but for §2's dated amendment.
+What this section corrects, and what the repair built.
+
+**§5.1's "PR 3 is the repair, and carries every attempt's `observed`
+entry to `main`", and §4's "they are committed in PR 3", cannot hold.**
+The first deploy of an agent from the template failed in the platform's
+own `deploy.yml` (run 37023118799): `sign-agent` uploaded three paths
+under two roots, GitHub rooted the artifact at their common parent, and
+`deploy-agent` did not find the signature. The deploy runs from `main`,
+so no later attempt can be made until the fix is merged, and a fifth
+pull request is a RED close. So: **PR 3 is the workflow fix and every
+repair owed before the next attempts, merged once, and carries one
+`observed` entry, the owner's test's. PR 4 carries every other attempt's
+entry and is the close.** The consequence §4 already names: an attempt
+recorded only on PR 4's branch is read from the anonymous viewpoint
+alone. The App's viewpoint will have read what `main`'s run files name:
+the owner's test, the dispatch, and SPEC/06's S2.
+
+**F7.0 fired on the owner's test.** Made once, on 2026-10-02, as stated.
+The new head was refused on the seats and the goldens and nothing else;
+the fixed head passed and merged (`5249dec`, 14:39:32Z); the App passed
+the merge commit. The deploy did not complete within
+`upgrade.deploy_max_seconds`. The attempt is not re-made and not
+restated. Row 7 is expected to close RED on it. The other attempts are
+still made and measured.
+
+**Repaired at PR 3, each named above as open or as a control with no
+seeded case.** Each is held by tests on fixtures or a seeded case. None
+has run live, and no document describes any as working.
+
+| What | Was | Now | Before |
+|---|---|---|---|
+| A person's edit (§2) | CI's own envelope commit was one | amended; the reader follows it | the swap |
+| Who made a commit (cold review F5) | the author's login | GitHub's record: the App's bot as author, verified, the bot or GitHub's signer as committer. Anything else is not the App's | S1 |
+| The relaxation's times (cold review F6) | compared by the observer; "after the restore" was any pass after the call | compared by `build`; the restore is the ruleset's own last change, when it equals the export | the relaxation |
+| The observer's keyed job (security-reviewer 12) | the key held through every read; a bearer token sent on a redirect | tokens minted first and the key let go; no tree packed beside it; no credential to the storage host | its first keyed run |
+| The two new roles and the key policies (13h) | in neither list | in both | owner-check's first deploy |
+| The grant and its reader (13j) | on Product's and Engineering's paths | `infra/platform_grant.yaml`; `scripts/platform_check.py` Security's (ADR-0012) | binds from the next pull request |
+| The bytes an upgrade proposes (13l) | the plan's | each file held to the template at the commit the plan names, read by the keyed job; the guardrail to `main`'s | S1 |
+| A retirement's head (13i) | checked for `rollout: retired` only | held to the manifest at the registry row's commit; any other move refused | S2 |
+| `two-key` and `deprecated_after` | not read | read, after its seeded case | `model-watch`'s first run |
+| SPEC/04 §2's second-run rule | no ADR | ADR-0011 | not used yet |
+
+**Controls with no seeded case, added by this repair:**
+
+- **No commit by `agentkeel-upgrades` has been read.** The rule on who
+  made a commit takes two committers because which one GitHub writes for
+  the App's commit is not known from this tree. A third reads as a
+  person's edit.
+- **CI's envelope commit is told by a login and by its paths.** GitHub
+  does not sign it. A person can push a commit that carries the login;
+  it can then touch only envelope files named for the pull request's own
+  commits, and a hand-made file there is `two-key`'s to refuse.
+- **`bypass_actors` after the restore is shown to neither viewpoint.**
+  The App's own pass after the restore, read with its `rulesets` token,
+  is what reads it.
+- **Who may push to the template repository's default branch** still
+  sets what is proposed to every agent. The keyed job now proves the
+  proposal is the template's, not that the template is right.
+- **The grant file names the ruling that rules it.** A test holds the
+  reader to that. Nothing live has refused a draft.
+- **ADR-0011's rule is read by no gate.**
+
+**Not in PR 3:** item 13n (the seeded relaxation's step is removed at PR
+4, after the attempt); threshold-owner F5 on PR 2 (a swap leaves the old
+model's `deprecated_after`), moot while refagent's is null, and
+`model-watch`'s paths fixed to M07 (threshold-owner N13): both to M08's
+open list at the close.
+
+**After the seat reviews of PR 3** (four reports on `3bfd074...936eb17`;
+`milestones/M07/rulings/pr3-engineering.md`, `pr3-security.md` and
+`pr3-threshold-owner.md` carry each finding and what was done). Repaired
+in code: a restore is a change to the ruleset after the detection, not
+after the call; `two-key` reads an unquoted timestamp by its day; the
+observer revokes its tokens and sends one only to GitHub's API host; the
+`open` job compares text and says so. Still true, and said here so no
+document describes these as working:
+
+- **The cost of the row's amendment.** None of PR 3's repairs has run
+  live: the artifact's layout, the keyed observer, the rule on who made a
+  commit, the retire job's check, the `open` job's check. Each first runs
+  during an attempt. A fault one of them shows then has no pull request
+  left to repair it in: PR 4 is the close. It is recorded as a finding.
+- **A platform role added after an agent's key exists.** A template
+  agent's key policy is made with its stack and names the platform's
+  roles. No platform role may change a key policy afterwards. So a later
+  change to that list changes the policy in the template, CloudFormation
+  is refused the change, and that agent's next stack update fails, its
+  retirement included. No key exists yet; PR 3's two names land before
+  the first. Nothing tests the case.
+- **`two-key` reads `deprecated_after` in `agentkeel` only.** An agent
+  repository has no `two-key`; a date moved later there takes one commit
+  and switches the 30-day check off for that agent.
+- **The grant file is tied to its ruling by name.** The reader checks the
+  named ruling is Security's and ruled, not that it rules these bytes.
+  `ruling-cited` on `/infra/` is what holds a later change.
+- **The files that hold PR 3's new checks stay Engineering's**
+  (`scripts/platform_upgrade.py`, `scripts/retire_agent.py`,
+  `scripts/observe_upgrade.py`, `scripts/platform_pr.py`,
+  `scripts/registry.py`, `src/validate/agent.py`). A pull request that
+  weakens one meets `cold-review-ruling` and no Security gate.
+- **The bundle put under `bundles/` is the artifact's file.** The deploy
+  job verifies its own re-pack against the signature and then puts the
+  artifact's `bundle.tar`; nothing compares the two digests before the
+  put. `image.tar` is carried in the same artifact and is not signed.
+- **What is deployed in the security account rests on one person's
+  statement.** No role in either account reads that stack back, and no
+  hash of the template deployed on 2026-10-02 was kept.
+- **The Deny for the two new roles has not fired.** They are named in
+  both lists. Neither holds a kms Allow, so a refusal could not be shown
+  to be the key policy's.
+- **"No role the platform creates"** is still what refagent's key says of
+  itself. Its policy names seven roles and the agent path; the Grafana
+  connector's, the ingest's and the audit's are not among them.
+
+**To M08's open list at the close, by name:** the six items above that
+are not repaired; threshold-owner F2 on PR 2 (item 3's sentence on the
+revert's median, restated in ADR-0011 and not in the ruling), its F5 (a
+swap leaves the old model's date) and N9 (the manifest's stale judge
+comment), N13 (`model-watch`'s paths fixed to M07); item 13n.

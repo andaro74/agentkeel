@@ -39,12 +39,19 @@
 # model-watch.yml and observe.yml added, each keyed job in its own environment on main's code; deploy.yml gains the retire jobs, the
 # bundle put and the 412 repair; evals.yml observes claim 7, reads panel 2, and its archive job writes panel 2's rows.
 # Rewritten at M07 PR 2 after the seat reviews: deploy.yml's retire job records nothing unless the runtime is gone (platform-architect B1); evals.yml's envelope-rows job writes panel 2's table through replay_history (cold review B1).
+# Rewritten at M07 PR 3: deploy.yml's sign-agent uploads one folder, so deploy-agent finds the signed files (run 37023118799).
+# Rewritten at M07 PR 3: observe.yml's header says what its keyed job now holds (tokens minted first, the key let go; security-reviewer 12 on M07 PR 2). No step changes.
+# Rewritten at M07 PR 3 (item 13j): platform-check.yml's and platform-upgrade.yml's headers name infra/platform_grant.yaml as where the grant is read from. No step changes.
+# Rewritten at M07 PR 3 (item 13l): platform-upgrade.yml's header says the open job holds the proposed bytes to the template and the guardrail to main's. No step changes.
+# Rewritten at M07 PR 3 (item 13i): deploy.yml's retire-agent job holds the retired head's manifest to the one at the registry row's commit, before the registry or the stack is touched.
+# Rewritten at M07 PR 3 after the seat reviews: observe.yml's header says what is still read from an agent repository beside the App's tokens, and that each token is revoked (cold review N4, security-reviewer 14). No step changes.
+# Rewritten at M07 PR 3 after the seat reviews: platform-upgrade.yml's header says text, not bytes (security-reviewer 9). No step changes.
 bedf184401fe99b3e2e3d893c3e7e3569f7dc6eecc689d8585b12fd5ffb98d48  .github/workflows/cold-review-ruling.yml
-d7dc7246300f1b95010f1394bc600a5471bf7c21251a7b4681ce3208ed3d4900  .github/workflows/deploy.yml
+865b89ef9ce12d39cf923f274da9f5fc988725e8c0b2b35c57918216fcf03d82  .github/workflows/deploy.yml
 2801eb4da8a685088687f046b9ad6a461a352978e74e9f13e49ef2bcd420af7b  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 977005d6918897772b83d279230d5febb4c3c35150d0037d08ed139af8727414  .github/workflows/model-watch.yml
-48d8372db65adee7827a06e8724289ddd425c04cb852dfea99ed952665759e8e  .github/workflows/observe.yml
-93e806287f79edf965928bda313709d60672465c5cfd4f451898a15ee789923b  .github/workflows/platform-check.yml
-b9d5de06062cb11337806311face403b19654ac1ffee0d61321bd3d74cb107a9  .github/workflows/platform-upgrade.yml
+33550c4d1d9d15db10dbf6409d679856084f178179fe45004b219c774750fd0a  .github/workflows/observe.yml
+28505afb258751dd419f0eb18f8d064b0144036acf4869b01a8c76eb492bfbdb  .github/workflows/platform-check.yml
+0004f433a26b757c57d8da7809b57facf1e8140618e0a51b17ea28aea48a4e24  .github/workflows/platform-upgrade.yml
 5440afdbd91af1efd2353e791aaabac567fa37fddb996720c7ca007c8874b7b0  .github/workflows/sign-fixture.yml

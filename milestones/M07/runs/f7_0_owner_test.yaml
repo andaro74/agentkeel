@@ -43,10 +43,22 @@ attempts:
     recorded_when: the observer reads the ruleset's history, the new head's check run and its reasons, owner-check's merges in the interval, and the ruleset after the restore
 # The second attempt was made on 2026-10-02, before any grant, with admin
 # bypass switched off on the environment (milestones/M07/runs/pr2_reads.md).
-# The first and third are not made: this list holds one entry of three, so
-# the run-file test still reads the seed as not made.
+# The first was made on 2026-10-02, after M07 PR 2 merged (3bfd074) and after
+# the grant: once, as stated here before it. Recorded at M07 PR 3. The
+# deploy of its merge commit did not complete within
+# upgrade.deploy_max_seconds: deploy.yml's sign-agent and deploy-agent did
+# not agree on where the signed files are in the artifact (run 37023118799,
+# the platform's own workflow; repaired in f5d2f6c). The attempt is not
+# re-made and not restated (Product, milestones/M07/rulings/pr3.md): the
+# observer reads what GitHub and AWS hold, and `build` rules on it.
+# The third is not made: this list holds two entries of three, so the
+# run-file test still reads the seed as not made.
 observed:
   - what: platform-check.yml dispatched from a branch
     repository: andaro74/agentkeel
     run: 36963543726
     at: '2026-10-02T04:12:44Z'
+  - what: the owner's test, steps 2 to 4 again, on owner-check pull request 1
+    repository: agentkeel-studio/owner-check
+    pull_request: 1
+    at: '2026-10-02T14:39:32Z'

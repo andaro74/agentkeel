@@ -12,6 +12,17 @@ edited into the draft: `docs/platform/surfaces.md` and
 the first envelope to carry `F7_0` to `F7_5` and `upgrade`, as test-only
 witnesses with every live reading unread.
 
+Product's note at M07 PR 3, in the same way: said here, not edited into
+the draft. Four rows of the second table are behind the tree. The owner's
+test was made on 2026-10-02 and its deploy missed its limit, so "an agent
+made from the template exists" is not evidenced and F7.0 fired
+(`milestones/M07/README.md`, PR 3 detail). `rulings/pr2-security.md` reads
+"Ruled by", and the grant is now `infra/platform_grant.yaml`. The audit
+bucket's `bundles/` and `observations/` statements were deployed by hand
+on 2026-10-02; nothing has been put under either. `two-key` now reads a
+pin's `deprecated_after`, in `agentkeel` only: an agent repository has no
+`two-key`, and a date moved later there takes one commit. The map is drafted again at the close.
+
 This page is not legal advice and not an audit opinion. It says which
 record in this repository bears on which line of a public framework.
 Whether that record is enough is an auditor's judgment.

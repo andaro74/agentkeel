@@ -24,16 +24,20 @@ One entry per falsifier, each `read` (every record it needs was found),
 - **F7.1**, an upgrade requires a manual edit. For each upgrade's pull
   request: opened by the platform's App within `arrive_max_seconds` of the
   trigger; no path under `.github/workflows/`; only the paths its kind may
-  change; no person's edit (a commit by anyone but the App that touches
-  anything but a ruling file, or a commit on the default branch between the
-  opening and the merge that touches the same files);
+  change; no person's edit (a commit GitHub's record does not show to be
+  the App's, `commit_by_the_app`, that touches anything but a ruling file,
+  or a commit on the default branch between the opening and the merge that
+  touches the same files);
   `infra/workflows.sha256` unchanged across it; merged on green checks.
   Unread until it has merged, unless a miss is already there: "needed to
-  merge it" is not known before a merge. **As SPEC/07 §2 defines a
-  person's edit, the commit CI itself pushes to an `agentkeel` pull
-  request (`evals/history/<commit>.json`, by `github-actions[bot]`) is
-  one**, so the model upgrade cannot read as held (cold review F1 on M07
-  PR 2). The definition is Product's; this reader keeps to it as written.
+  merge it" is not known before a merge. **CI's own envelope commit on an
+  `agentkeel` pull request is not a person's edit** (SPEC/07 §2 as Product
+  amended it at M07 PR 3; until then it was one, and the model upgrade
+  could not read as held: cold review F1 on M07 PR 2). It is that commit
+  only when its author and its committer are both `github-actions[bot]`
+  and every file it touches is an envelope file named for another commit
+  of the same pull request (`ci_envelope_commit`). GitHub does not sign
+  that commit, so the login is a name; the paths are what bound it.
 - **F7.2**, a retired agent still answers (seed S2's reader, `f7_2`).
 - **F7.3**, a rollback leaves the new digest live (seed S3's reader, `f7_3`).
 - **F7.4**, panel 2 shows GREEN where the envelope says RED (seed S4's
@@ -51,10 +55,12 @@ as RED.
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 from typing import Any
 
-from src.verdict import plants, replay_history
+from src.verdict import ROOT, plants, replay_history
 from src.verdict.template import (
     GOLDENS_CHECK,
     PLATFORM_CHECK,
@@ -76,8 +82,20 @@ BARS = ("arrive_max_seconds", "deploy_max_seconds", "retire_max_seconds")
 DISPATCHED_WORKFLOW = "/platform-check.yml"
 ENVIRONMENT_REFUSED = "is not allowed to deploy to platform-app"
 REFUSED_STATUS = 403  # GitHub's answer to a token that may not make the call
+# What an agent repository's ruleset is restored to after the seeded relaxation, and the fields GitHub
+# shows any caller. `bypass_actors` is shown only to a caller that can administer the ruleset (M06's
+# finding), which neither viewpoint here can: it is compared when shown and said when not.
+RULESET_EXPORT = ROOT / "infra" / "ruleset" / "agent.json"
+RULESET_SHOWN = ("name", "target", "enforcement", "conditions", "rules")
 KINDS = ("platform", "model", "retirement")
 RULING_FILE = ("milestones/", "/rulings/")
+# SPEC/07 §2 as amended at M07 PR 3: the one repository whose pull requests CI pushes an envelope to,
+# the login it pushes as, and the three files it writes for the commit it measured (`evals.yml`).
+AGENTKEEL = "andaro74/agentkeel"
+CI_BOT = "github-actions[bot]"
+ENVELOPE_FILE = re.compile(r"^evals/history/([0-9a-f]{40})\.(?:json|baseline-card\.json|baseline-raw\.json)$")
+# GitHub's own committer on a commit it signs for an App that made it through the API.
+GITHUB_SIGNER = "web-flow"
 WORKFLOWS = ".github/workflows/"
 # What each kind's pull request may change (SPEC/07 §2). A ruling file is beside the pin move, in
 # agentkeel only (BLOCK 2): a seat ruling a change is the gate working, not a person's edit.
@@ -277,12 +295,54 @@ def f7_5(results: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]
 
 
 def by_the_app(author: dict[str, Any] | None, app: dict[str, Any]) -> bool:
-    """The author is the platform's App that opens pull requests: by App id where GitHub gives one, and by
-    the bot login it gives the App's commits and pull requests."""
+    """Who opened a pull request is the platform's App that opens them: by App id where GitHub gives one
+    (`performed_via_github_app`), and by the bot login it gives the App otherwise. A commit is read by
+    `commit_by_the_app`, which asks more."""
     author = author or {}
     if author.get("app_id") is not None and app.get("id") is not None:
         return author["app_id"] == app["id"]
     return author.get("type") == "Bot" and author.get("login") == f"{app.get('slug')}[bot]"
+
+
+def _is_bot(actor: Any, login: str) -> bool:
+    return isinstance(actor, dict) and actor.get("type") == "Bot" and actor.get("login") == login
+
+
+def commit_by_the_app(commit: dict[str, Any], app: dict[str, Any]) -> bool:
+    """A commit is the App's only when GitHub's record of it is what an App's own commit carries (cold
+    review F5 on M07 PR 2: "no person's edit" rested on the author's login, which is the email a commit
+    was made with, and a person can make one with the App's noreply address).
+
+    All three, or it is not the App's: its author is the App's bot; GitHub verified it
+    (`verification.verified`), which it does for a commit an App makes through the API with no author
+    or committer of its own, and for nobody who only writes the App's address into a commit; and its
+    committer is the App's bot or GitHub's own signer (`web-flow`), never a person. A record that is
+    missing, or does not match, reads as not the App's: a person's edit, never the benefit of the
+    doubt. **No commit by `agentkeel-upgrades` had been read when this was written (M07 PR 3)**: which
+    of the two committers GitHub records for `POST /git/commits` is not known from this tree, so both
+    are taken. If the App's first commit carries neither, S1 reads as a person's edit and that is the
+    finding."""
+    login = f"{app.get('slug')}[bot]"
+    if not _is_bot(commit.get("author"), login) or commit.get("verified") is not True:
+        return False
+    committer = commit.get("committer")
+    return _is_bot(committer, login) or (isinstance(committer, dict) and committer.get("login") == GITHUB_SIGNER)
+
+
+def ci_envelope_commit(commit: dict[str, Any], commits: list[dict[str, Any]], repository: Any) -> bool:
+    """CI's own envelope commit on an `agentkeel` pull request (SPEC/07 §2, amended at M07 PR 3).
+
+    Author and committer both `github-actions[bot]`; every file it touches an envelope file under
+    `evals/history/` named for the full id of another commit of the same pull request; in `agentkeel`
+    and in no agent repository. One path more, a file named for a commit the pull request does not
+    hold, or files that were not read, and it is not that commit."""
+    if repository != AGENTKEEL or not _is_bot(commit.get("author"), CI_BOT) or not _is_bot(commit.get("committer"), CI_BOT):
+        return False
+    files = commit.get("files")
+    if not isinstance(files, list) or not files:
+        return False
+    others = {c.get("sha") for c in commits if c is not commit}
+    return all((named := ENVELOPE_FILE.match(str(path))) is not None and named[1] in others for path in files)
 
 
 def pull_reading(kind: str, pull: dict[str, Any] | None, app: dict[str, Any], bars: dict[str, float], now: Any,
@@ -319,18 +379,26 @@ def pull_reading(kind: str, pull: dict[str, Any] | None, app: dict[str, Any], ba
         reasons.append(f"arrived {arrived:.0f} s after the trigger, over upgrade.arrive_max_seconds {bars['arrive_max_seconds']:.0f}")
     reasons += [f"touches a workflow: {path}" for path in files if path.startswith(WORKFLOWS)]
     allowed = MAY_CHANGE[kind]
+    # The files CI's own envelope commits wrote are not paths the upgrade changes (SPEC/07 §2, amended).
+    ci = [commit for commit in commits if ci_envelope_commit(commit, commits, pull.get("repository"))]
+    ci_wrote = {path for commit in ci for path in commit["files"]}
     outside = [path for path in files if path not in allowed and not path.startswith(WORKFLOWS)
-               and not (expects_ruling and is_ruling(path))]  # fmt: skip
+               and not (expects_ruling and is_ruling(path)) and path not in ci_wrote]  # fmt: skip
     reasons += [f"changes {path}, which a {kind} upgrade does not" for path in outside]
     for commit in commits:
-        if by_the_app(commit.get("author"), app):
+        if commit_by_the_app(commit, app) or any(commit is one for one in ci):
             continue
         touched = commit.get("files")
         if not isinstance(touched, list):
             return {**head, **entry(False, [f"unread: commit {str(commit.get('sha'))[:12]}'s files were not read"])}
         edits = [path for path in touched if not (expects_ruling and is_ruling(path))]
         if edits:
-            reasons.append(f"a person's edit: {str(commit.get('sha'))[:12]} by {(commit.get('author') or {}).get('login')!r} "
+            who = (commit.get("author") or {}).get("login")
+            # The App's login on a commit GitHub did not verify, or with a person as its committer, is said:
+            # the reason must not read as if a person signed it under their own name.
+            unproven = (" (the App's login, on a commit GitHub's record does not show to be the App's)"
+                        if _is_bot(commit.get("author"), f"{app.get('slug')}[bot]") else "")
+            reasons.append(f"a person's edit: {str(commit.get('sha'))[:12]} by {who!r}{unproven} "
                            f"touches {', '.join(edits[:3])}")  # fmt: skip
     if pull.get("workflows_sha256_changed") is True:
         reasons.append("infra/workflows.sha256 changed between the pull request's base and its merge: a workflow edit was needed")
@@ -343,7 +411,7 @@ def pull_reading(kind: str, pull: dict[str, Any] | None, app: dict[str, Any], ba
             return {**head, **entry(False, ["unread: the default branch between the opening and the merge was not read"])}
         for commit in between:
             same = sorted(set(commit.get("files") or []) & set(files))
-            if same and not by_the_app(commit.get("author"), app):
+            if same and not commit_by_the_app(commit, app):
                 reasons.append(f"a person's commit on the default branch before the merge, {str(commit.get('sha'))[:12]}, "
                                f"touches {', '.join(same[:3])}")  # fmt: skip
         red = sorted(name for name, conclusion in (pull.get("required_on_head") or {}).items() if conclusion != "success")
@@ -480,12 +548,34 @@ def dispatch_from_a_branch(run: dict[str, Any] | None) -> dict[str, Any]:
                         "the App's key was reached from a branch"])  # fmt: skip
 
 
-def relaxation(seen: dict[str, Any] | None, app_id: int | None) -> dict[str, Any]:
+def ruleset_differs(ruleset: dict[str, Any], export: dict[str, Any]) -> list[str]:
+    """The fields in which a ruleset, as GitHub returned it, is not the export. [] when it is the export
+    in everything GitHub showed the caller."""
+    differs = [key for key in RULESET_SHOWN if ruleset.get(key) != export.get(key)]
+    if ruleset.get("bypass_actors") not in (None, export.get("bypass_actors")):
+        differs.append("bypass_actors")
+    return differs
+
+
+def relaxation(seen: dict[str, Any] | None, app_id: int | None, now: Any = None,
+               export: dict[str, Any] | None = None) -> dict[str, Any]:  # fmt: skip
     """The App's token asked to relax an agent repository's ruleset (S0's third attempt).
 
     Held when GitHub refused the call (`outcome: refused`), or accepted it and the platform check then
     failed the new head for the ruleset, nothing merged while it differed, and the App passed a head
-    after the owner restored it (`outcome: detected`: detection, not refusal, and said so)."""
+    after the owner restored it (`outcome: detected`: detection, not refusal, and said so).
+
+    Every comparison of one record's time with another's is made here, on records the observer wrote
+    raw (cold review F6 on M07 PR 2: until M07 PR 3 the observer worked out "after the restore" and
+    "merged meanwhile" itself, and "after the restore" was any App success after the call). **The
+    restore is read from the ruleset itself**: it is restored when, as GitHub returns it, it equals
+    `infra/ruleset/agent.json` in every field GitHub shows, and GitHub's own `updated_at` on it is
+    after the platform check failed the new head for the ruleset; that time is when. The App's own
+    accepted call also sets `updated_at`, after the run that made it began, so "after the call" would
+    read the relaxation itself as its restore (cold review F1 on M07 PR 3): a restore is a change
+    after the detection, and with no detection there is none. The call's time, where the no-merge
+    interval starts, is GitHub's `created_at` of the run that made it, on `main`, not the runner's
+    clock. While the ruleset still differs there is no restore, and the interval runs to `now`."""
     if not seen or not seen.get("found") or app_id is None:
         return entry(False, [f"unread: {(seen or {}).get('error') or 'the relaxation was not attempted'}"], outcome=None)
     status = (seen.get("answer") or {}).get("status")
@@ -498,19 +588,43 @@ def relaxation(seen: dict[str, Any] | None, app_id: int | None) -> dict[str, Any
         # refusing the App's token, as a refusal for access is not a deletion (cold review F2 on M07 PR 2).
         return entry(False, [f"unread: GitHub answered {status}, which does not say the token was refused "
                              f"({REFUSED_STATUS} does)"], outcome=None)  # fmt: skip
-    head = seen.get("new_head") or {}
-    run = app_run(head, app_id)
-    if run is None or seen.get("merges_between") is None or seen.get("passed_after_restore") is None:
-        return entry(False, ["unread: the new head's check, the merges in the interval or the restore were not read"],
+    run = app_run(seen.get("new_head") or {}, app_id)
+    ruleset, merges, passes = seen.get("ruleset"), seen.get("merges"), seen.get("app_passes")
+    asked = when((seen.get("asked") or {}).get("at"))
+    if run is None or not isinstance(merges, list) or not isinstance(passes, list):
+        return entry(False, ["unread: the new head's check, the merges or the App's passes were not read"], outcome=None)
+    if asked is None:
+        return entry(False, ["unread: the run that made the call was not read as platform-check.yml on main, so the "
+                             "call has no time of GitHub's"], outcome=None)  # fmt: skip
+    if not isinstance(ruleset, dict) or ruleset.get("error") or not isinstance(ruleset.get("rules"), list):
+        return entry(False, [f"unread: the ruleset as it stands was not read ({(ruleset or {}).get('error') or 'no record'})"],
                      outcome=None)  # fmt: skip
+    if export is None:
+        export = json.loads(RULESET_EXPORT.read_text(encoding="utf-8"))
+    differs, changed = ruleset_differs(ruleset, export), when(ruleset.get("updated_at"))
+    detected = run.get("conclusion") == "failure" and RULESET_CHECK in (run.get("refused") or [])
+    detected_at = when(run.get("completed_at")) if detected else None
+    restored_at = changed if (not differs and changed is not None and detected_at is not None
+                              and changed > detected_at and changed > asked) else None  # fmt: skip
+    until = restored_at or when(now)
+    if until is None:
+        return entry(False, ["unread: the ruleset is not restored and the time of this reading is not known"], outcome=None)
     reasons = []
-    if run.get("conclusion") != "failure" or RULESET_CHECK not in (run.get("refused") or []):
+    if not detected:
         reasons.append("GitHub accepted the call and the platform check did not fail the new head for the ruleset")
-    if seen["merges_between"]:
-        reasons.append(f"pull requests merged while the ruleset differed: {', '.join(map(str, seen['merges_between']))}")
-    if seen["passed_after_restore"] is not True:
-        reasons.append("after the restore the App passed no head: the ruleset was not read back equal to the export")
-    return entry(True, reasons, outcome="detected" if not reasons else "undetected")
+    between = sorted(m.get("number") for m in merges if (at := when(m.get("merged_at"))) is not None and asked <= at <= until)
+    if between:
+        reasons.append(f"pull requests merged while the ruleset differed: {', '.join(map(str, between))}")
+    if differs:
+        reasons.append(f"the ruleset still differs from the export ({', '.join(differs)}): it has not been restored")
+    elif restored_at is None:
+        reasons.append("the ruleset equals the export, and GitHub's record of its last change is not after the platform "
+                       "check failed the new head for it: no restore is recorded")  # fmt: skip
+    elif not any((at := when(p.get("completed_at"))) is not None and at > restored_at for p in passes):
+        reasons.append(f"after the restore ({ruleset.get('updated_at')}, the ruleset's own last change) the App passed no head")
+    hidden = ruleset.get("bypass_actors") is None
+    return entry(True, reasons, outcome="detected" if not reasons else "undetected",
+                 restored_at=ruleset.get("updated_at") if restored_at else None, bypass_actors_shown=not hidden)
 
 
 def timed_run(template: dict[str, Any] | None) -> dict[str, Any]:
@@ -529,7 +643,7 @@ def f7_0(s0: dict[str, Any] | None, template: dict[str, Any] | None, app_id: int
     parts = {
         "owner_test": owner_test(s0.get("owner_test"), app_id, bars, now),
         "dispatch": dispatch_from_a_branch(s0.get("dispatch")),
-        "relaxation": relaxation(s0.get("relaxation"), app_id),
+        "relaxation": relaxation(s0.get("relaxation"), app_id, now),
         "timed_run": timed_run(template),
     }
     reasons = [f"{name}: {reason}" for name, part in parts.items() for reason in part["reasons"]]

@@ -50,10 +50,33 @@
 /.github/workflows/ @andaro74
 /.github/CODEOWNERS @andaro74
 /infra/ @andaro74
+# ADR-0012 (M07 PR 3): the reader of the Apps' grant, the table of permission
+# sets and the mint. The grant itself is infra/platform_grant.yaml, above.
+/scripts/platform_check.py @andaro74
 
 # seat: Engineering
 /src/ @andaro74
-/scripts/ @andaro74
+# Engineering's scripts, one by one from ADR-0012: `validate` refuses a file
+# two seats' lines match, and scripts/platform_check.py is Security's. A new
+# script matches no line, and `validate` fails, until it is listed here; but
+# for a new scripts/observe_<name>.py, which the pattern below takes as
+# Engineering's with no change to this file (security-reviewer 18 on M07 PR 3).
+/scripts/check_model_access.py @andaro74
+/scripts/envelope_rows.py @andaro74
+/scripts/load_rights_table.py @andaro74
+/scripts/make_template.py @andaro74
+/scripts/model_watch.py @andaro74
+/scripts/observe_*.py @andaro74
+/scripts/platform_pr.py @andaro74
+/scripts/platform_upgrade.py @andaro74
+/scripts/probe_guardrail.py @andaro74
+/scripts/read_back_grants.py @andaro74
+/scripts/registry.py @andaro74
+/scripts/retire_agent.py @andaro74
+/scripts/rule_swaps.py @andaro74
+/scripts/runtime_for_tree.py @andaro74
+/scripts/seed_slate.py @andaro74
+/scripts/try_guardrail_wording.py @andaro74
 /tests/ @andaro74
 /Makefile @andaro74
 /pyproject.toml @andaro74

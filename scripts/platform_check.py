@@ -31,9 +31,10 @@ id, `tests/test_m06_readers.py`).
 - `grant` (M07 PR 2; seed S0's reader): what GitHub says one App holds, read
   with the App's own JWT (its registered permissions, each installation's
   permissions, selection and repositories) and its key's environment (branch
-  policies, admin bypass), against the `grant:` block of the ruled file under
-  `milestones/M07/rulings/`. It writes what it read and exits 1 on any value
-  beyond the grant. It runs first in every keyed job.
+  policies, admin bypass), against `infra/platform_grant.yaml`, which is
+  Security's (from M07 PR 3; until then the block was in a ruling file under
+  `milestones/M07/rulings/`, on Product's path). It writes what it read and
+  exits 1 on any value beyond the grant. It runs first in every keyed job.
 - `deployable`: every public repository's default-branch head that carries a
   successful `platform-check` run from the App, with the agent name its
   manifest holds there. `deploy.yml` reads the registry to skip what is
@@ -216,41 +217,66 @@ def revoke(token: str) -> None:
 
 # --- the reader of the grant (M07 PR 2; SPEC/07 section 6; rulings/pr2-security.md item 6; S0's reader) ----
 
-RULINGS = "milestones/M07/rulings"
+GRANT_FILE = "infra/platform_grant.yaml"  # Security's path (rulings/pr2-security.md item 13j, at M07 PR 3)
+RULING_PATH = re.compile(r"milestones/M[0-9]{2}/rulings/[a-z0-9][a-z0-9-]*\.md")
 PLATFORM_REPOSITORY = "andaro74/agentkeel"  # whose environments hold the Apps' keys
 LEVELS = {"read": 1, "write": 2, "admin": 3}
-FENCED_YAML = re.compile(r"^```yaml\n(.*?)^```", re.DOTALL | re.MULTILINE)
 
 
 class NoGrant(Exception):
     """No ruled grant can be read: a keyed job then stops before it mints anything."""
 
 
+def grant_file(root: Path = ROOT) -> dict[str, Any]:
+    """`infra/platform_grant.yaml` as a mapping, or NoGrant: missing, not YAML, or with no `grant:` mapping."""
+    path = root / GRANT_FILE
+    if not path.is_file():
+        raise NoGrant(f"{GRANT_FILE}: missing; no grant is ruled")
+    try:
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise NoGrant(f"{GRANT_FILE} does not parse ({exc.__class__.__name__})") from exc
+    if not isinstance(doc, dict) or not isinstance(doc.get("grant"), dict):
+        raise NoGrant(f"{GRANT_FILE} carries no grant: mapping")
+    return doc
+
+
 def load_grant(root: Path = ROOT, *, ruled_only: bool = True) -> dict[str, Any]:
-    """The `grant:` block of the one ruling file under milestones/M07/rulings/ that carries one.
+    """The `grant:` mapping of `infra/platform_grant.yaml`.
 
     Read from the checkout, which in a keyed job is `main`'s (each key's environment deploys from
-    `main` only): a pull request cannot widen the grant it is checked against. A draft is not a grant:
-    with `ruled_only`, the file must carry a line that starts "Ruled by", as `cold-review-ruling` reads
-    it. Two files with a block is refused, not resolved."""
-    found: list[tuple[str, dict[str, Any], bool]] = []
-    for path in sorted((root / RULINGS).glob("*.md")):
-        text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
-        for block in FENCED_YAML.findall(text):
-            try:
-                doc = yaml.safe_load(block)
-            except yaml.YAMLError as exc:
-                raise NoGrant(f"{RULINGS}/{path.name}: a yaml block does not parse ({exc.__class__.__name__})") from exc
-            if isinstance(doc, dict) and isinstance(doc.get("grant"), dict):
-                ruled = any(line.startswith("Ruled by ") for line in text.splitlines())
-                found.append((path.name, doc["grant"], ruled))
-    if len(found) != 1:
-        names = ", ".join(name for name, _grant, _ruled in found) or "none"
-        raise NoGrant(f"{RULINGS}/: one ruling file must carry a grant: block; found {len(found)} ({names})")
-    name, grant, ruled = found[0]
-    if ruled_only and not ruled:
-        raise NoGrant(f"{RULINGS}/{name}: the grant is a draft; no seat has ruled it (no line starts 'Ruled by')")
-    return grant
+    `main` only): a pull request cannot widen the grant it is checked against. The file is on
+    Security's path, so a change to it needs a Security ruling. Until M07 PR 3 the block was in a
+    ruling file under milestones/M07/rulings/, which is Product's path (security-reviewer 5 on M07 PR 2).
+
+    A draft is not a grant: with `ruled_only`, the file must name, in `ruled_in`, a ruling file that is
+    on the checkout, whose `seat:` is Security, and which carries a line that starts "Ruled by", as
+    `cold-review-ruling` reads it."""
+    doc = grant_file(root)
+    if ruled_only:
+        named = doc.get("ruled_in")
+        if not isinstance(named, str) or not RULING_PATH.fullmatch(named):
+            raise NoGrant(f"{GRANT_FILE}: ruled_in names no ruling file ({named!r}); no seat has ruled the grant")
+        ruling = root / named
+        if not ruling.is_file():
+            raise NoGrant(f"{GRANT_FILE}: {named}, which it says rules it, is not on this checkout")
+        lines = ruling.read_text(encoding="utf-8").replace("\r\n", "\n").splitlines()
+        seat = None
+        if lines and lines[0].strip() == "---":
+            front = lines[1:lines.index("---", 1)] if "---" in lines[1:] else []
+            seat = next((line.split(":", 1)[1].strip() for line in front if line.startswith("seat:")), None)
+        if seat != "Security":
+            raise NoGrant(f"{named} is not a Security ruling (seat: {seat!r}): it cannot rule the grant")
+        if not any(line.startswith("Ruled by ") for line in lines):
+            raise NoGrant(f"{named}: the grant is a draft; no seat has ruled it (no line starts 'Ruled by')")
+    return doc["grant"]
+
+
+def seeded_repository(root: Path = ROOT) -> str | None:
+    """The one repository the seeded relaxation may be pointed at, from the grant file (Security's)."""
+    seed = grant_file(root).get("relax_seed")
+    name = seed.get("repository") if isinstance(seed, dict) else None
+    return name if isinstance(name, str) else None
 
 
 def _beyond(held: Any, granted: Any) -> bool:
@@ -501,8 +527,10 @@ def relax_seed(name: str, org: str, app_id: int, private_key_pem: str, root: Pat
     is expected to be accepted, and then detected: the next platform check refuses every head of that
     repository until its owner restores the export. Which it is comes from the attempt.
 
-    It can be pointed at one repository only: the one seed S0's run file names on `main`. Any other
-    name is refused before a token is minted, so this is not a tool for relaxing an agent's ruleset.
+    It can be pointed at one repository only: the one `infra/platform_grant.yaml` names under
+    `relax_seed` on `main` (Security's path from M07 PR 3; until then the seed's run file named it, on
+    Product's). Any other name is refused before a token is minted, so this is not a tool for relaxing
+    an agent's ruleset.
     And it is made once: when the run file on `main` already records the attempt (an `observed` entry
     whose `what` names the relaxation, as the observer matches it), it is refused before a token is minted (security-reviewer 6 on M07 PR 2:
     "made once" was a sentence, not a check). Between the attempt and the commit that records it,
@@ -512,7 +540,10 @@ def relax_seed(name: str, org: str, app_id: int, private_key_pem: str, root: Pat
     if not isinstance(name, str) or not NAME.match(name):
         raise ValueError(f"{name!r} is not an agent's name")
     seed = yaml.safe_load((root / SEED_RUN_FILE).read_text(encoding="utf-8")) or {}
-    seeded = seed.get("repository")
+    try:
+        seeded = seeded_repository(root)
+    except NoGrant as exc:
+        raise ValueError(f"the seeded relaxation's repository cannot be read: {exc}") from exc
     repository = f"{org}/{name}"
     if repository != seeded:
         raise ValueError(f"the seeded relaxation is made on {seeded} and on no other repository; got {repository}")

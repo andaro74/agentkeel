@@ -29,8 +29,9 @@
 #
 # a. **Reads the App's grant back** (scripts/platform_check.py grant): what
 #    GitHub says agentkeel-platform holds, and the environment's own rules,
-#    against the `grant:` block of the ruled file under
-#    milestones/M07/rulings/ on main. Anything beyond it stops the job here,
+#    against infra/platform_grant.yaml on main (Security's path from M07
+#    PR 3; until then the block was in the ruled file under
+#    milestones/M07/rulings/). Anything beyond it stops the job here,
 #    before any token with a write permission is minted. What it read is
 #    kept as the artifact `grant-agentkeel-platform`.
 # b. **Posts.** For each head, two tokens, each for that repository and one

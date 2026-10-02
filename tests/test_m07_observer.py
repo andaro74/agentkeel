@@ -32,8 +32,8 @@ class FakeGitHub(observer.GitHub):
     """Answers from `pages`, keyed by repository and path; every request is recorded with who asked."""
 
     def __init__(self, pages: dict[tuple[str, str], Any], viewpoint: str = "anonymous") -> None:
-        self.viewpoint, self.key, self.organisation = viewpoint, "key", ORG
-        self.tokens, self.job_token = {}, "the-jobs-own-token"
+        self.viewpoint, self.organisation = viewpoint, ORG
+        self.tokens, self.unminted, self.job_token = {}, {}, "the-jobs-own-token"
         self.pages, self.asked = pages, []
 
     def token(self, repository: str) -> str | None:
@@ -62,11 +62,17 @@ def pull_pages(number: int = 3, *, repository: str = REPO, author: dict[str, Any
             "head": {"sha": "1" * 40}, "base": {"sha": "0" * 40, "ref": "main"}, "mergeable_state": "unknown", "body": body},
         (repository, f"/issues/{number}"): {"performed_via_github_app": {"id": OPENER, "slug": "agentkeel-upgrades"}
                                             if author is BOT else None},
-        (repository, f"/pulls/{number}/commits"): [{"sha": "1" * 40, "author": author}],
+        # As GitHub returns an App's API commit: its bot as author, GitHub's signer as committer, verified.
+        (repository, f"/pulls/{number}/commits"): [{"sha": "1" * 40, "author": author, **(
+            {"committer": {"login": "web-flow", "type": "User"}, "commit": {"verification": {"verified": True}}}
+            if author is BOT else {})}],
         (repository, f"/pulls/{number}/files"): [{"filename": f} for f in files],
         (repository, f"/commits/{'1' * 40}"): {"files": [{"filename": f} for f in files]},
         (repository, f"/commits/{'1' * 40}/check-runs"): {"check_runs": [check("success")]},
-        (repository, "/commits?sha=main&since=2026-10-06T09:20:00Z&until=2026-10-06T10:00:00Z"): [{"sha": "4" * 40, "author": OWNER}],
+        (repository, "/commits?sha=main&since=2026-10-06T09:20:00Z&until=2026-10-06T10:00:00Z"): [
+            {"sha": "4" * 40, "author": OWNER}, {"sha": "5" * 40, "author": OWNER, "committer": OWNER,
+                                                 "commit": {"verification": {"verified": False}}}],
+        (repository, f"/commits/{'5' * 40}"): {"files": [{"filename": "agent.py"}]},
     }  # fmt: skip
 
 
@@ -79,14 +85,18 @@ def test_a_pull_request_is_written_with_who_opened_it_its_files_its_commits_and_
     assert pull["found"] is True and pull["error"] is None
     assert pull["author"] == {"login": "agentkeel-upgrades[bot]", "type": "Bot", "app_id": OPENER, "app_slug": "agentkeel-upgrades"}
     assert pull["files"] == ["manifest.yaml", "server.py"] and pull["merged"] is True and pull["merge_commit_sha"] == "4" * 40
-    nobody = {"login": None, "type": None, "app_id": None, "app_slug": None}
+    signer = {"login": "web-flow", "type": "User", "app_id": None, "app_slug": None}
     # The committer and GitHub's verification are written raw beside the author (cold review F5 on M07 PR 2:
-    # "no person's edit" rests on the author's login). Nothing rules on them yet.
+    # "no person's edit" rested on the author's login). build rules on them from M07 PR 3.
     assert pull["commits"] == [{"sha": "1" * 40, "author": {"login": "agentkeel-upgrades[bot]", "type": "Bot", "app_id": None,
-                                                           "app_slug": None}, "committer": nobody, "verified": None,
+                                                           "app_slug": None}, "committer": signer, "verified": True,
                                 "files": ["manifest.yaml", "server.py"]}]  # fmt: skip
     assert pull["required_on_head"] == {"platform-check": "success"}
-    assert pull["default_branch_commits_between"] == []  # the merge commit itself is the pull request's own
+    # The merge commit itself is the pull request's own. Another commit on the branch meanwhile is written
+    # with its committer and verification too, so build can hold it to the same rule.
+    owner = {"login": "andaro74", "type": "User", "app_id": None, "app_slug": None}
+    assert pull["default_branch_commits_between"] == [
+        {"sha": "5" * 40, "author": owner, "committer": owner, "verified": False, "files": ["agent.py"]}]
     # build rules on it as written: held, once it carries its trigger.
     observer.with_trigger(pull, {"at": "2026-10-06T09:00:00Z"})
     pull["workflows_sha256_changed"] = False
@@ -151,26 +161,110 @@ def test_as_the_app_each_repository_of_the_organisations_is_read_under_its_own_t
     assert {token for repository, _path, token in gh.asked if repository == observer.PLATFORM} == {"the-jobs-own-token"}
 
 
-def test_the_real_reader_mints_the_observe_set_for_one_repository_and_puts_the_jobs_token_back(monkeypatch):
+def test_the_real_reader_mints_first_for_the_repositories_named_and_does_not_keep_the_key(monkeypatch):
+    """security-reviewer 12 on M07 PR 2: the one keyed job with no keyless job before it. Every token is
+    minted before anything is read, read-only, one per repository named; the key is not kept."""
     minted: list[tuple[Any, ...]] = []
     from scripts import platform_check
 
+    def mint(*args: Any) -> str:
+        if args[3].endswith("/gone"):
+            raise urllib.error.HTTPError("x", 404, "Not Found", {}, None)
+        minted.append(args)
+        return f"observer-token-for-{args[3]}"
+
     monkeypatch.setattr(platform_check, "identity", lambda: (ORG, APP))
     monkeypatch.setattr(platform_check, "load_grant", lambda root=None: {"agentkeel-observer": {"app_id": WATCHER}})
-    monkeypatch.setattr(platform_check, "app_token", lambda *args: minted.append(args) or "observer-token")
+    monkeypatch.setattr(platform_check, "app_token", mint)
     seen: list[str | None] = []
     monkeypatch.setattr(platform_check, "gh", lambda path, raw=False: seen.append(__import__("os").environ.get("GITHUB_TOKEN")) or {})
     monkeypatch.setenv("GITHUB_TOKEN", "the-jobs-own-token")
-    gh = observer.GitHub("app", "the-key")
+    gh = observer.GitHub("app", "the-key", [REPO, f"{ORG}/gone", "someone-else/their-repo", observer.PLATFORM])
+    # Once per organisation repository, the read-only set, before any read; nobody else's account is asked.
+    assert minted == [(WATCHER, ORG, "the-key", REPO, "observe")] and seen == []
+    assert "the-key" not in repr(vars(gh)) and not hasattr(gh, "key")
     gh(REPO, "/pulls/1")
     gh(REPO, "/pulls/2")
     gh(observer.PLATFORM, "/actions/runs/9")
-    assert minted == [(WATCHER, ORG, "the-key", REPO, "observe")]  # once, for that repository, the read-only set
-    assert seen == ["observer-token", "observer-token", "the-jobs-own-token"]
+    assert len(minted) == 1  # nothing is minted later
+    assert seen == [f"observer-token-for-{REPO}", f"observer-token-for-{REPO}", "the-jobs-own-token"]
     assert __import__("os").environ["GITHUB_TOKEN"] == "the-jobs-own-token"
+    # A repository no token was minted for is unread, with the reason: never read under another token.
+    for name, said in ((f"{ORG}/gone", "HTTPError"), (f"{ORG}/never-named", "no run file on main names it")):
+        with pytest.raises(KeyError, match=said):
+            gh(name, "/pulls/1")
+    assert observer.pull_record(gh, f"{ORG}/never-named", 1, APP)["found"] is False
     anonymous = observer.GitHub("anonymous")
     anonymous(REPO, "/pulls/1")
     assert seen[-1] == "the-jobs-own-token" and len(minted) == 1
+    # security-reviewer 14 on M07 PR 3: the tokens are revoked when the observation is done, not left an hour.
+    revoked: list[str] = []
+    monkeypatch.setattr(platform_check, "revoke", revoked.append)
+    gh.close()
+    assert revoked == [f"observer-token-for-{REPO}"] and gh.tokens == {}
+    with pytest.raises(KeyError):
+        gh(REPO, "/pulls/1")  # and nothing is read under a revoked token
+    anonymous.close()
+    assert len(revoked) == 1  # the job's own token is not this script's to revoke
+
+
+def test_the_repositories_minted_for_are_the_ones_the_run_files_name_and_the_template():
+    named = observer.named_repositories()
+    assert f"{ORG}/agent-template" in named and REPO in named and observer.PLATFORM in named
+    assert all(name.count("/") == 1 for name in named)
+
+
+def test_as_the_app_no_agent_repositorys_tree_is_fetched_or_packed(monkeypatch):
+    """The digests are the pull request's run's, under no key; build never takes them from the stored record."""
+    def refuse(*args: Any) -> None:
+        raise AssertionError("packed beside the App's tokens")
+
+    monkeypatch.setattr(observer, "agent_digest", refuse)
+    monkeypatch.setattr(observer, "refagent_digest", refuse)
+    monkeypatch.setattr(observer, "observed", lambda name: [{"repository": REPO, "pull_request": 3}]
+                        if name == "f7_1_platform_upgrade.yaml" else [])  # fmt: skip
+    monkeypatch.setattr(observer, "template_push", lambda gh, org, version: {"at": "2026-10-06T09:00:00Z"})
+    pages = {**pull_pages(), (REPO, f"/contents/manifest.yaml?ref={'1' * 40}"): "name: owner-check\nplatform_version: m07\n",
+             (REPO, f"/contents/manifest.yaml?ref={'4' * 40}"): "name: owner-check\nplatform_version: m07\n"}  # fmt: skip
+    observation = observer.blank("app")
+    observer.read_github(FakeGitHub(pages, "app"), observation)
+    live = observation["s1"]["lives"][REPO]
+    assert live["tree_digest"] is None and live["error"] == observer.NOT_PACKED and live["agent"] == "owner-check"
+
+
+class Redirecting:
+    """An opener that answers the first request with GitHub's redirect and the second with the bytes."""
+
+    def __init__(self, location: str | None) -> None:
+        self.location, self.requests = location, []
+
+    def open(self, request: Any, timeout: int = 0) -> Any:
+        self.requests.append((request.full_url, dict(request.header_items())))
+        if len(self.requests) == 1 and self.location:
+            raise urllib.error.HTTPError(request.full_url, 302, "Found", {"Location": self.location}, None)
+        return __import__("io").BytesIO(b"the bytes")
+
+
+def test_an_artifact_is_fetched_from_the_storage_host_with_no_credential():
+    """security-reviewer 12 on M07 PR 2: urllib carried the job's token to the host GitHub redirects to."""
+    opener = Redirecting("https://storage.example/artifact.zip?sig=x")
+    assert observer.download("https://api.github.com/repos/o/r/actions/artifacts/1/zip", "the-token", opener) == b"the bytes"
+    (first, sent), (second, bare) = opener.requests
+    assert first.startswith("https://api.github.com/") and sent == {"Authorization": "Bearer the-token"}
+    assert second.startswith("https://storage.example/") and bare == {}
+    # No redirect: the bytes come from the host that was asked, in one request.
+    direct = Redirecting(None)
+    assert observer.download("https://api.github.com/x", "the-token", direct) == b"the bytes" and len(direct.requests) == 1
+    with pytest.raises(ValueError, match="not to an https address"):
+        observer.download("https://api.github.com/x", "the-token", Redirecting("http://storage.example/a.zip"))
+    # security-reviewer 15 on M07 PR 3: the first address is GitHub's API host or nothing is sent.
+    for elsewhere in ("https://storage.example/a.zip", "https://api.github.com.example/x", "http://api.github.com/x"):
+        nowhere = Redirecting(None)
+        with pytest.raises(ValueError, match="not on GitHub's API host"):
+            observer.download(elsewhere, "the-token", nowhere)
+        assert nowhere.requests == []
+    # The real opener never follows one by itself.
+    assert observer._NoRedirect().redirect_request(None, None, 302, "Found", {}, "https://elsewhere.example/") is None
 
 
 # --- the owner's test and the dispatch ---------------------------------------------------------
@@ -239,14 +333,64 @@ def test_the_dispatch_already_recorded_is_read_from_githubs_jobs_as_refused():
     assert unread["jobs"][2]["annotations"] is None and upgrade.dispatch_from_a_branch(unread)["read"] is False
 
 
-def test_the_run_files_as_they_stand_name_one_attempt_made_the_dispatch(monkeypatch):
-    """PR 2's own run: only S0's second attempt is recorded, so only it is looked up."""
+def test_the_relaxation_is_written_as_records_and_build_compares_their_times(monkeypatch):
+    """Cold review F6 on M07 PR 2: the observer said which pass was "after the restore" and what merged
+    meanwhile. It now writes each record with GitHub's own time and no comparison; build makes them."""
+    export = json.loads((ROOT / "infra" / "ruleset" / "agent.json").read_text(encoding="utf-8"))
+    refused = f"- **{upgrade.RULESET_CHECK}**: rules differs from live ruleset 24310403"
+    passed = {**check("success"), "completed_at": "2026-10-06T10:40:00Z"}
+    pages = {
+        (observer.PLATFORM, "/actions/runs/5"): {"id": 5, "path": ".github/workflows/platform-check.yml", "head_branch": "main",
+                                                 "event": "workflow_dispatch", "created_at": "2026-10-06T10:00:00Z"},
+        (REPO, "/pulls/7"): {"head": {"sha": "5" * 40}},
+        (REPO, f"/commits/{'5' * 40}/check-runs"): {"check_runs": [check("failure", summary=refused)]},
+        (REPO, "/pulls?state=all&sort=updated&direction=desc"): [
+            {"number": 7, "head": {"sha": "5" * 40}, "merged_at": None},
+            {"number": 1, "head": {"sha": "3" * 40}, "merged_at": "2026-10-02T14:39:32Z"}],
+        (REPO, ""): {"default_branch": "main"},
+        (REPO, "/branches/main"): {"commit": {"sha": "4" * 40}},
+        (REPO, f"/commits/{'3' * 40}/check-runs"): {"check_runs": [check("success")]},
+        (REPO, f"/commits/{'4' * 40}/check-runs"): {"check_runs": [passed, check("success", app=15368)]},
+        # As GitHub returns it to a caller that cannot administer it: no bypass_actors.
+        (REPO, "/rulesets/24310403"): {"id": 24310403, **{k: v for k, v in export.items() if k != "bypass_actors"},
+                                       "updated_at": "2026-10-06T10:30:00Z", "created_at": "2026-10-01T13:06:00Z"},
+    }  # fmt: skip
+    answer = {"status": 200, "ruleset": 24310403, "at": "2026-10-06T10:00:20Z", "repository": REPO}
+    monkeypatch.setattr(observer, "artifact_json", lambda gh, run, name: answer if (run, name) == (5, "relax-seed") else None)
+    seen = observer.read_relaxation(FakeGitHub(pages), {"repository": REPO, "run": 5, "pull_request": 7}, APP)
+    assert seen["error"] is None and seen["asked"]["at"] == "2026-10-06T10:00:00Z"
+    # Raw: every App success on a head, before the call or after; every merge, whenever it was.
+    assert seen["app_passes"] == [{"sha": "3" * 40, "completed_at": "2026-10-06T09:30:00Z"},
+                                  {"sha": "4" * 40, "completed_at": "2026-10-06T10:40:00Z"}]  # fmt: skip
+    assert seen["merges"] == [{"number": 1, "merged_at": "2026-10-02T14:39:32Z"}]
+    assert seen["ruleset"]["updated_at"] == "2026-10-06T10:30:00Z" and seen["ruleset"]["bypass_actors"] is None
+    assert not {"passed_after_restore", "merges_between"} & set(seen)  # the comparisons it no longer makes
+    reading = upgrade.relaxation(seen, APP, "2026-10-06T12:00:00Z")
+    assert reading["held"] is True and reading["outcome"] == "detected" and reading["restored_at"] == "2026-10-06T10:30:00Z"
+    # A run that is not platform-check.yml on main gives the call no time, and build reads that as unread.
+    pages[(observer.PLATFORM, "/actions/runs/5")]["head_branch"] = "m07-pr3"
+    other = observer.read_relaxation(FakeGitHub(pages), {"repository": REPO, "run": 5, "pull_request": 7}, APP)
+    assert other["asked"]["at"] is None and upgrade.relaxation(other, APP, "2026-10-06T12:00:00Z")["read"] is False
+    # A ruleset that cannot be read is written with its error; a refusal is read from the answer alone.
+    del pages[(REPO, "/rulesets/24310403")]
+    unread = observer.read_relaxation(FakeGitHub(pages), {"repository": REPO, "run": 5, "pull_request": 7}, APP)
+    assert "HTTPError" in unread["ruleset"]["error"]
+    answer["status"] = 403
+    refused_by_github = observer.read_relaxation(FakeGitHub({}), {"repository": REPO, "run": 5, "pull_request": 7}, APP)
+    assert refused_by_github["asked"] is None and upgrade.relaxation(refused_by_github, APP, None)["outcome"] == "refused"
+
+
+def test_the_run_files_as_they_stand_name_two_attempts_made_the_dispatch_and_the_owners_test(monkeypatch):
+    """PR 3's own run: S0's second attempt (PR 2 recorded it) and its first, the owner's test, made on
+    2026-10-02 and recorded at PR 3. Only they are looked up."""
     asked: list[str] = []
     monkeypatch.setattr(observer, "read_dispatch", lambda gh, entry: asked.append(str(entry["run"])) or {"found": True})
+    monkeypatch.setattr(observer, "read_owner_test", lambda gh, entry, app: asked.append(
+        f"{entry['repository']}#{entry['pull_request']}") or {"found": True})  # fmt: skip
     observation = observer.blank("anonymous")
     observer.read_github(FakeGitHub({}), observation)
-    assert asked == ["36963543726"]
-    assert observation["s0"]["owner_test"] is None and observation["s0"]["relaxation"] is None
+    assert asked == ["36963543726", "agentkeel-studio/owner-check#1"]
+    assert observation["s0"]["owner_test"] == {"found": True} and observation["s0"]["relaxation"] is None
     assert observation["s1"] is None and observation["s2"] is None and observation["s3"] is None
 
 

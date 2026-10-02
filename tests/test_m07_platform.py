@@ -8,6 +8,7 @@ GitHub: Bedrock, DynamoDB and GitHub are stand-ins, and no pull request is opene
 from __future__ import annotations
 
 import json
+import urllib.error
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -278,6 +279,73 @@ def test_the_keyed_job_opens_a_retirement_only_for_rollout_retired_and_nothing_e
     change(entry)
     errors = retire_agent.entry_errors(entry, "agentkeel-studio", AGENT_MANIFEST)
     assert any(said in e for e in errors), errors
+
+
+# --- item 13i: the retired head against the deployed manifest (platform-architect F4, security-reviewer 17) ---
+
+RETIRED_MANIFEST = AGENT_MANIFEST.replace("rollout: all-at-once", "rollout: retired")
+
+
+class Registry:
+    """The registry's one row, as `registry._own_row` reads it."""
+
+    def __init__(self, **row: str) -> None:
+        self.row = {"name": "premiere-desk", "repository_id": "9", "commit_sha": "d" * 40, **row}
+
+    def get_item(self, **_kwargs: Any) -> dict[str, Any]:
+        return {"Item": {key: {"S": value} for key, value in self.row.items()}} if self.row.get("name") else {}
+
+
+def test_a_retired_head_that_moves_rollout_and_nothing_else_is_the_deployed_manifest():
+    assert retire_agent.same_errors(AGENT_MANIFEST, RETIRED_MANIFEST, "d" * 40) == []
+    # A comment may move; a field may not.
+    assert retire_agent.same_errors(AGENT_MANIFEST, "# retired by its team\n" + RETIRED_MANIFEST, "d" * 40) == []
+    code, said = retire_agent.same("premiere-desk", AGENT["repository"], "9", RETIRED_MANIFEST, Registry(),
+                                   manifest_reader())  # fmt: skip
+    assert code == 0 and "the one deployed at dddddddddddd, but for rollout" in said
+
+
+@pytest.mark.parametrize("retired, said", [
+    (RETIRED_MANIFEST.replace("security: andaro74", "security: someone-else"), "moves seats besides rollout"),
+    (RETIRED_MANIFEST + "endpoint_allowlist_extra: [\"*\"]\n", "moves endpoint_allowlist_extra besides rollout"),
+    (RETIRED_MANIFEST.replace("name: premiere-desk", "name: another-agent"), "moves name besides rollout"),
+    (AGENT_MANIFEST, "does not say rollout: retired"),
+    ("- a list\n", "not a mapping"),
+    ("a: [\n", "not YAML"),
+])  # fmt: skip
+def test_a_retired_head_that_moves_another_field_is_refused_before_the_stack_is_touched(retired, said):
+    """Until M07 PR 3 the retire job checked that the head said `rollout: retired` and nothing about the rest:
+    another field could move with it into the stack update, from a head nobody signed."""
+    assert "security: andaro74" in AGENT_MANIFEST and "name: premiere-desk" in AGENT_MANIFEST
+    code, why = retire_agent.same("premiere-desk", AGENT["repository"], "9", retired, Registry(), manifest_reader())
+    assert code == 3 and said in why, why
+
+
+def test_a_retirement_with_no_deployed_commit_or_another_repositorys_row_is_refused():
+    read: list[tuple[str, str]] = []
+
+    def reader(repository: str, commit: str) -> str:
+        read.append((repository, commit))
+        return AGENT_MANIFEST
+
+    # Claimed and never deployed: there is no deployed manifest to hold the head to. The cost, taken knowingly.
+    code, why = retire_agent.same("premiere-desk", AGENT["repository"], "9", RETIRED_MANIFEST, Registry(commit_sha="none"), reader)
+    assert code == 3 and "holds no deployed commit" in why and read == []
+    code, why = retire_agent.same("premiere-desk", AGENT["repository"], "10", RETIRED_MANIFEST, Registry(), reader)
+    assert code == 3 and "held by repository 9" in why and read == []
+    code, why = retire_agent.same("premiere-desk", AGENT["repository"], "9", RETIRED_MANIFEST, Registry(name=""), reader)
+    assert code == 3 and "no registry row" in why
+    code, why = retire_agent.same("refagent", "andaro74/agentkeel", "9", RETIRED_MANIFEST, Registry(), reader)
+    assert code == 3 and "never retired by this path" in why and read == []
+    # The deployed manifest is read at the row's commit, in the row's repository, and nowhere else.
+    assert retire_agent.same("premiere-desk", AGENT["repository"], "9", RETIRED_MANIFEST, Registry(), reader)[0] == 0
+    assert read == [(AGENT["repository"], "d" * 40)]
+
+    def unreadable(repository: str, commit: str) -> str:
+        raise urllib.error.HTTPError("x", 404, "Not Found", {}, None)
+
+    code, why = retire_agent.same("premiere-desk", AGENT["repository"], "9", RETIRED_MANIFEST, Registry(), unreadable)
+    assert code == 3 and "could not be read" in why
 
 
 def test_the_retirements_title_and_body_are_the_keyed_jobs_own(monkeypatch):

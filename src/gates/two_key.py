@@ -32,6 +32,16 @@ and from M03 PR 2 the entries ADR-0009 added:
    (`rule-owner` on M03 PR 2: "input and output" to "input" turns the
    answer side's BLOCK to NONE). A definition's wording is not read.
 
+and ADR-0009's amendment 1 (M04 PR 1):
+
+6. a manifest's `deprecated_after` moved to a later date, set from a date
+   to null, or removed, with `model.id` unchanged (the Threshold Owner's
+   key). Null to a date is not one, nor is a date moved earlier; a swap
+   changes the id, and the two dates are not compared. The amendment said
+   this was read from M04 PR 2. It was not: the reader landed at M07 PR 3
+   (threshold-owner F1 on M07 PR 2), after its seeded case
+   (`tests/test_m07_two_key_seed.py`).
+
 Two keys are two ruling files with this PR's `pr:`, their `seat:` distinct.
 The file of the seat that owns the path covers it (SPEC/02 §2 "Covers");
 the other names the path, exactly, in its `keys:` (ADR-0009; until M03 PR
@@ -49,6 +59,7 @@ import argparse
 import re
 import sys
 from dataclasses import dataclass
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -209,6 +220,38 @@ def _version_key(value: Any) -> tuple[int, ...]:
     return tuple(int(part) for part in re.findall(r"\d+", str(value)))
 
 
+def _day(value: Any) -> date | None:
+    """A manifest's `deprecated_after` as a date: YAML's own date for an unquoted one, or a quoted YYYY-MM-DD."""
+    if isinstance(value, datetime):
+        return value.date()  # an unquoted YAML timestamp: its day, so two values always compare
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
+
+
+def date_relaxation(before: dict[str, Any], after: dict[str, Any]) -> str | None:
+    """ADR-0009 amendment 1, entry 6: how a pin's `deprecated_after` was relaxed, or None.
+
+    Only with `model.id` unchanged, and only from a value: moved later, set to null, or removed. A
+    value that is not a date on either side, and changed, is read as relaxed: which is later cannot be
+    said, and a gate that cannot say does not pass it."""
+    def model_id(manifest: dict[str, Any]) -> Any:
+        return manifest["model"].get("id") if isinstance(manifest.get("model"), dict) else None
+
+    was, now = before.get("deprecated_after"), after.get("deprecated_after")
+    if was is None or model_id(before) != model_id(after):
+        return None
+    if now is None:
+        return f"deprecated_after {was} set to null or removed with the model unchanged"
+    old, new = _day(was), _day(now)
+    if old is None or new is None:
+        return None if str(was) == str(now) else f"deprecated_after {was} -> {now}, not both dates, so which is later is unknown"
+    return f"deprecated_after {old.isoformat()} -> {new.isoformat()} moved later with the model unchanged" if new > old else None
+
+
 def relaxations(tree: Tree, base: Tree) -> list[Relaxation]:
     owners, _ = owner_table(base, tree)
     found: list[Relaxation] = []
@@ -266,6 +309,9 @@ def relaxations(tree: Tree, base: Tree) -> list[Relaxation]:
                     found.append(Relaxation(path, f"{budget} {was} set to null or removed (ADR-0009 entry 3)", "Threshold Owner"))
                 elif isinstance(now, (int, float)) and isinstance(was, (int, float)) and now > was:
                     found.append(Relaxation(path, f"{budget} {was} -> {now} raised (ADR-0009 entry 3)", "Threshold Owner"))
+            # ADR-0009 amendment 1, entry 6. The Threshold Owner's key (ADR-0010).
+            if moved := date_relaxation(before, after):
+                found.append(Relaxation(path, f"{moved} (ADR-0009 amendment 1, entry 6)", "Threshold Owner"))
             old_mem, new_mem = before.get("memory"), after.get("memory")
             if isinstance(old_mem, dict):
                 if after.get("memory") is None:  # set to null, or the key deleted outright (cold review of PR 2, F5)

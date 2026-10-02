@@ -243,7 +243,8 @@ def test_no_role_the_platform_creates_may_administer_the_key(template):
                               "kms:ScheduleKeyDeletion", "kms:DisableKey"}  # fmt: skip
     covered = json.dumps(admin["Condition"]["ArnLike"]["aws:PrincipalArn"])
     for role in ("agentkeel/agents/*", "agentkeel-deploy", "agentkeel-cfn-exec",
-                 "agentkeel-evals", "agentkeel-developer"):  # fmt: skip
+                 "agentkeel-evals", "agentkeel-developer",
+                 "agentkeel-model-watch", "agentkeel-envelope-row-put"):  # fmt: skip
         assert role in covered, f"{role} may administer the key"
 
 

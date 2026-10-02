@@ -268,7 +268,7 @@ one App or several, and so the reader's shape, is Security's before PR 2
 above describes PR 1's files, and these replace them:
 
 - `grant.json` is one entry per App, in the shape of the ruling's `grant:`
-  block (`app_id`, `environment`, `installed_on`, `repository_selection`,
+  block, which from M07 PR 3 is `infra/platform_grant.yaml` (`app_id`, `environment`, `installed_on`, `repository_selection`,
   `permissions`), and `environments`, the rules every key's environment
   carries. The ids of `agentkeel-upgrades` and `agentkeel-observer`
   (5200001, 5200002) are invented for the fixture: the ruling's own block
@@ -317,3 +317,18 @@ each attempt is recorded, after M07 PR 2 merges. S4's source names in
 panel 2 reads is `agentkeel-envelopes`, through the data source `registry`
 (`infra/grafana/panel2.json`), and a test holds that the fixture is still
 refused for its computed verdict with the source put right.
+
+## M07 PR 3: a seeded case that is not one of row 7's seeds
+
+`m07/two-key-deprecated-after/cases.json`, planted at M07 PR 3 in its own
+commit before its reader (threshold-owner F1 on M07 PR 2). ADR-0009
+amendment 1, entry 6, made a pin's `deprecated_after` moved later, set to
+null or removed, with the model unchanged, a relaxation, and said
+`two-key` reads it from M04 PR 2. Nothing read it. The file names a dated
+base and each change to it; `tests/test_m07_two_key_seed.py` builds the
+base from refagent's manifest as the tree holds it and asks `two-key` to
+refuse each change made with the Threshold Owner's key alone. Four cases
+are the false state; three are guards that pass before the reader and
+after it. It reads no falsifier of claim 7, so it is not in
+`plants.SEEDS_M07` and `make plants` does not list it. A false state,
+never copied to `evals/history/`.

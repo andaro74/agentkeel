@@ -3,6 +3,7 @@
     python scripts/retire_agent.py plan --name NAME --out PLAN.json      # no secret: the pull request, as data
     python scripts/retire_agent.py plan --deprecating --out PLAN.json    # every agent whose pin is within 30 days of its end
     python scripts/retire_agent.py open --plan PLAN.json                 # agentkeel-upgrades' key: the draft
+    python scripts/retire_agent.py same --name NAME ... --retired FILE   # the deploy role: the retired head moves rollout only
     python scripts/retire_agent.py invoke --arn ARN --out RESULT.json    # the deploy role: one call, after the deletion
     python scripts/retire_agent.py record --name NAME ... --out RETIRED.json   # what is put once in the audit bucket
 
@@ -27,6 +28,17 @@ names, a registry row idle for 90 days, is not built: nothing writes
 `retire-agent` job): at a merged head the App passed whose manifest says
 `rollout: retired`, the agent's stack is updated to the construct's
 template without the runtime (`infra/construct/`, no new IAM), and then:
+
+**First, the retired head is held to what was deployed** (`same`; M07 PR 3;
+rulings/pr2-security.md item 13i; platform-architect F4 and
+security-reviewer 17 on M07 PR 2). The stack update is synthesised from the
+retired head's manifest, and nobody signed that head. The commit the
+registry row holds was signed, verified and deployed. So the retired
+head's manifest must equal the manifest at that commit in every field but
+`rollout`, which must say `retired`. Any other move is refused before the
+registry or the stack is touched. The cost, taken knowingly: an agent whose
+row holds no deployed commit, or whose head moved another field on the way
+to its retirement, cannot be retired until that is put right.
 
 - `invoke`: one invocation of the runtime's ARN, after the deletion, written
   raw: answered or not, and the error's code. Only
@@ -230,6 +242,52 @@ def open_all(entries: list[Any], key: str) -> list[dict[str, Any]]:
     return results
 
 
+# --- before the stack is touched: the retired head against the deployed one --------------------
+
+
+def same_errors(deployed_text: Any, retired_text: Any, commit: str) -> list[str]:
+    """Why the retired head's manifest is not the deployed one's but for `rollout`; [] if it is.
+
+    `deployed_text` is `manifest.yaml` at the commit the registry row holds, `retired_text` the one at
+    the head being retired. Both are parsed: a comment may move, a field may not."""
+    try:
+        before, after = yaml.safe_load(deployed_text), yaml.safe_load(retired_text)
+    except yaml.YAMLError:
+        return ["manifest.yaml, as deployed or at the retired head, is not YAML"]
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return ["manifest.yaml, as deployed or at the retired head, is not a mapping"]
+    if after.get("rollout") != "retired":
+        return ["manifest.yaml at the retired head does not say rollout: retired"]
+    other = sorted(k for k in set(before) | set(after) if k != "rollout" and before.get(k) != after.get(k))
+    if other:
+        return [f"the retired head moves {', '.join(other)} besides rollout, against the manifest deployed at {commit[:12]}: "
+                "a retirement sets rollout to retired and nothing else"]  # fmt: skip
+    return []
+
+
+def same(name: str, repository: str, repository_id: str, retired_text: str, table: Any, read_manifest) -> tuple[int, str]:
+    """(exit code, what to say). 0 when the retired head is the deployed manifest but for `rollout`; 3 otherwise.
+
+    The deployed commit is the registry row's, read as the deploy role; its manifest is read from GitHub
+    as data, at that commit."""
+    from scripts import registry
+
+    item, why = registry._own_row(table, name, repository_id)
+    if item is None:
+        return 3, why
+    commit = (item.get("commit_sha") or {}).get("S")
+    if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+        return 3, (f"{name}: the registry row holds no deployed commit ({commit!r}), so there is no deployed manifest to hold "
+                   "the retired head to: refused")  # fmt: skip
+    try:
+        deployed = read_manifest(repository, commit)
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return 3, f"{name}: manifest.yaml at the deployed commit {commit[:12]} could not be read ({type(exc).__name__}): refused"
+    if errors := same_errors(deployed, retired_text, commit):
+        return 3, f"{name}: " + "; ".join(errors)
+    return 0, f"{name}: the retired head's manifest is the one deployed at {commit[:12]}, but for rollout"
+
+
 # --- after the deletion ---------------------------------------------------------------------
 
 
@@ -283,7 +341,24 @@ def main(argv: list[str] | None = None) -> int:
         four.add_argument(flag, required=True)
     four.add_argument("--invocation", required=True, type=Path)
     four.add_argument("--out", required=True, type=Path)
+    five = sub.add_parser("same")
+    for flag in ("--name", "--repository", "--repository-id"):
+        five.add_argument(flag, required=True)
+    five.add_argument("--retired", required=True, type=Path, help="manifest.yaml at the head being retired")
     args = parser.parse_args(argv)
+
+    if args.what == "same":
+        from scripts import platform_check, registry
+        from src.validate.agent import NAME
+
+        if not NAME.match(args.name) or args.name == PLATFORM_AGENT:
+            print(f"REFUSED: {args.name!r} is not an agent the platform retires", file=sys.stderr)
+            return 3
+        code, said = same(args.name, args.repository, args.repository_id, args.retired.read_text(encoding="utf-8"),
+                          registry.client(), lambda repository, commit: platform_check.gh(
+                              f"/repos/{repository}/contents/manifest.yaml?ref={commit}", raw=True))  # fmt: skip
+        print(said if code == 0 else f"REFUSED: {said}", file=sys.stderr if code else sys.stdout)
+        return code
 
     if args.what == "invoke":
         result = invoke(args.arn)

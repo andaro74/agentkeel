@@ -10,9 +10,9 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
 | Claim | An agent takes a platform, model or retirement upgrade without a workflow edit |
 | Falsifiers | F7.0 no agent from the template exists to upgrade: the owner's test's fixed head is refused, or not merged, deployed, answering and listed; the timed run's agent the same; or the platform check dispatched from a branch reaches the App's key (added at M07 PR 1). F7.1 an upgrade requires a manual edit: no pull request the platform opened arrives, or a workflow or a person's commit was needed to merge it; a ruling file is not a person's edit (reworded at M07 PR 1). F7.2 a retired agent still answers. F7.3 a rollback leaves the new digest live. F7.4 a Grafana panel shows GREEN where the envelope says RED (read through Grafana's query API, as F6.4; not Playwright). F7.5 `plants_expected ≠ plants_fired` for the surfaces. |
 | Seeded commit | `c870bca` (S0 the template's repair read by CI: the owner's test, the App token's bounds); `ef3d88a` (S1 a platform bump opens a draft pull request); `3872c13` (S2 a retired agent's target is gone); `ea53ef4`, its run file made to parse in `a46c98f` (S3 a `model-watch` pull request merged and rolled back); `e814efe` (S4 panel 2 forced to show GREEN on a RED envelope, two tests, one per reader); `f36adee` (S5 a surface plant goes silent); the fixtures given their held cases and three more uncovered ones in `4240d9e`, on the PR's own review, each its own commit before any reader (SPEC/07 §5). S0 to S3 are each a fixture and a run file with `observed: null`; S4 and S5 are fixtures. SPEC/06's S3 (`b4eb959`, the timed quickstart) is received, not re-planted |
-| Expected gate output | PR 1: refagent's envelope as at M06; it says nothing about claim 7. `make plants` lists S0 to S5 (seeded cases, not golden plants); `tests/test_m07_seeds.py` shows 13 expected failures, and `tests/test_m06_seeds.py` still 1 (S3's). PR 2, on the PR: the nine fixture tests pass, each by its reader, and the four run-file tests stay expected failures; from PR 2's merge the gate requires `F7_0` to `F7_5` on every agent envelope, **from the seed tests alone: test-only witnesses**. The live readings are **recorded in the envelope's `upgrade` and read by this row's cell, with `template`, not gated** (SPEC/07 §4): the observer writes raw observations with the viewpoint it read from, and `build` rules on them. **A named P3 exception (SPEC/07 §5.1):** the platform check, the deploy, `platform-upgrade`, `model-watch` and the retire job run from `agentkeel`'s `main`, and the App's grant is made by hand after PR 2 merges, when `main` no longer mints a token with no repository. The platform check dispatched from a branch is attempted first, before any grant, and must be read as refused. Then, after PR 2's merge, each stated before and pushed: the grant made and read back; SPEC/06's S2 read on a new head; the owner's test, steps 2 to 4; SPEC/06's S3 timed once by `floresinnovations`; the template re-made and S1's pull requests; the App's token asked to relax a ruleset; `model-watch`'s swap to Haiku 4.5 and its rollback (independent of the others; its two pull requests on `main` are outside the cap); `owner-check` retired, last. PR 3 is the repair and carries every attempt's `observed` entry to `main`; PR 4 is the close. **The cell cites PR 4's run's envelope**, which carries the App-viewpoint observation `main`'s scheduled observer made, named, beside its own anonymous one. Stated at open: the owner's test's new head refused on the seats and the goldens and nothing else, its fixed head merged, deployed within 3,600 s, answering and listed; S1's draft pull request from the App within 4,500 s, platform-owned files only, no person's edit, major or minor as read; S2 retired within 3,600 s of its pull request's merge, its one invocation refused; a revert leaving the tree's digest live. Haiku 4.5's envelope is **not stated**: it has never been run. If it is RED the swap is not merged, F7.3 is read on `owner-check`'s platform upgrade reverted, and `upgrade.taken` stays under 3. The measured value is `upgrade.taken`, n of 3. RED if F7.0 is unread or fired; if `taken` is under 3; if a trigger gets no pull request from the platform, or one that needed a workflow or a person's edit; if the retired agent answers or its runtime stands; if a revert leaves the upgrade's digest live; if panel 2 shows GREEN on a RED envelope or the surfaces' counts differ; if a seed's test passes but by its reader; if PR 4's run cannot read an attempt; or if `make ledger` stops matching rows 0 to 6 |
+| Expected gate output | PR 1: refagent's envelope as at M06; it says nothing about claim 7. `make plants` lists S0 to S5 (seeded cases, not golden plants); `tests/test_m07_seeds.py` shows 13 expected failures, and `tests/test_m06_seeds.py` still 1 (S3's). PR 2, on the PR: the nine fixture tests pass, each by its reader, and the four run-file tests stay expected failures; from PR 2's merge the gate requires `F7_0` to `F7_5` on every agent envelope, **from the seed tests alone: test-only witnesses**. The live readings are **recorded in the envelope's `upgrade` and read by this row's cell, with `template`, not gated** (SPEC/07 §4): the observer writes raw observations with the viewpoint it read from, and `build` rules on them. **A named P3 exception (SPEC/07 §5.1):** the platform check, the deploy, `platform-upgrade`, `model-watch` and the retire job run from `agentkeel`'s `main`, and the App's grant is made by hand after PR 2 merges, when `main` no longer mints a token with no repository. The platform check dispatched from a branch is attempted first, before any grant, and must be read as refused. Then, after PR 2's merge, each stated before and pushed: the grant made and read back; SPEC/06's S2 read on a new head; the owner's test, steps 2 to 4; SPEC/06's S3 timed once by `floresinnovations`; the template re-made and S1's pull requests; the App's token asked to relax a ruleset; `model-watch`'s swap to Haiku 4.5 and its rollback (independent of the others; its two pull requests on `main` are outside the cap); `owner-check` retired, last. PR 3 is the repair and carries every attempt's `observed` entry to `main`; PR 4 is the close. **Amended at PR 3 (Product, `rulings/pr3.md`): that cannot hold. The owner's test's deploy failed in the platform's own `deploy.yml` (run 37023118799), the deploy runs from `main`, and no later attempt can be made until the fix is merged. So PR 3 is the workflow fix and every repair owed before the next attempts, merged once, and carries one `observed` entry, the owner's test's; PR 4 carries every other attempt's entry and is the close, so those are read from the anonymous viewpoint alone (SPEC/07 §4). The owner's test is not re-made: its deploy missed `upgrade.deploy_max_seconds`, F7.0 fired, and this row is expected to close RED.** **The cell cites PR 4's run's envelope**, which carries the App-viewpoint observation `main`'s scheduled observer made, named, beside its own anonymous one. Stated at open: the owner's test's new head refused on the seats and the goldens and nothing else, its fixed head merged, deployed within 3,600 s, answering and listed; S1's draft pull request from the App within 4,500 s, platform-owned files only, no person's edit, major or minor as read; S2 retired within 3,600 s of its pull request's merge, its one invocation refused; a revert leaving the tree's digest live. Haiku 4.5's envelope is **not stated**: it has never been run. If it is RED the swap is not merged, F7.3 is read on `owner-check`'s platform upgrade reverted, and `upgrade.taken` stays under 3. The measured value is `upgrade.taken`, n of 3. RED if F7.0 is unread or fired; if `taken` is under 3; if a trigger gets no pull request from the platform, or one that needed a workflow or a person's edit; if the retired agent answers or its runtime stands; if a revert leaves the upgrade's digest live; if panel 2 shows GREEN on a RED envelope or the surfaces' counts differ; if a seed's test passes but by its reader; if PR 4's run cannot read an attempt; or if `make ledger` stops matching rows 0 to 6 |
 | Measured | — |
-| PRs used / cap | 2 / 4 |
+| PRs used / cap | 3 / 4 |
 | State | OPEN |
 
 ### Open detail (PR 1, 2026-10-01)
@@ -165,3 +165,146 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   platform check still refuses every head (the `rulesets` token cannot be
   minted until the grant), now saying so; no agent from the template
   exists; nothing has been upgraded, retired or rolled back.
+
+### PR 3 detail (the repair, 2026-10-02)
+
+- **What PR 3 is, ruled by Product on 2026-10-02** (`rulings/pr3.md`).
+  The row above says PR 3 "carries every attempt's `observed` entry to
+  `main`". That cannot hold. The first deploy of an agent from the
+  template failed in the platform's own `deploy.yml`; the deploy runs
+  from `main`; so no later attempt can be made until the fix is merged.
+  PR 3 is the workflow fix and every repair owed before the next
+  attempts, merged once. It carries one `observed` entry, the owner's
+  test's. PR 4 carries every other attempt's entry and is the close. A
+  fifth PR is a RED close.
+- **What that costs, said.** The observer on `main` reads the run files
+  as they are on `main`. An attempt recorded only on PR 4's branch is
+  read from the anonymous viewpoint alone (SPEC/07 §4). The repositories
+  are public, and nothing the attempts read is hidden from an anonymous
+  caller but a pull request's `mergeable_state`, which no M07 reading
+  rules on. The App's viewpoint will have read the owner's test, the
+  dispatch and SPEC/06's S2, whose run files are on `main`.
+- **The finding: the owner's test missed its deploy bar, because of the
+  platform's own workflow.** Made once, on 2026-10-02, as stated before
+  it, on `agentkeel-studio/owner-check` pull request 1. From GitHub's
+  record: the empty head `0f155ed` refused by the App at 14:27:33Z on
+  the seats and the goldens and nothing else; the fixed head `0c99008`
+  passed at 14:35:33Z; merged as `5249dec` at 14:39:32Z; the App passed
+  the merge commit at 14:47:11Z. The next deploy run, 37023118799
+  (14:54:00Z), signed the agent and failed at `deploy-agent`'s first
+  read: `sign-agent` uploaded three paths under two roots, GitHub rooted
+  the artifact at their common parent, and `bundle.cosign.json` was not
+  where `deploy-agent` reads it. M06 PR 2's code, never reached before,
+  because the App refused every head until the grant. Nothing was
+  deployed and nothing was written to AWS. Eleven more scheduled deploy
+  runs failed the same way by 17:22Z. The bar,
+  `upgrade.deploy_max_seconds` (3,600 s), passed at 15:39:32Z.
+- **So F7.0 fired, and row 7 is expected to close RED on it.** The
+  attempt is not re-made and not restated (Product, `rulings/pr3.md`):
+  it was stated before, made once, and what it measured is that the
+  platform could not deploy the first agent made from its template
+  within the hour. `runs/f7_0_owner_test.yaml` carries its one
+  `observed` entry; the observer reads GitHub and AWS, and `build` rules.
+  When the fix is on `main` the deploy is expected to complete, hours
+  late, and the reading stays a miss. The remaining attempts are still
+  made and measured, and `upgrade.taken` is still counted.
+- **The fix** (`f5d2f6c`, Security; Engineering for the test):
+  `sign-agent` stages the three files under one folder and uploads it
+  whole; `tests/test_m07_workflows.py` holds both jobs to that layout.
+  It has not run on `main`: the first run that reaches `deploy-agent`
+  after the merge is its measurement.
+- **SPEC/07 §2 amended, as Product agreed the wording on 2026-10-02**
+  (`8725485`), before the reader changed: CI's own envelope commit on an
+  `agentkeel` pull request is not a person's edit. It is that commit only
+  when its author and committer are both `github-actions[bot]` and every
+  file it touches is one of the three envelope files for another commit
+  of the same pull request. Until then the model upgrade could not read
+  as held. GitHub does not sign that commit, so the login is a name; the
+  paths are what bound it, and the text says so.
+- **The repairs the PR 2 reviews left open, each in its own commit, each
+  before the attempt it bears on.** None has run live.
+  - *Who made a commit* (cold review F5; before S1). `build` reads a
+    commit as the App's only when GitHub's record shows the App's bot as
+    its author, the commit verified, and its committer the bot or GitHub's
+    own signer. Anything else reads as not the App's. **No commit by
+    `agentkeel-upgrades` has been read yet.** If its first one carries
+    another record, S1 reads as a person's edit and that is the finding.
+  - *The relaxation's comparisons* (cold review F6; before the
+    relaxation). The observer writes records; `build` compares their
+    times. "After the restore" is read from the ruleset itself: it equals
+    the export in every field GitHub shows, and GitHub's `updated_at` on
+    it is after the call.
+  - *The observer's keyed job* (security-reviewer 12; before its first
+    keyed run). One read-only token per repository the run files on
+    `main` name, minted first, and the key let go before anything is
+    read; no agent repository's tree packed beside it; an artifact fetched
+    from GitHub's storage with no credential.
+  - *13h*: the two roles PR 2 added are in both key-policy lists
+    (`530bf98`). owner-check's key takes it when its first deploy makes
+    the key. refagent's key takes it when the bootstrap stack is deployed
+    by hand (`runs/pr2_by_hand.md` B2).
+  - *13j*: the grant is `infra/platform_grant.yaml`, and
+    `scripts/platform_check.py` is Security's (ADR-0012; CODEOWNERS as
+    the seat agreed the diff). It binds from the next pull request: the
+    gates read CODEOWNERS from the base.
+  - *13l* (before S1): the keyed `open` job reads the template itself,
+    refuses a plan made from another commit, and holds each proposed file
+    to the template and the guardrail to `main`'s.
+  - *13i* (before S2): the retire job holds the retired head's manifest
+    to the one at the registry row's commit and refuses any move but
+    `rollout`. The cost: a head that failed to deploy before it was
+    retired cannot be retired until it is fixed.
+  - *`two-key` reads `deprecated_after`* (threshold-owner F1; before
+    `model-watch` first runs), after its seeded case
+    (`tests/fixtures/m07/two-key-deprecated-after/`, `f9dc98a`; the reader
+    `4462d29`). ADR-0009 amendment 1 said this was read from M04 PR 2. It
+    was not.
+  - *ADR-0011*: SPEC/04 §2's second-run rule has its ADR. No gate reads
+    the rule.
+- **Left out of PR 3, and why.** 13n, removing the seeded relaxation's
+  step: PR 4's, after the attempt it serves. 13k (what the
+  `agentkeel-upgrades` key reaches on `agentkeel`) and 13m (where
+  `retired.json` is kept): ruled as accepted, nothing to build.
+  Threshold-owner F5 on PR 2 (a swap leaves the old model's
+  `deprecated_after` in place): moot while refagent's is null; to M08's
+  open list at the close. Nothing that had to precede an attempt was left
+  out.
+- **The seat reviews, read on `3bfd074...936eb17` before the pull request
+  was opened:** engineering-cold-reviewer 1 BLOCK, 3 FINDING, 7 NOTE;
+  security-reviewer 0, 5, 19; platform-architect 0, 6, 7; threshold-owner
+  0, 5, 9. The BLOCK: the two ruling files this diff rests on were not in
+  the tree. They are written now, as drafts, and it clears when the seats
+  rule them. Repaired in code, each in its own commit: a restore is a
+  change after the detection (`44a86eb`); `two-key` on an unquoted
+  timestamp (`b5b3b5f`); the observer revokes its tokens and sends one
+  only to GitHub's API host; the `open` job says text, not bytes
+  (`4fd46f8`). Each finding and what was done:
+  `rulings/pr3-engineering.md`, `pr3-security.md`,
+  `pr3-threshold-owner.md`.
+- **What the amendment costs, said by the cold review (F3).** None of
+  PR 3's repairs has run live. Each first runs during an attempt, and a
+  fault one of them shows then has no pull request left: PR 4 is the
+  close. It would be recorded as a finding.
+- **This PR's own run gets no second run.** Its diff touches
+  `infra/construct/`, so under ADR-0011 a p95 miss on it is RED
+  (`runs/pr3_expected.md`).
+- **Measured at `af8835f`** (run 37047341001; envelope
+  `af8835fad82709e2385bf4eff97a175e069bf855`): GREEN, mode runtime, p95
+  8,223 ms, 25 checks pass, refagent 9/9, 2/2, 2/3, 5/5, plants 7/7.
+  `upgrade.F7_0`'s `owner_test` part read and **not held**: "no deploy
+  and answer record 13862 s after the merge, over
+  upgrade.deploy_max_seconds 3600". `taken` 0 of 3. As stated, but for
+  one line: `template.F6_2` read **not held**, where the statement said
+  held. SPEC/06's S2 (`owner-check` pull request 2) reads `behind` since
+  pull request 1 merged; no new head was pushed to it before that merge,
+  which SPEC/07 §5.1 step 2 asked for. The statement was wrong on a fact
+  known when it was written (`runs/pr3_expected.md`).
+- **`runs/pr2_by_hand.md` corrected** (`96f3cda`): no local profile
+  reaches the security account. B1 was deployed on 2026-10-02 by
+  `hector.flores` in the console. No put under `bundles/` or
+  `observations/` has been made or refused yet.
+- **What is live after this PR merges, before any further attempt:** one
+  agent repository whose head the App passed and whose deploy has failed
+  on every run since (twelve by 17:22Z on 2026-10-02); no agent from the template deployed; nothing upgraded,
+  retired or rolled back. The first deploy run after the merge is the
+  fix's measurement.
