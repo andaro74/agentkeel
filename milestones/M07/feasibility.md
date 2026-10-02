@@ -383,6 +383,22 @@ The observer (`scripts/observe_upgrade.py`) must write S2's and S3's
 observations in the fixtures' shape, or PR 2 changes the fixtures' shape
 and says so; never what is wrong with them.
 
+**Changed at M07 PR 2's first commit, and said here** (Security's ruling
+of 2026-10-02, `rulings/pr2-security.md` items 2 and 6): S0's fixtures
+and `grant_errors`' grant are one entry per App, three Apps, not one flat
+permission set. The call is unchanged, `grant_errors(installation,
+environment, grant) -> list[str]`; `grant` is the ruling's `grant:` block,
+and the App is found by the installation's `app_slug`. The change was
+made before any reader existed, so the two S0 bounds tests were still
+expected failures after it, each run once with `--runxfail`: `seed S0:
+nothing reads the installation's grant back` and `seed S0: nothing reads
+the key's environment back`, as planted. What is wrong with each fixture
+is listed in `tests/fixtures/README.md`; every reason PR 1 planted is
+still asked for, and five are added (the checking App on the personal
+account, `checks` on the App that opens pull requests, a write level on
+the App that reads, an App or an id no ruling names, a second secret or
+the key as a repository secret).
+
 ## 5. Falsifiers, and what each would look like in the repo
 
 SPEC/07 §4. Test-only witnesses on every envelope from PR 2's merge:

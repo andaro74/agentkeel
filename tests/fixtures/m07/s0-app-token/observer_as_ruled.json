@@ -1,18 +1,17 @@
 {
-  "id": 1,
-  "app_id": 5144253,
-  "app_slug": "agentkeel-platform",
+  "id": 5,
+  "app_id": 5200002,
+  "app_slug": "agentkeel-observer",
   "account": {
     "login": "agentkeel-studio"
   },
   "repository_selection": "all",
   "permissions": {
-    "administration": "write",
-    "checks": "write",
+    "administration": "read",
+    "checks": "read",
     "contents": "read",
     "metadata": "read",
-    "pull_requests": "read",
-    "members": "write"
+    "pull_requests": "read"
   },
   "repositories": [
     "agent-template",

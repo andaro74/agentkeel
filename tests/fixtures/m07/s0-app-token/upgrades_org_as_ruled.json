@@ -1,0 +1,18 @@
+{
+  "id": 4,
+  "app_id": 5200001,
+  "app_slug": "agentkeel-upgrades",
+  "account": {
+    "login": "agentkeel-studio"
+  },
+  "repository_selection": "all",
+  "permissions": {
+    "contents": "write",
+    "pull_requests": "write",
+    "metadata": "read"
+  },
+  "repositories": [
+    "agent-template",
+    "owner-check"
+  ]
+}

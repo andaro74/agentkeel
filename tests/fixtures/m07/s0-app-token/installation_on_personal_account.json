@@ -1,21 +1,19 @@
 {
-  "id": 1,
+  "id": 2,
   "app_id": 5144253,
   "app_slug": "agentkeel-platform",
   "account": {
-    "login": "agentkeel-studio"
+    "login": "andaro74"
   },
-  "repository_selection": "all",
+  "repository_selection": "selected",
   "permissions": {
     "administration": "write",
     "checks": "write",
     "contents": "read",
     "metadata": "read",
-    "pull_requests": "read",
-    "members": "write"
+    "pull_requests": "read"
   },
   "repositories": [
-    "agent-template",
-    "owner-check"
+    "agentkeel"
   ]
 }

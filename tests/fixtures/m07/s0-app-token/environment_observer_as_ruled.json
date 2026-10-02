@@ -1,0 +1,13 @@
+{
+  "name": "platform-observer",
+  "can_admins_bypass": false,
+  "branch_policies": [
+    {
+      "name": "main",
+      "type": "branch"
+    }
+  ],
+  "secrets": [
+    "OBSERVER_APP_PRIVATE_KEY"
+  ]
+}

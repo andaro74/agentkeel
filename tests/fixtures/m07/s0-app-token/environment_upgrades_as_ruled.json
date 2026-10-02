@@ -1,0 +1,13 @@
+{
+  "name": "platform-upgrades",
+  "can_admins_bypass": false,
+  "branch_policies": [
+    {
+      "name": "main",
+      "type": "branch"
+    }
+  ],
+  "secrets": [
+    "UPGRADES_APP_PRIVATE_KEY"
+  ]
+}

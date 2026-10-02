@@ -8,10 +8,11 @@
     }
   ],
   "secrets": [
-    "PLATFORM_APP_PRIVATE_KEY"
+    "PLATFORM_APP_PRIVATE_KEY",
+    "A_SECOND_SECRET"
   ],
   "repository_secrets": [
-    "AGENTKEEL_GRAFANA_TOKEN",
+    "PLATFORM_APP_PRIVATE_KEY",
     "RULESET_TOKEN"
   ]
 }

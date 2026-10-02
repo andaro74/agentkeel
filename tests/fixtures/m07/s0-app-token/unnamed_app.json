@@ -1,0 +1,16 @@
+{
+  "id": 6,
+  "app_id": 5200009,
+  "app_slug": "agentkeel-other",
+  "account": {
+    "login": "agentkeel-studio"
+  },
+  "repository_selection": "all",
+  "permissions": {
+    "metadata": "read"
+  },
+  "repositories": [
+    "agent-template",
+    "owner-check"
+  ]
+}

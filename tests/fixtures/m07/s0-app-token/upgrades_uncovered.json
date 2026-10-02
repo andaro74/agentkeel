@@ -1,0 +1,19 @@
+{
+  "id": 3,
+  "app_id": 5200001,
+  "app_slug": "agentkeel-upgrades",
+  "account": {
+    "login": "andaro74"
+  },
+  "repository_selection": "selected",
+  "permissions": {
+    "contents": "write",
+    "pull_requests": "write",
+    "metadata": "read",
+    "checks": "write"
+  },
+  "repositories": [
+    "agentkeel",
+    "scratch-repo"
+  ]
+}

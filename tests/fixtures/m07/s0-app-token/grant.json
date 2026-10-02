@@ -1,10 +1,11 @@
 {
-  "installation": {
-    "repository_selection": "selected",
-    "repositories": [
-      "agent-template",
-      "owner-check"
+  "agentkeel-platform": {
+    "app_id": 5144253,
+    "environment": "platform-app",
+    "installed_on": [
+      "agentkeel-studio"
     ],
+    "repository_selection": "all",
     "permissions": {
       "administration": "write",
       "checks": "write",
@@ -13,13 +14,48 @@
       "pull_requests": "read"
     }
   },
-  "environment": {
+  "agentkeel-upgrades": {
+    "app_id": 5200001,
+    "environment": "platform-upgrades",
+    "installed_on": [
+      "agentkeel-studio",
+      "andaro74"
+    ],
+    "repository_selection": {
+      "agentkeel-studio": "all",
+      "andaro74": [
+        "agentkeel"
+      ]
+    },
+    "permissions": {
+      "contents": "write",
+      "pull_requests": "write",
+      "metadata": "read"
+    }
+  },
+  "agentkeel-observer": {
+    "app_id": 5200002,
+    "environment": "platform-observer",
+    "installed_on": [
+      "agentkeel-studio"
+    ],
+    "repository_selection": "all",
+    "permissions": {
+      "administration": "read",
+      "checks": "read",
+      "contents": "read",
+      "metadata": "read",
+      "pull_requests": "read"
+    }
+  },
+  "environments": {
     "branch_policies": [
       {
         "name": "main",
         "type": "branch"
       }
     ],
-    "can_admins_bypass": false
+    "can_admins_bypass": false,
+    "secrets": "one each, the App's key, and not a repository secret"
   }
 }

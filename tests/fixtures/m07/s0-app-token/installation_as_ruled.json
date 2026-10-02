@@ -5,7 +5,7 @@
   "account": {
     "login": "agentkeel-studio"
   },
-  "repository_selection": "selected",
+  "repository_selection": "all",
   "permissions": {
     "administration": "write",
     "checks": "write",
