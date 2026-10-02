@@ -151,6 +151,7 @@ SEEDS_M07: dict[str, tuple[str, str, str]] = {
     "S2": ("F7.2", "tests/fixtures/m07/s2-retired-agent/, milestones/M07/runs/f7_2_retire.yaml", "scripts/retire_agent.py, src/verdict/upgrade.py"),
     "S3": ("F7.3", "tests/fixtures/m07/s3-rollback/, milestones/M07/runs/f7_3_rollback.yaml", "scripts/model_watch.py, src/verdict/upgrade.py"),
     "S4": ("F7.4", "tests/fixtures/m07/s4-panel2/", "infra/grafana/panel2.json, src/verdict/upgrade.py"),
+    "S5": ("F7.5", "tests/fixtures/m07/s5-silent-surface-plant/", "src/verdict/upgrade.py"),
 }
 
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.

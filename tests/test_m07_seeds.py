@@ -325,3 +325,25 @@ def test_s4_a_green_row_for_a_red_envelope_is_found_by_build():
     holds(envelope["verdict"] == "RED", "the envelope on main says RED")
     compare = reader(build, "panel_verdict_mismatch", "S4", "nothing compares panel 2's verdicts with the envelopes")
     assert compare(frame, HISTORY) == [RED_ENVELOPE]
+
+
+# --- S5: a surface plant goes silent ------------------------------------------
+
+
+@expected_failure
+def test_s5_a_silent_surface_plant_is_counted():
+    """A run's results for the surfaces' plants with one reader's result missing: panel 1's plant
+    fired, panel 2's did not report. `plants.SURFACE_PLANTS` must name the two, and
+    `build.surface_plants(results)` must give plants_expected 2, plants_fired 1 and name the silent
+    one (F7.5). Today no control names a surface's plants and nothing counts them."""
+    from src.verdict import build, plants
+
+    results = fixture("s5-silent-surface-plant/results.json")
+    holds(list(results) == ["tests/fixtures/m06/s4-panel1/"] and results["tests/fixtures/m06/s4-panel1/"] is True,
+          "the run reports panel 1's plant as fired and says nothing of panel 2's")  # fmt: skip
+    named = reader(plants, "SURFACE_PLANTS", "S5", "no control names a surface's plants")
+    assert sorted(named) == ["tests/fixtures/m06/s4-panel1/", "tests/fixtures/m07/s4-panel2/"], named
+    count = reader(build, "surface_plants", "S5", "nothing counts a surface's plants")
+    counted = count(results)
+    assert counted["plants_expected"] == 2 and counted["plants_fired"] == 1, counted
+    assert counted["silent"] == ["tests/fixtures/m07/s4-panel2/"], counted
