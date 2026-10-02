@@ -23,6 +23,18 @@ observation is stored in the audit bucket, and `--read stored` fetches the
 latest one for build to rule on. The App's key is never in a job that
 checks out a pull request's code.
 
+**What the keyed job holds, and for how long** (M07 PR 3; security-reviewer
+12 on M07 PR 2: this is the one keyed job with no keyless job before it,
+and it reads agent repositories' data). Before anything is read, one
+read-only token is minted for each organisation repository the run files
+on `main` name, and the key is let go: nothing that reads GitHub holds it.
+A repository no token was minted for is unread. As the App, no agent
+repository's tree is fetched or packed: the bundle digests are the pull
+request's run's to work out, under no key, and build never takes them from
+the stored observation. A token is sent to `api.github.com` and nowhere
+else: an artifact's bytes are fetched from the storage host GitHub
+redirects to with no credential (`download`).
+
 Each `--read` part needs its own credentials, so `evals.yml` calls this once
 per set and each call merges its part into the same file:
 
@@ -117,21 +129,32 @@ GITHUB_ERRORS = (urllib.error.URLError, KeyError, TypeError, TimeoutError, OSErr
 class GitHub:
     """Who is asking. Anonymous: the job's own token, which has no rights in the organisation. App: for a
     repository of the organisation's, a token minted for that repository and the `observe` set; for
-    `agentkeel` itself, where the observer App is not installed, the job's own token."""
+    `agentkeel` itself, where the observer App is not installed, the job's own token.
 
-    def __init__(self, viewpoint: str, key: str | None = None) -> None:
+    As the App, every token is minted here, at the start, for the repositories named, and the key is
+    not kept: no read is made by anything that holds it (M07 PR 3; security-reviewer 12 on M07 PR 2)."""
+
+    def __init__(self, viewpoint: str, key: str | None = None, repositories: Any = ()) -> None:
         self.viewpoint = viewpoint
-        self.key = key
         self.organisation, _platform = platform_check.identity()
         self.tokens: dict[str, str] = {}
+        self.unminted: dict[str, str] = {}
         self.job_token = os.environ.get("GITHUB_TOKEN")
+        if viewpoint == "app":
+            app_id = platform_check.load_grant()["agentkeel-observer"]["app_id"]
+            for repository in sorted({str(r) for r in repositories if str(r).split("/")[0] == self.organisation}):
+                try:
+                    self.tokens[repository] = platform_check.app_token(app_id, str(self.organisation), str(key), repository,
+                                                                       "observe")  # fmt: skip
+                except (urllib.error.URLError, ValueError, KeyError, TimeoutError, OSError) as exc:
+                    self.unminted[repository] = failed(exc)
 
     def token(self, repository: str) -> str | None:
         if self.viewpoint != "app" or repository.split("/")[0] != self.organisation:
             return self.job_token
         if repository not in self.tokens:
-            app_id = platform_check.load_grant()["agentkeel-observer"]["app_id"]
-            self.tokens[repository] = platform_check.app_token(app_id, str(self.organisation), str(self.key), repository, "observe")
+            # KeyError is one of GITHUB_ERRORS: the reading is written with this as its error, and is unread.
+            raise KeyError(f"no token was minted for {repository} ({self.unminted.get(repository) or 'no run file on main names it'})")
         return self.tokens[repository]
 
     def __call__(self, repository: str, path: str, *, raw: bool = False) -> Any:
@@ -398,17 +421,45 @@ def read_dispatch(gh: GitHub, entry: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect is returned to the caller as the HTTPError it is, never followed."""
+
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
+def download(url: str, token: str | None, opener: Any = None) -> bytes:
+    """The bytes at `url`, with `token` sent to `url`'s own host and to no other.
+
+    GitHub answers an artifact's download with a redirect to its storage host. urllib follows a redirect
+    with the request's headers, the Authorization header among them, so until M07 PR 3 the job's token
+    went to that host too (security-reviewer 12 on M07 PR 2). Here the redirect is not followed: its
+    Location is fetched by a second request that carries no credential, and that one is not allowed a
+    redirect of its own. Anything but https is refused."""
+    opener = opener or urllib.request.build_opener(_NoRedirect)
+    request = urllib.request.Request(url)
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
+    try:
+        with opener.open(request, timeout=60) as response:
+            return response.read()
+    except urllib.error.HTTPError as exc:
+        location = exc.headers.get("Location") if exc.code in (301, 302, 303, 307, 308) and exc.headers else None
+        if not location:
+            raise
+    if not str(location).startswith("https://"):
+        raise ValueError("an artifact's redirect is not to an https address: not fetched")
+    with opener.open(urllib.request.Request(str(location)), timeout=60) as response:
+        return response.read()
+
+
 def artifact_json(gh: GitHub, run_id: Any, name: str) -> dict[str, Any] | None:
     """A JSON artifact a run of `agentkeel`'s kept, by name: GitHub's copy of what the job wrote. None if absent."""
     listed = gh(PLATFORM, f"/actions/runs/{int(run_id)}/artifacts?per_page=100").get("artifacts") or []
     found = next((a for a in listed if a.get("name") == name and not a.get("expired")), None)
     if found is None:
         return None
-    request = urllib.request.Request(found["archive_download_url"])
-    if token := gh.token(PLATFORM):
-        request.add_header("Authorization", f"Bearer {token}")
-    with urllib.request.urlopen(request, timeout=60) as response:
-        archive = zipfile.ZipFile(io.BytesIO(response.read()))
+    archive = zipfile.ZipFile(io.BytesIO(download(found["archive_download_url"], gh.token(PLATFORM))))
     return json.loads(archive.read(archive.namelist()[0]))
 
 
@@ -459,9 +510,36 @@ def read_relaxation(gh: GitHub, entry: dict[str, Any], platform_app: int | None)
     return out
 
 
+NOT_PACKED = "not packed as the App: the pull request's own run works the bundle digests out, under no key"
+
+
+def named_repositories() -> list[str]:
+    """Every repository the run files on this checkout name, and the template's: the ones the App's
+    viewpoint mints a token for before anything is read."""
+    organisation, _platform = platform_check.identity()
+    names = {f"{organisation}/{TEMPLATE}"}
+    for name in ("f7_0_owner_test.yaml", "f7_1_platform_upgrade.yaml", "f7_2_retire.yaml", "f7_3_rollback.yaml"):
+        names.add(str(run_file(name).get("repository")))
+        names |= {str(entry.get("repository")) for entry in observed(name)}
+    for name in ("f6_2_standin.yaml", "f6_3_quickstart.yaml"):
+        seen = observe_template.first_observed(observe_template.run_file(name))
+        if seen is not None:
+            names.add(str(seen.get("repository")))
+    return sorted(n for n in names if re.fullmatch(r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+", n))
+
+
 def read_github(gh: GitHub, observation: dict[str, Any]) -> None:
     organisation, platform_app = platform_check.identity()
     platform_app = platform_app if isinstance(platform_app, int) else None
+    keyed = gh.viewpoint == "app"
+
+    # As the App nothing is fetched from an agent repository's tree or packed (M07 PR 3).
+    def agent_digest_(repository: str, commit: str | None) -> tuple[str | None, str | None]:
+        return (None, NOT_PACKED) if keyed else agent_digest(repository, commit)
+
+    def refagent_digest_(commit: str | None) -> tuple[str | None, str | None]:
+        return (None, NOT_PACKED) if keyed else refagent_digest(commit)
+
     s0 = {"owner_test": None, "dispatch": None, "relaxation": None}
     for entry in observed("f7_0_owner_test.yaml"):
         what = str(entry.get("what", ""))
@@ -480,7 +558,7 @@ def read_github(gh: GitHub, observation: dict[str, Any]) -> None:
         version = manifest_at(gh, repository, pull["head_sha"]).get("platform_version") if pull.get("found") else None
         pulls.append(with_trigger(pull, template_push(gh, str(organisation), version)))
         if pull.get("merged"):
-            digest, error = agent_digest(repository, pull.get("merge_commit_sha"))
+            digest, error = agent_digest_(repository, pull.get("merge_commit_sha"))
             lives[repository] = {"agent": manifest_at(gh, repository, pull["merge_commit_sha"]).get("name"),
                                  "merge_commit_sha": pull.get("merge_commit_sha"), "tree_digest": digest, "error": error,
                                  "deploy": None, "runtime": None}  # fmt: skip
@@ -510,7 +588,7 @@ def read_github(gh: GitHub, observation: dict[str, Any]) -> None:
             swap = pull_record(gh, PLATFORM, swap_entry.get("pull_request"), platform_app)
             s3["swap"] = with_trigger(swap, workflow_run(gh, swap.get("opened_by_run"), "model-watch.yml"))
             if swap.get("merged"):
-                digest, error = refagent_digest(swap.get("merge_commit_sha"))
+                digest, error = refagent_digest_(swap.get("merge_commit_sha"))
                 s3["swap_live"] = {"agent": "refagent", "merge_commit_sha": swap["merge_commit_sha"], "tree_digest": digest,
                                    "error": error, "deploy": deploy_run(gh, swap["merge_commit_sha"]), "runtime": None}  # fmt: skip
         if back_entry:
@@ -521,7 +599,7 @@ def read_github(gh: GitHub, observation: dict[str, Any]) -> None:
             # What the revert reverts: the swap's merge on agentkeel, or the platform upgrade's merge in the agent's repository.
             upgraded = (s3["swap"] or {}).get("merge_commit_sha") if on_refagent else next(
                 (p.get("merge_commit_sha") for p in pulls if p.get("repository") == repository), None)  # fmt: skip
-            pack = refagent_digest if on_refagent else (lambda commit: agent_digest(repository, commit))
+            pack = refagent_digest_ if on_refagent else (lambda commit: agent_digest_(repository, commit))
             tree, tree_error = pack(merge)
             upgrade, upgrade_error = pack(upgraded)
             s3["rollback"] = {
@@ -850,12 +928,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {args.stored}: {stored.get('key') or stored.get('error')}")
         parts = [p for p in parts if p != "stored"]
     observation = json.loads(args.out.read_text(encoding="utf-8")) if args.out.is_file() else blank(args.viewpoint)
-    observation = observe(parts, observation, GitHub(args.viewpoint, key))
+    # As the App: every token minted here, for the repositories the run files name, and the key let go
+    # before the first read.
+    gh = GitHub(args.viewpoint, key, named_repositories() if args.viewpoint == "app" else ())
+    del key
+    observation = observe(parts, observation, gh)
     if args.viewpoint == "app":
         # What is stored: the App's reading, with the run that made it, in the shape build takes as `app`.
         observation = {"viewpoint": "app", "run_id": args.run_id, "read_at": observation["looked_up_at"],
                        "upgrade": {k: observation.get(k) for k in ("s0", "s1", "s2", "s3")},
-                       "template": observe_template_as(GitHub(args.viewpoint, key)),
+                       "template": observe_template_as(gh),
+                       "minted_for": sorted(gh.tokens), "not_minted_for": gh.unminted,
                        "github_error": observation.get("github_error")}  # fmt: skip
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(observation, indent=2, default=str) + "\n", encoding="utf-8")

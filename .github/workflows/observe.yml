@@ -21,6 +21,12 @@
 #    minted for that repository and the `observe` permission set. The App is
 #    not installed on this repository, which is read with the job's own
 #    token. Raw records: it rules on nothing.
+#    From M07 PR 3 (security-reviewer 12 on M07 PR 2: this is the one keyed
+#    job with no keyless job before it): every token is minted first, for
+#    the repositories the run files on main name, and the key is let go
+#    before anything is read; no agent repository's tree is fetched or
+#    packed here; and an artifact's bytes are fetched from GitHub's storage
+#    host with no credential, where urllib used to carry the job's token.
 # 3. The observation is put once, as observations/<run id>.json, in the
 #    security account's audit bucket, through `agentkeel-observation-put`, a
 #    role that trusts this workflow on refs/heads/main and nothing else and
@@ -42,7 +48,7 @@
 # trust and the bucket's put-once rule; prove what it stored was not changed
 # by this file being edited (ruling-cited holds a workflow change to a
 # Security ruling). Until `agentkeel-observer` exists and its id is in the
-# ruling's grant block, the job stops at step 1; until the role exists and
+# grant block (infra/platform_grant.yaml), the job stops at step 1; until the role exists and
 # its variable is set, nothing is stored and the job says so. Nothing here
 # has fired on a seeded case.
 name: observe

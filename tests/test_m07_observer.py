@@ -32,8 +32,8 @@ class FakeGitHub(observer.GitHub):
     """Answers from `pages`, keyed by repository and path; every request is recorded with who asked."""
 
     def __init__(self, pages: dict[tuple[str, str], Any], viewpoint: str = "anonymous") -> None:
-        self.viewpoint, self.key, self.organisation = viewpoint, "key", ORG
-        self.tokens, self.job_token = {}, "the-jobs-own-token"
+        self.viewpoint, self.organisation = viewpoint, ORG
+        self.tokens, self.unminted, self.job_token = {}, {}, "the-jobs-own-token"
         self.pages, self.asked = pages, []
 
     def token(self, repository: str) -> str | None:
@@ -161,26 +161,95 @@ def test_as_the_app_each_repository_of_the_organisations_is_read_under_its_own_t
     assert {token for repository, _path, token in gh.asked if repository == observer.PLATFORM} == {"the-jobs-own-token"}
 
 
-def test_the_real_reader_mints_the_observe_set_for_one_repository_and_puts_the_jobs_token_back(monkeypatch):
+def test_the_real_reader_mints_first_for_the_repositories_named_and_does_not_keep_the_key(monkeypatch):
+    """security-reviewer 12 on M07 PR 2: the one keyed job with no keyless job before it. Every token is
+    minted before anything is read, read-only, one per repository named; the key is not kept."""
     minted: list[tuple[Any, ...]] = []
     from scripts import platform_check
 
+    def mint(*args: Any) -> str:
+        if args[3].endswith("/gone"):
+            raise urllib.error.HTTPError("x", 404, "Not Found", {}, None)
+        minted.append(args)
+        return f"observer-token-for-{args[3]}"
+
     monkeypatch.setattr(platform_check, "identity", lambda: (ORG, APP))
     monkeypatch.setattr(platform_check, "load_grant", lambda root=None: {"agentkeel-observer": {"app_id": WATCHER}})
-    monkeypatch.setattr(platform_check, "app_token", lambda *args: minted.append(args) or "observer-token")
+    monkeypatch.setattr(platform_check, "app_token", mint)
     seen: list[str | None] = []
     monkeypatch.setattr(platform_check, "gh", lambda path, raw=False: seen.append(__import__("os").environ.get("GITHUB_TOKEN")) or {})
     monkeypatch.setenv("GITHUB_TOKEN", "the-jobs-own-token")
-    gh = observer.GitHub("app", "the-key")
+    gh = observer.GitHub("app", "the-key", [REPO, f"{ORG}/gone", "someone-else/their-repo", observer.PLATFORM])
+    # Once per organisation repository, the read-only set, before any read; nobody else's account is asked.
+    assert minted == [(WATCHER, ORG, "the-key", REPO, "observe")] and seen == []
+    assert "the-key" not in repr(vars(gh)) and not hasattr(gh, "key")
     gh(REPO, "/pulls/1")
     gh(REPO, "/pulls/2")
     gh(observer.PLATFORM, "/actions/runs/9")
-    assert minted == [(WATCHER, ORG, "the-key", REPO, "observe")]  # once, for that repository, the read-only set
-    assert seen == ["observer-token", "observer-token", "the-jobs-own-token"]
+    assert len(minted) == 1  # nothing is minted later
+    assert seen == [f"observer-token-for-{REPO}", f"observer-token-for-{REPO}", "the-jobs-own-token"]
     assert __import__("os").environ["GITHUB_TOKEN"] == "the-jobs-own-token"
+    # A repository no token was minted for is unread, with the reason: never read under another token.
+    for name, said in ((f"{ORG}/gone", "HTTPError"), (f"{ORG}/never-named", "no run file on main names it")):
+        with pytest.raises(KeyError, match=said):
+            gh(name, "/pulls/1")
+    assert observer.pull_record(gh, f"{ORG}/never-named", 1, APP)["found"] is False
     anonymous = observer.GitHub("anonymous")
     anonymous(REPO, "/pulls/1")
     assert seen[-1] == "the-jobs-own-token" and len(minted) == 1
+
+
+def test_the_repositories_minted_for_are_the_ones_the_run_files_name_and_the_template():
+    named = observer.named_repositories()
+    assert f"{ORG}/agent-template" in named and REPO in named and observer.PLATFORM in named
+    assert all(name.count("/") == 1 for name in named)
+
+
+def test_as_the_app_no_agent_repositorys_tree_is_fetched_or_packed(monkeypatch):
+    """The digests are the pull request's run's, under no key; build never takes them from the stored record."""
+    def refuse(*args: Any) -> None:
+        raise AssertionError("packed beside the App's tokens")
+
+    monkeypatch.setattr(observer, "agent_digest", refuse)
+    monkeypatch.setattr(observer, "refagent_digest", refuse)
+    monkeypatch.setattr(observer, "observed", lambda name: [{"repository": REPO, "pull_request": 3}]
+                        if name == "f7_1_platform_upgrade.yaml" else [])  # fmt: skip
+    monkeypatch.setattr(observer, "template_push", lambda gh, org, version: {"at": "2026-10-06T09:00:00Z"})
+    pages = {**pull_pages(), (REPO, f"/contents/manifest.yaml?ref={'1' * 40}"): "name: owner-check\nplatform_version: m07\n",
+             (REPO, f"/contents/manifest.yaml?ref={'4' * 40}"): "name: owner-check\nplatform_version: m07\n"}  # fmt: skip
+    observation = observer.blank("app")
+    observer.read_github(FakeGitHub(pages, "app"), observation)
+    live = observation["s1"]["lives"][REPO]
+    assert live["tree_digest"] is None and live["error"] == observer.NOT_PACKED and live["agent"] == "owner-check"
+
+
+class Redirecting:
+    """An opener that answers the first request with GitHub's redirect and the second with the bytes."""
+
+    def __init__(self, location: str | None) -> None:
+        self.location, self.requests = location, []
+
+    def open(self, request: Any, timeout: int = 0) -> Any:
+        self.requests.append((request.full_url, dict(request.header_items())))
+        if len(self.requests) == 1 and self.location:
+            raise urllib.error.HTTPError(request.full_url, 302, "Found", {"Location": self.location}, None)
+        return __import__("io").BytesIO(b"the bytes")
+
+
+def test_an_artifact_is_fetched_from_the_storage_host_with_no_credential():
+    """security-reviewer 12 on M07 PR 2: urllib carried the job's token to the host GitHub redirects to."""
+    opener = Redirecting("https://storage.example/artifact.zip?sig=x")
+    assert observer.download("https://api.github.com/repos/o/r/actions/artifacts/1/zip", "the-token", opener) == b"the bytes"
+    (first, sent), (second, bare) = opener.requests
+    assert first.startswith("https://api.github.com/") and sent == {"Authorization": "Bearer the-token"}
+    assert second.startswith("https://storage.example/") and bare == {}
+    # No redirect: the bytes come from the host that was asked, in one request.
+    direct = Redirecting(None)
+    assert observer.download("https://api.github.com/x", "the-token", direct) == b"the bytes" and len(direct.requests) == 1
+    with pytest.raises(ValueError, match="not to an https address"):
+        observer.download("https://api.github.com/x", "the-token", Redirecting("http://storage.example/a.zip"))
+    # The real opener never follows one by itself.
+    assert observer._NoRedirect().redirect_request(None, None, 302, "Found", {}, "https://elsewhere.example/") is None
 
 
 # --- the owner's test and the dispatch ---------------------------------------------------------
