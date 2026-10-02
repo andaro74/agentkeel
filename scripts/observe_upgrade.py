@@ -272,7 +272,9 @@ def pull_record(gh: GitHub, repository: str, number: Any, platform_app: int | No
             own = {c["sha"] for c in commits} | {out["merge_commit_sha"]}
             between = gh.paged(repository, f"/commits?sha={out['base_ref']}&since={out['created_at']}&until={out['merged_at']}")
             out["default_branch_commits_between"] = [
-                {"sha": c["sha"], "author": actor(c.get("author")), "files": commit_files(gh, repository, c["sha"])}
+                {"sha": c["sha"], "author": actor(c.get("author")), "committer": actor(c.get("committer")),
+                 "verified": ((c.get("commit") or {}).get("verification") or {}).get("verified"),
+                 "files": commit_files(gh, repository, c["sha"])}
                 for c in between if c["sha"] not in own]  # fmt: skip
     except GITHUB_ERRORS as exc:
         out["error"] = failed(exc)

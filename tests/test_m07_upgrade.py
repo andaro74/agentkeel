@@ -25,6 +25,15 @@ APP = 5144253
 OPENER = {"id": 5200001, "slug": "agentkeel-upgrades"}
 BOT = {"login": "agentkeel-upgrades[bot]", "type": "Bot", "app_id": 5200001}
 PERSON = {"login": "andaro74", "type": "User", "app_id": None}
+# GitHub's record of a commit an App made through the API: the App's bot as its author, verified, and
+# GitHub's own signer (or the bot) as its committer. Anything less reads as not the App's (cold review
+# F5 on M07 PR 2; `upgrade.commit_by_the_app`).
+SIGNER = {"login": "web-flow", "type": "User", "app_id": None}
+CI = {"login": "github-actions[bot]", "type": "Bot", "app_id": None, "app_slug": None}
+
+
+def app_commit(sha: str, files: list[str] | None, **more: Any) -> dict[str, Any]:
+    return {"sha": sha, "author": BOT, "committer": SIGNER, "verified": True, "files": files, **more}
 BARS = {"arrive_max_seconds": 4500.0, "deploy_max_seconds": 3600.0, "retire_max_seconds": 3600.0}
 THRESHOLDS = {"upgrade": {"arrive_max_seconds": 4500, "deploy_max_seconds": 3600, "retire_max_seconds": 3600}}
 NOW = "2026-10-06T12:00:00Z"
@@ -198,7 +207,7 @@ def pull(**more: Any) -> dict[str, Any]:
         "trigger": {"at": "2026-10-06T09:00:00Z", "what": "the template's push"},
         "author": BOT, "created_at": "2026-10-06T09:20:00Z", "merged": True, "merged_at": "2026-10-06T10:00:00Z",
         "files": ["manifest.yaml", "server.py"],
-        "commits": [{"sha": "1" * 40, "author": BOT, "files": ["manifest.yaml", "server.py"]}],
+        "commits": [app_commit("1" * 40, ["manifest.yaml", "server.py"])],
         "required_on_head": {"platform-check": "success"}, "default_branch_commits_between": [],
         "workflows_sha256_changed": False,
     }  # fmt: skip
@@ -217,11 +226,18 @@ def test_an_upgrade_the_platform_opened_in_time_with_no_edit_is_held():
     ({"created_at": "2026-10-06T08:00:00Z"}, "earlier than its trigger"),
     ({"files": ["manifest.yaml", ".github/workflows/own.yml"]}, "touches a workflow"),
     ({"files": ["manifest.yaml", "agent.py"]}, "changes agent.py, which a platform upgrade does not"),
-    ({"commits": [{"sha": "1" * 40, "author": BOT, "files": ["manifest.yaml"]},
+    ({"commits": [app_commit("1" * 40, ["manifest.yaml"]),
                   {"sha": "2" * 40, "author": PERSON, "files": ["server.py"]}]}, "a person's edit: 222222222222"),
     ({"workflows_sha256_changed": True}, "infra/workflows.sha256 changed"),
     ({"default_branch_commits_between": [{"sha": "3" * 40, "author": PERSON, "files": ["server.py", "agent.py"]}]},
      "a person's commit on the default branch"),
+    # The App's login on the default branch, on a commit GitHub did not verify: not the App's.
+    ({"default_branch_commits_between": [{"sha": "3" * 40, "author": BOT, "committer": PERSON, "verified": False,
+                                          "files": ["server.py"]}]}, "a person's commit on the default branch"),
+    # The App's address written into a commit a person pushed (cold review F5 on M07 PR 2).
+    ({"commits": [app_commit("1" * 40, ["manifest.yaml"]),
+                  {"sha": "2" * 40, "author": BOT, "committer": PERSON, "verified": False, "files": ["server.py"]}]},
+     "a person's edit: 222222222222 by 'agentkeel-upgrades[bot]' (the App's login, on a commit GitHub's record does not show"),
     ({"required_on_head": {"platform-check": "failure"}}, "merged with platform-check not green"),
     ({"required_on_head": {}}, "no required check read"),
 ])  # fmt: skip
@@ -233,8 +249,8 @@ def test_each_way_an_upgrade_needs_a_manual_edit_is_named(change, said):
 def test_a_ruling_file_is_not_a_persons_edit_and_only_where_a_seat_must_rule():
     """BLOCK 2: a model upgrade in agentkeel cannot merge without a seat ruling it."""
     ruled = pull(repository="andaro74/agentkeel", files=["agents/refagent/manifest.yaml", "milestones/M07/rulings/model-swap.md"],
-                 commits=[{"sha": "1" * 40, "author": BOT, "files": ["agents/refagent/manifest.yaml"]},
-                          {"sha": "2" * 40, "author": BOT, "files": ["milestones/M07/rulings/model-swap.md"]},
+                 commits=[app_commit("1" * 40, ["agents/refagent/manifest.yaml"]),
+                          app_commit("2" * 40, ["milestones/M07/rulings/model-swap.md"]),
                           {"sha": "3" * 40, "author": PERSON, "files": ["milestones/M07/rulings/model-swap.md"]}],
                  required_on_head={"evals": "success", "checks": "success"})  # fmt: skip
     assert upgrade.pull_reading("model", ruled, OPENER, BARS, NOW, expects_ruling=True)["held"] is True
@@ -253,6 +269,24 @@ def test_the_app_is_told_by_its_id_and_by_its_bot_login():
     assert not upgrade.by_the_app({**BOT, "app_id": APP}, OPENER)  # the checking App is not the App that opens
     assert upgrade.by_the_app({"login": "agentkeel-upgrades[bot]", "type": "Bot"}, {"id": None, "slug": "agentkeel-upgrades"})
     assert not upgrade.by_the_app({"login": "agentkeel-upgrades", "type": "User"}, {"id": None, "slug": "agentkeel-upgrades"})
+
+
+@pytest.mark.parametrize("change, mine", [
+    ({}, True),
+    ({"committer": BOT}, True),  # the bot as its own committer: the other record GitHub may write
+    ({"verified": False}, False), ({"verified": None}, False),
+    ({"committer": PERSON}, False), ({"committer": None}, False),
+    ({"committer": {"login": "web-flow-2", "type": "User"}}, False),
+    ({"author": PERSON}, False), ({"author": {"login": "agentkeel-upgrades[bot]", "type": "User"}}, False),
+    ({"author": CI, "committer": CI}, False),  # CI's bot is not the App that opens pull requests
+])  # fmt: skip
+def test_a_commit_is_the_apps_only_on_githubs_record_of_it(change, mine):
+    """Cold review F5 on M07 PR 2. Conservative: a record that is missing or does not match is not the App's.
+    No commit by agentkeel-upgrades had been read when this was written; both committers GitHub may record
+    for an App's API commit are taken, and nothing else."""
+    assert upgrade.commit_by_the_app({**app_commit("1" * 40, ["manifest.yaml"]), **change}, OPENER) is mine
+    record = {k: v for k, v in app_commit("1" * 40, ["manifest.yaml"]).items() if k not in ("committer", "verified")}
+    assert upgrade.commit_by_the_app(record, OPENER) is False  # as M07 PR 2's observer first wrote a commit
 
 
 def test_no_pull_request_is_unread_inside_the_limit_and_a_miss_after_it():
@@ -486,9 +520,9 @@ def full() -> dict[str, Any]:
     retirement = fixture("s2-retired-agent/observation_held.json")
     rollback = fixture("s3-rollback/observation_held.json")
     swap = pull(repository="andaro74/agentkeel", pull_request=41, files=["agents/refagent/manifest.yaml"],
-                commits=[{"sha": "6" * 40, "author": BOT, "files": ["agents/refagent/manifest.yaml"]}],
+                commits=[app_commit("6" * 40, ["agents/refagent/manifest.yaml"])],
                 required_on_head={"evals": "success"})  # fmt: skip
-    retire = pull(pull_request=5, files=["manifest.yaml"], commits=[{"sha": "7" * 40, "author": BOT, "files": ["manifest.yaml"]}],
+    retire = pull(pull_request=5, files=["manifest.yaml"], commits=[app_commit("7" * 40, ["manifest.yaml"])],
                   merged_at="2026-10-05T09:50:00Z", created_at="2026-10-05T09:20:00Z", trigger={"at": "2026-10-05T09:00:00Z"})  # fmt: skip
     return observation(
         s0={"owner_test": owner(), "dispatch": recorded_dispatch(), "relaxation": relaxed(answer={"status": 403})},
@@ -614,22 +648,62 @@ def test_the_apps_stored_reading_is_not_laid_over_a_record_the_run_read_later():
     assert viewpoint == "app" and found["seen_only_by_the_app"] == 1
 
 
-def test_cis_own_envelope_commit_reads_as_a_persons_edit_as_the_spec_defines_one():
-    """Cold review F1 on M07 PR 2, stated and not repaired: SPEC/07 section 2 calls any commit on an upgrade
-    pull request that is not the App's, and touches anything but a ruling file, a person's edit. CI pushes
-    `evals/history/<commit>.json` to every agentkeel pull request as `github-actions[bot]`. So the model
-    upgrade cannot read as held, and `taken` is at most 2 of 3, until Product amends the definition. This
-    test holds the reader to the definition as written; it changes when the definition does."""
+def envelope_files(sha: str) -> list[str]:
+    return [f"evals/history/{sha}{suffix}" for suffix in (".json", ".baseline-card.json", ".baseline-raw.json")]
+
+
+def swap_with(ci_commit: dict[str, Any], files: list[str] | None = None) -> dict[str, Any]:
+    """Every attempt held, and the swap pull request carrying one more commit beside the App's own."""
     seen = full()
     swap = seen["s3"]["swap"]
-    envelope = f"evals/history/{'a' * 40}.json"
-    swap["files"] = [*swap["files"], envelope]
-    swap["commits"] = [*swap["commits"], {"sha": "3" * 40, "author": {"login": "github-actions[bot]", "type": "Bot",
-                                                                    "app_id": None, "app_slug": None}, "files": [envelope]}]  # fmt: skip
-    reading = upgrade.record(seen, THRESHOLDS, HISTORY, template=TEMPLATE)
-    said = " ".join(reading["F7_1"]["reasons"])
-    assert reading["taken"]["model"] is False and reading["taken"]["n"] == 2
-    assert "which a model upgrade does not" in said and "a person's edit" in said and "github-actions[bot]" in said
+    swap["files"] = [*swap["files"], *(ci_commit["files"] if files is None else files)]
+    swap["commits"] = [*swap["commits"], ci_commit]
+    return seen
+
+
+def test_cis_own_envelope_commit_is_not_a_persons_edit_on_an_agentkeel_pull_request():
+    """SPEC/07 section 2 as Product amended it at M07 PR 3 (cold review F1 on M07 PR 2: as first written,
+    CI's own commit was a person's edit and the model upgrade could not read as held). `evals.yml` pushes
+    three files for the commit it measured, as `github-actions[bot]`; GitHub's record of a00b80e is the
+    shape used here."""
+    ci = {"sha": "3" * 40, "author": CI, "committer": CI, "verified": False, "files": envelope_files("6" * 40)}
+    reading = upgrade.record(swap_with(ci), THRESHOLDS, HISTORY, template=TEMPLATE)
+    assert reading["F7_1"]["held"] is True and reading["F7_1"]["reasons"] == []
+    assert reading["taken"]["model"] is True and reading["taken"]["n"] == 3
+
+
+@pytest.mark.parametrize("change, said", [
+    # one path more
+    ({"files": [*envelope_files("6" * 40), "agents/refagent/manifest.yaml"]}, "a person's edit: 333333333333 by 'github-actions[bot]'"),
+    ({"files": [*envelope_files("6" * 40), "evals/history/pre-scope/x.json"]}, "a person's edit"),
+    ({"files": [f"evals/history/{'6' * 40}.json.bak"]}, "a person's edit"),
+    # an envelope named for a commit the pull request does not hold, or for itself
+    ({"files": envelope_files("a" * 40)}, "a person's edit"),
+    ({"files": envelope_files("3" * 40)}, "a person's edit"),
+    # the login on one side only: a person's commit carrying the bot's name as author
+    ({"committer": PERSON}, "a person's edit"),
+    ({"author": PERSON}, "a person's edit: 333333333333 by 'andaro74'"),
+    ({"author": {**CI, "type": "User"}}, "a person's edit"),
+])  # fmt: skip
+def test_a_commit_that_is_not_cis_envelope_commit_as_the_spec_bounds_it_is_still_a_persons_edit(change, said):
+    ci = {"sha": "3" * 40, "author": CI, "committer": CI, "verified": False, "files": envelope_files("6" * 40), **change}
+    reading = upgrade.record(swap_with(ci), THRESHOLDS, HISTORY, template=TEMPLATE)
+    reasons = " ".join(reading["F7_1"]["reasons"])
+    assert reading["taken"]["model"] is False and reading["taken"]["n"] == 2 and said in reasons, reasons
+    assert "which a model upgrade does not" in reasons  # and its files are then paths the upgrade changed
+
+
+def test_cis_envelope_commit_is_an_edit_in_an_agent_repository_and_unread_without_its_files():
+    """"In `agentkeel`, and in no agent repository": an agent repository has no `evals.yml` to push one."""
+    ci = {"sha": "3" * 40, "author": CI, "committer": CI, "verified": False, "files": envelope_files("1" * 40)}
+    there = pull(files=["manifest.yaml", "server.py", *ci["files"]],
+                 commits=[app_commit("1" * 40, ["manifest.yaml", "server.py"]), ci])  # fmt: skip
+    reading = upgrade.pull_reading("platform", there, OPENER, BARS, NOW)
+    assert reading["held"] is False and any("a person's edit" in r for r in reading["reasons"])
+    assert upgrade.ci_envelope_commit(ci, there["commits"], upgrade.AGENTKEEL) is True
+    assert upgrade.ci_envelope_commit(ci, there["commits"], "agentkeel-studio/owner-check") is False
+    unread = swap_with({**ci, "files": None}, files=[])
+    assert upgrade.record(unread, THRESHOLDS, HISTORY, template=TEMPLATE)["F7_1"]["read"] is False
 
 
 def test_each_upgrades_deploy_seconds_are_kept_beside_it():

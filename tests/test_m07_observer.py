@@ -62,11 +62,17 @@ def pull_pages(number: int = 3, *, repository: str = REPO, author: dict[str, Any
             "head": {"sha": "1" * 40}, "base": {"sha": "0" * 40, "ref": "main"}, "mergeable_state": "unknown", "body": body},
         (repository, f"/issues/{number}"): {"performed_via_github_app": {"id": OPENER, "slug": "agentkeel-upgrades"}
                                             if author is BOT else None},
-        (repository, f"/pulls/{number}/commits"): [{"sha": "1" * 40, "author": author}],
+        # As GitHub returns an App's API commit: its bot as author, GitHub's signer as committer, verified.
+        (repository, f"/pulls/{number}/commits"): [{"sha": "1" * 40, "author": author, **(
+            {"committer": {"login": "web-flow", "type": "User"}, "commit": {"verification": {"verified": True}}}
+            if author is BOT else {})}],
         (repository, f"/pulls/{number}/files"): [{"filename": f} for f in files],
         (repository, f"/commits/{'1' * 40}"): {"files": [{"filename": f} for f in files]},
         (repository, f"/commits/{'1' * 40}/check-runs"): {"check_runs": [check("success")]},
-        (repository, "/commits?sha=main&since=2026-10-06T09:20:00Z&until=2026-10-06T10:00:00Z"): [{"sha": "4" * 40, "author": OWNER}],
+        (repository, "/commits?sha=main&since=2026-10-06T09:20:00Z&until=2026-10-06T10:00:00Z"): [
+            {"sha": "4" * 40, "author": OWNER}, {"sha": "5" * 40, "author": OWNER, "committer": OWNER,
+                                                 "commit": {"verification": {"verified": False}}}],
+        (repository, f"/commits/{'5' * 40}"): {"files": [{"filename": "agent.py"}]},
     }  # fmt: skip
 
 
@@ -79,14 +85,18 @@ def test_a_pull_request_is_written_with_who_opened_it_its_files_its_commits_and_
     assert pull["found"] is True and pull["error"] is None
     assert pull["author"] == {"login": "agentkeel-upgrades[bot]", "type": "Bot", "app_id": OPENER, "app_slug": "agentkeel-upgrades"}
     assert pull["files"] == ["manifest.yaml", "server.py"] and pull["merged"] is True and pull["merge_commit_sha"] == "4" * 40
-    nobody = {"login": None, "type": None, "app_id": None, "app_slug": None}
+    signer = {"login": "web-flow", "type": "User", "app_id": None, "app_slug": None}
     # The committer and GitHub's verification are written raw beside the author (cold review F5 on M07 PR 2:
-    # "no person's edit" rests on the author's login). Nothing rules on them yet.
+    # "no person's edit" rested on the author's login). build rules on them from M07 PR 3.
     assert pull["commits"] == [{"sha": "1" * 40, "author": {"login": "agentkeel-upgrades[bot]", "type": "Bot", "app_id": None,
-                                                           "app_slug": None}, "committer": nobody, "verified": None,
+                                                           "app_slug": None}, "committer": signer, "verified": True,
                                 "files": ["manifest.yaml", "server.py"]}]  # fmt: skip
     assert pull["required_on_head"] == {"platform-check": "success"}
-    assert pull["default_branch_commits_between"] == []  # the merge commit itself is the pull request's own
+    # The merge commit itself is the pull request's own. Another commit on the branch meanwhile is written
+    # with its committer and verification too, so build can hold it to the same rule.
+    owner = {"login": "andaro74", "type": "User", "app_id": None, "app_slug": None}
+    assert pull["default_branch_commits_between"] == [
+        {"sha": "5" * 40, "author": owner, "committer": owner, "verified": False, "files": ["agent.py"]}]
     # build rules on it as written: held, once it carries its trigger.
     observer.with_trigger(pull, {"at": "2026-10-06T09:00:00Z"})
     pull["workflows_sha256_changed"] = False
@@ -239,14 +249,17 @@ def test_the_dispatch_already_recorded_is_read_from_githubs_jobs_as_refused():
     assert unread["jobs"][2]["annotations"] is None and upgrade.dispatch_from_a_branch(unread)["read"] is False
 
 
-def test_the_run_files_as_they_stand_name_one_attempt_made_the_dispatch(monkeypatch):
-    """PR 2's own run: only S0's second attempt is recorded, so only it is looked up."""
+def test_the_run_files_as_they_stand_name_two_attempts_made_the_dispatch_and_the_owners_test(monkeypatch):
+    """PR 3's own run: S0's second attempt (PR 2 recorded it) and its first, the owner's test, made on
+    2026-10-02 and recorded at PR 3. Only they are looked up."""
     asked: list[str] = []
     monkeypatch.setattr(observer, "read_dispatch", lambda gh, entry: asked.append(str(entry["run"])) or {"found": True})
+    monkeypatch.setattr(observer, "read_owner_test", lambda gh, entry, app: asked.append(
+        f"{entry['repository']}#{entry['pull_request']}") or {"found": True})  # fmt: skip
     observation = observer.blank("anonymous")
     observer.read_github(FakeGitHub({}), observation)
-    assert asked == ["36963543726"]
-    assert observation["s0"]["owner_test"] is None and observation["s0"]["relaxation"] is None
+    assert asked == ["36963543726", "agentkeel-studio/owner-check#1"]
+    assert observation["s0"]["owner_test"] == {"found": True} and observation["s0"]["relaxation"] is None
     assert observation["s1"] is None and observation["s2"] is None and observation["s3"] is None
 
 
