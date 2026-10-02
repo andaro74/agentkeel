@@ -17,8 +17,15 @@
 # listed and taken S1, and after S3's fallback rollback if it is needed.
 # **It deletes AWS resources**: owner-check's runtime and stack
 # (agentkeel-owner-check), with its key scheduled for deletion. The audit
-# bucket's records of it stay (write-once). The human starts it only after
-# reading what the retire job will delete.
+# bucket's records of it stay, locked for one day (R5 as amended at M05)
+# and after that kept by the security account's policies. **It is one-way:
+# nothing restores the runtime.** Before the dispatch, the list of what the
+# retire job deletes and what it leaves (the construct keeps the key, its
+# alias and the rights table when a stack is deleted), and what the key
+# encrypts, is committed under milestones/M07/runs/ (SPEC/07 section 11,
+# R7), and this file names it. The human starts the attempt only after
+# reading that list. The invocation counts as refused only on
+# ResourceNotFoundException: a refusal for access is not a deletion.
 seed: S2
 falsifiers: [F7.2]
 principal: andaro74, owner of agentkeel-studio; the platform's App opens the pull request

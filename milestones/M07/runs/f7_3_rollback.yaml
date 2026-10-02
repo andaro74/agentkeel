@@ -28,8 +28,16 @@
 # swap and its revert are pull requests on agentkeel's main outside M07's
 # cap of four, by a line in the ledger. Each needs its Threshold Owner
 # ruling file, which is not a person's edit (BLOCK 2).
+#
+# **If the revert does not go green** (security-reviewer 16 on M07 PR 1):
+# the revert is itself a pin move the M04 gate rules, and the first main
+# envelope after a merged swap may fail F4_4 (open.md row 58). What is
+# done then is not stated here yet. The Threshold Owner names it in this
+# file, pushed, before the swap is merged; the swap is not merged until it
+# is named. Whether the candidate's model access stays after the revert is
+# Security's, with it.
 seed: S3
-falsifiers: [F7.3]
+falsifiers: [F7.1, F7.3]  # the first attempt is the model upgrade arriving; the second is the rollback
 principal: the platform's App opens the pull request; andaro74 as Threshold Owner rules and merges
 candidate: pinned_roles.m04_cheaper_swap
 attempts:

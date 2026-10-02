@@ -170,7 +170,12 @@ reading as a dated note. A quickstart over its bar does not fire F7.0
   raw; the registry row carries `retired_at`; the signed bundle archive
   is under `bundles/<name>/<commit>.tar` in the audit bucket, put there
   **at deploy time** (item 17: the Actions artifact expires after 30
-  days), write-once (R5). "Still answers" (F7.2) means that invocation
+  days), write-once (R5). **How long** (legal-compliance 8, 9): the audit
+  bucket's lock is one day (R5 as amended at M05; seven years is M08's
+  F8.4), so a bundle and an answer record are locked for a day and after
+  that kept only by the security account's policies. M07 changes no
+  retention. The registry row is in the agent account's table and is not
+  write-once. "Still answers" (F7.2) means that invocation
   answered, or the runtime still exists `retire_max_seconds` after the
   merge, or an answer record for the agent under
   `envelopes/agents/<name>/` has `LastModified` after the deletion.
@@ -336,7 +341,7 @@ re-planted: its run file and its test stay where M06 put them.
 | S0 the template's repair, read by CI | F7.0 | `runs/f7_0_owner_test.yaml`, three attempts, `observed: null`: the owner's test, steps 2 to 4 again on `owner-check` pull request 1; `platform-check.yml` dispatched from a branch (item 6); the App's token asked to relax `owner-check`'s ruleset. And `tests/fixtures/m07/s0-app-token/`: the installation as the API returns it (`repositories`, `permissions`) and the environment (`deployment-branch-policies`, `can_admins_bypass`), each twice: as the ruling will name it, and with a grant no ruling covers | the attempts are not made: every head is refused (§3 item 1). `app_token()` accepts no repository (§3 item 2); nothing reads the installation's permissions or the environment back | `scripts/platform_check.py`: `POST_PERMISSIONS` with `administration: write`; `app_token()` refusing a call with no repository; a `permissions` reader that takes the installation and the environment and fails on any value no ruling names. `src/validate/agent.py` failing closed on a hidden field and passing `[]`. The observer reading pull request 1's heads with the App's reasons, and the dispatched run's record |
 | S1 a platform bump opens a draft pull request | F7.1 | `runs/f7_1_platform_upgrade.yaml`: the re-make of the template after PR 2 merges, and the draft pull request it must open in `owner-check` (the timed run's repository is added, pushed, when Product names the agent; item 7), `observed: null`. And `tests/fixtures/m07/s1-platform-upgrade/`: an agent folder at `platform_version: m06` with a workflow file of its own and an edited `agent.py`, beside the platform-owned files at a later version | the attempt is not made: nothing opens one (§3 item 4). No module computes the upgrade diff | `.github/workflows/platform-upgrade.yml` on `main` (Security), every 15 minutes: for each registered agent behind the template's version, a draft pull request as the App with the platform-owned files and the check's verdict at the new version (major or minor) in its body. `scripts/platform_upgrade.py` `diff` (Engineering), which the seed test calls on the fixture: it must change platform-owned files only, and leave the workflow file and `agent.py` alone. The observer reading the pull request |
 | S2 a retired agent's target is gone | F7.2 | `runs/f7_2_retire.yaml`: the retire workflow dispatched for `owner-check` after it has deployed, answered, been listed and taken S1; the draft pull request setting `rollout: retired`; its merge; `observed: null`. And `tests/fixtures/m07/s2-retired-agent/`: CloudTrail's `DeleteAgentRuntime` record, a `GetAgentRuntime` answer that still finds the runtime, the retire job's invocation answered, and an answer record dated after the deletion | the attempt is not made (§3 item 5); nothing reads the records against each other | `deploy.yml`'s `retire` job (Security) from `main`; `scripts/retire_agent.py` and `scripts/registry.py retire` (Engineering); the schema's `rollout` enum; `build.f7_2` over the observer's records |
-| S3 a `model-watch` pull request is merged and rolled back | F7.3 | `runs/f7_3_rollback.yaml`: `model-watch` opening a draft swap pull request moving refagent's pin to `pinned_roles.m04_cheaper_swap` (Haiku 4.5, never run; item 16), its merge if GREEN, its revert; and **the fallback, named here before any run**: if the swap's envelope is RED it is not merged, and the rollback is read on `owner-check`'s platform upgrade, merged and then reverted. `observed: null`. And `tests/fixtures/m07/s3-rollback/`: the tree's digest at a revert beside a `GetAgentRuntime` answer whose image tags hold the upgrade's digest | the attempt is not made (§3 item 6); nothing compares the two digests after a merge | `.github/workflows/model-watch.yml` on `main` (Security); `scripts/model_watch.py` (Engineering); `scripts/runtime_for_tree.py` given an agent, reused by the observer after each deploy; `build.f7_3` |
+| S3 a `model-watch` pull request is merged and rolled back | F7.1 (the model upgrade arriving), F7.3 | `runs/f7_3_rollback.yaml`: `model-watch` opening a draft swap pull request moving refagent's pin to `pinned_roles.m04_cheaper_swap` (Haiku 4.5, never run; item 16), its merge if GREEN, its revert; and **the fallback, named here before any run**: if the swap's envelope is RED it is not merged, and the rollback is read on `owner-check`'s platform upgrade, merged and then reverted. `observed: null`. And `tests/fixtures/m07/s3-rollback/`: the tree's digest at a revert beside a `GetAgentRuntime` answer whose image tags hold the upgrade's digest | the attempt is not made (§3 item 6); nothing compares the two digests after a merge | `.github/workflows/model-watch.yml` on `main` (Security); `scripts/model_watch.py` (Engineering); `scripts/runtime_for_tree.py` given an agent, reused by the observer after each deploy; `build.f7_3` |
 | S4 panel 2 forced to show GREEN on a RED envelope | F7.4 | `tests/fixtures/m07/s4-panel2/`: `dashboard.json`, a panel 2 whose query maps every verdict to GREEN; `frame.json`, panel 2's rows as `/api/ds/query` returns them, GREEN for `6f3d1618f42a…`; the envelope `evals/history/6f3d1618f42acbb217f7bcd62ecf2fc000ac4a9f.json` on `main`, RED (item 3) | nothing reads a panel 2 query or compares a panel's verdict with an envelope (§3 item 7) | `validate` refuses a panel 2 query that does anything but select the verdict from its source (`src/validate/panel.py`); `build.panel_verdict_mismatch(frame, history_dir)` compares by commit |
 | S5 a surface plant goes silent | F7.5 | `tests/fixtures/m07/s5-silent-surface-plant/`: `results.json`, the surfaces' two plants with one reader's result missing from a run | nothing counts a surface's plants (§3 item 8) | `plants.SURFACE_PLANTS` naming the two; `build.surface_plants(results)` giving `plants_expected` 2 and `plants_fired` 1 on the fixture, written to `upgrade.surfaces` and `checks.F7_5` |
 
@@ -363,7 +368,10 @@ setting made by hand after a Security ruling.
   (item 40). Row 20's environment read recorded. No reader, no grant, no
   attempt.
 - **Before PR 2's first commit: the rulings §11 owes**, by the human.
-  None is a grant: they say what the grant will be.
+  None is a grant: they say what the grant will be. **And the dispatch
+  from a branch** (S0's second attempt): it needs nothing M07 builds, so
+  it is made, with R1 ruled and applied, and read as refused **before any
+  grant** (`open.md` row 2: it "comes first"; security-reviewer 3).
 - **PR 2's run, on the PR.** The nine fixture tests pass, each by its
   reader, and their markers are off; the four run-file tests stay
   expected failures (item 20). `checks.F7_0` to `F7_5` pass from them.
@@ -372,10 +380,10 @@ setting made by hand after a Security ruling.
 - **After PR 2 merges, each attempt stated before and pushed.** The
   grant comes first, and only now (item 36): `main` no longer carries
   `scope = {}`.
-  1. Security makes the grant as ruled; the organisation accepts it;
+  1. Security makes the grant as ruled, and only if the dispatch from a
+     branch was read as refused; the organisation accepts it;
      `platform-check.yml`'s `post` job on `main` reads the installation
-     and the environment back, and the dispatch from a branch is
-     attempted.
+     and the environment back.
   2. SPEC/06's S2 gets a new head: the owner pushes one empty commit to
      `s2-standin` (items 12, 13). The repaired App checks it; it is read
      **before** owner-check #1 merges, so "behind" cannot enter.
@@ -388,9 +396,12 @@ setting made by hand after a Security ruling.
   5. The template re-made from PR 2's merge; S1's pull requests arrive
      in `owner-check` and the timed run's repository; each merged by its
      seat when green.
-  6. `owner-check` retired (S2), last, after the fallback rollback if S3
-     needs it.
-  **Independent of 2 to 6** (item 30): `model-watch`'s pull request on
+  6. The seeded relaxation (S0's third attempt) on `owner-check`, with a
+     new head pushed while the ruleset is changed; restored by the owner
+     with the owner's own token and read back equal to the export.
+  7. `owner-check` retired (S2), last, after the fallback rollback if S3
+     needs it. A retirement is one-way: nothing restores the runtime.
+  **Independent of 2 to 7** (item 30): `model-watch`'s pull request on
   refagent, at any time after the grant R3 rules; merged if GREEN, then
   reverted. The swap and its revert are pull requests on `main` outside
   the cap, by a line in the ledger, as #1 and #29 were.
@@ -419,10 +430,20 @@ None of it is in PR 1. Each with one seat and one path.
   repository; `platform-upgrade.yml` and the retire job (`contents:
   write`, `pull_requests: write`, per repository, no `checks`, no
   `administration`); the observer (`pull_requests: read`, `checks:
-  read`, `contents: read`). No one token can open a pull request and
-  post the check that passes it. Whether the App may hold `contents:
-  write` and `pull_requests: write` on agent repositories at all is that
-  ruling's.
+  read`, `contents: read`). **With one App and one key this split binds
+  nothing** (security-reviewer 1): a token is narrowed by the request
+  that mints it, the installation holds the union, and any job that holds
+  the key can mint all of it, so it could open a change, post the check
+  that passes it and merge it. The proposal put to Security under R2 is
+  therefore **three Apps, each with its own key in its own environment
+  limited to `main`**: the platform's (5144253) for the check; a second
+  for opening pull requests (`contents: write`, `pull_requests: write`,
+  no `checks`, no `administration`); a third, read-only, for the
+  observer. 5144253 is never installed on `andaro74/agentkeel`, whose
+  required checks are names any App could answer to (security-reviewer
+  2). Each App and each permission is a grant, made by the human after
+  its ruling; if Security keeps one key, this section and §8 say the
+  split is a convention in `main`'s code.
 - **The token** (`scripts/platform_check.py`, Engineering):
   `POST_PERMISSIONS` asks `administration: write`; `app_token()` requires
   a repository and a named permission set and refuses a call without
@@ -458,7 +479,12 @@ None of it is in PR 1. Each with one seat and one path.
   platform-owned files' diff, evaluates the agent's head with
   `src.validate.agent` at `main` to record major or minor, and opens one
   draft pull request as the App in that repository. `make upgrade` runs
-  `platform_upgrade.py diff` locally and opens nothing (§9 cut 5).
+  `platform_upgrade.py diff` locally and opens nothing (§9 cut 5). Two
+  jobs, as `platform-check.yml` has: one with no secret that reads the
+  agent repository as data and computes the diff; one with the key that
+  runs `main`'s code on the first's artifact. The retire job the same
+  (security-reviewer 4; `open.md` row 2: "never beside agent-repository
+  or pull-request code").
 - **`model-watch`** (`.github/workflows/model-watch.yml`, Security;
   `scripts/model_watch.py`, Engineering): scheduled on `main`; reads
   `modelLifecycle` for refagent's pin and `pinned_roles`
@@ -573,6 +599,19 @@ SPEC/00 §10.5: no document describes these as working.
   write` on an agent repository the platform could merge what it opened.
   The permission sets are split so that the token that opens cannot post
   the check; no seed attempts a merge by the App.
+- **One key behind every permission set**, unless Security rules three
+  Apps (§6). Nothing mechanical reads which job minted which token.
+- **Who can change what the keyed job does** (security-reviewer 5): the
+  `post` job runs `scripts/platform_check.py`, `src/validate/agent.py`
+  and whatever `uv.lock` installs, all Engineering paths gated by
+  `cold-review-ruling`; `infra/workflows.sha256` covers the workflow file
+  only. The reader of the grant lives in the file it guards. One person
+  holds every seat (R1), and nothing mechanical stops an edit that
+  removes the reader.
+- **A ruling line's author is not read** (security-reviewer 8):
+  `cold-review-ruling` looks for a line that starts "Ruled by", not for
+  who committed it. `model-watch` drafts its ruling file and must not
+  write that line.
 - **A platform pull request edited after it arrived.** F7.1 reads the
   commits' authors; nothing stops an owner merging one a person changed.
 - **A platform upgrade moves `guardrail` in an agent repository with no
@@ -701,13 +740,13 @@ a code change and none is a grant.
 
 | # | Seat | Read | Then rule |
 |---|---|---|---|
-| R1 | Security | Row 20: the `platform-app` environment (read 2026-10-02T02:12Z: one branch policy, `main`, type branch; `can_admins_bypass: true`). Whether an admin's bypass reaches a deployment branch policy (item 37) | whether `can_admins_bypass` is inside the bound or is switched off first; the dispatch from a branch is S0's second attempt, after PR 2 merges |
-| R2 | Security | The installation as the App's JWT returns it: `repository_selection`, `repositories`, `permissions`; GitHub's documentation of which permission shows `bypass_actors` and whether a read-only form exists | row 2's bounds, one by one, and the permission set per workflow (§6), in `rulings/pr2-security.md`, with its `grant:` block; the grant itself after PR 2 merges |
+| R1 | Security | Row 20: the `platform-app` environment (read 2026-10-02T02:12Z: one branch policy, `main`, type branch; `can_admins_bypass: true`). Whether an admin's bypass reaches a deployment branch policy (item 37) | whether `can_admins_bypass` is inside the bound or is switched off first; the dispatch from a branch is S0's second attempt, made and read as refused **before the grant**. Read 2026-10-02T03:16Z (`runs/platform_app_read.md`): `PLATFORM_APP_PRIVATE_KEY` is a secret of the environment only; the repository's own secrets are `AGENTKEEL_GRAFANA_TOKEN` and `RULESET_TOKEN` (security-reviewer 11) |
+| R2 | Security | The installation as the App's JWT returns it: `repository_selection`, `repositories`, `permissions`; GitHub's documentation of which permission shows `bypass_actors` and whether a read-only form exists | row 2's bounds, one by one, and the permission set per workflow (§6), in `rulings/pr2-security.md`, with its `grant:` block; one App or three (§6); how a new agent repository enters the grant (`selected` or `all`) and what that does to S3's clock; whether `agent-template` is in it; where S0's third attempt mints its token (security-reviewer 1, 2, 6, 14). The grant itself after PR 2 merges |
 | R3 | Security | Whether the App can be installed on `andaro74/agentkeel` with `contents: write` and `pull_requests: write` for `model-watch`'s pull requests, or a fine-grained token in the `platform-app` environment is the smaller grant; whether a pull request opened by an App installation token starts `evals.yml` | the token `model-watch` opens pull requests with |
 | R4 | Security; Engineering | Where the scheduled observer on `main` stores its observation, and how a pull request's run takes it as data without the key | row 3's design; §4's paragraph on which run the cell cites, restated if it changes |
 | R5 | Security | Whether the platform pushes the re-made template or the owner does, by hand, as at M06 | proposed: the owner, at M07 |
-| R6 | Threshold Owner | `GetFoundationModel` for refagent's pin and `pinned_roles`; Haiku 4.5's access (`scripts/check_model_access.py`) and whether the eval role and refagent's runtime role may call it; the cost of a swap run against `cost_cap` | the candidate as named (item 16) or another, before `model-watch` runs; `open.md` rows 58, 65 to 67 |
-| R7 | Security | `DeleteAgentRuntime`'s behaviour on a runtime with an endpoint; what the stack's deletion through the deploy role needs that it does not have; the agent key's deletion window; the `bundles/` statement | the retirement path's grants, as a diff for the Security seat's PR, and the security account's hand deploy |
+| R6 | Threshold Owner | `GetFoundationModel` for refagent's pin and `pinned_roles`; Haiku 4.5's access (`scripts/check_model_access.py`) and whether the eval role and refagent's runtime role may call it; the cost of a swap run against `cost_cap` | the candidate as named (item 16) or another, before `model-watch` runs; `open.md` rows 58, 65 to 67; what is done if the revert's own envelope is not GREEN, named in S3's run file before the swap is merged; with Security, whether the candidate's access stays after the revert (security-reviewer 16) |
+| R7 | Security | `DeleteAgentRuntime`'s behaviour on a runtime with an endpoint; what the stack's deletion through the deploy role needs that it does not have; the agent key's deletion window; the `bundles/` statement | the retirement path's grants, as a diff for the Security seat's PR, and the security account's hand deploy; every resource of a retired agent listed as deleted or kept (the construct keeps the key, its alias and the rights table when a stack is deleted; the log group), and what the key encrypts, committed under `runs/` before the dispatch; the deletes scoped in IAM so refagent's and the bootstrap's stacks are out of reach; whether the retire job also writes the retirement to the audit bucket (legal-compliance 9, 10; security-reviewer 10, 15) |
 | R8 | Security | Where panel 2 reads envelopes: Athena over the audit bucket's `envelopes/` prefix in the security account, or a copy the deploy path writes in the agent account; the Grafana observer token's renewal before 2026-10-31 (`open.md` row 9) | panel 2's source; who renews the token and when |
 | R9 | Product | `milestones/M06/runs/f6_3_quickstart.yaml`'s "after M06 PR 3" and "PR 4's run"; SPEC/06 §7's "five records" against four | the restatements, pushed before S3 |
 | R10 | Product; Security | Which pull request carries the owner's test at M07 | proposed: a new head on `owner-check` #1 with the template's content (an empty commit), then the fix; S0's run file names it before the attempt |

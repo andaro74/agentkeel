@@ -106,7 +106,9 @@ Push. When `platform-check` passes, merge with a **merge commit** (the
 only kind the ruleset allows). A job in your own workflow called
 `platform-check` is not meant to count: the ruleset binds the check to
 agentkeel's App, which GitHub documents as accepting it from that App
-alone. That has not yet been attempted here (M06's seed S2).
+alone. It was attempted once, at M06 (seed S2): the stand-in's check
+did not count, while the platform's check was refusing every change for
+a fault of its own. It is read again at M07.
 
 ## 7. The platform deploys it
 

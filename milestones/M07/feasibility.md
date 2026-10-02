@@ -343,7 +343,7 @@ seeds, one commit each, before any reader. Each test was run once with
 
 | Seed | Commit | `--runxfail` messages |
 |---|---|---|
-| S0 | `c870bca` | `seed S0: app_token() can be called with no repository, and then mints every permission on every repository`; `seed S0: nothing reads the installation's grant back`; `seed S0: nothing reads the key's environment back`; `seed S0: the attempt has not been made` |
+| S0 | `c870bca` | `seed S0: app_token() can be called with no repository, and then mints every permission on every repository (it asked for a token with scope [{}])` (as read after `4240d9e`; before it the test read the signature's default and the message ended at "repository"); `seed S0: nothing reads the installation's grant back`; `seed S0: nothing reads the key's environment back`; `seed S0: the attempt has not been made` |
 | S1 | `ef3d88a` | `seed S1: nothing computes an agent's platform upgrade`; `seed S1: the attempt has not been made` |
 | S2 | `3872c13` | `seed S2: nothing reads a retired agent's records against each other`; `seed S2: the attempt has not been made` |
 | S3 | `ea53ef4`, `a46c98f` | `seed S3: nothing compares the runtime's digest with the tree's after a revert`; `seed S3: the attempt has not been made` |
@@ -479,3 +479,58 @@ repositories. It made no call to AWS. `POST_PERMISSIONS`, `app_token()`,
 the observer's token, the manifest schema and every workflow are as M06
 left them. Owner-check's pull requests 1 and 2 and the `floresinnovations`
 account are untouched.
+
+## 8. The reviews of PR 1, and what each changed
+
+Three reports, each verbatim in the PR body. Counts and dispositions here;
+Engineering's are in `rulings/pr1-engineering.md`, Security's in
+`rulings/pr1-security.md`.
+
+**`engineering-cold-reviewer`**, on the diff `57b9bf6...01e8ff8` and row 7
+only: BLOCK 1, FINDING 6, NOTE 6; and, on the six M06 commits `open.md`
+row 15 owed a cold read, FINDING 5, NOTE 1. It ran nothing; the caller
+ran the checks it names.
+
+**`security-reviewer`**, on the same diff as a file: BLOCK 0, FINDING 14,
+NOTE 9. The diff's one Security path is the CODEOWNERS line; the findings
+are on the plan for the grant.
+
+**`legal-compliance`** (R8), run once on the tree at `340a034`: BLOCK 0,
+FINDING 6, NOTE 11. Nothing recognised as real in the slate, the rights
+table, the clause index, the corpus, the goldens, refagent's prompt or
+the fixtures' agent folders; it cannot search, so that means "nothing
+recognised". It drafted the compliance map's rows for rows 0 to 6 and
+placed every row for S2, the retirement, under "Not evidenced". **It was
+run through a general-purpose agent given its prompt file**, because a
+subagent written in a session is not registered until the next one; its
+first run under its own name is owed at PR 2.
+
+| Finding | Disposition |
+|---|---|
+| Cold review BLOCK 1: no ruling in the tree for the CODEOWNERS line | Lifted by this PR's ruling commit: `rulings/pr1.md`, `pr1-engineering.md`, `pr1-security.md`, each a draft until its seat rules |
+| Cold review F1; security 20: `app_token`'s test read a signature | Repaired (`4240d9e`): the test calls it with no repository against a stub and expects a refusal and no token asked for. Today it asks for one with scope `{}` |
+| Cold review F2: S1 could not fire F7.1's workflow arm | Repaired (`4240d9e`): the platform side carries a workflow and an `agent.py` the upgrade must leave behind |
+| Cold review F3; legal 7: refusing arms only; no missing-bundle case | Repaired (`4240d9e`): a held case for S2, S3, S4 and S5; S2 also without its bundle, and with an invocation refused for access |
+| Cold review F4: `build` as a reader of `evals/history/` | PR 2: `panel_verdict_mismatch` reads past envelopes through `src/verdict/replay_history.py`, and its ruling says so (Engineering) |
+| Cold review F5: the video's confirmation has no record; its date | Recorded in `rulings/pr1.md`. The row's "2026-10-02" is the human's, as given; the session's own dates are local (2026-10-01) and its read times UTC. Unsure, Product |
+| Cold review F6: no artifact for `legal-compliance`'s run | This section; the report is in the PR body |
+| Cold review N2, N3, N4 | Repaired: S3's run file names F7.1 and F7.3; `PLATFORM_OWNED` is used; the explainer says "would keep answering" |
+| Security 1, 2: one key behind every permission set; never install 5144253 on `agentkeel` | SPEC/07 §6 and §8 say the split binds nothing with one key and put three Apps to Security under R2. A grant: the human's, before PR 2 |
+| Security 3: the dispatch from a branch before the grant | Repaired: SPEC/07 §5.1 and §11 R1, and S0's run file: made and read as refused before any grant |
+| Security 4: the new mint points beside agent data | Repaired in SPEC/07 §6: two jobs, as `platform-check.yml` has |
+| Security 5, 8: who can change the keyed job; a ruling line's author | Named in SPEC/07 §8. Moving `scripts/platform_check.py` to Security's row, or reading a ruling commit's author, is a SPEC/00 §5 amendment: Unsure, Product, before PR 2 |
+| Security 6, 7, 9, 10: the repositories bound; two mints in `post`; R4's store; R7's three points | Added to SPEC/07 §11 R2, R4 and R7's questions |
+| Security 11, 12: where the key is stored; the read's time | Read and committed (`runs/platform_app_read.md`): the key is an environment secret only |
+| Security 13, 14: S0's second and third attempts | Repaired in the run file: an unchecked head must exist and `skipped` is not a refusal; the relaxation has its place in the order, a new head, the owner's restore and read-back. Where its token is minted is R2's |
+| Security 15; legal 8, 9, 10: what retirement deletes, keeps, and for how long | SPEC/07 §2 states the one-day lock and that the registry row is not write-once; the run file says it is one-way and waits for R7's list |
+| Security 16: no path back if the revert is not green | The run file: named by the Threshold Owner before the swap is merged; the swap is not merged until it is |
+| Security 18, 21: one flat grant; the fixture is not one endpoint's answer | Stands until R2: the reader's shape follows the ruling, and PR 2 says so if the fixtures' shape changes (§4) |
+| Security 19: no raised level, widened selection or tag policy | Repaired (`4240d9e`) |
+| Legal 11: no envelope field for the lock's duration | M08's `open.md`, with F8.4 (Engineering; Product) |
+| Legal 12: a person's IAM user name and two account ids in envelopes | Unsure, Security, by M08 open: written envelopes cannot be changed |
+| Legal notes 1 to 6 (names recognised by nobody; place names in two titles; a 45-day window; reserved phone ranges; a live guardrail id in a fixture; no "fictional" marker on the rights table) | For Product, Security and the Data Owner to confirm; none is a finding |
+| Re-read `69f8383` A: a merged S2 with state "unknown" reads as unread | M07 PR 2 (Engineering): `merged` read before the unread return, with a test. S2 is read again at M07 |
+| Re-read `69f8383` B: "refused first" counts any failure from the App | M07 PR 2 (Engineering): S0's reading of "the seats and the goldens and nothing else" needs the reasons read |
+| Re-read `52ebd57`: on a 412 the registry row is written against a record the run did not write | M07 PR 2 (Security), with `deploy.yml`'s retire job |
+| Re-read `9be344c`: the quickstart's stale line | Repaired here |
+| Re-read `b19db9a`: the test proved the reader on an administrator's view | M06's RED, `open.md` row 2. S0's fixtures carry the same risk and say so; the live installation is read by the App's key on `main` |
