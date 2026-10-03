@@ -236,10 +236,11 @@ human's word; no session reads that account), from `m07-pr4` at
 machine, sha256
 `c15c8ca50b42b279fdeee14a817236af039095d13dde127c6e17b5dfa9bf7b45`, and
 differed from `main`'s synth in one line of one resource
-(`ObservationPutRole`, the `sub`). **Owed from the human:** that the
-change set showed that one modification and no replacement, the role's
-trust as the console shows it, and the time of `UPDATE_COMPLETE`. What
-a session can read: the next `observe.yml` run, 37123531195 (dispatched
+(`ObservationPutRole`, the `sub`). As the human read it in the console:
+the change set showed `ObservationPutRole` modified and nothing else, no
+replacement; the stack's updated time is 2026-10-03 05:15:47 UTC-7
+(12:15:47Z); the role's trust reads `...:environment:platform-observer`.
+What a session can read: the next `observe.yml` run, 37123531195 (dispatched
 by the owner, 12:38:35Z), passed the grant step (`grant-agentkeel-observer`:
 `errors: []`, `narrower: []`), read GitHub as the App, assumed the role
 (`agentkeel-observation-put-37123531195`) and **put the first
