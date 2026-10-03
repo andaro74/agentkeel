@@ -16,7 +16,7 @@ pr: 42
 
 # Ruling: the ids pull request, Security
 
-DRAFT for andaro74 as Security. Not ruled until this line is replaced by one that starts with the two words the gate reads.
+Ruled by andaro74 as Security, 2026-10-03, as written.
 
 Dates in this file are UTC (cold review F3: the human's clock is UTC-7,
 so "2026-10-02 evening" there is 2026-10-03 here).

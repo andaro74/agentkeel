@@ -18,7 +18,7 @@ pr: 42
 
 # Ruling: the ids pull request, Product
 
-DRAFT for andaro74 as Product. Not ruled until this line is replaced by one that starts with the two words the gate reads.
+Ruled by andaro74 as Product, 2026-10-03, as written.
 
 Dates in this file are UTC.
 
