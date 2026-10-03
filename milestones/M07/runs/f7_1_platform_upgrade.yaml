@@ -26,8 +26,22 @@
 seed: S1
 falsifiers: [F7.1]
 principal: the platform's App agentkeel-upgrades opens the pull request, and agentkeel-platform (5144253) checks it; the owner re-makes the template and merges as the agent's seats
+# Stated at M07 PR 4, 2026-10-03, before the re-make (milestones/M07/runs/
+# pr4_expected.md, attempt 2): the template is re-made from agentkeel's
+# main at 36c97dd (the merge of #42, the ids pull request), not from PR 2's
+# merge as planned, since the ids reached main only there. The one
+# platform-owned file the pull request is expected to change, in each
+# repository, is manifest.yaml, one line: `platform_version: m06` to
+# `platform_version: 36c97ddaee93`. server.py and __init__.py are
+# byte-identical between the live template (a4c3788) and the re-make.
+# README.md and .template-source.json change in the template and are not
+# platform-owned, so no pull request carries them. Minor, if read as
+# stated: the platform check at main passes both agents' heads as they
+# stand. window-check is the timed run's repository (Product named the
+# agent on 2026-10-03).
 repositories:
   - agentkeel-studio/owner-check
+  - agentkeel-studio/window-check
 attempts:
   - what: the template re-made from M07 PR 2's merge, and the draft pull request the platform opens in each agent repository behind it
     command: "`python scripts/make_template.py --out DIR` at agentkeel's main after PR 2's merge, pushed by the owner to agent-template's default branch; then nothing: platform-upgrade.yml runs every 15 minutes from main"

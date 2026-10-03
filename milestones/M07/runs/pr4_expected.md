@@ -108,3 +108,54 @@ marker is off in the same commit.
 - `agentkeel-studio/window-check` created 2026-10-03T01:01:33Z from
   `agent-template` (`main` at `8d2bfb4`); ruleset 24400101 `platform`,
   active; `floresinnovations` invited with write at 01:01:49Z.
+
+## Attempt 2: the platform upgrade (S1; SPEC/07 §5 step 5)
+
+Stated 2026-10-03, after #42 merged (`36c97dd`) and before the template
+is re-made. Both agents exist at the version before: `owner-check`
+(`5249dec`, deployed 2026-10-02) and `window-check` (`1c5b6ff`, deployed
+2026-10-03), each with `platform_version: m06`.
+
+### What is made
+
+- **The owner**, once, by hand: `python scripts/make_template.py --out
+  DIR` at `agentkeel`'s `main` at `36c97dd`, and the result pushed to
+  `agentkeel-studio/agent-template`'s default branch as one commit by
+  `andaro74`. GitHub's push record of that commit is the trigger.
+- **The platform**, by itself: `platform-upgrade.yml` on `main` (every
+  15 minutes; the first keyed run on `main` at `36c97dd`, 37093799719,
+  planned both agents "at m06" and opened nothing) reads the template's
+  head, finds both agents behind, and opens one draft pull request in
+  each repository as `agentkeel-upgrades`.
+- **The owner, as each agent's seats**: merges each pull request as a
+  merge commit once `agentkeel-platform`'s check passes its head, and
+  not before. No commit of the owner's on either pull request.
+- **The platform**: `deploy.yml` deploys each merge commit after the App
+  passes it.
+
+### Expected
+
+| | Expected |
+|---|---|
+| The re-made template against `a4c3788` | `manifest.yaml`: `platform_version: m06` → `36c97ddaee93`; `README.md`: four lines (Product's template-README); `.template-source.json`: the commit. `server.py`, `__init__.py`, `agent.py`, `prompt.txt`, `tools/`, `data/`: identical |
+| Each pull request | draft; author `agentkeel-upgrades[bot]`, one commit, verified; changes `manifest.yaml` only, one line; nothing under `.github/workflows/`; `created_at` within `upgrade.arrive_max_seconds` (4,500 s) of the template's push |
+| Major or minor | minor: the App passes the agent's head as it stands |
+| Merge | by `andaro74` as the seats, merge commit, with the App's success on the head; `infra/workflows.sha256` unchanged between the push and the merge |
+| Deploy | within `upgrade.deploy_max_seconds` (3,600 s) of each merge; the agent answers its goldens; registry row updated to the new commit |
+| `upgrade.F7_1.platform` at PR 4's run | read, held |
+| `upgrade.taken` | 1 of 3 (platform) |
+
+### What can go wrong, and what is done then
+
+- GitHub's schedules were late all of 2026-10-03's first hours (five-
+  minute crons firing at 28-minute gaps). `arrive_max_seconds` is 4,500 s
+  from the push to the pull request's `created_at`, and
+  `deploy_max_seconds` 3,600 s from the merge to the deploy. The owner
+  may dispatch `platform-upgrade.yml`, `platform-check.yml` and
+  `deploy.yml` from `main` with no inputs if a schedule is late; a
+  dispatch starts the platform's own job and edits nothing, and each is
+  recorded here with its time. A dispatch is not a person's edit.
+- The pull request changes a file other than `manifest.yaml`, or more
+  than the one line: F7.1 is read on what it carries; the owner does not
+  edit the pull request. Recorded.
+- A bound missed: F7.1 reads not held on that part; nothing is retried.
