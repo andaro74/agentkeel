@@ -393,9 +393,13 @@ class SecurityStack(cdk.Stack):
         App's key, so it runs in the environment `platform-observer`, and GitHub's token for a job in an
         environment carries `sub` = `...:environment:<name>`, not `...:ref:refs/heads/main`. The role trusted the
         ref form, and every keyed run was refused at AssumeRoleWithWebIdentity. The subject is the environment's
-        now. Main-only is held twice still: `job_workflow_ref` exact, `observe.yml@refs/heads/main`, and the
-        environment's own branch policy (`main` alone, no admin bypass), which the grant's reader reads back
-        before this step. Not wider: the same job, named as GitHub names it."""
+        now. In IAM, main-only rests on `job_workflow_ref` alone, exact, `observe.yml@refs/heads/main`. The
+        other half is no longer a token claim: it is the environment's branch policy (`main` alone, no admin
+        bypass), a GitHub setting a repository admin can change, which the grant's reader reads back before
+        this step. Not wider: the same job, named as GitHub names it. One run has assumed the role
+        (37123531195); none from a branch or from another workflow has been refused at it, so "main only"
+        here is read from the template and has not fired (security-reviewer N2, platform-architect F10 on
+        M07 PR 4)."""
         role = iam.Role(
             self, "ObservationPutRole", role_name=OBSERVATION_PUT_ROLE, max_session_duration=cdk.Duration.hours(1),
             assumed_by=self._github(provider, [f"{SUBJECT}:environment:{OBSERVER_ENVIRONMENT}"], MAIN_OBSERVE,

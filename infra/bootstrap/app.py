@@ -656,10 +656,13 @@ class BootstrapStack(cdk.Stack):
         # 2026-09-22, when the statement read runtime/*. These two actions on runtime/* are wider than the
         # two prefixes: the execution role may also create an endpoint on, or tag, a runtime in this account
         # that is not the platform's. No condition narrows them: the service does not say which keys the
-        # implicit check carries, and each refused create costs a stack rolled back and its retained key and
-        # table deleted by hand. With these two deployed the third create passed (run 37077850271): the
-        # list is these two. Every other runtime action stays on the two prefixes. Ruled by Security
-        # (milestones/M07/rulings/pr4-security.md).
+        # implicit check carries, and each refused create costs a stack rolled back, its retained table
+        # deleted and its retained key scheduled for deletion, by hand. With these two deployed the third
+        # create passed (run 37077850271): the list is these two. Every other runtime action stays on the
+        # two prefixes in the template; no create and no refusal has shown that (platform-architect F2 on
+        # M07 PR 4), and the Resource form `runtime/${*}`, a literal asterisk, was not tried (F1). Both
+        # deploys of this statement were made by hand from this branch before any ruling; it is put to
+        # Security in milestones/M07/rulings/pr4-security.md.
         role.add_to_policy(iam.PolicyStatement(
             sid="WhatCreateAgentRuntimeChecksOnTheRuntimeItHasNotNamedYet",
             actions=["bedrock-agentcore:CreateAgentRuntimeEndpoint", "bedrock-agentcore:TagResource"],
@@ -1431,7 +1434,10 @@ SUPPRESSIONS = {
         f"M06 PR 2 (SPEC/01 §6's key, for an agent from the template, SPEC/06 §6 item 5): kms:CreateKey and "
         f"kms:TagResource take no resource and are held to a request tagged agentkeel:agent; key/* is held to a "
         f"key carrying that tag; alias/agentkeel-* is an agent's alias, and refagent's is denied; ListAliases "
-        f"takes no resource. {CEILING}"
+        f"takes no resource. M07 PR 4: runtime/* carries two actions and no other, CreateAgentRuntimeEndpoint and "
+        f"TagResource, which CreateAgentRuntime checks before the runtime has an id (deploy runs 37066321605 and "
+        f"37074759767 were refused without them); that one statement is wider than the platform's runtimes: it "
+        f"reaches every runtime in this shared account. {CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "
