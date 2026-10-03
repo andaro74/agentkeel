@@ -1058,3 +1058,34 @@ as a repair in the close. Until it was deployed no agent from the
 template could get a runtime, and every scheduled deploy run failed the
 same way. The owner's test stays a miss: `upgrade.deploy_max_seconds`
 is 3,600, and the deploy came 32,260 s after the merge.
+
+**Before the timed run: the restatements R9 owes** (Product, at M07
+PR 4; `open.md` rows 4 and 31). SPEC/06 §7 says "five records" and
+SPEC/06 §1, its row 6 and `milestones/M06/runs/f6_3_quickstart.yaml` say
+four. The reader is the authority (`src/verdict/template.py`, `f6_3`,
+built at M06 PR 2 and not changed since): it takes the repository's
+`created_at` as the start and **times three records** after it, the
+first pull request's `merged_at`, the deploy run's `completed_at` when
+its conclusion is success, and the answer record's `last_modified` when
+one of the agent's goldens passed in it; and it **reads two more without
+timing them**, the registry row and panel 1's row, either of which
+unread makes F6.3 unread. The first pull request's refusal is F6.1's,
+not F6.3's. So: four moments, of which one is the start; two listings;
+one refusal read elsewhere. SPEC/06 §7's "five" counted the refusal.
+That text stands as written; this paragraph is what is read against.
+
+The run file said "after M06 PR 3 merges" and "PR 4's run". It is
+restated in the same commit as this paragraph: the attempt is made once,
+at M07, after PR 3 merged (`cba3aac`) and after the owner's test
+deployed (run 37077850271), and is read by M07 PR 4's run with
+`scripts/observe_template.py` and `build`, as SPEC/07 §5 step 4 has it.
+Step 4 asks for "every step above read as held". Step 3, the owner's
+test, was read and not held: F7.0 fired on the deploy's time, not on
+the path. What step 4 needs of step 3 is the path, which the same
+reading showed held end to end once the two IAM actions were granted.
+**Product ruled on 2026-10-03, before the attempt: the time bound's miss
+does not stop step 4; the run is made.** `rulings/pr4.md` carries the
+ruling. What it risks is the one attempt, on a fault nobody has seen;
+what not making it would have cost is F6.1's live half and F6.3 unread
+for good (SPEC/00 §10.5: once). The agent is named `window-check`
+(Product, the same day, in the run file).

@@ -346,3 +346,15 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   of IAM, ruled by Security and deployed by hand (`runs/pr2_by_hand.md`
   B2, twice). It is in PR 4's branch from its first commit, before the
   close is written.
+
+### Before the timed run (2026-10-03)
+
+- **Product's two restatements** (`open.md` rows 4 and 31; SPEC/07 §12
+  "the restatements R9 owes"): the reader's count of S3's records (the
+  start, three timed, two listed, the refusal F6.1's) is what SPEC/06's
+  "five" and "four" are read against; `milestones/M06/runs/f6_3_quickstart.yaml`'s
+  comment says when the attempt is made and which run reads it. The
+  run file's `observed` stays null until the attempt.
+- **Product ruled: the owner's test's miss on time does not stop the
+  timed run.** The path held end to end on run 37077850271. The agent is
+  `window-check`.
