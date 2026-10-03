@@ -90,6 +90,16 @@ attempts:
 # draft (#43) 51 s after its run began. Its envelope is RED: g-004
 # regressed under Haiku 4.5. Not merged. So the second attempt is the
 # fallback, and the list holds one entry of two until it is made.
+#
+# **The fallback restated before it is made** (Product, 2026-10-03;
+# pr4_expected.md, attempt 5): it is read on window-check's platform
+# upgrade (its pull request 2, merge e050fcc), reverted by a pull request
+# in window-check, not on owner-check's as the lines above and the second
+# attempt below say. F7.3 is read from the agent's live runtime at the
+# closing run, and owner-check is retired before that run (S2), which
+# deletes its runtime: one envelope cannot read both on one agent.
+# window-check took the same upgrade (S1 names both repositories). The
+# attempt's own lines are left as planted.
 observed:
   - what: model-watch's draft swap pull request on refagent
     repository: andaro74/agentkeel

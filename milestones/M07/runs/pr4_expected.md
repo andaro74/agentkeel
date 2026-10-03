@@ -389,3 +389,49 @@ the close.
 A third run (37127017458, on CI's envelope commit `096cecb`) waits for
 approval: GitHub asks for one on a run started by the bot's push to an
 App's branch. It measures nothing new and is not approved.
+
+#43 was closed by the owner at 13:46:04Z, unmerged; its branch stays at
+`096cecb`.
+
+## Attempt 5: the rollback, on the fallback (S3's second attempt)
+
+Stated 2026-10-03, after the swap read RED and before the revert is
+opened. **Restated by Product the same day: the fallback is read on
+`window-check`, not on `owner-check`.** F7.3 reads the agent's live
+runtime at the closing run; `owner-check` is retired before that run,
+and a retirement deletes the runtime. One envelope cannot read a
+rollback and a retirement on one agent. `window-check` took the same
+platform upgrade (#2, merge `e050fcc`, deployed 12:26:50Z).
+
+### What is made
+
+1. **andaro74**, as `window-check`'s seats: one pull request in
+   `window-check` that reverts the merge `e050fcc` (`git revert -m 1`),
+   one commit. A rollback is a person's act; F7.1 does not read it.
+2. **The platform**: `agentkeel-platform` checks the head; the owner
+   merges as a merge commit when it passes; the App passes the merge
+   commit; `deploy.yml` deploys it. Dispatches from `main` with no input
+   if a schedule is late, each recorded.
+3. Nothing reopens the upgrade: `platform-upgrade.yml` opens one pull
+   request per branch name, ever, and `platform-upgrade/36c97ddaee93`
+   was used.
+
+### Expected
+
+| | Expected |
+|---|---|
+| The revert's diff | `manifest.yaml`, one line: `platform_version: "36c97ddaee93"` → `platform_version: m06`; nothing else |
+| The tree at the revert's merge | the same bytes as before the upgrade (`1c5b6ff`), so its bundle digest is that tree's, already an image in `agentkeel/window-check`; it is not the upgrade's digest |
+| The App | passes the revert's head and its merge commit: the platform check reads no `platform_version` |
+| The deploy | success; the agent answers `g-001` and `g-002`; a new answer record for the merge commit; registry row moved to it |
+| `upgrade.F7_3` at PR 4's run | read, held, `fallback: true`: the runtime's image tags hold the tree's digest at the revert and do not hold the upgrade's |
+| `upgrade.F7_1.platform` | unchanged by this: its live reading looks for an image tagged with the upgrade's digest in the agent's repository, and images are kept |
+| `upgrade.taken` | 1 of 3 so far (platform); the model is not taken |
+
+### What makes it a miss
+
+- The runtime's image still carries the upgrade's digest after the
+  revert's deploy: F7.3 fired.
+- The tree's digest at the revert equals the upgrade's: nothing was
+  rolled back; fired.
+- The deploy of the revert fails: F7.3 unread, recorded with the reason.
