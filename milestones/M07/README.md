@@ -12,7 +12,7 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
 | Seeded commit | `c870bca` (S0 the template's repair read by CI: the owner's test, the App token's bounds); `ef3d88a` (S1 a platform bump opens a draft pull request); `3872c13` (S2 a retired agent's target is gone); `ea53ef4`, its run file made to parse in `a46c98f` (S3 a `model-watch` pull request merged and rolled back); `e814efe` (S4 panel 2 forced to show GREEN on a RED envelope, two tests, one per reader); `f36adee` (S5 a surface plant goes silent); the fixtures given their held cases and three more uncovered ones in `4240d9e`, on the PR's own review, each its own commit before any reader (SPEC/07 §5). S0 to S3 are each a fixture and a run file with `observed: null`; S4 and S5 are fixtures. SPEC/06's S3 (`b4eb959`, the timed quickstart) is received, not re-planted |
 | Expected gate output | PR 1: refagent's envelope as at M06; it says nothing about claim 7. `make plants` lists S0 to S5 (seeded cases, not golden plants); `tests/test_m07_seeds.py` shows 13 expected failures, and `tests/test_m06_seeds.py` still 1 (S3's). PR 2, on the PR: the nine fixture tests pass, each by its reader, and the four run-file tests stay expected failures; from PR 2's merge the gate requires `F7_0` to `F7_5` on every agent envelope, **from the seed tests alone: test-only witnesses**. The live readings are **recorded in the envelope's `upgrade` and read by this row's cell, with `template`, not gated** (SPEC/07 §4): the observer writes raw observations with the viewpoint it read from, and `build` rules on them. **A named P3 exception (SPEC/07 §5.1):** the platform check, the deploy, `platform-upgrade`, `model-watch` and the retire job run from `agentkeel`'s `main`, and the App's grant is made by hand after PR 2 merges, when `main` no longer mints a token with no repository. The platform check dispatched from a branch is attempted first, before any grant, and must be read as refused. Then, after PR 2's merge, each stated before and pushed: the grant made and read back; SPEC/06's S2 read on a new head; the owner's test, steps 2 to 4; SPEC/06's S3 timed once by `floresinnovations`; the template re-made and S1's pull requests; the App's token asked to relax a ruleset; `model-watch`'s swap to Haiku 4.5 and its rollback (independent of the others; its two pull requests on `main` are outside the cap); `owner-check` retired, last. PR 3 is the repair and carries every attempt's `observed` entry to `main`; PR 4 is the close. **Amended at PR 3 (Product, `rulings/pr3.md`): that cannot hold. The owner's test's deploy failed in the platform's own `deploy.yml` (run 37023118799), the deploy runs from `main`, and no later attempt can be made until the fix is merged. So PR 3 is the workflow fix and every repair owed before the next attempts, merged once, and carries one `observed` entry, the owner's test's; PR 4 carries every other attempt's entry and is the close, so those are read from the anonymous viewpoint alone (SPEC/07 §4). The owner's test is not re-made: its deploy missed `upgrade.deploy_max_seconds`, F7.0 fired, and this row is expected to close RED.** **The cell cites PR 4's run's envelope**, which carries the App-viewpoint observation `main`'s scheduled observer made, named, beside its own anonymous one. Stated at open: the owner's test's new head refused on the seats and the goldens and nothing else, its fixed head merged, deployed within 3,600 s, answering and listed; S1's draft pull request from the App within 4,500 s, platform-owned files only, no person's edit, major or minor as read; S2 retired within 3,600 s of its pull request's merge, its one invocation refused; a revert leaving the tree's digest live. Haiku 4.5's envelope is **not stated**: it has never been run. If it is RED the swap is not merged, F7.3 is read on `owner-check`'s platform upgrade reverted, and `upgrade.taken` stays under 3. The measured value is `upgrade.taken`, n of 3. RED if F7.0 is unread or fired; if `taken` is under 3; if a trigger gets no pull request from the platform, or one that needed a workflow or a person's edit; if the retired agent answers or its runtime stands; if a revert leaves the upgrade's digest live; if panel 2 shows GREEN on a RED envelope or the surfaces' counts differ; if a seed's test passes but by its reader; if PR 4's run cannot read an attempt; or if `make ledger` stops matching rows 0 to 6 |
 | Measured | — |
-| PRs used / cap | 3 / 4 |
+| PRs used / cap | 4 / 4; the close is a fifth (RED by the cap, Product, `rulings/grant-ids.md`) |
 | State | OPEN |
 
 ### Open detail (PR 1, 2026-10-01)
@@ -358,3 +358,43 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
 - **Product ruled: the owner's test's miss on time does not stop the
   timed run.** The path held end to end on run 37077850271. The agent is
   `window-check`.
+
+### The ids pull request (#42, 2026-10-03): the fourth, so the close is a fifth
+
+- **What it carries.** Two lines in `infra/platform_grant.yaml`: the ids
+  of `agentkeel-upgrades` (5169860) and `agentkeel-observer` (5169892),
+  made by the human on 2026-10-03 UTC (the evening of the 2nd on the
+  human's clock) and read back with the permissions the grant block
+  names and no more. Nothing else. `make validate` (20 checks) and
+  `make ledger` (exit 0) pass on the cell's new form; at the close the
+  cell reads `5 / 4`.
+- **Why it is a pull request of its own.** Every keyed job reads the
+  grant from `main`'s checkout, and each App's key sits in an environment
+  that deploys from `main` alone. With `app_id: null` on `main`, the
+  upgrade pull requests (S1), the model swap and the retirement cannot
+  be opened, and the relaxation waits on S1. The ids were to go to `main`
+  in PR 3 (`runs/pr2_by_hand.md` A4); the Apps were made after PR 3
+  merged. That is the finding: a by-hand precondition missed its pull
+  request, and the branch for PR 4 is the close, which cannot merge
+  before the attempts it records.
+- **What it costs.** M07's cap is four pull requests. This is the fourth,
+  and the close will be the fifth: **a RED close by the cap's rule**
+  (CLAUDE.md: "A fifth PR is a RED close with the finding as the
+  result"). No cap raise is proposed. Row 7 was already expected to close
+  RED on F7.0; the colour does not change, the reasons are two.
+- **The alternative, not taken** (Product, 2026-10-03): carry the ids in
+  the close and leave S1, the relaxation, the swap and the retirement to
+  M08, with F7.1 to F7.5 unread. Also RED, and less measured.
+- **#41, the same content, closed unmerged.** Its one commit `ced3b8a`
+  was authored as `floresinnovations`: the quickstart's
+  `git config --global` lines for the timed run's developer had been run
+  on the owner's own Windows account, and the session's checkout
+  inherited them. A Security-path change does not reach `main` under an
+  account with no write to this repository, and the author could not be
+  corrected without overwriting CI's envelope commit on that branch, so
+  #41 was closed (its branch and envelope kept) and #42 opened by
+  `andaro74`. The same mistake reached `m07-pr4` once (`d79915c`, the
+  timed run's record, no PR and no CI commit on top): amended to
+  `78aac19` and force-pushed with a lease on that commit alone, on
+  Product's word, 2026-10-03. A closed, unmerged pull request is not
+  one of the cap's.
