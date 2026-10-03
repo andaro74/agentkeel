@@ -35,7 +35,7 @@ pr: 44
 
 # Ruling: M07 PR 4, Security
 
-DRAFT for andaro74 as Security. Not ruled until this line is replaced by one that starts with the two words the gate reads.
+Ruled by andaro74 as Security, 2026-10-03, as written.
 
 Dates and times are UTC. Each item is a recommendation with its
 alternative. The seat rules it by the line above; a different ruling on

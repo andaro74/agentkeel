@@ -44,7 +44,7 @@ amended (`78aac19`) and the other never merged (#41). At the close the
 seed tests read 13 passed (`tests/test_m07_seeds.py`) and 8 passed
 (`tests/test_m06_seeds.py`).
 
-Signed:
+Signed: andaro74  Date: 2026-10-03
 
 ---
 
@@ -79,7 +79,7 @@ keys are gone (pending deletion until 2026-10-09); that nothing else
 changed in the security account (one person's word); and any control in
 SPEC/07 §8 or §12 that no seed attempted.
 
-Signed:
+Signed: andaro74  Date: 2026-10-03
 
 ---
 
@@ -98,7 +98,7 @@ kept is for `2c02cff`, p95 3,258 ms. Not merged. No "second run" in
 ADR-0011's sense was made and none was owed (the rule allows one after
 a p95 miss only). refagent's pin on `main` is unchanged. No candidate is named now.
 
-Signed:
+Signed: andaro74  Date: 2026-10-03
 
 ---
 
@@ -119,4 +119,4 @@ afterwards is filed as it. Every finding and every Unsure item of #38,
 with a seat and a milestone, and #44's own are listed in
 `rulings/pr4.md` section 7 and ruled by that file's first line.
 
-Signed:
+Signed: andaro74  Date: 2026-10-03
