@@ -470,3 +470,52 @@ to the close's list.
 
 The observed entry is in `runs/f7_3_rollback.yaml` (two of two); S3's
 run-file test's marker is off.
+
+## Attempt 6: owner-check retired (S2), last
+
+Stated 2026-10-03, after the rollback and before the dispatch. One-way:
+nothing restores the runtime. `runs/f7_2_removed_and_kept.md` says what
+is removed and what is kept; no retirement has ever run through this
+path.
+
+### What is made
+
+1. **andaro74**, once: `gh workflow run deploy.yml --ref main -f
+   retire=owner-check`. `retire-plan` plans it; `retire-open`, in
+   `platform-upgrades`, opens one draft pull request in `owner-check`
+   as `agentkeel-upgrades`, changing `manifest.yaml`'s `rollout` to
+   `retired` and nothing else.
+2. **The owner, as the seats**: marks it ready and merges it as a merge
+   commit once `agentkeel-platform`'s check passes its head. No commit of
+   the owner's.
+3. **The platform**: after the App passes the merge commit, the next
+   `deploy.yml` run (dispatched with no input if the schedule is late)
+   finds the retired head and runs `retire-agent`: it holds the retired
+   head's manifest to the deployed one's but for `rollout`, updates the
+   stack to a template without the runtime, invokes the runtime's ARN
+   once and expects `ResourceNotFoundException`, writes
+   `envelopes/agents/owner-check/retired.json` once, and sets
+   `retired_at` on the registry row.
+
+### Expected
+
+| | Expected |
+|---|---|
+| The pull request | draft; author `agentkeel-upgrades[bot]`, one verified commit; `manifest.yaml`, one line, `rollout: all-at-once` → `retired`; `created_at` within 4,500 s of the dispatched run's `created_at` |
+| Merge | by andaro74 with the App's success on the head; no person's commit |
+| The runtime | `DeleteAgentRuntime` for `agentkeel_owner_check-G4vMbRB3Dx` in CloudTrail within `upgrade.retire_max_seconds` (3,600 s) of `merged_at`; `GetAgentRuntime` on its ARN refused as not found; the retire job's one invocation refused the same way |
+| Kept | the stack (updated, not deleted), the key, the rights table, the image repository, the registry row with `retired_at`, the answer records, `bundles/owner-check/`, and `retired.json` |
+| After it | no answer record under `envelopes/agents/owner-check/` later than the deletion; the deploy never redeploys the name |
+| `upgrade.F7_2` at PR 4's run | read, held |
+| `upgrade.taken` | 2 of 3: platform and retirement; the model was not taken |
+
+### What can go wrong, and what is done then
+
+- The execution role is refused something a delete checks that no
+  create or update has: a fourth IAM finding. The stack update rolls
+  back, the runtime stands, the job fails and the row stays open
+  (`f7_2_removed_and_kept.md`). The repair would be a grant, yours to
+  rule; the bound of 3,600 s runs from the merge whatever happens.
+- The invocation after the update answers: F7.2 fired. Recorded; the
+  job fails and writes no `retired_at`.
+- The App's pull request carries more than the one line: read as it is.
