@@ -47,4 +47,16 @@ attempts:
     command: "`python scripts/make_template.py --out DIR` at agentkeel's main after PR 2's merge, pushed by the owner to agent-template's default branch; then nothing: platform-upgrade.yml runs every 15 minutes from main"
     refused_when: there is no falsifier to refuse; F7.1 holds when, in each repository, one draft pull request authored by the App exists with `created_at` within upgrade.arrive_max_seconds (4,500 s) of GitHub's push record of the template's commit; it changes platform-owned files only (manifest.yaml's platform_version and guardrail, server.py, __init__.py) and no file under .github/workflows/; every commit on it is the App's; it merged with the App's platform-check a success on its head; infra/workflows.sha256 in agentkeel is unchanged between the push and the merge; and the deploy run of the merge completed within upgrade.deploy_max_seconds
     recorded_when: the observer reads the template's push, each pull request with its commits' authors and files, its checks, its merge, and the deploy run
-observed: null
+# Made on 2026-10-03, as stated in milestones/M07/runs/pr4_expected.md
+# (attempt 2, pushed before the template's push). One entry per repository
+# named above: the attempt is one, the pull requests are two. The observer
+# reads the rest from GitHub and AWS; `build` rules on it.
+observed:
+  - what: the draft pull request the platform opened in owner-check
+    repository: agentkeel-studio/owner-check
+    pull_request: 3
+    at: '2026-10-03T12:18:18Z'
+  - what: the draft pull request the platform opened in window-check
+    repository: agentkeel-studio/window-check
+    pull_request: 2
+    at: '2026-10-03T12:18:25Z'

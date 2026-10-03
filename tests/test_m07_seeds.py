@@ -302,12 +302,15 @@ def test_s1_a_platform_upgrade_changes_platform_owned_files_only():
     assert changed["server.py"] == (platform / "server.py").read_text(encoding="utf-8")
 
 
-@expected_failure
 def test_s1_the_platform_upgrade_was_made():
-    """The template re-made from M07 PR 2's merge, and the draft pull request the platform must open
-    in owner-check. Made after the owner's test and the timed run (SPEC/07 §5.1), read by the observer."""
+    """The template re-made, and the draft pull request the platform must open in each repository the run
+    file names: owner-check, and the timed run's (added when Product named its agent, as the file says).
+    Made after the owner's test and the timed run (SPEC/07 §5.1), read by the observer. One attempt, one
+    observed entry per repository: `made` counts one per attempt, which fits one repository only."""
     run = run_file("f7_1_platform_upgrade.yaml", "S1", 1)
-    observed = made(run)
+    observed = run["observed"]
+    assert observed is not None, "seed S1: the attempt has not been made"
+    assert sorted(o.get("repository") for o in observed) == sorted(run["repositories"]), "one entry per repository named"
     assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
 
 

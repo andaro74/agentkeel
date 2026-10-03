@@ -170,6 +170,21 @@ is re-made. Both agents exist at the version before: `owner-check`
 | 03:47:44 | `owner-check` #3 opened by `agentkeel-upgrades[bot]`, draft, one verified commit `3bfe95b` (committer `web-flow`), `manifest.yaml` one line, "minor", 147 s after the push |
 | 03:47:49 | `window-check` #2 the same: `8d55170`, 152 s after the push |
 | 03:51 | both drafts open, unchecked and unmerged; the session ended for the night here. Nothing moves by itself before the merges: the deploy bound runs from each merge, and the App checks the draft heads at its next tick |
+| 03:51:33, 03:51:36 | the App (5144253) passed `3bfe95b` and `8d55170` |
+| 12:18:18 | `owner-check` #3 marked ready and merged by andaro74, merge commit `840f5ab`; the pull request still one commit, the App's |
+| 12:18:25 | `window-check` #2 the same, merge commit `e050fcc` |
+| 12:18:41 | the owner dispatched `platform-check.yml` (37122453034); the App passed both merge commits at 12:20:47 and 12:20:51 |
+| 12:21:33 | the owner dispatched `deploy.yml` (37122613011) |
+| 12:24:41 | `owner-check` at `840f5ab`: stack updated, `g-001` and `g-002` answered in the runtime, GREEN, bundle put (first), answer record put (first), registry row; job completed 12:24:45, **387 s** after its merge |
+| 12:26:50 | `window-check` at `e050fcc`: the same; job completed 12:26:55, **510 s** after its merge |
+
+Both under `upgrade.deploy_max_seconds` 3,600; both drafts within
+`upgrade.arrive_max_seconds` 4,500 (147 s and 152 s). `main` of
+`agentkeel` did not move between the template's push and the merges
+(`36c97dd`), so `infra/workflows.sha256` is unchanged. The owner's part
+was three dispatches and two merges: no commit, no edit. The observed
+entries are in `f7_1_platform_upgrade.yaml`; its seed test's marker is
+off, and counts one entry per repository the file names.
 
 The new value is written quoted (`"36c97ddaee93"`) where the template
 writes it bare; the same YAML string. The first keyed `observe.yml` run
