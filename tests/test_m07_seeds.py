@@ -309,6 +309,8 @@ def test_s1_the_platform_upgrade_was_made():
     run = run_file("f7_1_platform_upgrade.yaml", "S1", 1)
     observed = run["observed"]
     assert observed is not None, "seed S1: the attempt has not been made"
+    # Cold review F5 on M07 PR 4: with nothing named, an empty list of entries passed.
+    assert "agentkeel-studio/owner-check" in run["repositories"], "S1 names owner-check, as planted"
     assert sorted(o.get("repository") for o in observed) == sorted(run["repositories"]), "one entry per repository named"
     assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
 

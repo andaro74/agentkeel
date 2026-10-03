@@ -702,6 +702,11 @@ def test_the_execution_role_holds_on_any_runtime_only_what_create_agent_runtime_
                     (s["Resource"] if isinstance(s["Resource"], list) else [s["Resource"]]))]  # fmt: skip
     assert len(wide) == 1 and wide[0]["Sid"] == "WhatCreateAgentRuntimeChecksOnTheRuntimeItHasNotNamedYet"
     assert actions(wide[0]) == {"bedrock-agentcore:CreateAgentRuntimeEndpoint", "bedrock-agentcore:TagResource"}
+    assert "Condition" not in wide[0], "no condition narrows it, as the comment says: a condition added later is said there"
+    # Cold review N8 on M07 PR 4: "only" also means no runtime action on Resource "*" but the create itself.
+    on_any = [s for s in statements if s.get("Effect") == "Allow" and s.get("Resource") == "*"
+              and any(a.startswith("bedrock-agentcore:") for a in actions(s))]  # fmt: skip
+    assert [actions(s) for s in on_any] == [{"bedrock-agentcore:CreateAgentRuntime"}]
     (narrow,) = [s for s in statements if s.get("Sid") == "TheRuntimeAndItsWorkloadIdentity"]
     assert not any(":runtime/*" in json.dumps(r) for r in narrow["Resource"])
 

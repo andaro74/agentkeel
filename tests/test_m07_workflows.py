@@ -90,11 +90,12 @@ def test_no_input_or_matrix_value_is_interpolated_into_a_keyed_jobs_script():
     for name, job, _environment, body in keyed_jobs():
         for step in body["steps"]:
             assert "${{" not in str(step.get("run", "")), f"{name} {job}: {step.get('name')}"
-    # And the two dispatch inputs reach their scripts through env.
-    post = load("platform-check.yml")["jobs"]["post"]
-    relax = next(s for s in post["steps"] if "relax" in str(s.get("run", "")))
-    assert relax["env"]["RELAX_SEED"] == "${{ inputs.relax_seed }}" and '--agent "$RELAX_SEED"' in relax["run"]
-    assert relax["if"] == "github.event_name == 'workflow_dispatch' && inputs.relax_seed != ''"
+    # And the one dispatch input left reaches its script through env. The seeded relaxation's input and
+    # step are gone (M07 PR 4, item 13n): made once, on 2026-10-03, and no dispatch asks for it again.
+    check = load("platform-check.yml")
+    assert not ((check.get("on") or check.get(True))["workflow_dispatch"] or {}).get("inputs")
+    assert not [s for s in check["jobs"]["post"]["steps"] if "relax" in str(s.get("run", "")) or "relax" in str(s.get("with", ""))]
+    assert "inputs." not in str(check["jobs"]["post"].get("if"))
     plan = next(s for s in load("deploy.yml")["jobs"]["retire-plan"]["steps"] if s.get("id") == "plan")
     assert plan["env"]["RETIRE"] == "${{ inputs.retire }}" and '--name "$RETIRE"' in plan["run"]
 
