@@ -227,7 +227,6 @@ def test_s2_a_stand_in_for_the_platform_check_was_refused():
 # --- S3: the timed quickstart ----------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="S3 is timed after M06 PR 2 merges (SPEC/06 §5.1)")
 def test_s3_the_timed_quickstart_was_made():
     """The second developer runs the quickstart once, from the repository's created_at to the last of
     its four records (F6.3), with the first pull request refused on its planted reasons (F6.1's live

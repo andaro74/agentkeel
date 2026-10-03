@@ -1,0 +1,610 @@
+# M07 PR 4: each attempt stated before it is made, and what PR 4's run is expected to read
+
+Each section is pushed before the attempt it states (SPEC/06 §2 "stated
+before"; `milestones/M06/open.md` row 17). The run that reads them all is
+PR 4's, on the close PR, after the last attempt. What the run read is
+written beside each statement afterwards, not edited into it.
+
+## Attempt 1: the timed run (SPEC/06's S3; SPEC/07 §5 step 4)
+
+Stated 2026-10-03, before the repository exists. Product ruled the same
+day that the owner's test's miss on time does not stop this attempt
+(SPEC/07 §12). `milestones/M06/runs/f6_3_quickstart.yaml` names the agent
+`window-check` and holds `observed: null` until the attempt is made.
+
+### Who does what
+
+- **andaro74**, the owner, not timed until the first command: creates
+  `agentkeel-studio/window-check` from `agentkeel-studio/agent-template`
+  (at `a4c3788`), applies the ruleset from `infra/ruleset/agent.post.json`,
+  gives `floresinnovations` write. The repository's `created_at` is the
+  start of the clock.
+- **floresinnovations** (id 336113686), on the fresh Windows profile with
+  no AWS credential, follows `docs/developer/quickstart.md` steps 1 to 8
+  as written: clone, branch, name the agent `window-check`, open the
+  pull request **before** touching seats or goldens, wait for the App's
+  failure, fill the seven seats with `andaro74`, write one ordinary and
+  one trap golden citing rows and clauses in the repository's own `data/`,
+  push, wait for the App's success, merge as a merge commit, watch the
+  deploy, find the row in panel 1. The screen is captured throughout
+  (Act 1).
+- **The platform**, by itself: `platform-check.yml` every five minutes
+  posts the App's check on each head; `deploy.yml` every ten minutes
+  deploys the merged head, asks the agent its goldens, puts the bundle
+  and the answer record in the security account, writes the registry row.
+- **Nobody** touches `owner-check`, its pull request 2, the platform's
+  workflows or any AWS resource during the run.
+
+### Expected reading, PR 4's run (`template` and `upgrade` on its envelope)
+
+| Reading | Expected |
+|---|---|
+| `template.F6_1` | read, held: the first pull request's first commit carries the template's seven null seats and no golden; the App (5144253) failed it with reasons naming both `seats assigned...` and `an agent's goldens...`; no faulty commit passed; merged at a head the App passed; the ruleset requires `platform-check` from the App |
+| `template.F6_3` | read, held: `created_at`, `merged_at`, `deployed_at` (the deploy run's completion, success), `answered_at` (the answer record, one golden passed) all read; the registry row `window-check` and panel 1's row read; elapsed under `quickstart.max_seconds` 28,800 |
+| `template.F6_4` | read, held: panel 1's rows equal the registry's (`refagent`, `owner-check`, `window-check`) |
+| `template.F6_2` | as at PR 3: read, not held, "behind" (owner-check #2 is not touched) |
+| `upgrade.F7_0.timed_run` | read, held: the timed run's agent listed |
+| `upgrade.F7_0.owner_test` | read, not held: "deployed 32260 s after the merge, over upgrade.deploy_max_seconds 3600" (the sentence changes from PR 3's; the miss does not) |
+| `upgrade.taken` | 0 of 3 until the later attempts |
+
+Expected elapsed, if nothing fails: under 3,600 s. The App's check comes
+within about five minutes of a push; the deploy within about ten minutes
+of the merge and takes about seven. The bar is eight hours.
+
+### What makes it a miss, and what is done then
+
+- The first pull request mergeable before the App's failure, or the App
+  passing a commit with a null seat or no golden: F6.1 fired. Nothing is
+  retried; the run file records it.
+- The deploy refused at the runtime again: a third IAM action nobody has
+  seen. The stack rolls back; the clock keeps running; the repair is a
+  grant, and whether the attempt is continued after it is Product's.
+  F6.3 reads elapsed from `created_at` whatever happens in between.
+- Over 28,800 s: F6.3 fired. Recorded as the measured value; a second
+  timing is a second attempt beside the first and not the measured one.
+- The repository deleted or renamed during the run: recorded, never
+  replaced.
+
+### What is installed on the profile
+
+The run file asks for this list in a commit pushed before the repository
+is created. **It was not**: the repository was created at 01:01:33Z
+before the list was sent. The list is added below when it arrives, dated,
+and stands as listed after the start. Nothing reads it.
+
+### What happened (written after; the statement above is not edited)
+
+Times are GitHub's and AWS's.
+
+| When (UTC) | What |
+|---|---|
+| 01:00:11 | statement pushed (`a490d5d`) |
+| 01:01:33 | `agentkeel-studio/window-check` created; ruleset 24400101; floresinnovations invited (01:01:49) |
+| 01:13:02 | first commit `c83fa6f`, "Name the agent": the manifest also carried a stray `i` at the start of line 2 (the developer's editor), so it was not YAML |
+| 01:21:49 | the scheduled check ran (the previous was 00:53:45: GitHub's five-minute schedule skipped 28 minutes); the App failed `c83fa6f` at 01:22:49 with **one** reason, `the agent's name: manifest.yaml: not YAML (ParserError)`. Not the planted fault's two reasons: F6.1 is expected to read **not held** on this commit, "refused, and not for its planted fault" |
+| 01:26:06 | second commit `74e7feb`, the stray character removed, seats still null, no golden (Product chose to continue #1 rather than open a second pull request, so that the record keeps the first) |
+| 01:34:41 | the owner dispatched `platform-check.yml` from `main` (37086621844) after eight minutes with no scheduled run; the App failed `74e7feb` at 01:35:39 for exactly the two planted reasons: seven seats unassigned, 0 ordinary and 0 trap goldens |
+| 01:42:14 | third commit `7e27a03`: seats `andaro74`, `g-001` (ordinary, `r-038`, `ML-2.1`), `g-002` (trap, `r-016`, `HS-2`) |
+| 01:43:30 | the owner dispatched the check again; the schedule fired the same minute, the dispatch was cancelled by the concurrency group, and the scheduled run (37087187702) passed `7e27a03` at 01:44:46 |
+| 01:47:40 | merged by floresinnovations, merge commit `1c5b6ff` |
+| 01:49 | the owner dispatched `deploy.yml` (37087589740): nothing to deploy, the App had not yet checked the merge commit |
+| 01:51:45 | the owner dispatched the check (37087696839); the App passed `1c5b6ff` at 01:53:17 |
+| 01:54:22 | **scheduled** deploy run 37087860298 started; stack `agentkeel-window-check` created, runtime `agentkeel_window_check-YBt5st7kMX`; `g-001` and `g-002` answered in it, 2 observations, 0 errors, GREEN; `bundles/window-check/1c5b6ff….tar` and `.cosign.json` put, first; the answer record put, first; registry row at **02:01:44**; the run completed 02:01:48 |
+| 01:56:03 | the owner's second deploy dispatch (37087964107) found nothing left: already deployed |
+
+Elapsed as the reader will take it: `created_at` 01:01:33 to the last
+timed record (the deploy run's completion, 02:01:48) is **3,615 s**,
+under 28,800. Panel 1's row is read by the observer at PR 4's run, not
+here. The two IAM actions granted on 2026-10-02 were exercised a second
+time by this create, and no third was asked for.
+
+The observed entry is in `milestones/M06/runs/f6_3_quickstart.yaml`
+(repository, pull request 1, `window-check`, 02:01:44Z); its seed test's
+marker is off in the same commit.
+
+### Started
+
+- Statement on GitHub: `a490d5d`, committed 2026-10-03T01:00:11Z.
+- `agentkeel-studio/window-check` created 2026-10-03T01:01:33Z from
+  `agent-template` (`main` at `8d2bfb4`); ruleset 24400101 `platform`,
+  active; `floresinnovations` invited with write at 01:01:49Z.
+
+## Attempt 2: the platform upgrade (S1; SPEC/07 §5 step 5)
+
+Stated 2026-10-03, after #42 merged (`36c97dd`) and before the template
+is re-made. Both agents exist at the version before: `owner-check`
+(`5249dec`, deployed 2026-10-02) and `window-check` (`1c5b6ff`, deployed
+2026-10-03), each with `platform_version: m06`.
+
+### What is made
+
+- **The owner**, once, by hand: `python scripts/make_template.py --out
+  DIR` at `agentkeel`'s `main` at `36c97dd`, and the result pushed to
+  `agentkeel-studio/agent-template`'s default branch as one commit by
+  `andaro74`. GitHub's push record of that commit is the trigger.
+- **The platform**, by itself: `platform-upgrade.yml` on `main` (every
+  15 minutes; the first keyed run on `main` at `36c97dd`, 37093799719,
+  planned both agents "at m06" and opened nothing) reads the template's
+  head, finds both agents behind, and opens one draft pull request in
+  each repository as `agentkeel-upgrades`.
+- **The owner, as each agent's seats**: merges each pull request as a
+  merge commit once `agentkeel-platform`'s check passes its head, and
+  not before. No commit of the owner's on either pull request.
+- **The platform**: `deploy.yml` deploys each merge commit after the App
+  passes it.
+
+### Expected
+
+| | Expected |
+|---|---|
+| The re-made template against `a4c3788` | `manifest.yaml`: `platform_version: m06` → `36c97ddaee93`; `README.md`: four lines (Product's template-README); `.template-source.json`: the commit. `server.py`, `__init__.py`, `agent.py`, `prompt.txt`, `tools/`, `data/`: identical |
+| Each pull request | draft; author `agentkeel-upgrades[bot]`, one commit, verified; changes `manifest.yaml` only, one line; nothing under `.github/workflows/`; `created_at` within `upgrade.arrive_max_seconds` (4,500 s) of the template's push |
+| Major or minor | minor: the App passes the agent's head as it stands |
+| Merge | by `andaro74` as the seats, merge commit, with the App's success on the head; `infra/workflows.sha256` unchanged between the push and the merge |
+| Deploy | within `upgrade.deploy_max_seconds` (3,600 s) of each merge; the agent answers its goldens; registry row updated to the new commit |
+| `upgrade.F7_1.platform` at PR 4's run | read, held |
+| `upgrade.taken` | 1 of 3 (platform) |
+
+### What can go wrong, and what is done then
+
+- GitHub's schedules were late all of 2026-10-03's first hours (five-
+  minute crons firing at 28-minute gaps). `arrive_max_seconds` is 4,500 s
+  from the push to the pull request's `created_at`, and
+  `deploy_max_seconds` 3,600 s from the merge to the deploy. The owner
+  may dispatch `platform-upgrade.yml`, `platform-check.yml` and
+  `deploy.yml` from `main` with no inputs if a schedule is late; a
+  dispatch starts the platform's own job and edits nothing, and each is
+  recorded here with its time. A dispatch is not a person's edit.
+- The pull request changes a file other than `manifest.yaml`, or more
+  than the one line: F7.1 is read on what it carries; the owner does not
+  edit the pull request. Recorded.
+- A bound missed: F7.1 reads not held on that part; nothing is retried.
+
+### What happened (written after; the statement above is not edited)
+
+| When (UTC) | What |
+|---|---|
+| 03:44 | statement pushed (`096c295` on `m07-pr4`) |
+| 03:45:17 | the template re-made from `36c97dd` and pushed by andaro74: `66ca2e4`, three files (`manifest.yaml` one line, `README.md` 4/3, `.template-source.json`) |
+| 03:46:58 | the owner dispatched `platform-upgrade.yml` from `main` (37094346708; its last scheduled run was 03:37, before the push) |
+| 03:47:44 | `owner-check` #3 opened by `agentkeel-upgrades[bot]`, draft, one verified commit `3bfe95b` (committer `web-flow`), `manifest.yaml` one line, "minor", 147 s after the push |
+| 03:47:49 | `window-check` #2 the same: `8d55170`, 152 s after the push |
+| 03:51 | both drafts open, unchecked and unmerged; the session ended for the night here. Nothing moves by itself before the merges: the deploy bound runs from each merge, and the App checks the draft heads at its next tick |
+| 03:51:33, 03:51:36 | the App (5144253) passed `3bfe95b` and `8d55170` |
+| 12:18:18 | `owner-check` #3 marked ready and merged by andaro74, merge commit `840f5ab`; the pull request still one commit, the App's |
+| 12:18:25 | `window-check` #2 the same, merge commit `e050fcc` |
+| 12:18:41 | the owner dispatched `platform-check.yml` (37122453034); the App passed both merge commits at 12:20:47 and 12:20:51 |
+| 12:21:33 | the owner dispatched `deploy.yml` (37122613011) |
+| 12:24:41 | `owner-check` at `840f5ab`: stack updated, `g-001` and `g-002` answered in the runtime, GREEN, bundle put (first), answer record put (first), registry row; job completed 12:24:45, **387 s** after its merge |
+| 12:26:50 | `window-check` at `e050fcc`: the same; job completed 12:26:55, **510 s** after its merge |
+
+Both under `upgrade.deploy_max_seconds` 3,600; both drafts within
+`upgrade.arrive_max_seconds` 4,500 (147 s and 152 s). `main` of
+`agentkeel` did not move between the template's push and the merges
+(`36c97dd`), so `infra/workflows.sha256` is unchanged. The owner's part
+was three dispatches and two merges: no commit, no edit. The observed
+entries are in `f7_1_platform_upgrade.yaml`; its seed test's marker is
+off, and counts one entry per repository the file names.
+
+The new value is written quoted (`"36c97ddaee93"`) where the template
+writes it bare; the same YAML string. The first keyed `observe.yml` run
+on `main` with the ids had not fired by 03:51 (the last, 03:23, was on
+`cba3aac`).
+
+## Attempt 3: the App's token asked to relax owner-check's ruleset (S0's third attempt)
+
+Stated 2026-10-03, after `owner-check` took the platform upgrade
+(merged 12:18:18Z, deployed 12:24:41Z) and before it is retired, as
+`runs/f7_0_owner_test.yaml` has it. Made once.
+
+### What is made, in order
+
+1. **The call.** andaro74 dispatches, once:
+   `gh workflow run platform-check.yml --ref main -f relax_seed=owner-check`.
+   The `post` job, in `platform-app`, mints the App's `rulesets` token
+   for `agentkeel-studio/owner-check` and asks GitHub to put ruleset
+   24310403 back without its `required_status_checks` rule. GitHub's
+   answer is kept as the artifact `relax-seed`. The run's `created_at`
+   is the time of the call. **Nothing on `main` stops a second
+   dispatch** (the observed entry is on `m07-pr4`): it is the human who
+   makes it once.
+2. **A new head while the ruleset is changed.** andaro74 pushes one
+   empty commit to a new branch of `owner-check` and opens a pull
+   request from it. It is never merged.
+3. **Detection.** The next `platform-check.yml` run (dispatched with no
+   input if the schedule is late) fails that head, and its reasons name
+   `the repository's ruleset is the export`.
+4. **The restore.** andaro74, with the owner's own token:
+   `gh api --method PUT repos/agentkeel-studio/owner-check/rulesets/24310403 --input infra/ruleset/agent.post.json`,
+   then reads it back equal to `infra/ruleset/agent.json`. After the
+   detection, not before: the reader takes the ruleset's own
+   `updated_at` as the restore only when it is after the failing check.
+5. **A head passed after the restore.** `find` checks a head once, so
+   the failed head stays failed. andaro74 pushes one empty commit to a
+   second new branch and opens a second pull request; the next
+   platform-check run passes it. Never merged either.
+
+Nothing merges in `owner-check` from the call to the restore. Pull
+request 2 (`e3a8083`) is not touched.
+
+### Expected reading, PR 4's run
+
+| | Expected |
+|---|---|
+| GitHub's answer to the call | **200, accepted.** The App holds Administration: write on the repository, because nothing less shows it `bypass_actors` (M06's finding); GitHub does not hold that grant to reading |
+| `upgrade.F7_0.relaxation` | read, held, `outcome: detected`: the new head failed for the ruleset; no pull request merged between the call and the restore; the ruleset equals the export in every field GitHub shows, with `updated_at` after the detection; the App passed a head after that |
+| `bypass_actors_shown` | false: PR 4's run reads as the pull request's own token, which GitHub does not show them to. `main`'s observer, as the App, reads only what `main`'s run files name, and this attempt's entry is on `m07-pr4` (row 7's amendment at PR 3: read from the anonymous viewpoint alone) |
+| What it is called | **detection, not refusal.** For the minutes between the call and the restore, `owner-check`'s `main` could have taken a merge with no platform check. Nothing did, and nothing stopped it but that nobody tried |
+
+### What makes it a miss
+
+- GitHub refuses the call (403): `outcome: refused`, held, and the
+  statement above was wrong about the grant.
+- The App passes the new head while the ruleset is changed: not
+  detected. Fired; the ruleset is restored at once all the same.
+- A pull request merges in `owner-check` in the interval: fired.
+- The restore reads back different from the export: recorded, and
+  repaired by re-exporting, not by editing the reader.
+
+### What happened (written after; the statement above is not edited)
+
+| When (UTC) | What |
+|---|---|
+| 12:41:52 | statement on GitHub (`780ab14`) |
+| 12:44:25 | the call's run created: 37123843294, `workflow_dispatch` on `main`, `relax_seed=owner-check`, by andaro74, once |
+| 12:45:04 | **GitHub answered 200, "accepted the change"** (artifact `relax-seed`); the ruleset's `updated_at` 12:45:06, its rules `deletion, non_fast_forward, pull_request` |
+| 12:48:11 | `owner-check` #4 opened from `relax-detect` (`e7d0fd5`, one empty commit by andaro74) |
+| 12:51:01 | the App failed `e7d0fd5`, one reason: "the repository's ruleset is the export: `infra/ruleset/agent.json`: rules differs from live ruleset 24310403 (required_status_checks: only in the export)" |
+| 12:52:27 | the owner restored the ruleset from `infra/ruleset/agent.post.json`; read back with the platform check's own reader: no difference from the export, `bypass_actors: []` |
+| 12:54:07 | `owner-check` #5 opened from `after-restore` (`8e18b6f`) |
+| 12:55:15 | the App passed `8e18b6f` |
+
+The ruleset required no platform check for **7 min 21 s** (12:45:06 to
+12:52:27). No pull request merged in `owner-check` in that time; the
+last merge before it was #3 at 12:18:18. #4 and #5 stay open and are not
+merged; #2 was not touched. Detected, not refused, as stated. A local
+read with the observer and `build`'s reader (not evidence; the owner's
+token, so `bypass_actors` shown) gave `read`, `held`, `outcome:
+detected`, `restored_at` 12:52:27. The observed entry is in
+`runs/f7_0_owner_test.yaml` (run 37123843294, pull request 4); S0's
+run-file test's marker is off; three reader tests that called the
+relaxation on the tree itself now use a tree where it is not yet made,
+and a new one holds that the tree refuses a second attempt.
+
+## Attempt 4: the model swap (S3's first attempt; SPEC/07 §5, independent of the others)
+
+Stated 2026-10-03, before `AWS_MODEL_WATCH_ROLE_ARN` is set. That
+variable is the last thing `model-watch.yml` waits for: the candidate is
+named on `main` (`runs/f7_3_rollback.yaml`, `candidate:
+pinned_roles.m04_cheaper_swap`, Threshold Owner, 2026-10-01), the
+`agentkeel-upgrades` id is on `main` (#42) and its key is in
+`platform-upgrades`.
+
+### What is made
+
+1. **The owner**, once: `gh variable set AWS_MODEL_WATCH_ROLE_ARN`, then
+   one dispatch of `model-watch.yml` from `main` with no input (its
+   schedule is daily at 06:17 UTC; a dispatch starts the same jobs).
+2. **The platform**, by itself: the `read` job asks Bedrock for the
+   lifecycle of the pinned models as `agentkeel-model-watch`; `plan`
+   works out what to open; `open`, in `platform-upgrades`, opens one
+   draft pull request on `andaro74/agentkeel` as `agentkeel-upgrades`,
+   branch `model-watch/m04_cheaper_swap`, with a second commit that is
+   the drafted Threshold Owner ruling naming the pull request's own
+   number. A dry run of `read` and `plan` on `main` at `36c97dd` with the
+   owner's own credentials (2026-10-03, not evidence) planned exactly
+   that, and no `deprecated_after` pull request: Bedrock gives Sonnet 4.6
+   no end-of-life date.
+3. **CI**: `evals.yml` on the pull request measures refagent on the
+   candidate and commits its envelope to the branch. That is the shadow
+   run. The gate rules it (F4.1, F4.2, F4.4).
+
+### Expected
+
+| | Expected |
+|---|---|
+| The pull request | draft; author `agentkeel-upgrades[bot]`; two commits by the App, verified, then CI's envelope commit; changes `agents/refagent/manifest.yaml` (`model`: `anthropic.claude-sonnet-4-6` → `anthropic.claude-haiku-4-5-20251001-v1:0`, version `20251001-v1:0`, profile `us.anthropic.claude-haiku-4-5-20251001-v1:0`, region `us-west-2`) and one ruling file under `milestones/M07/rulings/`; nothing under `.github/workflows/`; `infra/workflows.sha256` unchanged |
+| Mode of its run | runner: the tree's bytes are not the deployed runtime's |
+| F4.4, p95 | held: Haiku 4.5's p95 at most 2.0 × Sonnet 4.6's median in that mode (runner: 6,219.5 ms over 12 envelopes, so at most 12,439 ms) |
+| Agent tokens | at most 1.5 × 41,044.5 = 61,566 |
+| **Its verdict** | **not stated.** Haiku 4.5 has never been run against the goldens. A golden that passed under Sonnet 4.6 and fails under Haiku 4.5 is RED (F4.2), whatever else reads |
+| `cold-review-ruling` | fails until the Threshold Owner replaces the ruling's "Drafted" line |
+
+### Then, by the verdict (as ruled 2026-10-02, `rulings/pr2-threshold-owner.md` item 3)
+
+- **GREEN and every required check green.** The Threshold Owner
+  replaces the "Drafted" line (a ruling file is not a person's edit) and
+  merges as a merge commit. `deploy.yml` redeploys refagent on the
+  candidate; the first `main` envelope after it is recorded as read,
+  whatever F4_4 says. Then the revert: a pull request reverting the
+  merge commit, with its own Threshold Owner ruling. **Before the revert
+  is opened, the number it is held to is written in
+  `runs/f7_3_rollback.yaml`**: Sonnet 4.6's p95 must be at most 2.0 ×
+  the median of Haiku 4.5's envelopes in the revert's mode. With Sonnet's
+  runner median at 6,219.5 ms, the revert is RED on F4_4 if Haiku's p95
+  in that mode is under about 3,110 ms. Its verdict is not stated. RED on
+  F4_4 alone: one second run, stated first. RED on a regressed golden or
+  RED twice: refagent stays on Haiku 4.5, which the gate passed; F7.3 is
+  read on the fallback; `upgrade.taken` stays under 3.
+- **RED.** Not merged; the pull request is closed with its envelope
+  kept. The model upgrade is not taken (`upgrade.taken` at most 2 of 3,
+  row 7 RED on that too). F7.3 is read on the fallback: a pull request
+  in `owner-check` reverting the platform upgrade's merge (`840f5ab`),
+  merged by the seats when the App passes it, and the runtime's digest
+  read after its deploy.
+
+Either way both pull requests on `agentkeel` are outside M07's cap, by
+row 7's own text. `m07-pr4` takes `main` in again after each merge.
+
+### What can go wrong before the verdict
+
+- The `read` job cannot assume `agentkeel-model-watch`: a trust fault of
+  the kind the observer had. Its job has no environment, so the ref
+  subject should match; this is the first run that tries.
+- GitHub holds the pull request's `evals` run for approval because an
+  App opened it. The owner approves the run in the Actions tab; an
+  approval is not an edit.
+- `open` refuses the grant: recorded, and nothing is opened.
+
+### What happened (written after; the statement above is not edited)
+
+| When (UTC) | What |
+|---|---|
+| 13:16:53 | statement on GitHub (`497c52f`) |
+| 13:24:56 | `AWS_MODEL_WATCH_ROLE_ARN` set by the owner |
+| 13:25:05 | `model-watch.yml` dispatched from `main` (37126101337): `read` assumed `agentkeel-model-watch` (its first live use; the trust held) and read Bedrock; `open` passed the grant step and opened the draft |
+| 13:25:56 | **#43** opened by `agentkeel-upgrades`, draft, branch `model-watch/m04_cheaper_swap`: two verified commits by the App (`0496a44` the pin, `2c02cff` the drafted ruling naming #43), `agents/refagent/manifest.yaml` three lines (`id`, `version`, `profile` to Haiku 4.5) and the ruling file; no workflow touched |
+| 13:26 | `evals` started on each of the App's two commits with no approval asked; `two-key` pass, `ruling-cited` pass, `cold-review-ruling` fail on the draft, as stated |
+| ~13:36, ~13:46 | both runs RED (37126152101 on `0496a44`, 37126156979 on `2c02cff`); CI's envelope commit `096cecb` for `2c02cff` |
+
+**The envelope, `2c02cff…`:** RED, runner, `us.anthropic.claude-haiku-4-5-20251001-v1:0`,
+p95 3,258 ms (bar 12,439), agent tokens 40,748 (bar 61,566). The gate's
+one reason: **"regressed: g-004 has passed before and fails now"**
+(F4.2). On g-004 Haiku 4.5 answered `available: false, exclusive:
+false` as the golden has it, cited clause `ML-2.1` where the golden
+expects `MC-3`, and gave `[clearance_expired]` where it expects
+`[clearance_expired, non_exclusive]`; the same on both passes of the
+run. `never_passed` is `g-014`, as under Sonnet 4.6. As stated: the
+pull request and its bars as expected, the verdict not stated; it is
+RED.
+
+**So, as ruled:** #43 is not merged. The model upgrade is not taken:
+`upgrade.taken` is at most 2 of 3, and row 7 is RED on that as well.
+The revert on `agentkeel` is not made; F7.3 is read on the fallback.
+Had the swap been GREEN, the revert would have been held to 2.0 × 3,258
+= 6,516 ms against Sonnet 4.6's runner median of 6,219.5 ms: inside the
+bar by 297 ms, on one envelope.
+
+**A second finding, the platform's own.** Fourteen tests fail on the
+swap's branch (`tests/test_m07_platform.py`, 13;
+`tests/test_m07_two_key_seed.py`, 1): they read refagent's manifest
+from the tree and assume its pin is Sonnet 4.6, so `checks` is red on
+any pull request that moves the pin, whatever the model. The gate's RED
+is not theirs (its one reason is g-004). A GREEN swap would have met a
+red `checks` job; `evals` and `cold-review-ruling` are the required
+ones, so it could still have merged, with a red check beside it. The
+repair is for the tests to carry their own manifest; Engineering's, in
+the close.
+
+A third run (37127017458, on CI's envelope commit `096cecb`) waits for
+approval: GitHub asks for one on a run started by the bot's push to an
+App's branch. It measures nothing new and is not approved.
+
+#43 was closed by the owner at 13:46:04Z, unmerged; its branch stays at
+`096cecb`.
+
+## Attempt 5: the rollback, on the fallback (S3's second attempt)
+
+Stated 2026-10-03, after the swap read RED and before the revert is
+opened. **Restated by Product the same day: the fallback is read on
+`window-check`, not on `owner-check`.** F7.3 reads the agent's live
+runtime at the closing run; `owner-check` is retired before that run,
+and a retirement deletes the runtime. One envelope cannot read a
+rollback and a retirement on one agent. `window-check` took the same
+platform upgrade (#2, merge `e050fcc`, deployed 12:26:50Z).
+
+### What is made
+
+1. **andaro74**, as `window-check`'s seats: one pull request in
+   `window-check` that reverts the merge `e050fcc` (`git revert -m 1`),
+   one commit. A rollback is a person's act; F7.1 does not read it.
+2. **The platform**: `agentkeel-platform` checks the head; the owner
+   merges as a merge commit when it passes; the App passes the merge
+   commit; `deploy.yml` deploys it. Dispatches from `main` with no input
+   if a schedule is late, each recorded.
+3. Nothing reopens the upgrade: `platform-upgrade.yml` opens one pull
+   request per branch name, ever, and `platform-upgrade/36c97ddaee93`
+   was used.
+
+### Expected
+
+| | Expected |
+|---|---|
+| The revert's diff | `manifest.yaml`, one line: `platform_version: "36c97ddaee93"` → `platform_version: m06`; nothing else |
+| The tree at the revert's merge | the same bytes as before the upgrade (`1c5b6ff`), so its bundle digest is that tree's, already an image in `agentkeel/window-check`; it is not the upgrade's digest |
+| The App | passes the revert's head and its merge commit: the platform check reads no `platform_version` |
+| The deploy | success; the agent answers `g-001` and `g-002`; a new answer record for the merge commit; registry row moved to it |
+| `upgrade.F7_3` at PR 4's run | read, held, `fallback: true`: the runtime's image tags hold the tree's digest at the revert and do not hold the upgrade's |
+| `upgrade.F7_1.platform` | unchanged by this: its live reading looks for an image tagged with the upgrade's digest in the agent's repository, and images are kept |
+| `upgrade.taken` | 1 of 3 so far (platform); the model is not taken |
+
+### What makes it a miss
+
+- The runtime's image still carries the upgrade's digest after the
+  revert's deploy: F7.3 fired.
+- The tree's digest at the revert equals the upgrade's: nothing was
+  rolled back; fired.
+- The deploy of the revert fails: F7.3 unread, recorded with the reason.
+
+### What happened (written after; the statement above is not edited)
+
+| When (UTC) | What |
+|---|---|
+| 13:48:27 | statement on GitHub (`2c159f2`) |
+| 13:50:10 | `window-check` #3 opened by andaro74 from `revert-platform-upgrade`: one commit `22e7022`, `manifest.yaml` one line, `platform_version: "36c97ddaee93"` → `m06` |
+| 13:51:44 | the App passed `22e7022` (the owner's dispatch of the check) |
+| 13:55:04 | merged by andaro74, merge commit `3925e67` |
+| 13:56:13 | the App passed `3925e67` (run 37127830951) |
+| 13:59:42 | the owner dispatched `deploy.yml` (37128076000); no image was pushed: the tree's digest already tags one |
+| 14:02:34 | `window-check` at `3925e67`: stack updated, `g-001` and `g-002` answered in the runtime, GREEN, bundle and answer record put (first), registry row; the job completed 14:02:38, **454 s** after the merge |
+
+The digests, as `deploy.yml` tags images with them (the sha256 of the
+packed bundle): before the upgrade (`1c5b6ff`) `185ab598…`; the
+upgrade's merge (`e050fcc`) `1674ae9f…`; the revert's merge (`3925e67`)
+`185ab598…`, the same bytes as before the upgrade. `agentkeel/window-check`
+holds two images, tagged `185ab598…` (pushed 2026-10-03T01:56Z) and
+`1674ae9f…` (12:25Z). After the revert's deploy the runtime
+`agentkeel_window_check-YBt5st7kMX` runs image `sha256:ca4e0e04…`, whose
+one tag is `185ab598…`: the tree's digest at the revert, and not the
+upgrade's. Read by the session with the owner's credentials (not
+evidence); PR 4's run reads it again. Nothing reopened the upgrade.
+
+**A finding beside it, Engineering's:** `src/bundle/pack.py` orders the
+archive's members with `sorted()` over paths, which on Windows is
+case-insensitive (`README.md` after `prompt.txt`) and on Linux is not.
+A bundle packed on Windows has a different digest from CI's for the same
+tree (`5a149257…` against `185ab598…` here). Every digest that is
+evidence is packed in CI, so no reading is affected; a local
+`make evals-local` in the runtime's mode cannot match on Windows. Carried
+to the close's list.
+
+The observed entry is in `runs/f7_3_rollback.yaml` (two of two); S3's
+run-file test's marker is off.
+
+## Attempt 6: owner-check retired (S2), last
+
+Stated 2026-10-03, after the rollback and before the dispatch. One-way:
+nothing restores the runtime. `runs/f7_2_removed_and_kept.md` says what
+is removed and what is kept; no retirement has ever run through this
+path.
+
+### What is made
+
+1. **andaro74**, once: `gh workflow run deploy.yml --ref main -f
+   retire=owner-check`. `retire-plan` plans it; `retire-open`, in
+   `platform-upgrades`, opens one draft pull request in `owner-check`
+   as `agentkeel-upgrades`, changing `manifest.yaml`'s `rollout` to
+   `retired` and nothing else.
+2. **The owner, as the seats**: marks it ready and merges it as a merge
+   commit once `agentkeel-platform`'s check passes its head. No commit of
+   the owner's.
+3. **The platform**: after the App passes the merge commit, the next
+   `deploy.yml` run (dispatched with no input if the schedule is late)
+   finds the retired head and runs `retire-agent`: it holds the retired
+   head's manifest to the deployed one's but for `rollout`, updates the
+   stack to a template without the runtime, invokes the runtime's ARN
+   once and expects `ResourceNotFoundException`, writes
+   `envelopes/agents/owner-check/retired.json` once, and sets
+   `retired_at` on the registry row.
+
+### Expected
+
+| | Expected |
+|---|---|
+| The pull request | draft; author `agentkeel-upgrades[bot]`, one verified commit; `manifest.yaml`, one line, `rollout: all-at-once` → `retired`; `created_at` within 4,500 s of the dispatched run's `created_at` |
+| Merge | by andaro74 with the App's success on the head; no person's commit |
+| The runtime | `DeleteAgentRuntime` for `agentkeel_owner_check-G4vMbRB3Dx` in CloudTrail within `upgrade.retire_max_seconds` (3,600 s) of `merged_at`; `GetAgentRuntime` on its ARN refused as not found; the retire job's one invocation refused the same way |
+| Kept | the stack (updated, not deleted), the key, the rights table, the image repository, the registry row with `retired_at`, the answer records, `bundles/owner-check/`, and `retired.json` |
+| After it | no answer record under `envelopes/agents/owner-check/` later than the deletion; the deploy never redeploys the name |
+| `upgrade.F7_2` at PR 4's run | read, held |
+| `upgrade.taken` | 2 of 3: platform and retirement; the model was not taken |
+
+### What can go wrong, and what is done then
+
+- The execution role is refused something a delete checks that no
+  create or update has: a fourth IAM finding. The stack update rolls
+  back, the runtime stands, the job fails and the row stays open
+  (`f7_2_removed_and_kept.md`). The repair would be a grant, yours to
+  rule; the bound of 3,600 s runs from the merge whatever happens.
+- The invocation after the update answers: F7.2 fired. Recorded; the
+  job fails and writes no `retired_at`.
+- The App's pull request carries more than the one line: read as it is.
+
+### What happened (written after; the statement above is not edited)
+
+| When (UTC) | What |
+|---|---|
+| 14:08:09 | statement on GitHub (`676c26c`) |
+| 14:11:22 | the owner dispatched `deploy.yml` with `retire=owner-check` (37128759405), once |
+| 14:12:01 | `owner-check` #6 opened by `agentkeel-upgrades[bot]`, draft, 39 s after the run began: one verified commit `2704c15`, `manifest.yaml` one line, `rollout: all-at-once` → `retired` |
+| 14:22:56 | the App passed `2704c15` |
+| 14:24:36 | marked ready and merged by andaro74, merge commit `926641f`; the pull request still one commit, the App's |
+| 14:26:05 | the App passed `926641f` |
+| 14:29:37 | the owner dispatched `deploy.yml` with no input (37129778736); `retire-agent` ran: the head still what the App passed and saying `rollout: retired`; the retired head's manifest the deployed one's but for `rollout`; the runtime's ARN kept |
+| 14:30:44 | **`DeleteAgentRuntime`** for `agentkeel_owner_check-G4vMbRB3Dx` in CloudTrail, as `agentkeel-cfn-exec`, no error: **368 s** after the merge (bar 3,600). No IAM refusal on the delete |
+| 14:35:12 | the job's one invocation of the ARN: `ResourceNotFoundException`, "No endpoint or agent found with qualifier 'DEFAULT'" (artifact `retire-invocation-owner-check`) |
+| 14:35:15 | `envelopes/agents/owner-check/retired.json` put in the security account, once |
+| 14:35:17 | `retired_at` on the registry row, with `retired_commit` `926641f` and `retire_run_id`; the row's `commit_sha` stays `840f5ab`, the last commit deployed |
+
+Read afterwards with the owner's credentials (not evidence; PR 4's run
+reads it again): `GetAgentRuntime` on the id answers
+`ResourceNotFoundException`; the stack `agentkeel-owner-check` is
+`UPDATE_COMPLETE` with one output left, `AgentRoleArn`;
+`list-agent-runtimes` shows `agentkeel_window_check` and `refagent` and
+no `agentkeel_owner_check`. As stated, every line. The owner's part was
+two dispatches and one merge.
+
+The observed entry is in `runs/f7_2_retire.yaml`; S2's run-file test's
+marker is off. **Every attempt M07 stated is now made.**
+
+## After the cold review of the branch (2026-10-03, before PR 4 opens)
+
+Corrections to this file, appended. Nothing above is edited by them.
+
+1. **Attempt 1's statement was edited once after the attempt began**
+   (cold review F3). `6eb955d`, pushed about 01:03Z, after the repository
+   was created at 01:01:33Z, replaced the three lines under "What is
+   installed on the profile" ("Listed by the human, in a commit pushed
+   before the repository is created ... Until that commit this section is
+   empty and the run is not started") with the paragraph that begins "The
+   run file asks for this list". So "the statement above is not edited"
+   is not true of that section. The expected readings were not touched.
+   The list itself is still owed.
+2. **The owner started the platform's jobs by hand, and not only when a
+   schedule was late** (cold review F4). Attempt 1's statement allowed no
+   dispatch ("the platform, by itself"; "nobody touches ... the
+   platform's workflows"), and five were made: the check at 01:34:41,
+   01:43:30 (cancelled) and 01:51:45, and the deploy at 01:49 and
+   01:56:03. The third check dispatch is what let the scheduled deploy
+   find a checked merge commit. Attempts 2, 5 and 6 allowed a dispatch
+   "if a schedule is late", and the session told the owner to dispatch
+   at once: 101 s after the template's push, 16 s after a merge, 42 s,
+   94 s, 209 s and 212 s after the events they followed. So 3,615 s, 147
+   and 152 s, 387 and 510 s, 454 s and 368 s are what the platform took
+   **once started by the owner**, not what its schedules take. Every bar
+   was met with a wide margin. What the schedules alone would have given
+   was not measured, on a night when GitHub fired a five-minute schedule
+   at gaps of up to 28 minutes. "As stated, every line", in attempt 6's
+   record, overreaches for that reason and is withdrawn.
+3. **The statement's push time for attempt 2** is 03:41:38Z by this
+   checkout's record of the push, not "03:44" (cold review N1).
+4. **The relaxation's reading** (attempt 3) is from PR 4's own token,
+   which GitHub does not show `bypass_actors`. "Held, detected" will
+   rest on the fields that token sees. The `bypass_actors: []` in the
+   record is the owner's read (cold review F7; SPEC/07 §12 corrects the
+   sentence that said the App's viewpoint would see it: it does not).
+5. **The fourteen tests** that are red on a moved pin are not repaired in
+   the close (cold review F2). The record of attempt 4 said
+   "Engineering's, in the close"; it is carried to M08's open list.
+6. **Item 13n is done in the close**: `platform-check.yml` loses the
+   seeded relaxation's dispatch input and step. Until PR 4 merges,
+   `main` still carries them, and nothing on `main` but the owner's
+   restraint stops a second dispatch (security-reviewer F7).
+7. **The retirement's three owed reads** were made five hours late, and
+   one is a finding: two network interfaces remain behind the retired
+   agent's kept security group (`runs/f7_2_removed_and_kept.md`).
+8. **Line 517's "yours to rule"** was written to the human in the
+   conversation's voice; it means Security's (cold review N12).
+
+## After the second cold read (2026-10-03, before the close merges)
+
+9. **The statement for attempt 1 expected "deployed 32260 s"** for the
+   owner's test; the envelope reads 32,264 s (cold review 2, F1). Four
+   seconds: the reader takes the deploy's own record, the session
+   counted to the registry row's time.
+10. **Item 7 above says "five hours late"**; it was four and a half
+    (14:30:44Z to 19:05Z), and four reads were made, not three (N10).
+11. **Attempt 4's record says "both runs RED"**: two `evals` runs
+    measured the candidate, one per commit the App pushed, and one
+    envelope was kept (`2c02cff`). Prose that says the candidate was
+    "measured once" means one pull request, not one run (F2).

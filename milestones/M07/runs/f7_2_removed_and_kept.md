@@ -4,8 +4,10 @@ For seed S2 (`f7_2_retire.yaml`), owed by SPEC/07 §11 R7 before the
 dispatch. Read from the tree at `a2c5a61` and the account as listed on
 2026-10-02 (`pr2_reads.md`, R7). Security ruled the path on 2026-10-02
 (`rulings/pr2-security.md`, item 11): a retirement is an update of the
-agent's stack to a template without the runtime. Nothing here has run:
-the first retirement is S2's attempt on `owner-check`.
+agent's stack to a template without the runtime. Nothing here had run
+when this was written. **The first retirement ran on 2026-10-03**
+(`owner-check`, `runs/pr4_expected.md` attempt 6); what it showed is at
+the end of this file.
 
 The agent below is one made from the template, stack
 `agentkeel-<name>`. refagent is never retired by this path: the retire
@@ -82,3 +84,30 @@ that is retired once.
   stack `UPDATE_COMPLETE` and the runtime in the account outside any
   stack, where only an admin can delete it. The retire job's one
   invocation is what would show it.
+
+## What the first retirement showed (2026-10-03, added at M07 PR 4)
+
+`owner-check`, retire run 37129778736. The delete succeeded:
+`DeleteAgentRuntime` in CloudTrail at 14:30:44Z as `agentkeel-cfn-exec`,
+no error; the job's one invocation at 14:35:12Z answered
+`ResourceNotFoundException`.
+
+The three reads "Not read" promises "at S2" were not made at the
+retirement (platform-architect F8 on PR 4). They were made at
+2026-10-03T19:05Z, four and a half hours after the delete, by the
+session as the agent account's admin user:
+
+| Read | Result |
+|---|---|
+| The stack's resources | nine left: the key and its alias, the inference profile, the rights table, the role and its policy, the security group `sg-0657b2c0977659a8f` and its two egress rules. No runtime |
+| The network interfaces behind that security group (`aws ec2 describe-network-interfaces --filters Name=group-id,...`) | **two, still `in-use`**: `eni-0186583e3b5e6180c` and `eni-06592620b867ef62a`, type `agentic_ai`, one in each platform subnet, attached, owner `amazon-aws`. `window-check`'s group, whose runtime is live, shows two of the same kind |
+| The workload identity (`list-workload-identities`) | gone: `refagent-…` and `agentkeel_window_check-…` are listed, no `agentkeel_owner_check-…` |
+| VPC Lattice (`list-service-network-vpc-associations` for the VPC; `list-resource-gateways`) | nothing listed |
+
+**The finding:** a retirement removes the runtime and leaves its two
+network interfaces in the platform VPC, behind a security group the
+stack keeps. Whether AgentCore removes them later was not read; they
+were still there after four and a half hours. The VPC has no route out,
+and the group's egress is the platform endpoints'. Carried to M08 with
+the kept role (platform-architect F9): what a retired agent's stack
+should still hold is Security's.

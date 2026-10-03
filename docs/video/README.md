@@ -1,7 +1,8 @@
 # Recordings
 
-Two kinds, both unedited screen capture with narration, both committed
-once and never re-recorded to match later prose. If the platform changes,
+Two kinds of recording, both unedited screen capture with narration, both
+committed once and never re-recorded to match later prose; and, from M07,
+read-backs, which are neither (below). If the platform changes,
 a new recording is added and the old one is marked superseded here
 (SPEC/00 §10.2).
 
@@ -51,3 +52,20 @@ chosen to fit; they are not edits.
 
 None recorded. The six acts are scheduled at M06 to M08 (SPEC/00 §10.2);
 each gets its row here when it is recorded, with its commit and tag.
+
+**Act 1 was not captured.** It is the unedited screen capture of the
+timed quickstart (SPEC/06 §5.1). That run was made once, on 2026-10-03,
+with no capture, and it is not made again (SPEC/00 §10.5). Nothing filmed
+afterwards is Act 1. Act 2 was due at M06's close and again at M07's and
+was recorded at neither. What becomes of both is
+`milestones/M08/open.md` row 2.
+
+## Read-backs (`docs/video/readbacks/`, not acts, not milestone videos)
+
+A read-back is a screen capture with narration, made after the fact, of
+the records a run left in GitHub and AWS. It measures nothing, shows no
+run as it happened, and is filed here so that nobody takes it for one.
+
+| What | Recorded at | Shows | State |
+|---|---|---|---|
+| The timed quickstart of 2026-10-03 (`window-check`), read back from its records. **Not Act 1** | 2026-10-03, about 18:34 to 18:39Z, by andaro74, with the checkout on `m07-pr4` at `b310735`, before M07's close PR (#44) opened. To be committed in M08 PR 1 as an LFS object, `docs/video/readbacks/M07-timed-run.mp4` (`milestones/M08/open.md` row 1); until then the file is kept outside the repository, sha256 `75a2439b4153d9be62f5556c94b598904d1c0dbcfac7fae083d178803522450b` | A terminal over a browser. In the terminal, six read-only commands and what GitHub answers: the repository created 2026-10-03T01:01:33Z from `agent-template`; the first pull request's three commits; the platform check's result on each; the merge; the scheduled deploy run finished 02:01:48Z; "3615 seconds; the bar is 28800". In the browser: `window-check` pull request 1, merged by `floresinnovations`; the App's check on the second commit, "2 refused", the seats and the goldens; the deploy job with "The agent answers its own goldens" open; the registry dashboard in Grafana as it stood on the day of recording, after the agent's upgrade and rollback | recorded, 5:37 (337.5 s), 1920×1080, 25.69 MiB (26,941,226 bytes), as `M07-timed-run-read-back.mp4` on the owner's machine; held to an act's ceilings, eight minutes and 64 MiB, since no ceiling is ruled for a read-back (`milestones/M07/rulings/pr4.md`, Unsure C). The session read eight still frames and the audio's level (mean −22.7 dB), not the narration: what is said, and that the export was not edited, are Product's to confirm (`milestones/M07/rulings/pr4.md`) |

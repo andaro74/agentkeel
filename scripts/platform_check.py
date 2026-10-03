@@ -534,7 +534,12 @@ def relax_seed(name: str, org: str, app_id: int, private_key_pem: str, root: Pat
     And it is made once: when the run file on `main` already records the attempt (an `observed` entry
     whose `what` names the relaxation, as the observer matches it), it is refused before a token is minted (security-reviewer 6 on M07 PR 2:
     "made once" was a sentence, not a check). Between the attempt and the commit that records it,
-    nothing but the dispatch's own log stops a second one."""
+    nothing but the dispatch's own log stops a second one.
+
+    Made on 2026-10-03 (run 37123843294): GitHub accepted the call. From M07 PR 4 no workflow calls
+    this (item 13n: `platform-check.yml`'s dispatch input and step are removed). The function and
+    its `relax` subcommand stay as the record of what was asked, held by the tests of its refusals;
+    the key it needs is in the `platform-app` environment and nowhere else."""
     from src.validate.agent import NAME
 
     if not isinstance(name, str) or not NAME.match(name):

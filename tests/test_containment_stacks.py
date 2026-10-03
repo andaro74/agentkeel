@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENT, SECURITY = "581208540944", "897698239547"
@@ -205,9 +206,13 @@ def test_a_bundle_and_an_observation_are_each_put_once(security):
 
 
 def test_the_observation_put_role_trusts_observe_yml_on_main_and_puts_under_observations_only(security):
+    """M07 PR 4: the putting job runs in the environment platform-observer, so GitHub's `sub` names the
+    environment, not the ref; the role trusted the ref form and every keyed run was refused (37119509159)."""
     role = roles(security)["agentkeel-observation-put"]
     on_main = role["AssumeRolePolicyDocument"]["Statement"][0]["Condition"]["StringEquals"]
-    assert on_main["token.actions.githubusercontent.com:sub"] == ["repo:andaro74@3157440/agentkeel@1376369685:ref:refs/heads/main"]
+    assert on_main["token.actions.githubusercontent.com:sub"] == ["repo:andaro74@3157440/agentkeel@1376369685:environment:platform-observer"]
+    workflow = yaml.safe_load((ROOT / ".github/workflows/observe.yml").read_text(encoding="utf-8"))
+    assert workflow["jobs"]["observe"]["environment"] == "platform-observer", "the trust names the job's environment"
     assert on_main["token.actions.githubusercontent.com:job_workflow_ref"] == "andaro74/agentkeel/.github/workflows/observe.yml@refs/heads/main"
     assert role.get("PermissionsBoundary")
     policy = next(p for k, p in {json.dumps(p["Roles"]): p for p in of_type(security, "AWS::IAM::Policy")}.items()

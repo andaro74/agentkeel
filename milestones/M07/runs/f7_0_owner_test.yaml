@@ -51,8 +51,13 @@ attempts:
 # the platform's own workflow; repaired in f5d2f6c). The attempt is not
 # re-made and not restated (Product, milestones/M07/rulings/pr3.md): the
 # observer reads what GitHub and AWS hold, and `build` rules on it.
-# The third is not made: this list holds two entries of three, so the
-# run-file test still reads the seed as not made.
+# The third was made on 2026-10-03, once, as stated in
+# milestones/M07/runs/pr4_expected.md (attempt 3, pushed 12:41:52Z; the
+# call's run created 12:44:25Z): GitHub accepted the App's call; the new
+# head (pull request 4) was failed for the ruleset; the owner restored the
+# ruleset and it read back equal to the export; the App passed a head
+# opened after that (pull request 5). Neither pull request is merged.
+# Detection, not refusal. The list holds three entries of three.
 observed:
   - what: platform-check.yml dispatched from a branch
     repository: andaro74/agentkeel
@@ -62,3 +67,8 @@ observed:
     repository: agentkeel-studio/owner-check
     pull_request: 1
     at: '2026-10-02T14:39:32Z'
+  - what: the App's token asked to relax owner-check's ruleset
+    repository: agentkeel-studio/owner-check
+    run: 37123843294
+    pull_request: 4
+    at: '2026-10-03T12:45:04Z'

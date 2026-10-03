@@ -5,13 +5,17 @@ never edit a pipeline to take an upgrade: your repository has none. The
 platform opens a pull request in your repository, and you read it and
 merge it.
 
-**What has run, as this page is written (M07 PR 3): no upgrade.** The
-parts below are built and tested against planted cases in the platform's
-own repository. No agent has yet taken an upgrade. One agent repository
-made from the template has merged its first pull request; its first
-deploy failed in the platform's own pipeline and is repaired at M07 PR 3.
-The upgrades are made after that merges, and this page is corrected at
-the close if they show it wrong.
+**What has run, as of M07's close (2026-10-03).** Two agents made from
+the template each took one platform upgrade: the pull request arrived 139
+and 144 seconds after the new version was published, changed one line,
+and the agents were redeployed 518 and 511 seconds after the merges. One
+agent was retired: its runtime was deleted 368 seconds after the merge.
+One platform upgrade was undone by a revert. The model upgrade was
+proposed for the platform's reference agent and not accepted: the
+candidate failed one of that agent's tests. In each case the owner
+started the platform's job by hand instead of waiting for its timer, so
+these are not what the timers take. This is one run of each, by the
+platform's author.
 
 ## The three kinds
 
@@ -80,12 +84,16 @@ Read this one carefully. **It is one-way.**
 
 Merging it means: at the next deploy run the platform removes your
 agent's runtime, and your agent stops answering. Nothing restores it. If
-you later set `rollout` back, the platform deploys a new runtime at a new
-address; the old one stays gone.
+you later set `rollout` back, nothing is deployed: the platform refuses
+to deploy a name the registry holds as retired, and the deploy fails. A
+new agent needs a new name.
 
 What is kept: your repository; the agent's row in the registry, which
 then says when it was retired; its past answers and the signed copy of
 what was deployed, in the audit bucket; its key, its table and its logs.
+Not everything else goes at once: after the one retirement that has run,
+two of the runtime's network interfaces were still in the platform's
+network four and a half hours later.
 The audit bucket locks each record for one day. After that the records
 are kept by the security account's own rules, not by a lock.
 
@@ -93,8 +101,9 @@ If your agent should not be retired, close the pull request.
 
 A retirement changes one line and must stay one line. When the platform
 retires your agent it is built to compare your manifest with the one it
-last deployed, and to refuse if anything but `rollout` differs. No
-retirement has run yet. So do not change
+last deployed, and to refuse if anything but `rollout` differs. One
+retirement has run, of an agent whose manifest differed in that line
+alone; the refusal has not been met live. So do not change
 another field in the retirement pull request, and do not merge another
 manifest change just before it: let that change deploy first. If your
 agent's last deploy failed, it cannot be retired until a deploy succeeds.
@@ -116,7 +125,19 @@ limits, which a late step misses and nobody moves:
   platform's. Do not merge it as an upgrade.
 - It changes a file other than the ones in the table above: close it and
   tell the platform's owner. The platform's own check for this is in
-  `scripts/platform_upgrade.py`; it has been tested on a planted case and
-  has not yet run on a real repository.
+  `scripts/platform_upgrade.py`; it has been tested on a planted case, and
+  has run on two real repositories, where the upgrade changed one line
+  and the check had nothing to refuse.
 - The platform check does not arrive: it runs every five minutes, and
   GitHub can delay a schedule when it is busy.
+
+## Undoing an upgrade
+
+Nothing undoes an upgrade for you. If a platform upgrade you merged
+should go back, a seat holder opens a pull request that reverts its
+merge, the platform's check passes it like any change, and after you
+merge it the platform deploys your agent again from the reverted tree.
+This was done once, at M07: afterwards the running agent carried the
+earlier version's bytes and not the upgrade's. The platform does not
+open the upgrade a second time on its own: it opens one pull request per
+version, ever.

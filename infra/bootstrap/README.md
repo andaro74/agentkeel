@@ -67,6 +67,35 @@ and cannot be updated: delete it first. The ECR repository has
 fails on a name that already exists; delete that too when it holds no
 images.
 
+**An agent's stack whose first create fails** (M07, twice on 2026-10-02:
+`milestones/M07/README.md`, "After PR 3 merged"). The stack
+`agentkeel-<name>` is left `ROLLBACK_COMPLETE` and keeps what the
+construct retains under fixed names: the agent's key, its alias once the
+alias was made, and the rights table. Every later deploy run fails
+before it starts, and no platform role can clear it: the deploy role has
+no `DeleteStack`, and the key's policy denies its deletion to every
+platform role. The account's admin, by hand, in this order:
+
+```sh
+aws cloudformation delete-stack --stack-name agentkeel-<name> --region us-west-2
+aws cloudformation wait stack-delete-complete --stack-name agentkeel-<name> --region us-west-2
+aws dynamodb delete-table --table-name agentkeel-<name>-rights --region us-west-2
+aws kms delete-alias --alias-name alias/agentkeel-<name> --region us-west-2      # if the alias was made
+aws kms schedule-key-deletion --key-id <the retained key> --pending-window-in-days 7 --region us-west-2
+```
+
+A key is scheduled, not deleted: it stays in the account for the window,
+and the schedule can be cancelled. Each act is written in the
+milestone's by-hand file with the principal and the time. Whether this
+stays the admin's or becomes a named role is Security's, carried to M08
+(platform-architect F3 on M07 PR 4; the landing zone's, deferred item 2).
+
+**After any change to the execution role's runtime statements, one
+create of a throwaway agent is made before a developer's**
+(platform-architect F2 on M07 PR 4). M06 PR 2 narrowed those statements
+and ran no create; the next one was a developer's, and it was refused
+twice. What a create checks cannot be read without making one.
+
 ## Deploying it
 
 ```bash
@@ -224,8 +253,10 @@ no sentence here or anywhere else may call the deploy plane proven
 Not ruled on 2026-10-02: `milestones/M07/rulings/pr2-security.md` items
 13b, 13c and 13d put each to the Security seat. Redeployed by hand after
 reading `cdk diff --strict`: `milestones/M07/runs/pr2_by_hand.md` step
-B2 has the commands and what the diff should show and nothing else. Not
-deployed as this is written.
+B2 has the commands and what the diff should show and nothing else.
+Deployed by hand on 2026-10-02, twice, from `m07-pr4` (`7a9032d`, then
+`81508ab`), with M07 PR 4's change to the execution role below
+(`milestones/M07/runs/pr2_by_hand.md`, `b2_cdk_diff.md`).
 
 - `agentkeel-evals` gains three read-only statements on an agent from the
   template (its stack, its runtime, its image's tags), so a pull request's
@@ -238,7 +269,21 @@ deployed as this is written.
   `archive` job on `main`. Panel 2 reads the table (`infra/grafana/`). It
   is a copy for a surface, not evidence.
 
-The deploy role and the execution role do not change: a retirement is an
-update of the agent's stack, and the execution role already may delete a
-template agent's runtime (`tests/test_bootstrap.py` holds that no
-`DeleteStack` and no `UpdateItem` was added).
+The deploy role does not change, and a retirement needed nothing new: it
+is an update of the agent's stack, and the execution role already may
+delete a template agent's runtime (`tests/test_bootstrap.py` holds that
+no `DeleteStack` and no `UpdateItem` was added; the first retirement,
+2026-10-03, deleted `agentkeel_owner_check` with no refusal).
+
+**M07 PR 4: the execution role does change.** One statement,
+`WhatCreateAgentRuntimeChecksOnTheRuntimeItHasNotNamedYet`:
+`bedrock-agentcore:CreateAgentRuntimeEndpoint` and
+`bedrock-agentcore:TagResource` on `runtime/*`, no condition.
+`CreateAgentRuntime` checks both against a runtime that has no id yet,
+one at a time, and the first two creates of a template agent were refused
+without them. It is wider than the platform's runtimes: in this shared
+account the role may add an endpoint to, or tag, a runtime that is not
+the platform's. It may not update, delete or untag one. Two narrower
+forms were not tried: the Resource `runtime/${*}`, IAM's literal
+asterisk, and a condition on `aws:TagKeys` for `TagResource`. Trying
+either costs a create that may be refused; carried to M08.

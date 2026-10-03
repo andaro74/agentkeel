@@ -24,7 +24,8 @@ What you cannot change from here:
   check bound to an App is accepted from that App only. It was attempted
   once, as M06's seed S2: the stand-in's check did not let the pull
   request merge. At that time the platform's own check was refusing every
-  head for a fault of its own, so the attempt is read again at M07.
+  head for a fault of its own. It was to be tried again at M07 and was
+  not, so that question is still open.
 - **The deploy.** agentkeel deploys this agent from its own pipeline after
   a merge. Nothing in this repository holds a cloud credential.
 - **The guardrail.** Every agent from the template uses the platform's,

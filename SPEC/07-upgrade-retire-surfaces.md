@@ -1024,3 +1024,104 @@ are not repaired; threshold-owner F2 on PR 2 (item 3's sentence on the
 revert's median, restated in ADR-0011 and not in the ruling), its F5 (a
 swap leaves the old model's date) and N9 (the manifest's stale judge
 comment), N13 (`model-watch`'s paths fixed to M07); item 13n.
+
+**After PR 3 merged: the second finding under F7.0** (Product, at M07
+PR 4). The first deploy run after the merge (37066321605, 2026-10-02
+21:23Z) got past the artifact: the bytes verified, the image was pushed,
+the stack `agentkeel-owner-check` was created. The runtime was refused:
+`CreateAgentRuntime` also authorises the runtime's DEFAULT endpoint,
+against `runtime/*` because the runtime has no id yet, and the execution
+role allowed `CreateAgentRuntimeEndpoint` on `runtime/refagent*` and
+`runtime/agentkeel_*` only. That statement read `runtime/*` when
+refagent's runtime was made (2026-09-22); M06 PR 2 narrowed it, and no
+create ran after the narrowing until this one. The stack rolled back and
+kept its key and its rights table. With that one action granted and
+deployed (B2, 22:49Z) and the stack deleted, the next create (run
+37074759767, 22:54Z) was refused one check further along:
+`bedrock-agentcore:TagResource` on `runtime/*`, for the three
+`aws:cloudformation:*` tags CloudFormation passes in the create. The
+service checks one action at a time, so each refusal hides the next.
+That stack rolled back too and kept a second key, its alias and the
+table. With both actions deployed (B2 again, 23:16Z) and the stack,
+table and alias deleted and the key scheduled for deletion, the third
+create passed: run 37077850271
+deployed owner-check's runtime, the agent answered its two goldens in
+it, the signed bundle and the answer record went to the security
+account (each a first put) and the registry row was written at
+23:37:12Z, 32,260 s after the merge of pull request 1 by the session's
+count and 32,264 s as the envelopes read it. The list was
+these two actions.
+**The repair is a widening of IAM**: two actions,
+`CreateAgentRuntimeEndpoint` and `TagResource`, on `runtime/*`, in the
+bootstrap stack (`infra/bootstrap/app.py`), deployed by hand, twice,
+from the close's branch **before any ruling**, and put to Security in
+`rulings/pr4-security.md`; they are wider than the platform's own
+runtimes, and no condition narrows them. It is carried in PR 4, the close, and said there
+as a repair in the close. Until it was deployed no agent from the
+template could get a runtime, and every scheduled deploy run failed the
+same way. The owner's test stays a miss: `upgrade.deploy_max_seconds`
+is 3,600, and the deploy came 32,264 s after the merge (the envelope's
+number; the session first wrote 32,260).
+
+**Before the timed run: the restatements R9 owes** (Product, at M07
+PR 4; `open.md` rows 4 and 31). SPEC/06 §7 says "five records" and
+SPEC/06 §1, its row 6 and `milestones/M06/runs/f6_3_quickstart.yaml` say
+four. The reader is the authority (`src/verdict/template.py`, `f6_3`,
+built at M06 PR 2 and not changed since): it takes the repository's
+`created_at` as the start and **times three records** after it, the
+first pull request's `merged_at`, the deploy run's `completed_at` when
+its conclusion is success, and the answer record's `last_modified` when
+one of the agent's goldens passed in it; and it **reads two more without
+timing them**, the registry row and panel 1's row, either of which
+unread makes F6.3 unread. The first pull request's refusal is F6.1's,
+not F6.3's. So: four moments, of which one is the start; two listings;
+one refusal read elsewhere. SPEC/06 §7's "five" counted the refusal.
+That text stands as written; this paragraph is what is read against.
+
+The run file said "after M06 PR 3 merges" and "PR 4's run". It is
+restated in the same commit as this paragraph: the attempt is made once,
+at M07, after PR 3 merged (`cba3aac`) and after the owner's test
+deployed (run 37077850271), and is read by M07 PR 4's run with
+`scripts/observe_template.py` and `build`, as SPEC/07 §5 step 4 has it.
+Step 4 asks for "every step above read as held". Step 3, the owner's
+test, was read and not held: F7.0 fired on the deploy's time, not on
+the path. What step 4 needs of step 3 is the path, which the same
+reading showed held end to end once the two IAM actions were granted.
+**Product ruled on 2026-10-03, before the attempt: the time bound's miss
+does not stop step 4; the run is made.** `rulings/pr4.md` carries the
+ruling. What it risks is the one attempt, on a fault nobody has seen;
+what not making it would have cost is F6.1's live half and F6.3 unread
+for good (SPEC/00 §10.5: once). The agent is named `window-check`
+(Product, the same day, in the run file).
+
+**After the ids merged: the observer could not put** (Product, at M07
+PR 4, 2026-10-03). With `agentkeel-observer`'s id on `main` (#42), the
+scheduled `observe.yml` passed its grant step live for the first time:
+GitHub's read of the App was within its block, and the job read GitHub
+as the App. It then failed, fifteen times from 03:56Z to 11:23Z, at
+`sts:AssumeRoleWithWebIdentity` on `agentkeel-observation-put`: the role
+trusted the token subject for a ref, and a job that runs in an
+environment carries the environment's subject. The job that puts must
+be the job that holds the key, so it is in `platform-observer`; the
+trust was written at M07 PR 2 for a job with no environment, and no
+keyed run existed to refuse it until the id did. No App-viewpoint
+observation is in the security account before the repair. **The repair
+is the trust's subject**, the environment's, with `job_workflow_ref`
+exact as before; it is not wider (the same job, named as GitHub names
+it), it is Security's, deployed by `hector.flores`, and it is a third
+repair in the close. No other job has both an environment and an AWS
+role (`observe.yml`'s is the only one). It too was deployed before any
+ruling, by `hector.flores`, from the close's branch.
+
+**Corrected after the reviews of PR 4** (security-reviewer F8, cold
+review F7): the paragraph above first ended "PR 4's run reads the
+anonymous viewpoint alone, which cannot see a ruleset's
+`bypass_actors`: the relaxation waits for it". That was wrong twice.
+The observer App holds Administration: read, and M06 showed read does
+not return `bypass_actors` either (`rulings/pr2-security.md` item 7):
+no viewpoint M07 reads from sees that field, the App's included. And
+the relaxation did not wait: its entry is on the close's branch, `main`'s
+observer reads only what `main`'s run files name, so it is read by PR
+4's own token, with `bypass_actors_shown` false. Its "held" rests on
+the fields GitHub shows that token and on the owner's read of
+`bypass_actors: []` after the restore, which is not evidence.

@@ -40,14 +40,12 @@
 #    `check` for the seats, the visibility and the check run. No call mints
 #    the installation's whole grant: app_token() refuses one with no
 #    repository.
-# c. **The seeded relaxation, only when dispatched for it** (S0's third
-#    attempt): `gh workflow run platform-check.yml --ref main -f
-#    relax_seed=owner-check`. One call asks GitHub to remove the required
-#    status check from that repository's ruleset, with the token `post`
-#    mints for it, and GitHub's answer is kept as the artifact `relax-seed`.
-#    The input reaches the script through `env:`, never interpolated, and
-#    the script refuses any repository but the one seed S0's run file names
-#    on main. It is made once.
+# c. The seeded relaxation (S0's third attempt) was a dispatch input and a
+#    step of `post` from M07 PR 2. It was made once, on 2026-10-03 (run
+#    37123843294: GitHub accepted the App's call, and the next check failed
+#    the new head for the ruleset). The input and the step were removed at
+#    M07 PR 4 (rulings/pr2-security.md item 13n): no dispatch of this
+#    workflow asks the App to change a ruleset.
 #
 # **Dispatched from a branch, `post` does not start**: the environment
 # refuses the ref (read on 2026-10-02, run 36963543726, before any grant).
@@ -66,12 +64,6 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
-    inputs:
-      relax_seed:
-        description: "Seed S0's third attempt only: the agent repository whose ruleset the App's token is asked to relax. Made once. Leave empty."
-        required: false
-        default: ""
-        type: string
 
 permissions: {}
 
@@ -157,11 +149,9 @@ jobs:
 
   post:
     needs: evaluate
-    # always(): `evaluate` is skipped when no head waits, and the seeded relaxation is dispatched for
-    # itself. A dispatch from a branch still reaches this job, and the environment refuses it there.
-    if: >-
-      always() && (needs.evaluate.result == 'success' || needs.evaluate.result == 'failure'
-      || (github.event_name == 'workflow_dispatch' && inputs.relax_seed != ''))
+    # always(): a head that fails `evaluate` still gets its check posted. A dispatch from a branch
+    # reaches this job only when a head waits, and the environment refuses it there.
+    if: always() && (needs.evaluate.result == 'success' || needs.evaluate.result == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: platform-app
@@ -206,19 +196,3 @@ jobs:
           mkdir -p "$RUNNER_TEMP/results"
           uv run python scripts/platform_check.py post --results "$RUNNER_TEMP/results"
 
-      # (c) Seed S0's third attempt. Only on a dispatch that names a repository; the script holds the
-      # name to the one the seed's run file names on main.
-      - name: The seeded relaxation, when dispatched for it
-        if: github.event_name == 'workflow_dispatch' && inputs.relax_seed != ''
-        env:
-          AGENTKEEL_APP_PRIVATE_KEY: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
-          RELAX_SEED: ${{ inputs.relax_seed }}
-        run: uv run python scripts/platform_check.py relax --agent "$RELAX_SEED" --out "$RUNNER_TEMP/relax-seed.json"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: github.event_name == 'workflow_dispatch' && inputs.relax_seed != ''
-        with:
-          name: relax-seed
-          path: ${{ runner.temp }}/relax-seed.json
-          if-no-files-found: error
-          retention-days: 90

@@ -690,6 +690,27 @@ def test_no_agent_role_can_read_the_table_marker(template):
     assert not any(a.startswith("ssm:") for a in allowed(named(template, "agentkeel-boundary")))
 
 
+def test_the_execution_role_holds_on_any_runtime_only_what_create_agent_runtime_checks_before_the_runtime_has_an_id(template):
+    """M07, the second finding under F7.0 (runs 37066321605 and 37074759767): CreateAgentRuntime authorises the
+    DEFAULT endpoint, then the tags CloudFormation passes, against runtime/*; with both granted the create passed
+    (run 37077850271). Those two actions on runtime/*; every other runtime action stays on the two prefixes."""
+    statements = [s for policy in of_type(template, "AWS::IAM::Policy").values()
+                  if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
+                  for s in policy["Properties"]["PolicyDocument"]["Statement"]]  # fmt: skip
+    wide = [s for s in statements if s.get("Effect") == "Allow"
+            and any("runtime/*" in json.dumps(r) and "bedrock-agentcore" in json.dumps(r) for r in
+                    (s["Resource"] if isinstance(s["Resource"], list) else [s["Resource"]]))]  # fmt: skip
+    assert len(wide) == 1 and wide[0]["Sid"] == "WhatCreateAgentRuntimeChecksOnTheRuntimeItHasNotNamedYet"
+    assert actions(wide[0]) == {"bedrock-agentcore:CreateAgentRuntimeEndpoint", "bedrock-agentcore:TagResource"}
+    assert "Condition" not in wide[0], "no condition narrows it, as the comment says: a condition added later is said there"
+    # Cold review N8 on M07 PR 4: "only" also means no runtime action on Resource "*" but the create itself.
+    on_any = [s for s in statements if s.get("Effect") == "Allow" and s.get("Resource") == "*"
+              and any(a.startswith("bedrock-agentcore:") for a in actions(s))]  # fmt: skip
+    assert [actions(s) for s in on_any] == [{"bedrock-agentcore:CreateAgentRuntime"}]
+    (narrow,) = [s for s in statements if s.get("Sid") == "TheRuntimeAndItsWorkloadIdentity"]
+    assert not any(":runtime/*" in json.dumps(r) for r in narrow["Resource"])
+
+
 def test_the_deploy_role_calls_the_platforms_runtimes_and_no_other(template):
     """refagent's, and from M06 PR 2 an agent from the template's (agentkeel_<name>, R7). Never runtime/*:
     the account holds other projects' runtimes (milestones/M06/feasibility.md section 8)."""

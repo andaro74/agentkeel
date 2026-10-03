@@ -34,8 +34,9 @@ stored, and where the agent ran.
   `evals/history/`. A row that says GREEN for a run whose envelope says
   anything else is a miss (F7.4).
 - **Fired on its planted case:** in a copy of the tree only (M07 PR 2).
-  The live panel is not deployed as this page is written; until it is,
-  its live reading is unread.
+  The live panel was deployed on 2026-10-03 and read at M07's close: 55
+  rows, each equal to its envelope's verdict. That is a reading of
+  agreement; the live panel has not been made to show a wrong GREEN.
 
 ### A GREEN on panel 2 is not a GREEN milestone
 

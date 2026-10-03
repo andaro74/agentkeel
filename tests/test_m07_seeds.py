@@ -258,7 +258,6 @@ def test_s0_the_key_environment_is_read_back():
     assert any("A_SECOND_SECRET" in e for e in errors) and any("repository secret" in e for e in errors), errors
 
 
-@expected_failure
 def test_s0_the_owners_test_was_read():
     """The owner's test of the template, steps 2 to 4 again, on owner-check pull request 1; the
     platform check dispatched from a branch; the App's token asked to relax a ruleset. Each is made
@@ -302,12 +301,17 @@ def test_s1_a_platform_upgrade_changes_platform_owned_files_only():
     assert changed["server.py"] == (platform / "server.py").read_text(encoding="utf-8")
 
 
-@expected_failure
 def test_s1_the_platform_upgrade_was_made():
-    """The template re-made from M07 PR 2's merge, and the draft pull request the platform must open
-    in owner-check. Made after the owner's test and the timed run (SPEC/07 §5.1), read by the observer."""
+    """The template re-made, and the draft pull request the platform must open in each repository the run
+    file names: owner-check, and the timed run's (added when Product named its agent, as the file says).
+    Made after the owner's test and the timed run (SPEC/07 §5.1), read by the observer. One attempt, one
+    observed entry per repository: `made` counts one per attempt, which fits one repository only."""
     run = run_file("f7_1_platform_upgrade.yaml", "S1", 1)
-    observed = made(run)
+    observed = run["observed"]
+    assert observed is not None, "seed S1: the attempt has not been made"
+    # Cold review F5 on M07 PR 4: with nothing named, an empty list of entries passed.
+    assert "agentkeel-studio/owner-check" in run["repositories"], "S1 names owner-check, as planted"
+    assert sorted(o.get("repository") for o in observed) == sorted(run["repositories"]), "one entry per repository named"
     assert all(o.get("repository") and o.get("pull_request") for o in observed), observed
 
 
@@ -343,7 +347,6 @@ def test_s2_a_retired_agent_that_still_answers_is_found_by_build():
     assert denied["held"] is False and len(denied["reasons"]) == 1 and "invocation" in denied["reasons"][0], denied
 
 
-@expected_failure
 def test_s2_the_retirement_was_made():
     """The retire workflow dispatched for owner-check, its draft pull request, the merge. Made last,
     after owner-check has deployed, answered, been listed and taken S1 (SPEC/07 §5.1)."""
@@ -374,7 +377,6 @@ def test_s3_a_rollback_that_leaves_the_new_digest_live_is_found_by_build():
     assert held["read"] is True and held["held"] is True and held["reasons"] == [], held
 
 
-@expected_failure
 def test_s3_the_rollback_was_made():
     """model-watch's draft swap pull request on refagent, merged if its envelope is GREEN, then
     reverted; or the fallback the run file names before any run (SPEC/07 §5, item 16)."""

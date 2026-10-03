@@ -9,7 +9,8 @@ and which of it has fired on a planted case. SPEC/00 is the authority.
 - **An agent** is a folder under `agents/<name>/`: a manifest, a prompt,
   tool schemas, rules. `refagent` answers one question, whether a title
   can be published somewhere on a date, from a rights table it reads
-  through a tool. `ratings-helper` is a manifest with no code (M07).
+  through a tool. `ratings-helper` is a manifest with no code; its code
+  is not built in this project (SPEC/00 §12).
 - **The control** is `src/baseline/`, frozen at tag `m00`. Every number
   the platform reports is a delta against it.
 - **The goldens** are `evals/goldens/v1/g-NNN.yaml`: a question, the
@@ -68,7 +69,8 @@ two checks are made required (SPEC/02 §5.1).
 - A PR that edits a workflow can edit `src/`, `scripts/` and the
   `Makefile` it runs; only the workflow's text is hashed (M05).
 - The envelope is written by the PR's own code; nothing signs it (M05).
-- `ratings-helper` has no code, no edge and no ceiling in force (M07).
+- `ratings-helper` has no code, no edge and no ceiling in force, and none
+  is built in this project (SPEC/00 §12).
 - The ledger is read by `make ledger`, which holds each Measured cell to
   its envelope; the prose around it is held by nobody but the reader.
 
