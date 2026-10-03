@@ -72,6 +72,36 @@ is created. **It was not**: the repository was created at 01:01:33Z
 before the list was sent. The list is added below when it arrives, dated,
 and stands as listed after the start. Nothing reads it.
 
+### What happened (written after; the statement above is not edited)
+
+Times are GitHub's and AWS's.
+
+| When (UTC) | What |
+|---|---|
+| 01:00:11 | statement pushed (`a490d5d`) |
+| 01:01:33 | `agentkeel-studio/window-check` created; ruleset 24400101; floresinnovations invited (01:01:49) |
+| 01:13:02 | first commit `c83fa6f`, "Name the agent": the manifest also carried a stray `i` at the start of line 2 (the developer's editor), so it was not YAML |
+| 01:21:49 | the scheduled check ran (the previous was 00:53:45: GitHub's five-minute schedule skipped 28 minutes); the App failed `c83fa6f` at 01:22:49 with **one** reason, `the agent's name: manifest.yaml: not YAML (ParserError)`. Not the planted fault's two reasons: F6.1 is expected to read **not held** on this commit, "refused, and not for its planted fault" |
+| 01:26:06 | second commit `74e7feb`, the stray character removed, seats still null, no golden (Product chose to continue #1 rather than open a second pull request, so that the record keeps the first) |
+| 01:34:41 | the owner dispatched `platform-check.yml` from `main` (37086621844) after eight minutes with no scheduled run; the App failed `74e7feb` at 01:35:39 for exactly the two planted reasons: seven seats unassigned, 0 ordinary and 0 trap goldens |
+| 01:42:14 | third commit `7e27a03`: seats `andaro74`, `g-001` (ordinary, `r-038`, `ML-2.1`), `g-002` (trap, `r-016`, `HS-2`) |
+| 01:43:30 | the owner dispatched the check again; the schedule fired the same minute, the dispatch was cancelled by the concurrency group, and the scheduled run (37087187702) passed `7e27a03` at 01:44:46 |
+| 01:47:40 | merged by floresinnovations, merge commit `1c5b6ff` |
+| 01:49 | the owner dispatched `deploy.yml` (37087589740): nothing to deploy, the App had not yet checked the merge commit |
+| 01:51:45 | the owner dispatched the check (37087696839); the App passed `1c5b6ff` at 01:53:17 |
+| 01:54:22 | **scheduled** deploy run 37087860298 started; stack `agentkeel-window-check` created, runtime `agentkeel_window_check-YBt5st7kMX`; `g-001` and `g-002` answered in it, 2 observations, 0 errors, GREEN; `bundles/window-check/1c5b6ff….tar` and `.cosign.json` put, first; the answer record put, first; registry row at **02:01:44**; the run completed 02:01:48 |
+| 01:56:03 | the owner's second deploy dispatch (37087964107) found nothing left: already deployed |
+
+Elapsed as the reader will take it: `created_at` 01:01:33 to the last
+timed record (the deploy run's completion, 02:01:48) is **3,615 s**,
+under 28,800. Panel 1's row is read by the observer at PR 4's run, not
+here. The two IAM actions granted on 2026-10-02 were exercised a second
+time by this create, and no third was asked for.
+
+The observed entry is in `milestones/M06/runs/f6_3_quickstart.yaml`
+(repository, pull request 1, `window-check`, 02:01:44Z); its seed test's
+marker is off in the same commit.
+
 ### Started
 
 - Statement on GitHub: `a490d5d`, committed 2026-10-03T01:00:11Z.
