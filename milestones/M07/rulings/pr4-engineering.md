@@ -8,6 +8,7 @@ authorises:
   - tests/test_bootstrap.py
   - tests/test_containment_stacks.py
   - tests/test_m06_seeds.py
+  - tests/test_m07_observer.py
   - tests/test_m07_readers.py
   - tests/test_m07_seeds.py
   - tests/test_m07_workflows.py
@@ -45,6 +46,16 @@ code.
   markers off, each in the commit that wrote its `observed` entry (S0,
   S1, S2, S3 of M07; S3 of M06). S1's test counts one entry per
   repository the run file names and holds `owner-check` among them.
+
+- `tests/test_m07_observer.py`: the test of "the run files as they
+  stand" now holds that every attempt is named and looked up. **It was
+  red on the close's first run** (37147871497, on `84dc913`): it still
+  held that two attempts were named, the entries had been written since
+  `87bbb50`, and the session pushed without having read the suite to its
+  end (its command piped `pytest` through `tail`, and the exit code it
+  saw was `tail`'s). The gate ruled that run's envelope GREEN; the
+  `evals` job and `checks` failed on this one test. Repaired after the
+  envelope, so the next run measures again.
 
 **A run-file test passing is not its falsifier held.** Each passes
 because a human-filled entry exists. The readings are `build`'s, on the

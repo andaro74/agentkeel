@@ -380,18 +380,30 @@ def test_the_relaxation_is_written_as_records_and_build_compares_their_times(mon
     assert refused_by_github["asked"] is None and upgrade.relaxation(refused_by_github, APP, None)["outcome"] == "refused"
 
 
-def test_the_run_files_as_they_stand_name_two_attempts_made_the_dispatch_and_the_owners_test(monkeypatch):
-    """PR 3's own run: S0's second attempt (PR 2 recorded it) and its first, the owner's test, made on
-    2026-10-02 and recorded at PR 3. Only they are looked up."""
+def test_the_run_files_as_they_stand_name_every_attempt_and_each_is_looked_up(monkeypatch):
+    """At M07's close the run files name every attempt: S0's three, S1's two pull requests, the retirement,
+    the swap and the rollback on the fallback. Each is looked up, and nothing else is. (At PR 3 this test held
+    that two were named; it failed on the close's first run, 37147871497, because the entries had been
+    written and the test had not: the suite had not been read to its end before the push.)"""
     asked: list[str] = []
     monkeypatch.setattr(observer, "read_dispatch", lambda gh, entry: asked.append(str(entry["run"])) or {"found": True})
     monkeypatch.setattr(observer, "read_owner_test", lambda gh, entry, app: asked.append(
         f"{entry['repository']}#{entry['pull_request']}") or {"found": True})  # fmt: skip
+    monkeypatch.setattr(observer, "read_relaxation", lambda gh, entry, app: asked.append(
+        f"relaxation {entry['run']} on {entry['repository']}#{entry['pull_request']}") or {"found": True})  # fmt: skip
     observation = observer.blank("anonymous")
     observer.read_github(FakeGitHub({}), observation)
-    assert asked == ["36963543726", "agentkeel-studio/owner-check#1"]
-    assert observation["s0"]["owner_test"] == {"found": True} and observation["s0"]["relaxation"] is None
-    assert observation["s1"] is None and observation["s2"] is None and observation["s3"] is None
+    assert asked == ["36963543726", "agentkeel-studio/owner-check#1",
+                     "relaxation 37123843294 on agentkeel-studio/owner-check#4"]  # fmt: skip
+    assert observation["s0"]["owner_test"] == {"found": True} and observation["s0"]["relaxation"] == {"found": True}
+    # The fake holds no pull request, so each is recorded as asked for and not found: the names are the run files'.
+    assert [p["repository"] for p in observation["s1"]["pulls"]] == ["agentkeel-studio/owner-check",
+                                                                    "agentkeel-studio/window-check"]  # fmt: skip
+    assert observation["s2"]["pull"]["repository"] == "agentkeel-studio/owner-check"
+    assert observation["s2"]["pull"]["pull_request"] == 6 and observation["s2"]["pull"]["trigger"]["run"] == 37128759405
+    swap, back = observation["s3"]["swap"], observation["s3"]["rollback"]
+    assert (swap["repository"], swap["pull_request"]) == ("andaro74/agentkeel", 43)
+    assert (back["repository"], back["pull_request"], back["fallback"]) == ("agentkeel-studio/window-check", 3, True)
 
 
 # --- the bucket, AWS and the composition ---------------------------------------------------------
