@@ -1,4 +1,4 @@
-# B2: what the two bootstrap deploys changed, and how it was read
+# B2 and B3: what the three deploys by hand changed, and how each was read
 
 The bootstrap stack was deployed by hand twice on 2026-10-02
 (`runs/pr2_by_hand.md`, B2): from `7a9032d` at 22:49:50Z and from
@@ -118,5 +118,44 @@ PYTHONUTF8=1 npx aws-cdk@2 diff --strict 2>&1 | tee "$HOME/agentkeel-<stack>-dif
 PYTHONUTF8=1 npx aws-cdk@2 deploy 2>&1 | tee "$HOME/agentkeel-<stack>-deploy.txt"
 ```
 
-Whether `PYTHONUTF8=1` is what fixes the sign is not tested; the read
-above, run again after the deploy, says whether it did.
+`PYTHONUTF8=1` does not fix the sign: B3 below was deployed with it and
+stored `?` too. Where the sign is lost between the app and the CLI on
+this machine is not found, and is not looked for further: `Metadata`
+only.
+
+## B3, Grafana's stack, from `8f4bc7a` (2026-10-03T00:48:04Z)
+
+`infra/grafana` is identical on `main` (`cba3aac`) and `m07-pr4`. The
+first `deploy` with `2>&1 | tee` applied nothing: "Stack includes
+security-sensitive updates, but terminal (TTY) is not attached so we are
+unable to get a confirmation from the user". It printed the IAM changes,
+which were read, and the deploy was run again with
+`--require-approval never`. Its output:
+
+```
+Stack AgentkeelGrafana
+IAM Statement Changes
+┌───┬───────────────────────────────────────────────────────────────────────┬────────┬────────────────────────┬──────────────────────┬───────────┐
+│   │ Resource                                                              │ Effect │ Action                 │ Principal            │ Condition │
+├───┼───────────────────────────────────────────────────────────────────────┼────────┼────────────────────────┼──────────────────────┼───────────┤
+│ + │ arn:aws:dynamodb:us-west-2:581208540944:table/agentkeel-envelopes     │ Allow  │ dynamodb:DescribeTable │ AWS:${ConnectorRole} │           │
+│   │                                                                       │        │ dynamodb:PartiQLSelect │                      │           │
+│   │                                                                       │        │ dynamodb:Query         │                      │           │
+│   │                                                                       │        │ dynamodb:Scan          │                      │           │
+├───┼───────────────────────────────────────────────────────────────────────┼────────┼────────────────────────┼──────────────────────┼───────────┤
+│ + │ arn:aws:glue:us-west-2:581208540944:table/default/agentkeel-envelopes │ Allow  │ glue:GetTable          │ AWS:${ConnectorRole} │           │
+└───┴───────────────────────────────────────────────────────────────────────┴────────┴──────────────────────────────────────────────┴──────────────────────┴───────────┘
+
+AgentkeelGrafana | 0/5 | 5:48:06 PM | CREATE_IN_PROGRESS      | AWS::Glue::Table             | EnvelopesSchema
+AgentkeelGrafana | 0/5 | 5:48:07 PM | UPDATE_IN_PROGRESS      | AWS::IAM::Policy             | ConnectorRole/DefaultPolicy (ConnectorRoleDefaultPolicyA5ABCAB4)
+AgentkeelGrafana | 1/5 | 5:48:07 PM | CREATE_COMPLETE         | AWS::Glue::Table             | EnvelopesSchema
+AgentkeelGrafana | 2/5 | 5:48:25 PM | UPDATE_COMPLETE         | AWS::IAM::Policy             | ConnectorRole/DefaultPolicy (ConnectorRoleDefaultPolicyA5ABCAB4)
+AgentkeelGrafana | 4/5 | 5:48:28 PM | UPDATE_COMPLETE         | AWS::CloudFormation::Stack   | AgentkeelGrafana
+✅  AgentkeelGrafana
+```
+
+Times are the machine's (UTC-7). The read: the stored template (YAML,
+as the CLI uploads this stack) equals a synth of the tree at `8f4bc7a`,
+with the 3 cdk-nag signs as `?` and CDK's path metadata set aside, as
+for B2. Panel 2 is imported by the human from `infra/grafana/panel2.json`;
+its table holds no row until the next push to `main`.

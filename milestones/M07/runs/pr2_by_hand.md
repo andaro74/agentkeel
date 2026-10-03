@@ -34,7 +34,7 @@ where it stood.
 | A4 the two ids in the grant block | **Done**, in the commit that carries this row, on `m07-pr4` |
 | B1 the security account's stack | **Done**, by `hector.flores` in the console, 2026-10-02, from a template synthesised from `main` (`3bfd074`). The role `agentkeel-observation-put` was created at 15:39:21Z (as the human read it in the console; no session can read that account). `AWS_OBSERVATION_PUT_ROLE_ARN` was set at 15:40:56Z (`gh variable list`). **No put under `bundles/` or `observations/` has been made or refused yet** |
 | B2 the bootstrap stack | **Not done.** `AWS_MODEL_WATCH_ROLE_ARN` and `AWS_ENVELOPE_ROW_PUT_ROLE_ARN` are not set |
-| B3 Grafana's stack | **Not done** |
+| B3 Grafana's stack | **Done**, 2026-10-03T00:48:04Z, from `m07-pr4` at `8f4bc7a` (`infra/grafana` is identical to `main` at `cba3aac`, `git diff --quiet main m07-pr4 -- infra/grafana`). The stored template read equal to the tree's synth, signs aside (`runs/b2_cdk_diff.md`). `agentkeel-envelopes` holds 0 rows until the next push to `main` |
 | C the grant to `agentkeel-platform` | **Done**, after PR 2 merged. The installation holds Administration: write (`gh api orgs/agentkeel-studio/installations`) |
 
 **The order now, and the one thing held back.** A1, A2, A3, A4's read,
@@ -67,7 +67,7 @@ Whichever it is, the table below is filled when it is done.
 | B1 security | `3bfd074` (as the human stated it) | 2026-10-02 | the console's change set; not kept. **Owed** (platform-architect 3 on M07 PR 3): the sha256 of `AgentkeelSecurity.template.json` synthesised at that commit, and the same hash of the template CloudFormation stores, read by `hector.flores` |
 | B2 bootstrap, first | `7a9032d` (`m07-pr4`; `CreateAgentRuntimeEndpoint` alone) | 2026-10-02T22:49:50Z (`AgentkeelBootstrap` `LastUpdatedTime`); `AWS_ENVELOPE_ROW_PUT_ROLE_ARN` set 22:51:50Z | read by the human against the list above; its last lines (the two outputs) in `runs/b2_cdk_diff.md`; the rest not kept (the session's `tee` caught stdout, and `cdk diff` writes to stderr) |
 | B2 bootstrap, second | `81508ab` (`m07-pr4`; `TagResource` added) | 2026-10-02T23:16:52Z (`AgentkeelBootstrap` `LastUpdatedTime`) | in full in `runs/b2_cdk_diff.md`: one statement, and `Metadata` hunks that are `§` against `?`. The stored template read equal to the tree's synth, signs aside. The next deploy run, 37077850271, created owner-check's runtime |
-| B3 Grafana | not deployed | | |
+| B3 Grafana | `8f4bc7a` (`m07-pr4`; `infra/grafana` identical to `main`) | 2026-10-03T00:48:04Z (`AgentkeelGrafana` `LastUpdatedTime`) | the deploy's own output, kept at `~/agentkeel-grafana-deploy.txt` and in `runs/b2_cdk_diff.md`: one `AWS::Glue::Table` created, `ConnectorRole/DefaultPolicy` updated, nothing else. A first run with `2>&1 \| tee` and no `--require-approval never` applied nothing: cdk will not apply IAM changes without a terminal to ask |
 
 ## A. The two new Apps, their environments and keys
 
