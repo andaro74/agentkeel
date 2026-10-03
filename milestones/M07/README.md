@@ -11,9 +11,9 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
 | Falsifiers | F7.0 no agent from the template exists to upgrade: the owner's test's fixed head is refused, or not merged, deployed, answering and listed; the timed run's agent the same; or the platform check dispatched from a branch reaches the App's key (added at M07 PR 1). F7.1 an upgrade requires a manual edit: no pull request the platform opened arrives, or a workflow or a person's commit was needed to merge it; a ruling file is not a person's edit (reworded at M07 PR 1). F7.2 a retired agent still answers. F7.3 a rollback leaves the new digest live. F7.4 a Grafana panel shows GREEN where the envelope says RED (read through Grafana's query API, as F6.4; not Playwright). F7.5 `plants_expected ≠ plants_fired` for the surfaces. |
 | Seeded commit | `c870bca` (S0 the template's repair read by CI: the owner's test, the App token's bounds); `ef3d88a` (S1 a platform bump opens a draft pull request); `3872c13` (S2 a retired agent's target is gone); `ea53ef4`, its run file made to parse in `a46c98f` (S3 a `model-watch` pull request merged and rolled back); `e814efe` (S4 panel 2 forced to show GREEN on a RED envelope, two tests, one per reader); `f36adee` (S5 a surface plant goes silent); the fixtures given their held cases and three more uncovered ones in `4240d9e`, on the PR's own review, each its own commit before any reader (SPEC/07 §5). S0 to S3 are each a fixture and a run file with `observed: null`; S4 and S5 are fixtures. SPEC/06's S3 (`b4eb959`, the timed quickstart) is received, not re-planted |
 | Expected gate output | PR 1: refagent's envelope as at M06; it says nothing about claim 7. `make plants` lists S0 to S5 (seeded cases, not golden plants); `tests/test_m07_seeds.py` shows 13 expected failures, and `tests/test_m06_seeds.py` still 1 (S3's). PR 2, on the PR: the nine fixture tests pass, each by its reader, and the four run-file tests stay expected failures; from PR 2's merge the gate requires `F7_0` to `F7_5` on every agent envelope, **from the seed tests alone: test-only witnesses**. The live readings are **recorded in the envelope's `upgrade` and read by this row's cell, with `template`, not gated** (SPEC/07 §4): the observer writes raw observations with the viewpoint it read from, and `build` rules on them. **A named P3 exception (SPEC/07 §5.1):** the platform check, the deploy, `platform-upgrade`, `model-watch` and the retire job run from `agentkeel`'s `main`, and the App's grant is made by hand after PR 2 merges, when `main` no longer mints a token with no repository. The platform check dispatched from a branch is attempted first, before any grant, and must be read as refused. Then, after PR 2's merge, each stated before and pushed: the grant made and read back; SPEC/06's S2 read on a new head; the owner's test, steps 2 to 4; SPEC/06's S3 timed once by `floresinnovations`; the template re-made and S1's pull requests; the App's token asked to relax a ruleset; `model-watch`'s swap to Haiku 4.5 and its rollback (independent of the others; its two pull requests on `main` are outside the cap); `owner-check` retired, last. PR 3 is the repair and carries every attempt's `observed` entry to `main`; PR 4 is the close. **Amended at PR 3 (Product, `rulings/pr3.md`): that cannot hold. The owner's test's deploy failed in the platform's own `deploy.yml` (run 37023118799), the deploy runs from `main`, and no later attempt can be made until the fix is merged. So PR 3 is the workflow fix and every repair owed before the next attempts, merged once, and carries one `observed` entry, the owner's test's; PR 4 carries every other attempt's entry and is the close, so those are read from the anonymous viewpoint alone (SPEC/07 §4). The owner's test is not re-made: its deploy missed `upgrade.deploy_max_seconds`, F7.0 fired, and this row is expected to close RED.** **The cell cites PR 4's run's envelope**, which carries the App-viewpoint observation `main`'s scheduled observer made, named, beside its own anonymous one. Stated at open: the owner's test's new head refused on the seats and the goldens and nothing else, its fixed head merged, deployed within 3,600 s, answering and listed; S1's draft pull request from the App within 4,500 s, platform-owned files only, no person's edit, major or minor as read; S2 retired within 3,600 s of its pull request's merge, its one invocation refused; a revert leaving the tree's digest live. Haiku 4.5's envelope is **not stated**: it has never been run. If it is RED the swap is not merged, F7.3 is read on `owner-check`'s platform upgrade reverted, and `upgrade.taken` stays under 3. The measured value is `upgrade.taken`, n of 3. RED if F7.0 is unread or fired; if `taken` is under 3; if a trigger gets no pull request from the platform, or one that needed a workflow or a person's edit; if the retired agent answers or its runtime stands; if a revert leaves the upgrade's digest live; if panel 2 shows GREEN on a RED envelope or the surfaces' counts differ; if a seed's test passes but by its reader; if PR 4's run cannot read an attempt; or if `make ledger` stops matching rows 0 to 6 |
-| Measured | — |
-| PRs used / cap | 4 / 4; the close is a fifth (RED by the cap, Product, `rulings/grant-ids.md`) |
-| State | OPEN |
+| Measured | agent: traps 2/2 (g-010, g-011); ordinary 9/9; guardrail 2/3; redteam 5/5; control: traps 0/2; ordinary 1/9; guardrail 0/3; redteam 0/5; mode runtime; never_passed 1; regressed 0; plants 7/7; F0_2 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F0_3 pass https://github.com/andaro74/agentkeel/actions/runs/35401176820/job/105781176255; F1_1 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F1_2 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F1_3 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F1_4 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F2_1 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F2_2 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F3_1 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F3_2 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F3_3 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F3_5 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F3_6 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F4_1 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F4_2 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F4_4 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F5_1 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F6_1 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F6_4 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F7_0 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F7_1 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F7_2 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F7_3 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F7_4 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; F7_5 pass https://github.com/andaro74/agentkeel/actions/runs/37149475766; taken 2 of 3; F7_0 not held (relaxation detected); F7_1 unread; F7_2 held 368 s; F7_3 held; F7_4 held; F7_5 held; surface plants 2/2; claim 6 later F6_1 not held; claim 6 later F6_3 held 3615 s; F7_0 not held: owner_test: deployed 32264 s after the merge, over upgrade.deploy_max_seconds 3600; F7_1 unread: model andaro74/agentkeel#43: unread: the pull request has not merged; taken 2 of 3: model unread; RED; envelope `dee74c3cf4102bfb6d4315faafb161c154618ed9`; base b0219756 |
+| PRs used / cap | 5 / 4 |
+| State | RED |
 
 ### Open detail (PR 1, 2026-10-01)
 
@@ -419,3 +419,127 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   corrected in SPEC/07 §12. The observer App's Administration: read
   does not show that field either, and the relaxation is read by PR 4's
   own token.
+
+### Close detail (PR 4, the close, the fifth pull request, 2026-10-03)
+
+**Row 7 is RED**, three ways. F7.0 fired: the first agent from the
+template deployed 32,264 s after its merge, against 3,600. `taken` is 2
+of 3: the model upgrade was proposed by the platform and not merged,
+because its envelope was RED. And M07 used five pull requests against a
+cap of four (`rulings/grant-ids.md`); no cap raise is proposed.
+
+**The measurement.** The Measured cell is copied from `make ledger`'s "as
+row M07 reads it" line for the envelope for `dee74c3cf4102bfb6d4315faafb161c154618ed9`, written by CI
+run 37149475766 and committed by `github-actions[bot]` (`45bac6a`).
+`make ledger` exits 0 against it. As numbers: refagent GREEN in `mode:
+runtime`, ordinary 9/9, traps 2/2, guardrail 2/3, red team 5/5; plants
+7/7; `regressed` 0; `never_passed` 1 (`g-014`); 25 checks pass, `F7_0`
+to `F7_5` among them (from the seed tests, test-only witnesses); p95
+5,740 ms; 43,617 tokens in, 4,780 out. It carries the App-viewpoint
+observation `main`'s scheduled observer made (run 37149528340, read
+19:53:53Z, `observations/37149528340.json`), which covers what `main`'s
+run files name: the dispatch from a branch, the owner's test and S2.
+Every attempt of the close is read by the pull request's own token.
+
+| Falsifier | Read | Held | What the envelope says |
+|---|---|---|---|
+| F7.0 | yes | **no** | `owner_test`: "deployed 32264 s after the merge, over upgrade.deploy_max_seconds 3600". `dispatch` held; `relaxation` held, `detected`; `timed_run` held |
+| F7.1 | **unread** | — | "model andaro74/agentkeel#43: unread: the pull request has not merged". The platform's two pull requests held: arrived 139 s and 144 s after the template's push, deployed 518 s and 511 s after their merges. The retirement's pull request arrived 39 s after its dispatch. The swap's arrived 51 s after `model-watch` began |
+| F7.2 | yes | yes | 368 s from the merge to `DeleteAgentRuntime` |
+| F7.3 | yes | yes | on `window-check`: the runtime's image carries the tree's digest at the revert and not the upgrade's |
+| F7.4 | yes | yes | panel 2's 55 rows, none mismatched with the envelopes. Its first live read |
+| F7.5 | yes | yes | surface plants 2/2 |
+| `upgrade.taken` | | | **2 of 3**: platform and retirement; model unread |
+| F6.1 (live half, received from M06) | yes | **no** | "the first commit was refused, and not for its planted fault": the App did not refuse it on the seats or the goldens |
+| F6.3 (received) | yes | yes | 3,615 s, under 28,800; the registry row and panel 1's row read |
+| F6.2 (received) | yes | no | "S2's mergeable_state is 'behind'", as at PR 3 |
+| F6.4 | yes | yes | panel 1's rows equal the registry's |
+
+**Two numbers the session wrote by hand differ from the envelope's, and
+the envelope is right.** The records above this section give 147 s and
+152 s for the upgrade drafts and 387 s and 510 s for their deploys. The
+reader takes GitHub's record of the template's push (eight seconds after
+the commit's own time) and the deploy run's completion, one run for both
+agents: 139 s and 144 s; 518 s and 511 s.
+
+**The close ran twice.** Its first run (37147871497, on `84dc913`) wrote
+an envelope the gate ruled GREEN, with the same readings, and its
+`evals` and `checks` jobs failed on one test that still held that the
+run files name two attempts (`tests/test_m07_observer.py`). The entries
+had been written since `87bbb50`; the session pushed without reading the
+suite to its end. Repaired in `db4a94e`; a test is a measured path, so
+CI measured again, and the cell is the second run's. p95 was 7,339 ms on
+the first and 5,740 ms on the second.
+
+**What each attempt showed** (`runs/pr4_expected.md` has each statement,
+pushed before its attempt, and what happened).
+
+- **The owner's test** (PR 3): the App refused the empty head for the
+  seats and the goldens alone and passed the fixed one; merged; then
+  three faults of the platform's own stood between the merge and a
+  runtime (the signed files' path in `deploy.yml`; two IAM actions the
+  execution role lacked). 32,264 s.
+- **The timed quickstart** (SPEC/06's S3): one hour, once. Its first
+  commit was refused for the developer's typo, not for the planted
+  fault, so F6.1 reads not held. The owner started the platform's check
+  and deploy by hand; the statement did not allow it.
+- **The platform upgrade** (S1): opened by `agentkeel-upgrades` in both
+  repositories, one verified commit each, `manifest.yaml`'s
+  `platform_version` and nothing else, merged by the seats with no
+  commit of a person's, deployed. Taken.
+- **The relaxation** (S0's third attempt): GitHub accepted the App's
+  call. The ruleset required no platform check for 7 min 21 s; the next
+  check failed the new head for it; the owner restored it by hand.
+  Detected, not refused. No viewpoint the envelope reads from sees
+  `bypass_actors`.
+- **The model swap** (S3): `model-watch` opened #43 by itself. Haiku 4.5
+  regressed `g-004`. RED, not merged, as ruled. Its envelope is on the
+  branch `model-watch/m04_cheaper_swap`, which is kept.
+- **The rollback**, on the fallback, read on `window-check` and not
+  `owner-check` (Product, before it was made: one envelope cannot read a
+  rollback and a retirement on one agent). Held.
+- **The retirement** (S2): `owner-check`'s runtime deleted 368 s after
+  the merge, its one invocation refused, the row kept with `retired_at`.
+  Taken. Two network interfaces stayed behind the kept security group.
+
+**Three repairs were deployed by hand during the attempts, before any
+ruling**, from this branch: `CreateAgentRuntimeEndpoint`, then
+`TagResource`, on `runtime/*`; and the observer's put role trusting the
+environment's subject. `rulings/pr4-security.md` item 1 names each and
+puts it to Security after the fact. Item 13n (the relaxation's dispatch
+input and step) is removed in the close.
+
+**Statements that were wrong.** Attempt 1 expected `template.F6_1` held;
+it reads not held. The record of attempt 6 said "as stated, every line";
+the owner's dispatches were not only on late schedules, and that
+sentence is withdrawn. A sentence said the App's viewpoint sees
+`bypass_actors`; it does not. Each is corrected by an appended note, not
+by editing the statement.
+
+**Not recorded.** Act 1, the screen capture of the timed run, was not
+made. A read-back from the records was filmed afterwards and is filed as
+that (`docs/video/README.md`). Act 2 was not recorded. No row is written
+for M07's video: it is recorded after the merge (`milestones/M08/open.md`
+row 1).
+
+**Row 7's RED conditions, each checked at the close:** F7.0 unread or
+fired (**fires**); `taken` under 3 (**fires**: 2 of 3); a trigger that
+gets no pull request from the platform, or one that needed a workflow or
+a person's edit (no: each of the three triggers got one, opened by the
+App, and none was edited; the swap's was not merged for its own
+envelope); the retired agent answers or its runtime stands (no: `F7_2`
+held); a revert leaves the upgrade's digest live (no: `F7_3` held, on
+`window-check`); panel 2 shows GREEN on a RED envelope or the surfaces'
+counts differ (no: `F7_4` held over 55 rows; surface plants 2/2); a
+seed's test passes but by its reader (holds: `uv run pytest
+tests/test_m07_seeds.py`, 13 passed; the four run-file tests pass because
+their entries are filled, which is not a reader, and each marker came
+off in the commit that wrote its entry); PR 4's run cannot read an
+attempt (**fires** for the model: an unmerged pull request reads unread,
+as ruled at PR 2); `make ledger` stops matching rows 0 to 6 (no: exit
+0). And the cap: five pull requests.
+
+**What is carried.** `milestones/M08/open.md`, 62 rows: 26 new at this
+close and 36 of M07's `open.md` that M07 did not close. Every finding
+and every Unsure item of #38, #39, #40, #42 and #44 is ruled or has a
+row there (`rulings/pr4.md` sections 5 and 6).

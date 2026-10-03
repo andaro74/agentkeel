@@ -11,6 +11,7 @@ authorises:
   - milestones/README.md
   - milestones/M06/runs/f6_3_quickstart.yaml
   - milestones/M07/README.md
+  - milestones/M07/attestations.md
   - milestones/M07/runs/b2_cdk_diff.md
   - milestones/M07/runs/f7_0_owner_test.yaml
   - milestones/M07/runs/f7_1_platform_upgrade.yaml
@@ -29,6 +30,10 @@ authorises:
 evidence:
   - SPEC/00-overview.md#8-M07
   - SPEC/07-upgrade-retire-surfaces.md
+  - https://github.com/andaro74/agentkeel/actions/runs/37149475766
+  - evals/history/dee74c3cf4102bfb6d4315faafb161c154618ed9.json
+  - https://github.com/andaro74/agentkeel/actions/runs/37147871497
+  - evals/history/84dc913b996815b9bf8f7a6ebff45b272a211bdd.json
   - milestones/M07/feasibility.md
   - milestones/M07/rulings/pr1.md
   - milestones/M07/rulings/pr2.md
@@ -73,8 +78,40 @@ It builds no reader. Nothing under `src/`, `agents/`, `thresholds.yaml`,
 
 ## 2. The reading
 
-Written from the envelope CI writes for this pull request, in the commit
-that fills the cell. Until that commit this section says nothing.
+The cell is `make ledger`'s line for the envelope for
+`dee74c3cf4102bfb6d4315faafb161c154618ed9` (CI run 37149475766, bot commit `45bac6a`), copied.
+`make ledger` exits 0.
+
+refagent GREEN in `mode: runtime`, ordinary 9/9, traps 2/2, guardrail
+2/3, red team 5/5, plants 7/7, `regressed` 0, p95 5,740 ms. `upgrade`:
+`taken` **2 of 3** (platform and retirement; model unread). `F7_0` read
+and **not held**: "owner_test: deployed 32264 s after the merge, over
+upgrade.deploy_max_seconds 3600"; its other three parts held, the
+relaxation as `detected`. `F7_1` **unread**: "model andaro74/agentkeel#43:
+unread: the pull request has not merged". `F7_2` held, 368 s. `F7_3`
+held, on `window-check`. `F7_4` held, 55 rows. `F7_5` held. `template`:
+`F6_1` read and **not held**; `F6_3` held, 3,615 s; `F6_2` not held,
+"behind"; `F6_4` held. Row 7: **RED**.
+
+**Against what was stated before the run** (#44's body): every line as
+stated. `F7_4`, stated as "held or unread", read held. Two things the
+statement did not have: the platform pull requests' times are 139 s and
+144 s to arrive and 518 s and 511 s to deploy, not the session's hand
+counts (147, 152, 387, 510); and the reading of the model is "unread",
+which the statement gave as one of two.
+
+**The close ran twice.** The first run (37147871497, `84dc913`, envelope
+kept) read the same and its `evals` and `checks` jobs failed on one test
+the session had not updated (`pr4-engineering.md`). The cell is the
+second run's. If a later run on this branch reads differently, that is
+recorded beside it and the cell stays on `dee74c3`.
+
+**"Unread" for the model, and "not taken".** The envelope says the
+model's pull request is unread because it did not merge
+(`rulings/pr2-engineering.md` ruled that reading). Its own envelope, on
+its own branch, is RED on `g-004`. The row is RED on `taken` under 3
+either way; the close's prose says "not taken" for the upgrade and
+"unread" for the envelope's field, and does not use one for the other.
 
 ## 3. What Product ruled during the attempts, each in the conversation and recorded here
 
