@@ -212,6 +212,24 @@ account, can change it.
 PR 3 changes nothing under `infra/security/` but its README, so B1 is not
 made again for PR 3.
 
+**B1 again, at M07 PR 4 (2026-10-03): the observer's trust.** Every keyed
+`observe.yml` run on `main` since the ids merged (37094837939 at 03:56Z
+to 37119509159 at 11:23Z, fifteen) passed the grant step and "Read
+GitHub as the App", and was then refused at
+`sts:AssumeRoleWithWebIdentity`: `agentkeel-observation-put` trusted
+`sub` = `...:ref:refs/heads/main`, and a job in an environment carries
+`sub` = `...:environment:platform-observer`. The repair is the role's
+trust subject, in `infra/security/app.py`, ruled by Security
+(`rulings/pr4-security.md`) and deployed by `hector.flores` as steps 1
+to 4 above, from `m07-pr4` at the commit that carries it. **The change
+set must show one thing and nothing else:** the role
+`ObservationPutRole` modified, its `AssumeRolePolicyDocument` alone
+(`sub` from `repo:andaro74@3157440/agentkeel@1376369685:ref:refs/heads/main`
+to `repo:andaro74@3157440/agentkeel@1376369685:environment:platform-observer`),
+no replacement. Step 4's variable is already set. This time the
+template's sha256 is recorded before the upload and the stored
+template's after (the hash B1's first deploy owes).
+
 ### B2. The agent account's bootstrap stack (items 13b, 13c, 13d, 13h)
 
 From the commit Security rules (above). Write the commit down first.

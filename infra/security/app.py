@@ -133,6 +133,7 @@ MAIN_EVALS = f"{REPO}/.github/workflows/evals.yml@refs/heads/main"
 MAIN_DEPLOY = f"{REPO}/.github/workflows/deploy.yml@refs/heads/main"
 # M07 PR 2 (SPEC/07 section 6): observe.yml on main stores what it read as the platform's observer App.
 MAIN_OBSERVE = f"{REPO}/.github/workflows/observe.yml@refs/heads/main"
+OBSERVER_ENVIRONMENT = "platform-observer"  # observe.yml's job environment; infra/platform_grant.yaml names it too
 # The tag an agent role carries (infra/construct/governed_agent.py, AGENT_TAG), as a policy variable.
 OWN_PREFIX = "agents/${aws:PrincipalTag/agentkeel:agent}/*"
 # GitHub's two published intermediate thumbprints. IAM no longer checks them for GitHub, and
@@ -386,10 +387,19 @@ class SecurityStack(cdk.Stack):
         return role
 
     def _observation_put_role(self, provider: iam.CfnOIDCProvider) -> iam.Role:
-        """observe.yml on main, and only there: what it read as the observer App (SPEC/07 section 6, item 9)."""
+        """observe.yml on main, and only there: what it read as the observer App (SPEC/07 section 6, item 9).
+
+        M07 PR 4 (runs 37094837939 to 37119509159, 2026-10-03): the job that puts is the job that holds the
+        App's key, so it runs in the environment `platform-observer`, and GitHub's token for a job in an
+        environment carries `sub` = `...:environment:<name>`, not `...:ref:refs/heads/main`. The role trusted the
+        ref form, and every keyed run was refused at AssumeRoleWithWebIdentity. The subject is the environment's
+        now. Main-only is held twice still: `job_workflow_ref` exact, `observe.yml@refs/heads/main`, and the
+        environment's own branch policy (`main` alone, no admin bypass), which the grant's reader reads back
+        before this step. Not wider: the same job, named as GitHub names it."""
         role = iam.Role(
             self, "ObservationPutRole", role_name=OBSERVATION_PUT_ROLE, max_session_duration=cdk.Duration.hours(1),
-            assumed_by=self._github(provider, [f"{SUBJECT}:ref:refs/heads/main"], MAIN_OBSERVE, exact=True),
+            assumed_by=self._github(provider, [f"{SUBJECT}:environment:{OBSERVER_ENVIRONMENT}"], MAIN_OBSERVE,
+                                    exact=True),
             description="agentkeel: observe.yml on main puts its App-viewpoint observation under observations/ as this.",
         )  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(

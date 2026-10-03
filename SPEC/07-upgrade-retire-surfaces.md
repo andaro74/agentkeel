@@ -1089,3 +1089,23 @@ ruling. What it risks is the one attempt, on a fault nobody has seen;
 what not making it would have cost is F6.1's live half and F6.3 unread
 for good (SPEC/00 §10.5: once). The agent is named `window-check`
 (Product, the same day, in the run file).
+
+**After the ids merged: the observer could not put** (Product, at M07
+PR 4, 2026-10-03). With `agentkeel-observer`'s id on `main` (#42), the
+scheduled `observe.yml` passed its grant step live for the first time:
+GitHub's read of the App was within its block, and the job read GitHub
+as the App. It then failed, fifteen times from 03:56Z to 11:23Z, at
+`sts:AssumeRoleWithWebIdentity` on `agentkeel-observation-put`: the role
+trusted the token subject for a ref, and a job that runs in an
+environment carries the environment's subject. The job that puts must
+be the job that holds the key, so it is in `platform-observer`; the
+trust was written at M07 PR 2 for a job with no environment, and no
+keyed run existed to refuse it until the id did. No App-viewpoint
+observation is in the security account before the repair. **The repair
+is the trust's subject**, the environment's, with `job_workflow_ref`
+exact as before; it is not wider (the same job, named as GitHub names
+it), it is Security's, deployed by `hector.flores`, and it is a third
+repair in the close. No other job has both an environment and an AWS
+role (`observe.yml`'s is the only one). Until it is deployed, PR 4's
+run reads the anonymous viewpoint alone, which cannot see a ruleset's
+`bypass_actors`: the relaxation waits for it.

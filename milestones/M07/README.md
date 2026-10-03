@@ -398,3 +398,18 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   `78aac19` and force-pushed with a lease on that commit alone, on
   Product's word, 2026-10-03. A closed, unmerged pull request is not
   one of the cap's.
+
+### After the ids merged (2026-10-03)
+
+- **The grant's comparison held live.** The first keyed runs with a
+  non-null id: `platform-upgrade.yml` (37093799719, then 37094346708,
+  which opened the two drafts) and `observe.yml`'s grant step, each
+  within its block.
+- **The observer could not put, fifteen times.** `agentkeel-observation-put`
+  trusted `sub` for `refs/heads/main`; a job in the environment
+  `platform-observer` carries the environment's `sub`. Refused at
+  `sts:AssumeRoleWithWebIdentity` from 03:56Z to 11:23Z (37094837939 to
+  37119509159). The repair is the trust's subject (`infra/security/app.py`),
+  Security's, deployed by `hector.flores` (`runs/pr2_by_hand.md`, "B1
+  again"); a third repair in the close. The relaxation waits for it:
+  only the App's viewpoint sees a ruleset's `bypass_actors`.
