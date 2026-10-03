@@ -258,7 +258,6 @@ def test_s0_the_key_environment_is_read_back():
     assert any("A_SECOND_SECRET" in e for e in errors) and any("repository secret" in e for e in errors), errors
 
 
-@expected_failure
 def test_s0_the_owners_test_was_read():
     """The owner's test of the template, steps 2 to 4 again, on owner-check pull request 1; the
     platform check dispatched from a branch; the App's token asked to relax a ruleset. Each is made

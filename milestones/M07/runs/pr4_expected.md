@@ -245,3 +245,28 @@ request 2 (`e3a8083`) is not touched.
 - A pull request merges in `owner-check` in the interval: fired.
 - The restore reads back different from the export: recorded, and
   repaired by re-exporting, not by editing the reader.
+
+### What happened (written after; the statement above is not edited)
+
+| When (UTC) | What |
+|---|---|
+| 12:41:52 | statement on GitHub (`780ab14`) |
+| 12:44:25 | the call's run created: 37123843294, `workflow_dispatch` on `main`, `relax_seed=owner-check`, by andaro74, once |
+| 12:45:04 | **GitHub answered 200, "accepted the change"** (artifact `relax-seed`); the ruleset's `updated_at` 12:45:06, its rules `deletion, non_fast_forward, pull_request` |
+| 12:48:11 | `owner-check` #4 opened from `relax-detect` (`e7d0fd5`, one empty commit by andaro74) |
+| 12:51:01 | the App failed `e7d0fd5`, one reason: "the repository's ruleset is the export: `infra/ruleset/agent.json`: rules differs from live ruleset 24310403 (required_status_checks: only in the export)" |
+| 12:52:27 | the owner restored the ruleset from `infra/ruleset/agent.post.json`; read back with the platform check's own reader: no difference from the export, `bypass_actors: []` |
+| 12:54:07 | `owner-check` #5 opened from `after-restore` (`8e18b6f`) |
+| 12:55:15 | the App passed `8e18b6f` |
+
+The ruleset required no platform check for **7 min 21 s** (12:45:06 to
+12:52:27). No pull request merged in `owner-check` in that time; the
+last merge before it was #3 at 12:18:18. #4 and #5 stay open and are not
+merged; #2 was not touched. Detected, not refused, as stated. A local
+read with the observer and `build`'s reader (not evidence; the owner's
+token, so `bypass_actors` shown) gave `read`, `held`, `outcome:
+detected`, `restored_at` 12:52:27. The observed entry is in
+`runs/f7_0_owner_test.yaml` (run 37123843294, pull request 4); S0's
+run-file test's marker is off; three reader tests that called the
+relaxation on the tree itself now use a tree where it is not yet made,
+and a new one holds that the tree refuses a second attempt.

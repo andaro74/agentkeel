@@ -859,8 +859,33 @@ def owner_check(github, monkeypatch):
     return github
 
 
-def test_the_seeded_relaxation_asks_for_the_required_check_to_go_and_keeps_githubs_answer(owner_check, key):
-    record = platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key)
+@pytest.fixture
+def not_yet_made(tmp_path):
+    """A checkout on which the seeded relaxation is not yet recorded: the grant file as the tree has it, and
+    the seed's run file without its relaxation entry. From M07 PR 4 the tree's own run file records the
+    attempt (made on 2026-10-03, run 37123843294), so on the tree itself it is refused as made once."""
+    import yaml as _yaml
+
+    seed = _yaml.safe_load((platform_check.ROOT / platform_check.SEED_RUN_FILE).read_text(encoding="utf-8"))
+    seed["observed"] = [o for o in seed.get("observed") or [] if "relax" not in str(o.get("what", ""))]
+    (tmp_path / platform_check.SEED_RUN_FILE).parent.mkdir(parents=True)
+    (tmp_path / platform_check.SEED_RUN_FILE).write_text(_yaml.safe_dump(seed), encoding="utf-8")
+    (tmp_path / "infra").mkdir()
+    (tmp_path / platform_check.GRANT_FILE).write_text((platform_check.ROOT / platform_check.GRANT_FILE).read_text(encoding="utf-8"),
+                                                      encoding="utf-8")  # fmt: skip
+    return tmp_path
+
+
+def test_on_the_tree_the_seeded_relaxation_is_refused_as_made(owner_check, key):
+    """M07 PR 4: the attempt was made once (run 37123843294) and the run file records it, so the tree
+    refuses a second before any token is asked for."""
+    with pytest.raises(ValueError, match="made once"):
+        platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key)
+    assert owner_check["sent"] == []
+
+
+def test_the_seeded_relaxation_asks_for_the_required_check_to_go_and_keeps_githubs_answer(owner_check, key, not_yet_made):
+    record = platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key, root=not_yet_made)
     assert record["status"] == 200 and record["ruleset"] == 24310403 and record["repository"] == "agentkeel-studio/owner-check"
     (path, body, token), = [(p, b, t) for method, p, b, t in owner_check["sent"] if method == "PUT"]
     assert path == "/repos/agentkeel-studio/owner-check/rulesets/24310403" and token == "token-for-administration+metadata"
@@ -871,9 +896,9 @@ def test_the_seeded_relaxation_asks_for_the_required_check_to_go_and_keeps_githu
     assert [method for method, *_ in owner_check["sent"]][-1] == "DELETE"  # the token is revoked after the one call
 
 
-def test_a_refusal_by_github_is_recorded_as_githubs_not_raised(owner_check, key):
+def test_a_refusal_by_github_is_recorded_as_githubs_not_raised(owner_check, key, not_yet_made):
     owner_check["refuse"] = 403
-    record = platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key)
+    record = platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key, root=not_yet_made)
     assert record["status"] == 403 and record["ruleset"] == 24310403
 
 
@@ -890,10 +915,10 @@ def test_the_seeded_relaxation_cannot_be_pointed_at_another_repository(github, k
     assert github["sent"] == []  # refused before any token is asked for
 
 
-def test_a_repository_whose_ruleset_does_not_bind_the_check_gets_no_call(owner_check, key):
+def test_a_repository_whose_ruleset_does_not_bind_the_check_gets_no_call(owner_check, key, not_yet_made):
     unbound = {**EXPORT_RULESET, "id": 24310403, "rules": [r for r in EXPORT_RULESET["rules"] if r["type"] != "required_status_checks"]}
     owner_check["pages"]["/repos/agentkeel-studio/owner-check/rulesets/24310403"] = unbound
-    record = platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key)
+    record = platform_check.relax_seed("owner-check", "agentkeel-studio", APP, key, root=not_yet_made)
     assert record["status"] is None and "nothing to ask" in record["message"]
     assert not any(method == "PUT" for method, *_ in owner_check["sent"])
 
