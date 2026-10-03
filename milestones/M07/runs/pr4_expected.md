@@ -159,3 +159,19 @@ is re-made. Both agents exist at the version before: `owner-check`
   than the one line: F7.1 is read on what it carries; the owner does not
   edit the pull request. Recorded.
 - A bound missed: F7.1 reads not held on that part; nothing is retried.
+
+### What happened (written after; the statement above is not edited)
+
+| When (UTC) | What |
+|---|---|
+| 03:44 | statement pushed (`096c295` on `m07-pr4`) |
+| 03:45:17 | the template re-made from `36c97dd` and pushed by andaro74: `66ca2e4`, three files (`manifest.yaml` one line, `README.md` 4/3, `.template-source.json`) |
+| 03:46:58 | the owner dispatched `platform-upgrade.yml` from `main` (37094346708; its last scheduled run was 03:37, before the push) |
+| 03:47:44 | `owner-check` #3 opened by `agentkeel-upgrades[bot]`, draft, one verified commit `3bfe95b` (committer `web-flow`), `manifest.yaml` one line, "minor", 147 s after the push |
+| 03:47:49 | `window-check` #2 the same: `8d55170`, 152 s after the push |
+| 03:51 | both drafts open, unchecked and unmerged; the session ended for the night here. Nothing moves by itself before the merges: the deploy bound runs from each merge, and the App checks the draft heads at its next tick |
+
+The new value is written quoted (`"36c97ddaee93"`) where the template
+writes it bare; the same YAML string. The first keyed `observe.yml` run
+on `main` with the ids had not fired by 03:51 (the last, 03:23, was on
+`cba3aac`).
