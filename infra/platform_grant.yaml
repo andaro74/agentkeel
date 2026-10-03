@@ -37,14 +37,14 @@ grant:
     repository_selection: all
     permissions: {administration: write, checks: write, contents: read, metadata: read, pull_requests: read}
   agentkeel-upgrades:
-    app_id: null            # filled when the App exists, in a pushed commit, before any attempt
+    app_id: 5169860         # created 2026-10-03 UTC; on main by #41, the ids pull request (rulings/grant-ids-security.md)
     public: true            # item 13a: installed on two accounts, so GitHub makes it public
     environment: platform-upgrades
     installed_on: [agentkeel-studio, andaro74]
     repository_selection: {agentkeel-studio: all, andaro74: [agentkeel]}
     permissions: {contents: write, pull_requests: write, metadata: read}
   agentkeel-observer:
-    app_id: null
+    app_id: 5169892         # created 2026-10-03 UTC, first with the writer's permissions, corrected within the hour; on main by #41
     environment: platform-observer
     installed_on: [agentkeel-studio]
     repository_selection: all
