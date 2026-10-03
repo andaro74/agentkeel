@@ -270,3 +270,78 @@ detected`, `restored_at` 12:52:27. The observed entry is in
 run-file test's marker is off; three reader tests that called the
 relaxation on the tree itself now use a tree where it is not yet made,
 and a new one holds that the tree refuses a second attempt.
+
+## Attempt 4: the model swap (S3's first attempt; SPEC/07 §5, independent of the others)
+
+Stated 2026-10-03, before `AWS_MODEL_WATCH_ROLE_ARN` is set. That
+variable is the last thing `model-watch.yml` waits for: the candidate is
+named on `main` (`runs/f7_3_rollback.yaml`, `candidate:
+pinned_roles.m04_cheaper_swap`, Threshold Owner, 2026-10-01), the
+`agentkeel-upgrades` id is on `main` (#42) and its key is in
+`platform-upgrades`.
+
+### What is made
+
+1. **The owner**, once: `gh variable set AWS_MODEL_WATCH_ROLE_ARN`, then
+   one dispatch of `model-watch.yml` from `main` with no input (its
+   schedule is daily at 06:17 UTC; a dispatch starts the same jobs).
+2. **The platform**, by itself: the `read` job asks Bedrock for the
+   lifecycle of the pinned models as `agentkeel-model-watch`; `plan`
+   works out what to open; `open`, in `platform-upgrades`, opens one
+   draft pull request on `andaro74/agentkeel` as `agentkeel-upgrades`,
+   branch `model-watch/m04_cheaper_swap`, with a second commit that is
+   the drafted Threshold Owner ruling naming the pull request's own
+   number. A dry run of `read` and `plan` on `main` at `36c97dd` with the
+   owner's own credentials (2026-10-03, not evidence) planned exactly
+   that, and no `deprecated_after` pull request: Bedrock gives Sonnet 4.6
+   no end-of-life date.
+3. **CI**: `evals.yml` on the pull request measures refagent on the
+   candidate and commits its envelope to the branch. That is the shadow
+   run. The gate rules it (F4.1, F4.2, F4.4).
+
+### Expected
+
+| | Expected |
+|---|---|
+| The pull request | draft; author `agentkeel-upgrades[bot]`; two commits by the App, verified, then CI's envelope commit; changes `agents/refagent/manifest.yaml` (`model`: `anthropic.claude-sonnet-4-6` → `anthropic.claude-haiku-4-5-20251001-v1:0`, version `20251001-v1:0`, profile `us.anthropic.claude-haiku-4-5-20251001-v1:0`, region `us-west-2`) and one ruling file under `milestones/M07/rulings/`; nothing under `.github/workflows/`; `infra/workflows.sha256` unchanged |
+| Mode of its run | runner: the tree's bytes are not the deployed runtime's |
+| F4.4, p95 | held: Haiku 4.5's p95 at most 2.0 × Sonnet 4.6's median in that mode (runner: 6,219.5 ms over 12 envelopes, so at most 12,439 ms) |
+| Agent tokens | at most 1.5 × 41,044.5 = 61,566 |
+| **Its verdict** | **not stated.** Haiku 4.5 has never been run against the goldens. A golden that passed under Sonnet 4.6 and fails under Haiku 4.5 is RED (F4.2), whatever else reads |
+| `cold-review-ruling` | fails until the Threshold Owner replaces the ruling's "Drafted" line |
+
+### Then, by the verdict (as ruled 2026-10-02, `rulings/pr2-threshold-owner.md` item 3)
+
+- **GREEN and every required check green.** The Threshold Owner
+  replaces the "Drafted" line (a ruling file is not a person's edit) and
+  merges as a merge commit. `deploy.yml` redeploys refagent on the
+  candidate; the first `main` envelope after it is recorded as read,
+  whatever F4_4 says. Then the revert: a pull request reverting the
+  merge commit, with its own Threshold Owner ruling. **Before the revert
+  is opened, the number it is held to is written in
+  `runs/f7_3_rollback.yaml`**: Sonnet 4.6's p95 must be at most 2.0 ×
+  the median of Haiku 4.5's envelopes in the revert's mode. With Sonnet's
+  runner median at 6,219.5 ms, the revert is RED on F4_4 if Haiku's p95
+  in that mode is under about 3,110 ms. Its verdict is not stated. RED on
+  F4_4 alone: one second run, stated first. RED on a regressed golden or
+  RED twice: refagent stays on Haiku 4.5, which the gate passed; F7.3 is
+  read on the fallback; `upgrade.taken` stays under 3.
+- **RED.** Not merged; the pull request is closed with its envelope
+  kept. The model upgrade is not taken (`upgrade.taken` at most 2 of 3,
+  row 7 RED on that too). F7.3 is read on the fallback: a pull request
+  in `owner-check` reverting the platform upgrade's merge (`840f5ab`),
+  merged by the seats when the App passes it, and the runtime's digest
+  read after its deploy.
+
+Either way both pull requests on `agentkeel` are outside M07's cap, by
+row 7's own text. `m07-pr4` takes `main` in again after each merge.
+
+### What can go wrong before the verdict
+
+- The `read` job cannot assume `agentkeel-model-watch`: a trust fault of
+  the kind the observer had. Its job has no environment, so the ref
+  subject should match; this is the first run that tries.
+- GitHub holds the pull request's `evals` run for approval because an
+  App opened it. The owner approves the run in the Actions tab; an
+  approval is not an edit.
+- `open` refuses the grant: recorded, and nothing is opened.
