@@ -29,9 +29,9 @@ where it stood.
 
 | Step | State on 2026-10-02, and where it was read |
 |---|---|
-| A1, A2 the two new Apps | **Not done.** `gh api orgs/agentkeel-studio/installations` lists one App, `agentkeel-platform` (5144253) |
-| A3 the two environments and keys | **Part.** `platform-observer` exists (`gh api repos/andaro74/agentkeel/environments`); `platform-upgrades` does not. Whether a key is in either was not read: a job cannot list them |
-| A4 the two ids in the grant block | **Not done.** Both `app_id` are null |
+| A1, A2 the two new Apps | **Done**, 2026-10-02 (M07 PR 4). `agentkeel-upgrades` 5169860 (`contents: write, pull_requests: write, metadata: read`) and `agentkeel-observer` 5169892, each on `agentkeel-studio`, `all`. The observer was first created with the writer's two write permissions; the human corrected it to the four reads and accepted the change on the installation, and the read-back then matched the grant block. That `agentkeel-upgrades` is on `andaro74` with `agentkeel` only is the human's browser read, not the API's |
+| A3 the two environments and keys | **Done.** `platform-upgrades` and `platform-observer`: `can_admins_bypass` false, one policy `main` branch, one secret each (`UPGRADES_APP_PRIVATE_KEY`, `OBSERVER_APP_PRIVATE_KEY`); the repository's own secrets are `AGENTKEEL_GRAFANA_TOKEN` and `RULESET_TOKEN` and no key |
+| A4 the two ids in the grant block | **Done**, in the commit that carries this row, on `m07-pr4` |
 | B1 the security account's stack | **Done**, by `hector.flores` in the console, 2026-10-02, from a template synthesised from `main` (`3bfd074`). The role `agentkeel-observation-put` was created at 15:39:21Z (as the human read it in the console; no session can read that account). `AWS_OBSERVATION_PUT_ROLE_ARN` was set at 15:40:56Z (`gh variable list`). **No put under `bundles/` or `observations/` has been made or refused yet** |
 | B2 the bootstrap stack | **Not done.** `AWS_MODEL_WATCH_ROLE_ARN` and `AWS_ENVELOPE_ROW_PUT_ROLE_ARN` are not set |
 | B3 Grafana's stack | **Not done** |
