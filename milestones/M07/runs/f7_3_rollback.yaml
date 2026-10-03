@@ -85,4 +85,13 @@ attempts:
     command: if the swap merged, a pull request reverting its merge commit, ruled and merged; if it did not, a pull request in owner-check reverting the platform upgrade's merge, merged by the agent's seats when the App passes it. Then nothing, since deploy.yml redeploys from main
     refused_when: after the revert's deploy run completed, GetAgentRuntime names an image whose tags hold the digest the tree gives at the revert's merge commit, and do not hold the upgrade's digest (F7.3 fires on either miss)
     recorded_when: the observer reads the revert's merge, its deploy run, the runtime's image and its tags (scripts/runtime_for_tree.py's steps 1 to 4, for that agent), and packs the tree at the revert for its digest
-observed: null
+# The first attempt was made on 2026-10-03, as stated in
+# milestones/M07/runs/pr4_expected.md (attempt 4): model-watch opened the
+# draft (#43) 51 s after its run began. Its envelope is RED: g-004
+# regressed under Haiku 4.5. Not merged. So the second attempt is the
+# fallback, and the list holds one entry of two until it is made.
+observed:
+  - what: model-watch's draft swap pull request on refagent
+    repository: andaro74/agentkeel
+    pull_request: 43
+    at: '2026-10-03T13:25:56Z'

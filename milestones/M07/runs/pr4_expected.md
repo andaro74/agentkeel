@@ -345,3 +345,47 @@ row 7's own text. `m07-pr4` takes `main` in again after each merge.
   App opened it. The owner approves the run in the Actions tab; an
   approval is not an edit.
 - `open` refuses the grant: recorded, and nothing is opened.
+
+### What happened (written after; the statement above is not edited)
+
+| When (UTC) | What |
+|---|---|
+| 13:16:53 | statement on GitHub (`497c52f`) |
+| 13:24:56 | `AWS_MODEL_WATCH_ROLE_ARN` set by the owner |
+| 13:25:05 | `model-watch.yml` dispatched from `main` (37126101337): `read` assumed `agentkeel-model-watch` (its first live use; the trust held) and read Bedrock; `open` passed the grant step and opened the draft |
+| 13:25:56 | **#43** opened by `agentkeel-upgrades`, draft, branch `model-watch/m04_cheaper_swap`: two verified commits by the App (`0496a44` the pin, `2c02cff` the drafted ruling naming #43), `agents/refagent/manifest.yaml` three lines (`id`, `version`, `profile` to Haiku 4.5) and the ruling file; no workflow touched |
+| 13:26 | `evals` started on each of the App's two commits with no approval asked; `two-key` pass, `ruling-cited` pass, `cold-review-ruling` fail on the draft, as stated |
+| ~13:36, ~13:46 | both runs RED (37126152101 on `0496a44`, 37126156979 on `2c02cff`); CI's envelope commit `096cecb` for `2c02cff` |
+
+**The envelope, `2c02cff…`:** RED, runner, `us.anthropic.claude-haiku-4-5-20251001-v1:0`,
+p95 3,258 ms (bar 12,439), agent tokens 40,748 (bar 61,566). The gate's
+one reason: **"regressed: g-004 has passed before and fails now"**
+(F4.2). On g-004 Haiku 4.5 answered `available: false, exclusive:
+false` as the golden has it, cited clause `ML-2.1` where the golden
+expects `MC-3`, and gave `[clearance_expired]` where it expects
+`[clearance_expired, non_exclusive]`; the same on both passes of the
+run. `never_passed` is `g-014`, as under Sonnet 4.6. As stated: the
+pull request and its bars as expected, the verdict not stated; it is
+RED.
+
+**So, as ruled:** #43 is not merged. The model upgrade is not taken:
+`upgrade.taken` is at most 2 of 3, and row 7 is RED on that as well.
+The revert on `agentkeel` is not made; F7.3 is read on the fallback.
+Had the swap been GREEN, the revert would have been held to 2.0 × 3,258
+= 6,516 ms against Sonnet 4.6's runner median of 6,219.5 ms: inside the
+bar by 297 ms, on one envelope.
+
+**A second finding, the platform's own.** Fourteen tests fail on the
+swap's branch (`tests/test_m07_platform.py`, 13;
+`tests/test_m07_two_key_seed.py`, 1): they read refagent's manifest
+from the tree and assume its pin is Sonnet 4.6, so `checks` is red on
+any pull request that moves the pin, whatever the model. The gate's RED
+is not theirs (its one reason is g-004). A GREEN swap would have met a
+red `checks` job; `evals` and `cold-review-ruling` are the required
+ones, so it could still have merged, with a red check beside it. The
+repair is for the tests to carry their own manifest; Engineering's, in
+the close.
+
+A third run (37127017458, on CI's envelope commit `096cecb`) waits for
+approval: GitHub asks for one on a run started by the bot's push to an
+App's branch. It measures nothing new and is not approved.
