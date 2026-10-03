@@ -376,7 +376,6 @@ def test_s3_a_rollback_that_leaves_the_new_digest_live_is_found_by_build():
     assert held["read"] is True and held["held"] is True and held["reasons"] == [], held
 
 
-@expected_failure
 def test_s3_the_rollback_was_made():
     """model-watch's draft swap pull request on refagent, merged if its envelope is GREEN, then
     reverted; or the fallback the run file names before any run (SPEC/07 §5, item 16)."""

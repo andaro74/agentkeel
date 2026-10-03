@@ -435,3 +435,38 @@ platform upgrade (#2, merge `e050fcc`, deployed 12:26:50Z).
 - The tree's digest at the revert equals the upgrade's: nothing was
   rolled back; fired.
 - The deploy of the revert fails: F7.3 unread, recorded with the reason.
+
+### What happened (written after; the statement above is not edited)
+
+| When (UTC) | What |
+|---|---|
+| 13:48:27 | statement on GitHub (`2c159f2`) |
+| 13:50:10 | `window-check` #3 opened by andaro74 from `revert-platform-upgrade`: one commit `22e7022`, `manifest.yaml` one line, `platform_version: "36c97ddaee93"` → `m06` |
+| 13:51:44 | the App passed `22e7022` (the owner's dispatch of the check) |
+| 13:55:04 | merged by andaro74, merge commit `3925e67` |
+| 13:56:13 | the App passed `3925e67` (run 37127830951) |
+| 13:59:42 | the owner dispatched `deploy.yml` (37128076000); no image was pushed: the tree's digest already tags one |
+| 14:02:34 | `window-check` at `3925e67`: stack updated, `g-001` and `g-002` answered in the runtime, GREEN, bundle and answer record put (first), registry row; the job completed 14:02:38, **454 s** after the merge |
+
+The digests, as `deploy.yml` tags images with them (the sha256 of the
+packed bundle): before the upgrade (`1c5b6ff`) `185ab598…`; the
+upgrade's merge (`e050fcc`) `1674ae9f…`; the revert's merge (`3925e67`)
+`185ab598…`, the same bytes as before the upgrade. `agentkeel/window-check`
+holds two images, tagged `185ab598…` (pushed 2026-10-03T01:56Z) and
+`1674ae9f…` (12:25Z). After the revert's deploy the runtime
+`agentkeel_window_check-YBt5st7kMX` runs image `sha256:ca4e0e04…`, whose
+one tag is `185ab598…`: the tree's digest at the revert, and not the
+upgrade's. Read by the session with the owner's credentials (not
+evidence); PR 4's run reads it again. Nothing reopened the upgrade.
+
+**A finding beside it, Engineering's:** `src/bundle/pack.py` orders the
+archive's members with `sorted()` over paths, which on Windows is
+case-insensitive (`README.md` after `prompt.txt`) and on Linux is not.
+A bundle packed on Windows has a different digest from CI's for the same
+tree (`5a149257…` against `185ab598…` here). Every digest that is
+evidence is packed in CI, so no reading is affected; a local
+`make evals-local` in the runtime's mode cannot match on Windows. Carried
+to the close's list.
+
+The observed entry is in `runs/f7_3_rollback.yaml` (two of two); S3's
+run-file test's marker is off.

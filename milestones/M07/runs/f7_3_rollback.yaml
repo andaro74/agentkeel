@@ -105,3 +105,7 @@ observed:
     repository: andaro74/agentkeel
     pull_request: 43
     at: '2026-10-03T13:25:56Z'
+  - what: the rollback, on the fallback, read on window-check
+    repository: agentkeel-studio/window-check
+    pull_request: 3
+    at: '2026-10-03T13:55:04Z'
