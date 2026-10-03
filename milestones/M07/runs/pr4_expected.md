@@ -67,6 +67,14 @@ of the merge and takes about seven. The bar is eight hours.
 
 ### What is installed on the profile
 
-Listed by the human, in a commit pushed before the repository is created,
-as the run file asks. Until that commit this section is empty and the
-run is not started.
+The run file asks for this list in a commit pushed before the repository
+is created. **It was not**: the repository was created at 01:01:33Z
+before the list was sent. The list is added below when it arrives, dated,
+and stands as listed after the start. Nothing reads it.
+
+### Started
+
+- Statement on GitHub: `a490d5d`, committed 2026-10-03T01:00:11Z.
+- `agentkeel-studio/window-check` created 2026-10-03T01:01:33Z from
+  `agent-template` (`main` at `8d2bfb4`); ruleset 24400101 `platform`,
+  active; `floresinnovations` invited with write at 01:01:49Z.
