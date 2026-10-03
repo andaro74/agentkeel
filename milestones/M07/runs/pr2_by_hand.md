@@ -42,7 +42,7 @@ where it stood.
 - **A4 said the two ids go into `rulings/pr2-security.md`.** From PR 3 the
   grant block is `infra/platform_grant.yaml` (item 13j).
 
-| Step | State on 2026-10-02, and where it was read |
+| Step | State, and where it was read. Dates in this table are the human's clock (UTC-7): its "2026-10-02" evening is 2026-10-03 UTC, which is what `infra/platform_grant.yaml` and the rulings write |
 |---|---|
 | A1, A2 the two new Apps | **Done**, 2026-10-02 (M07 PR 4). `agentkeel-upgrades` 5169860 (`contents: write, pull_requests: write, metadata: read`) and `agentkeel-observer` 5169892, each on `agentkeel-studio`, `all`. The observer was first created with the writer's two write permissions; the human corrected it to the four reads and accepted the change on the installation, and the read-back then matched the grant block. That `agentkeel-upgrades` is on `andaro74` with `agentkeel` only is the human's browser read, not the API's |
 | A3 the two environments and keys | **Done.** `platform-upgrades` and `platform-observer`: `can_admins_bypass` false, one policy `main` branch, one secret each (`UPGRADES_APP_PRIVATE_KEY`, `OBSERVER_APP_PRIVATE_KEY`); the repository's own secrets are `AGENTKEEL_GRAFANA_TOKEN` and `RULESET_TOKEN` and no key |

@@ -7,7 +7,9 @@
 ruling: pr4
 seat: Product
 authorises:
+  - SPEC/00-overview.md
   - SPEC/07-upgrade-retire-surfaces.md
+  - CLAUDE.md
   - milestones/README.md
   - milestones/M06/runs/f6_3_quickstart.yaml
   - milestones/M07/README.md
@@ -27,6 +29,12 @@ authorises:
   - docs/milestones/M07.md
   - docs/milestones/README.md
   - docs/video/README.md
+  - docs/developer/quickstart.md
+  - docs/developer/template-README.md
+  - docs/developer/upgrade.md
+  - docs/platform/overview.md
+  - docs/platform/surfaces.md
+  - docs/compliance/map.md
 evidence:
   - SPEC/00-overview.md#8-M07
   - SPEC/07-upgrade-retire-surfaces.md
@@ -93,12 +101,16 @@ held, on `window-check`. `F7_4` held, 55 rows. `F7_5` held. `template`:
 `F6_1` read and **not held**; `F6_3` held, 3,615 s; `F6_2` not held,
 "behind"; `F6_4` held. Row 7: **RED**.
 
-**Against what was stated before the run** (#44's body): every line as
-stated. `F7_4`, stated as "held or unread", read held. Two things the
-statement did not have: the platform pull requests' times are 139 s and
-144 s to arrive and 518 s and 511 s to deploy, not the session's hand
-counts (147, 152, 387, 510); and the reading of the model is "unread",
-which the statement gave as one of two.
+**Against what was stated.** The statements that count are
+`runs/pr4_expected.md`'s, each pushed before its attempt. Of what they
+expected of this run: one was wrong (`template.F6_1` expected held; it
+reads not held) and one number was off by four seconds (32,260 for
+32,264). The rest read as expected. An expected reading of this run as a
+whole was also written in #44's body when it opened: after every
+attempt, before the run, and not in the tree (cold review 2, N17). It
+read as written there, with `F7_4`, given as "held or unread", held; and
+with the platform pull requests' times as 139 s and 144 s to arrive and
+518 s and 511 s to deploy, not the session's hand counts.
 
 **The close ran twice.** The first run (37147871497, `84dc913`, envelope
 kept) read the same and its `evals` and `checks` jobs failed on one test
@@ -172,7 +184,7 @@ Rows of `milestones/M08/open.md` are "M08 row n".
 | #40 K: the `two-key` seed and `make plants` | **Open**: M08 row 22 |
 | #40 N: B1's template hash | **Open**, by hand: `pr4-security.md` item 8; M08 row 12 |
 | #42: `ruled_in` not moved; the cap cell's form | Ruled: `rulings/grant-ids-security.md`, `grant-ids.md` |
-| #44: the items in its body's **Unsure** | Each names its seat there; ruled at the foot of this file when the seat rules |
+| #44 | Section 7 below: each with its seat and what is taken; ruled by this file's first line and the other two files' |
 
 ## 6. Every Finding
 
@@ -209,9 +221,67 @@ home before the close, and where they went:
 | The first bootstrap deploy's diff not kept | closed as lost; `runs/b2_cdk_diff.md` says so and gives the stored template's comparison |
 
 `milestones/M07/open.md`'s rows that M07 did not close are copied into
-`milestones/M08/open.md` as rows 27 to 62, each with its M07 row number;
+`milestones/M08/open.md` as rows 27 to 62, each with its M07 row number (rows 63 and 64 were added after the second review);
 the rows ruled "not built" at M07's open are named in that file's
 header and not copied.
+
+## 7. #44's own Unsure items
+
+Each was taken as its recommended option. The seat named rules it by
+ruling its file as written, or writes otherwise beside the item.
+
+| # | What | Taken | Seat |
+|---|---|---|---|
+| A | Whether `m07` is tagged | Section 8 | Product |
+| B | The three deploys made before any ruling: keep, narrow or revert | Keep; the narrowing is `milestones/M08/open.md` row 5 (`pr4-security.md` items 1, 2) | Security |
+| C | The read-back is filed under its own heading and not as Act 1; its file is committed in M08 PR 1, like a milestone video; it is held to an act's ceilings (eight minutes, 64 MiB), since none is ruled for a read-back | As written | Product |
+| D | The fourteen tests that fail on a moved pin, and four notes on tests from the second read, are carried and not repaired here | M08 rows 15, 23 | Engineering |
+| E | `relax_seed()` stays in `scripts/platform_check.py` with no caller | Kept as the record, with its tests; M08 row 8 | Security |
+| F | The owner's dispatches in the timed run were not allowed by its statement | Recorded as that. F6.3's elapsed time is GitHub's and AWS's own whatever started the jobs; the bar was not moved | Product; Threshold Owner |
+| G | Row 7's amendment sentence (section 4) | Written into the row only on the seat's word | Product |
+| H | The compliance map's redraft, owed at this close, is not made; a note on the page says so | M08 row 22 | Product |
+| I | The explainer runs to about three screens; SPEC/00 §10.3 says one | Left: the page is M06's length; M08 row 64 | Product |
+| J | SPEC/00 is amended at the close (§8 M07, one paragraph) | As written; the other stale sentences of SPEC/00 are M08 row 64 | Product |
+| K | `docs-current` is not built, so "runs `docs-current` before a close" was a read by hand | M08 row 63 | Product; Engineering |
+| L | The session's AWS reads were made as the agent account's admin user | Said where each is recorded; M08 row 12 | Security |
+
+## 8. The tag
+
+`/close-milestone` lists "the PR count would be five" among its refusals
+to tag. CLAUDE.md says a fifth pull request is "a RED close with the
+finding as the result". `rulings/grant-ids.md` ruled the fifth and the
+RED and did not speak of the tag (cold review 2, F4).
+
+**Recommended: `m07` is tagged**, on `main`, at this pull request's merge
+commit, by the human, after the merge, as `m01`, `m04`, `m05` and `m06`
+were on RED closes. A tag names the commit a closed milestone's evidence
+is at, and later files cite it: the ledger header's `validate` row,
+ADR-0005's "recorded at tag", M08's open. What the refusal guards, that
+five pull requests are not passed off as an ordinary close, is met by
+the row: RED, `5 / 4`, with the finding written. **Alternative: no
+tag**; each of those then cites the merge commit, as
+`milestones/M08/open.md` row 3 says.
+
+Ruled as recommended by this file's first line, unless the seat writes
+the alternative here. No session places the tag.
+
+## 9. The docs-writer's read of `d653c7d`, and what was done
+
+`docs-current` is not in the tree (item K), so its conditions were read
+by hand by `docs-writer`. Its report is in a comment on #44.
+
+| What it found | Status |
+|---|---|
+| `docs/developer/upgrade.md`: "no upgrade has run"; a retired agent redeployed "at a new address"; "no retirement has run"; the check "has not run on a real repository"; no rollback section | **Repaired**: what has run, with the envelope's numbers; setting `rollout` back deploys nothing; a section on undoing an upgrade |
+| `docs/developer/quickstart.md`, `template-README.md`: "M06's timed run"; "read again at M07"; the schedules | **Repaired**. The template repository's own README keeps the old sentence until the template is next re-made (M08 row 64) |
+| `docs/platform/surfaces.md`: panel 2 "not deployed" | **Repaired**: read live at the close, 55 rows |
+| `docs/platform/overview.md`, `CLAUDE.md`: `ratings-helper` "(M07)" | **Repaired**: its code is not built in this project |
+| `docs/compliance/map.md`: every M07 row behind | **A note**, not a redraft: item H |
+| `docs/video/README.md`: "two kinds"; two names for the read-back's file | **Repaired** |
+| SPEC/00 §8 M07 has no close amendment | **Repaired**: one paragraph (item J). §8 M08, §10.2's table and §12's rollback sentence: M08 row 64 |
+| The explainer: ten rewordings (who started the platform's jobs; the model is proposed for the reference agent only; 368 s is to the delete; one change failed, not "every"; three wrong statements, not one; the dispatches counted; "none did" overreached; one person holds every seat; "almost nine hours"; "four and a half hours") | **All ten taken** |
+| The explainer names the deploy role (also cold review 2, F5) | **Repaired** |
+| `README.md` says "Governed" with five rows RED; `CLAUDE.md`'s two omissions; the quickstart's "until M07" | M08 row 64 |
 
 ## What a reader can run
 
@@ -222,6 +292,6 @@ git log --format='%h %cI %s' origin/main..HEAD -- milestones/M07/runs/pr4_expect
 gh api repos/agentkeel-studio/window-check --jq .created_at
 gh api repos/agentkeel-studio/owner-check/rulesets/24310403 --jq .updated_at
 aws dynamodb get-item --table-name agentkeel-registry --key '{"name":{"S":"owner-check"}}' --query Item.retired_at
-grep -c "^| [0-9]" milestones/M08/open.md        # 62
+grep -c "^| [0-9]" milestones/M08/open.md        # 64
 grep -n "governed\|secure\|proven" docs/milestones/M07.md   # nothing but the claim's own word, if it is quoted
 ```

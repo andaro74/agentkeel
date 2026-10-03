@@ -138,7 +138,7 @@ scripts/              the observers (observe_*.py: raw records, never a verdict)
 .github/CODEOWNERS    the seat table as owner lines (Security); the gates read it from the base ref
 agents/refagent/      the reference agent (title availability): manifest.yaml,
                       prompt.txt, tools/, rules/ (ADR-0003 amendment 1)
-agents/ratings-helper/  manifest-only stub from M02 PR 2 (cut from M01 at open); code at M07
+agents/ratings-helper/  manifest-only stub from M02 PR 2 (cut from M01 at open); its code is not built (SPEC/00 §12)
 evals/goldens/v1/     g-NNN.yaml, immutable ids
 evals/history/        CI-written envelopes (evidence)
 evals/local/          your runs (not evidence)

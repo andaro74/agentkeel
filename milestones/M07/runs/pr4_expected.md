@@ -595,3 +595,16 @@ Corrections to this file, appended. Nothing above is edited by them.
    agent's kept security group (`runs/f7_2_removed_and_kept.md`).
 8. **Line 517's "yours to rule"** was written to the human in the
    conversation's voice; it means Security's (cold review N12).
+
+## After the second cold read (2026-10-03, before the close merges)
+
+9. **The statement for attempt 1 expected "deployed 32260 s"** for the
+   owner's test; the envelope reads 32,264 s (cold review 2, F1). Four
+   seconds: the reader takes the deploy's own record, the session
+   counted to the registry row's time.
+10. **Item 7 above says "five hours late"**; it was four and a half
+    (14:30:44Z to 19:05Z), and four reads were made, not three (N10).
+11. **Attempt 4's record says "both runs RED"**: two `evals` runs
+    measured the candidate, one per commit the App pushed, and one
+    envelope was kept (`2c02cff`). Prose that says the candidate was
+    "measured once" means one pull request, not one run (F2).

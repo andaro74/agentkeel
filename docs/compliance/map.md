@@ -23,6 +23,14 @@ on 2026-10-02; nothing has been put under either. `two-key` now reads a
 pin's `deprecated_after`, in `agentkeel` only: an agent repository has no
 `two-key`, and a date moved later there takes one commit. The map is drafted again at the close.
 
+**At M07's close (2026-10-03) the map was not drafted again.** Every row below is as it stood at
+M07 PR 3 and several are behind: row 7 is RED with its cell filled (envelope `dee74c3`, `upgrade.taken`
+2 of 3); the owner's test deployed 32,264 s after its merge; the timed quickstart was made, 3,615 s; a
+platform upgrade, a retirement and a rollback were made and read; the model swap was RED and not merged;
+the relaxation was accepted by GitHub and detected; the three Apps exist; panel 2 is live; puts have been
+made under `bundles/` and `observations/`; one agent has been retired and `retired.json` written.
+`milestones/M07/README.md`, close detail, is the record. The redraft is `milestones/M08/open.md` row 22.
+
 This page is not legal advice and not an audit opinion. It says which
 record in this repository bears on which line of a public framework.
 Whether that record is enough is an auditor's judgment.

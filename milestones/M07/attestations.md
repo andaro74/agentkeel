@@ -17,7 +17,7 @@ command (`milestones/M05/open.md` row 44).
 The ledger row is not waiting on these. Row 7's State is RED because the
 ledger's reading of the envelope its Measured cell names says so, and
 `make ledger` holds the cell to that line. What these four gate is the
-merge, and `git tag m07` if Product places it (`rulings/pr4.md`).
+merge, and `git tag m07`, which Product rules in `rulings/pr4.md` section 8.
 
 ---
 
@@ -65,8 +65,11 @@ stopped none. **Three deploys were made by hand before any ruling**, from
 execution role) and the security account's stack once (the observer's
 put role's trust), the last by `hector.flores` in the console
 (`rulings/pr4-security.md` item 1). The bootstrap's stored template was
-compared with the tree's synth by a script whose two hashes are recorded
-(`runs/b2_cdk_diff.md`); the security account's was hashed by nobody.
+compared with the tree's synth at `b310735` by a script whose two hashes
+are recorded (`runs/b2_cdk_diff.md`); at the close's head the tree
+differs from the stored template in one cdk-nag reason, `Metadata` only,
+since the stack was not redeployed for it. The security account's was
+hashed by nobody.
 The App's token relaxed `owner-check`'s ruleset when asked, once, and
 the owner restored it 7 min 21 s later; it reads back equal to the
 export as the owner read it. **Not attested:** that the execution role
@@ -88,10 +91,12 @@ and `upgrade.retire_max_seconds: 3600`, each `relaxes: up`, were added
 to `thresholds.yaml` in PR 2, before any attempt, and not moved.
 `quickstart.max_seconds: 28800` is as M06 set it. The owner's test
 missed `deploy_max_seconds` and the bar was not moved to meet it. The
-candidate named on 2026-10-01, Haiku 4.5, was run against the goldens
-once, on #43: RED, `g-004` regressed, p95 3,258 ms, not merged; no second
-run was made and none was owed (the rule allows one after a p95 miss
-only). refagent's pin on `main` is unchanged. No candidate is named now.
+candidate named on 2026-10-01, Haiku 4.5, was measured on one pull
+request, #43, by two `evals` runs, one on each commit the App pushed
+(37126152101, 37126156979): both RED, `g-004` regressed; the envelope
+kept is for `2c02cff`, p95 3,258 ms. Not merged. No "second run" in
+ADR-0011's sense was made and none was owed (the rule allows one after
+a p95 miss only). refagent's pin on `main` is unchanged. No candidate is named now.
 
 Signed:
 
@@ -110,7 +115,8 @@ made; one statement was edited after its attempt began, and the owner's
 dispatches went beyond what the statements allowed, and both are said in
 `runs/pr4_expected.md`. Act 1 was not captured, and nothing filmed
 afterwards is filed as it. Every finding and every Unsure item of #38,
-#39, #40, #42 and #44 is ruled in M07 or carried to
-`milestones/M08/open.md` with a seat and a milestone (`rulings/pr4.md`).
+#39, #40 and #42 is ruled in M07 or carried to `milestones/M08/open.md`
+with a seat and a milestone, and #44's own are listed in
+`rulings/pr4.md` section 7 and ruled by that file's first line.
 
 Signed:

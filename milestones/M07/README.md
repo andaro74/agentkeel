@@ -341,7 +341,8 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   (2 observations, 0 errors, GREEN), the signed bundle and the answer
   record were put in the security account, each a first put, and the
   registry row `owner-check` was written at 23:37:12Z. That is 32,260 s
-  after pull request 1 merged (14:39:32Z); `upgrade.deploy_max_seconds`
+  after pull request 1 merged (14:39:32Z) by the session's count, and
+  32,264 s as the envelopes read it; `upgrade.deploy_max_seconds`
   is 3,600. The owner's test stays a miss.
 - **The second finding under F7.0, and a repair in the close.** The
   repair is two actions on `runtime/*` in the bootstrap stack, a widening
@@ -422,7 +423,9 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
 
 ### Close detail (PR 4, the close, the fifth pull request, 2026-10-03)
 
-**Row 7 is RED**, three ways. F7.0 fired: the first agent from the
+**Row 7 is RED**, for three reasons (and, by the row's own list of
+conditions at the end of this section, four of them fire: the model's
+unmerged pull request fires two). F7.0 fired: the first agent from the
 template deployed 32,264 s after its merge, against 3,600. `taken` is 2
 of 3: the model upgrade was proposed by the platform and not merged,
 because its envelope was RED. And M07 used five pull requests against a
@@ -447,7 +450,7 @@ Every attempt of the close is read by the pull request's own token.
 | F7.1 | **unread** | — | "model andaro74/agentkeel#43: unread: the pull request has not merged". The platform's two pull requests held: arrived 139 s and 144 s after the template's push, deployed 518 s and 511 s after their merges. The retirement's pull request arrived 39 s after its dispatch. The swap's arrived 51 s after `model-watch` began |
 | F7.2 | yes | yes | 368 s from the merge to `DeleteAgentRuntime` |
 | F7.3 | yes | yes | on `window-check`: the runtime's image carries the tree's digest at the revert and not the upgrade's |
-| F7.4 | yes | yes | panel 2's 55 rows, none mismatched with the envelopes. Its first live read |
+| F7.4 | yes | yes | panel 2's 55 rows, none mismatched with the envelopes. Panel 2 was first read live on the close's first run (`84dc913`), with the same result |
 | F7.5 | yes | yes | surface plants 2/2 |
 | `upgrade.taken` | | | **2 of 3**: platform and retirement; model unread |
 | F6.1 (live half, received from M06) | yes | **no** | "the first commit was refused, and not for its planted fault": the App did not refuse it on the seats or the goldens |
@@ -455,12 +458,14 @@ Every attempt of the close is read by the pull request's own token.
 | F6.2 (received) | yes | no | "S2's mergeable_state is 'behind'", as at PR 3 |
 | F6.4 | yes | yes | panel 1's rows equal the registry's |
 
-**Two numbers the session wrote by hand differ from the envelope's, and
-the envelope is right.** The records above this section give 147 s and
-152 s for the upgrade drafts and 387 s and 510 s for their deploys. The
-reader takes GitHub's record of the template's push (eight seconds after
-the commit's own time) and the deploy run's completion, one run for both
-agents: 139 s and 144 s; 518 s and 511 s.
+**Three numbers the session wrote by hand differ from the envelope's,
+and the envelope is right.** `runs/pr4_expected.md` gives 147 s and 152 s
+for the upgrade drafts and 387 s and 510 s for their deploys. The reader
+takes GitHub's record of the template's push (eight seconds after the
+commit's own time) and the deploy run's completion, one run for both
+agents: 139 s and 144 s; 518 s and 511 s. And the owner's test: the
+session wrote 32,260 s, here, in SPEC/07 §12 and in the statement for
+attempt 1; the envelope reads 32,264 s, as #42's already did.
 
 **The close ran twice.** Its first run (37147871497, on `84dc913`) wrote
 an envelope the gate ruled GREEN, with the same readings, and its
@@ -531,15 +536,18 @@ envelope); the retired agent answers or its runtime stands (no: `F7_2`
 held); a revert leaves the upgrade's digest live (no: `F7_3` held, on
 `window-check`); panel 2 shows GREEN on a RED envelope or the surfaces'
 counts differ (no: `F7_4` held over 55 rows; surface plants 2/2); a
-seed's test passes but by its reader (holds: `uv run pytest
-tests/test_m07_seeds.py`, 13 passed; the four run-file tests pass because
-their entries are filled, which is not a reader, and each marker came
-off in the commit that wrote its entry); PR 4's run cannot read an
+seed's test passes for a reason other than its reader (not for the nine
+fixture tests, each of which passes by its reader; the four run-file
+tests have no reader: they pass because a human-filled entry exists,
+each marker came off in the commit that wrote its entry, and none feeds
+a check. `uv run pytest tests/test_m07_seeds.py`: 13 passed); PR 4's run cannot read an
 attempt (**fires** for the model: an unmerged pull request reads unread,
 as ruled at PR 2); `make ledger` stops matching rows 0 to 6 (no: exit
 0). And the cap: five pull requests.
 
 **What is carried.** `milestones/M08/open.md`, 62 rows: 26 new at this
-close and 36 of M07's `open.md` that M07 did not close. Every finding
-and every Unsure item of #38, #39, #40, #42 and #44 is ruled or has a
-row there (`rulings/pr4.md` sections 5 and 6).
+close and 36 of M07's `open.md` that M07 did not close, with two more
+added after the second review. Every finding and every Unsure item of
+#38, #39, #40 and #42 is ruled or has a row there (`rulings/pr4.md`
+sections 5 and 6). #44's own Unsure items are listed in `rulings/pr4.md`
+section 7, each with its seat and what is taken until the seat rules.

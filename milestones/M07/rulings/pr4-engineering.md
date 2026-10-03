@@ -89,9 +89,32 @@ envelope of this pull request's run.
 | N11 | Attempt 1's expected F6.1 was "held"; the record says not held on the first commit | The expectation is left as written; the envelope decides |
 | N12 | "yours to rule"; the `sorted()` finding in one place | Said in the appended section; M08 row 16 |
 
-**Not read cold again:** the repairs after this review (`e0345b0`,
-`660a0e6`, `b81dced`) and everything the close writes after the
-envelope. `milestones/M08/open.md` row 23.
+## The second cold read (`b310735...d653c7d`, 26 files): BLOCK 0, FINDING 5, NOTE 18
+
+It read the repairs after the first review, the test repair and the
+close's text, and rebuilt row 7's cell from the envelope by the gate's
+own format: byte-identical in both READMEs.
+
+| # | Finding | Status |
+|---|---|---|
+| F1 | A third hand number (32,260 for 32,264) | **Repaired**: the close detail says three; SPEC/07 §12 and the README give both numbers; `runs/pr4_expected.md` item 9 |
+| F2 | "Measured once" against two runs on #43 | **Repaired**: the attestation and the explainer say one pull request, two runs |
+| F3 | #44's Unsure items had no home in the tree | **Repaired**: `pr4.md` section 7 |
+| F4 | Whether `m07` is tagged was cited to a file that did not say | **Repaired**: `pr4.md` section 8 puts it to Product with both options |
+| F5 | The explainer named the deploy role | **Repaired**: "the role the platform creates agents with" |
+| N2 | The cap cell lost its pointer to the ruling | Stands: `rulings/grant-ids.md` ruled the cell reads `5 / 4`; the pointer is in the close detail |
+| N3 | The workflow's comment cites `pr2-security.md` 13n, not `pr4-security.md` | Left: another edit to the workflow is a measured path. `infra/workflows.sha256` names `pr4-security.md` |
+| N4, N5, N6, N7 | Four tests hold less than they could (the relax search covers one job; S1's pull numbers; `Resource: ["*"]`; a stale docstring and an unused helper) | **Carried**: `milestones/M08/open.md` row 23. A test change measures again |
+| N8, N9, N15 | "Three ways" against four conditions; the seed-test condition's wording; "first live read" | **Repaired** in the close detail |
+| N10, N16, N17 | "Five hours"; two dates for the Apps; the statement in #44's body is not in the tree | **Repaired**: `runs/pr4_expected.md` items 9 to 11; the by-hand table says whose clock; `pr4.md` section 2 |
+| N11 | M08's `open.md`: "M08" alone as a date; copied rows keep older row numbers | **Said** in that file's header; M08's open rules each |
+| N12 | "Not read cold again" was stale | This table |
+| N13, N14 | The read-back's file name and ceiling; the stored template differs at the head | **Repaired**: `docs/video/README.md`; `attestations.md` line 2 |
+| N1, N18 | `make ledger` not run by the reviewer; the close's shape | `make ledger` exits 0 as run by the session (`pr4.md`); the shape stands as said |
+
+**Not read cold:** the repairs after the second read (prose only: no
+file under `tests/`, `src/`, `infra/`, `scripts/` or `.github/`), and
+whatever the human commits when ruling. `milestones/M08/open.md` row 23.
 
 ## What a reader can run
 

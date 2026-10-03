@@ -1048,7 +1048,8 @@ create passed: run 37077850271
 deployed owner-check's runtime, the agent answered its two goldens in
 it, the signed bundle and the answer record went to the security
 account (each a first put) and the registry row was written at
-23:37:12Z, 32,260 s after the merge of pull request 1. The list was
+23:37:12Z, 32,260 s after the merge of pull request 1 by the session's
+count and 32,264 s as the envelopes read it. The list was
 these two actions.
 **The repair is a widening of IAM**: two actions,
 `CreateAgentRuntimeEndpoint` and `TagResource`, on `runtime/*`, in the
@@ -1059,7 +1060,8 @@ runtimes, and no condition narrows them. It is carried in PR 4, the close, and s
 as a repair in the close. Until it was deployed no agent from the
 template could get a runtime, and every scheduled deploy run failed the
 same way. The owner's test stays a miss: `upgrade.deploy_max_seconds`
-is 3,600, and the deploy came 32,260 s after the merge.
+is 3,600, and the deploy came 32,264 s after the merge (the envelope's
+number; the session first wrote 32,260).
 
 **Before the timed run: the restatements R9 owes** (Product, at M07
 PR 4; `open.md` rows 4 and 31). SPEC/06 §7 says "five records" and

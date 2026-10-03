@@ -575,6 +575,18 @@ judge of record; M08 run 1's attempt on the judge rubric; F8.5's
 "Gateway policy"; M08 PR 3's Braintrust experiments; Act 3's HITL
 refusal and Braintrust trace; and §15's "at least seven are GREEN",
 which rows 1, 4, 5 and 6, RED, already rule out.
+Amended at M07's close (`milestones/M07/rulings/pr4.md`). Row 7 closed
+RED, in five pull requests against a cap of four: the first agent from
+the template deployed 32,264 s after its merge (F7.0 fired); the model
+upgrade was proposed by the platform and not merged, its envelope RED,
+so `upgrade.taken` is 2 of 3; and the cap. Rows 1, 4, 5, 6 and 7 are
+RED. SPEC/06's S3 was timed once, 3,615 s. **Act 1 was not captured
+during it, and the run is not made again** (§10.5); Act 2 was not
+recorded. "Neither is ever cut", above, held for S3 and not for Act 1.
+What becomes of Acts 1 and 2, and which of the cuts above were taken, is
+ruled at M08 open (`milestones/M08/open.md` rows 2 and 25). The measured
+bump was minor; the measured rollback was a revert pull request the
+platform redeployed, not a re-point by hand (§12).
 
 ### M08 — Game-day drill
 Claim 8 above. **Zero new code paths** (ADR ruling at PR 1); any needed

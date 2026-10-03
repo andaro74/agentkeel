@@ -2,7 +2,10 @@
 
 For a developer with **write** access to one agent repository and nothing
 else: no admin on the repository, no cloud credentials. This page is what
-M06's timed run follows (SPEC/06 section 1). The clock starts when the
+the timed run followed (SPEC/06 section 1). It was run once, at M07, on
+2026-10-03: 3,615 seconds, with the organisation's owner starting the
+platform's check and deploy by hand when GitHub's schedules ran late. The
+clock starts when the
 repository is created and stops at the last of four records: your first
 pull request merged, the platform's deploy, your agent answering one of its
 own tests, and your agent listed in the registry. The bar is one working
@@ -48,8 +51,8 @@ and says why:
 - `an agent's goldens`: you have no tests.
 
 That is the platform check refusing it. The repository's ruleset requires
-the check to pass before a merge; whether nothing else can stand in for it
-is what M06 measures, after this page is published (seeds S2 and S3).
+the check to pass before a merge. Whether something else can stand in for
+it was tried once, at M06 (seed S2, below).
 
 ## 4. Fill the seats
 
@@ -109,7 +112,8 @@ only kind the ruleset allows). A job in your own workflow called
 agentkeel's App, which GitHub documents as accepting it from that App
 alone. It was attempted once, at M06 (seed S2): the stand-in's check
 did not count, while the platform's check was refusing every change for
-a fault of its own. It is read again at M07.
+a fault of its own. It was to be tried again at M07 on a fresh change
+and was not: that question is still open.
 
 ## 7. The platform deploys it
 
@@ -135,7 +139,7 @@ have shipped.
 
 | What you see | What it means |
 |---|---|
-| No `platform-check` after 30 minutes | agentkeel's schedule has not reached it. Push an empty commit, or tell the owner. |
+| No `platform-check` after 30 minutes | agentkeel's schedule has not reached it. Push an empty commit, or tell the owner, who can start the check by hand. On the timed run GitHub skipped the five-minute schedule for 28 minutes. |
 | `the agent's name` | The name is malformed, agentkeel's own, or taken. |
 | `the platform's guardrail` | `guardrail` differs from the platform's: changed here, or the platform moved it. Set it to the platform's (refagent's manifest in agentkeel). |
 | `the files the platform's image copies` | A file the image needs is missing: `__init__.py`, `agent.py`, `server.py`, `prompt.txt`, `manifest.yaml` or `tools/`. |
