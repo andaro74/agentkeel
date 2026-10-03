@@ -1043,7 +1043,8 @@ deployed (B2, 22:49Z) and the stack deleted, the next create (run
 service checks one action at a time, so each refusal hides the next.
 That stack rolled back too and kept a second key, its alias and the
 table. With both actions deployed (B2 again, 23:16Z) and the stack,
-table, alias and key gone, the third create passed: run 37077850271
+table and alias deleted and the key scheduled for deletion, the third
+create passed: run 37077850271
 deployed owner-check's runtime, the agent answered its two goldens in
 it, the signed bundle and the answer record went to the security
 account (each a first put) and the registry row was written at
@@ -1051,9 +1052,10 @@ account (each a first put) and the registry row was written at
 these two actions.
 **The repair is a widening of IAM**: two actions,
 `CreateAgentRuntimeEndpoint` and `TagResource`, on `runtime/*`, in the
-bootstrap stack (`infra/bootstrap/app.py`), ruled by Security and
-deployed by hand; they are wider than the platform's own runtimes, and no
-condition narrows them. It is carried in PR 4, the close, and said there
+bootstrap stack (`infra/bootstrap/app.py`), deployed by hand, twice,
+from the close's branch **before any ruling**, and put to Security in
+`rulings/pr4-security.md`; they are wider than the platform's own
+runtimes, and no condition narrows them. It is carried in PR 4, the close, and said there
 as a repair in the close. Until it was deployed no agent from the
 template could get a runtime, and every scheduled deploy run failed the
 same way. The owner's test stays a miss: `upgrade.deploy_max_seconds`
@@ -1106,6 +1108,18 @@ is the trust's subject**, the environment's, with `job_workflow_ref`
 exact as before; it is not wider (the same job, named as GitHub names
 it), it is Security's, deployed by `hector.flores`, and it is a third
 repair in the close. No other job has both an environment and an AWS
-role (`observe.yml`'s is the only one). Until it is deployed, PR 4's
-run reads the anonymous viewpoint alone, which cannot see a ruleset's
-`bypass_actors`: the relaxation waits for it.
+role (`observe.yml`'s is the only one). It too was deployed before any
+ruling, by `hector.flores`, from the close's branch.
+
+**Corrected after the reviews of PR 4** (security-reviewer F8, cold
+review F7): the paragraph above first ended "PR 4's run reads the
+anonymous viewpoint alone, which cannot see a ruleset's
+`bypass_actors`: the relaxation waits for it". That was wrong twice.
+The observer App holds Administration: read, and M06 showed read does
+not return `bypass_actors` either (`rulings/pr2-security.md` item 7):
+no viewpoint M07 reads from sees that field, the App's included. And
+the relaxation did not wait: its entry is on the close's branch, `main`'s
+observer reads only what `main`'s run files name, so it is read by PR
+4's own token, with `bypass_actors_shown` false. Its "held" rests on
+the fields GitHub shows that token and on the owner's read of
+`bypass_actors: []` after the restore, which is not evidence.

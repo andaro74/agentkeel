@@ -92,7 +92,8 @@ aws cloudformation get-template --stack-name AgentkeelBootstrap --region us-west
 CDK_OUTDIR=synth uv run python -m infra.bootstrap.app
 ```
 
-and, in Python, both loaded, `§` replaced by `?` in the tree's, the
+and, in Python (the script is at the end of this file, since M07 PR 4),
+both loaded, `§` replaced by `?` in the tree's, the
 resource `CDKMetadata` and each resource's `aws:cdk:path` set aside (the
 CLI adds those; a bare synth does not), `Parameters` and `Rules` set
 aside (the CLI's bootstrap-version check): **the two are equal.** So the
@@ -159,3 +160,60 @@ as the CLI uploads this stack) equals a synth of the tree at `8f4bc7a`,
 with the 3 cdk-nag signs as `?` and CDK's path metadata set aside, as
 for B2. Panel 2 is imported by the human from `infra/grafana/panel2.json`;
 its table holds no row until the next push to `main`.
+
+## The comparison, as something a reader can run (added at M07 PR 4)
+
+platform-architect F7 and cold review F10 on PR 4: "the two are equal"
+above had no script and no hash. Run again on 2026-10-03T19:10Z at
+`b310735`, by the session as the agent account's admin user, against
+`AgentkeelBootstrap` as last updated 2026-10-02T23:16:52Z:
+
+```
+stored 12e8041c906d60b5f7011e8cfb0714b0c3af825876e9e77ae80825fb5b1711dd
+tree   12e8041c906d60b5f7011e8cfb0714b0c3af825876e9e77ae80825fb5b1711dd
+equal  True
+```
+
+`stored.json` is `aws cloudformation get-template --stack-name
+AgentkeelBootstrap --template-stage Original --query TemplateBody
+--output json`; the tree's is `CDK_OUTDIR=synth uv run python -m
+infra.bootstrap.app`. The script:
+
+```python
+import hashlib, json, sys
+
+def norm(path):
+    t = json.load(open(path, encoding="utf-8"))
+    if isinstance(t, str):          # a stack whose template is stored as YAML (Grafana's)
+        import yaml
+        t = yaml.safe_load(t)
+    t = json.loads(json.dumps(t, sort_keys=True, ensure_ascii=False).replace("\u00a7", "?"))
+    t["Resources"].pop("CDKMetadata", None)
+    t.get("Conditions", {}).pop("CDKMetadataAvailable", None)
+    for r in t["Resources"].values():
+        md = r.get("Metadata", {})
+        md.pop("aws:cdk:path", None)
+        if not md:
+            r.pop("Metadata", None)
+    t.pop("Rules", None)
+    t.pop("Parameters", None)
+    if not t.get("Conditions"):
+        t.pop("Conditions", None)
+    return json.dumps(t, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+
+stored, tree = norm(sys.argv[1]), norm(sys.argv[2])
+print("stored", hashlib.sha256(stored.encode("utf-8")).hexdigest())
+print("tree  ", hashlib.sha256(tree.encode("utf-8")).hexdigest())
+print("equal ", stored == tree)
+```
+
+Its limits, as the reviews named them: the sign's replacement is over
+the whole text, so a `§` in a resource property would be hidden too (no
+property of this stack holds one); and it compares what the stack holds
+now, so it covers the first deploy only through the second.
+
+**From the next commit the tree's hash moves.** M07 PR 4's repair of the
+cdk-nag reason for `runtime/*` (security-reviewer F3) changes that
+reason's text, which is `Metadata` in the template. Until the bootstrap
+stack is next deployed, the stored template differs from the tree's in
+that one reason and in nothing CloudFormation reads.

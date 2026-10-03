@@ -6,6 +6,21 @@ and no stack is deployed from a commit whose Security ruling still reads
 DRAFT (the sentence PR 2's version of this file opened with, restored
 after the reviews of PR 3).
 
+**Neither half of that sentence held at M07 PR 4** (cold review B1,
+platform-architect B1 and F6, security-reviewer F4 on PR 4). Three
+deploys were made from the unmerged branch `m07-pr4` before any ruling
+file for PR 4 existed: the bootstrap stack from `7a9032d` (2026-10-02
+22:49:50Z) and from `81508ab` (23:16:52Z), by andaro74 as the agent
+account's admin user, and the security account's stack from `e68ec46`
+(2026-10-03 12:15:47Z), by `hector.flores`. Each followed andaro74's word
+to the session in the conversation ("go ahead with your recommendation";
+"go"; "yes on 1"), which is not a ruling file. And a session did part of
+one: it synthesised the template `hector.flores` uploaded, and it made
+every read marked "the session" below with the owner's credentials (the
+agent account's admin user, the machine's default profile).
+`rulings/pr4-security.md` names the three and rules each, after the
+fact.
+
 Git Bash, from the repository's root. The agent account is 581208540944
 (the default profile, the account's admin user). The security account is
 897698239547: **no local profile reaches it.** Its stack is updated by
@@ -31,9 +46,9 @@ where it stood.
 |---|---|
 | A1, A2 the two new Apps | **Done**, 2026-10-02 (M07 PR 4). `agentkeel-upgrades` 5169860 (`contents: write, pull_requests: write, metadata: read`) and `agentkeel-observer` 5169892, each on `agentkeel-studio`, `all`. The observer was first created with the writer's two write permissions; the human corrected it to the four reads and accepted the change on the installation, and the read-back then matched the grant block. That `agentkeel-upgrades` is on `andaro74` with `agentkeel` only is the human's browser read, not the API's |
 | A3 the two environments and keys | **Done.** `platform-upgrades` and `platform-observer`: `can_admins_bypass` false, one policy `main` branch, one secret each (`UPGRADES_APP_PRIVATE_KEY`, `OBSERVER_APP_PRIVATE_KEY`); the repository's own secrets are `AGENTKEEL_GRAFANA_TOKEN` and `RULESET_TOKEN` and no key |
-| A4 the two ids in the grant block | **Done**, in the commit that carries this row, on `m07-pr4` |
-| B1 the security account's stack | **Done**, by `hector.flores` in the console, 2026-10-02, from a template synthesised from `main` (`3bfd074`). The role `agentkeel-observation-put` was created at 15:39:21Z (as the human read it in the console; no session can read that account). `AWS_OBSERVATION_PUT_ROLE_ARN` was set at 15:40:56Z (`gh variable list`). **No put under `bundles/` or `observations/` has been made or refused yet** |
-| B2 the bootstrap stack | **Not done.** `AWS_MODEL_WATCH_ROLE_ARN` and `AWS_ENVELOPE_ROW_PUT_ROLE_ARN` are not set |
+| A4 the two ids in the grant block | **Done**: on `main` by #42 (`36c97dd`, 2026-10-03). They were first committed on `m07-pr4` (`8f4bc7a`) |
+| B1 the security account's stack | **Done**, by `hector.flores` in the console, 2026-10-02, from a template synthesised from `main` (`3bfd074`). The role `agentkeel-observation-put` was created at 15:39:21Z (as the human read it in the console; no session can read that account). `AWS_OBSERVATION_PUT_ROLE_ARN` was set at 15:40:56Z (`gh variable list`). No put under `bundles/` or `observations/` had been made or refused when this row was written. Since: `bundles/` first put by run 37077850271 (2026-10-02 23:37Z); `observations/` refused fifteen times and first put at 2026-10-03 12:39:08Z ("B1 again", below) |
+| B2 the bootstrap stack | **Done, twice**, 2026-10-02, from `m07-pr4` (the table below). `AWS_ENVELOPE_ROW_PUT_ROLE_ARN` set 22:51:50Z; `AWS_MODEL_WATCH_ROLE_ARN` held back and set 2026-10-03 13:24:56Z, after the swap's statement was pushed (13:16:53Z) |
 | B3 Grafana's stack | **Done**, 2026-10-03T00:48:04Z, from `m07-pr4` at `8f4bc7a` (`infra/grafana` is identical to `main` at `cba3aac`, `git diff --quiet main m07-pr4 -- infra/grafana`). The stored template read equal to the tree's synth, signs aside (`runs/b2_cdk_diff.md`). `agentkeel-envelopes` holds 0 rows until the next push to `main` |
 | C the grant to `agentkeel-platform` | **Done**, after PR 2 merged. The installation holds Administration: write (`gh api orgs/agentkeel-studio/installations`) |
 
@@ -219,8 +234,8 @@ GitHub as the App", and was then refused at
 `sts:AssumeRoleWithWebIdentity`: `agentkeel-observation-put` trusted
 `sub` = `...:ref:refs/heads/main`, and a job in an environment carries
 `sub` = `...:environment:platform-observer`. The repair is the role's
-trust subject, in `infra/security/app.py`, ruled by Security
-(`rulings/pr4-security.md`) and deployed by `hector.flores` as steps 1
+trust subject, in `infra/security/app.py`, put to Security in
+`rulings/pr4-security.md` after the fact and deployed by `hector.flores` as steps 1
 to 4 above, from `m07-pr4` at the commit that carries it. **The change
 set must show one thing and nothing else:** the role
 `ObservationPutRole` modified, its `AssumeRolePolicyDocument` alone
@@ -284,9 +299,11 @@ The diff should show, and nothing else:
   Deny made wider; no Allow changes;
 - two new outputs.
 
-No change to the deploy role, the execution role, either boundary, the
-VPC or the guardrail, and no other change to the key. Anything else is a
-stop. Then:
+No change to the deploy role, either boundary, the VPC or the guardrail,
+no change to the execution role but the one statement listed first
+above, and no other change to the key. Anything else is a stop. (Until
+M07 PR 4 this paragraph said "no change to ... the execution role" while
+the list above named one: platform-architect F6.) Then:
 
 ```sh
 npx aws-cdk@2 deploy
@@ -347,3 +364,47 @@ The run's `post` job reads the grant back first; its artifact
 Renew the Grafana observer token (it expires 2026-10-31T07:00:01Z), and
 set `AGENTKEEL_GRAFANA_TOKEN` to the new one. Until then nothing changes;
 after that date, unrenewed, panel 1's and panel 2's live reads are unread.
+
+## The two keys two failed creates left (2026-10-02)
+
+Recorded at M07 PR 4 after platform-architect F4: the README and SPEC/07
+first said these keys were "gone" and "deleted". A KMS key is scheduled
+for deletion, stays in the account for the window, and the schedule can
+be cancelled. Both rows are CloudTrail's `ScheduleKeyDeletion` events
+and `describe-key`, read by the session on 2026-10-03T19:02Z as the
+agent account's admin user.
+
+| Key | Made by | Scheduled | By | Window | Deletion date | State when read |
+|---|---|---|---|---|---|---|
+| `ce2d6f46-8088-4bd3-a57e-2c014278aa34` | the first failed create of `agentkeel-owner-check` (run 37066321605), 2026-10-02T21:23:19Z | 2026-10-02T22:52:18Z | the agent account's admin user | 7 days | 2026-10-09T22:52:18Z | `PendingDeletion` |
+| `fcd9e973-0d4b-4828-8f7a-022d9b414c65` | the second (run 37074759767), 2026-10-02T22:54:07Z | 2026-10-02T23:25:53Z | the same | 7 days | 2026-10-09T23:25:53Z | `PendingDeletion` |
+
+Both carry the tag `owner-check`, so until they are gone their policies
+admit `owner-check`'s kept role (platform-architect N7). Nothing is
+encrypted under either. The stacks, the table (twice) and the alias
+(once) were deleted by the same principal between 22:49Z and 23:29Z;
+their CloudTrail events were not read. `owner-check`'s present key,
+`23a1ee05-87e8-440e-93fc-61e7c85beebd`, is the third create's and is in
+its stack.
+
+## Still owed, by hand (Security)
+
+- **The stored template of `AgentkeelSecurity`, hashed**, after "B1
+  again" (security-reviewer F6, platform-architect F7 on PR 4; the first
+  B1's is owed since PR 3). `hector.flores`, in CloudShell in the security
+  account:
+
+  ```sh
+  aws cloudformation get-template --stack-name AgentkeelSecurity --region us-west-2 \
+    --template-stage Original --query TemplateBody --output json \
+    | python3 -c "import json,sys,hashlib; print(hashlib.sha256(json.dumps(json.load(sys.stdin),sort_keys=True,separators=(',',':')).encode()).hexdigest())"
+  ```
+
+  The same normalisation of the file that was uploaded (sha256 of the
+  file itself `c15c8ca5…bf7b45`) gives
+  `1a55571da2222787c0966f4004674110637d6a5f651dde69906bddc8e2657721`. Equal means the stack
+  holds what was uploaded.
+- **The Grafana observer token**, before 2026-10-31.
+- **The list of what is installed on the timed run's profile**
+  (`milestones/M06/runs/f6_3_quickstart.yaml` asked for it before the
+  run).

@@ -546,3 +546,52 @@ two dispatches and one merge.
 
 The observed entry is in `runs/f7_2_retire.yaml`; S2's run-file test's
 marker is off. **Every attempt M07 stated is now made.**
+
+## After the cold review of the branch (2026-10-03, before PR 4 opens)
+
+Corrections to this file, appended. Nothing above is edited by them.
+
+1. **Attempt 1's statement was edited once after the attempt began**
+   (cold review F3). `6eb955d`, pushed about 01:03Z, after the repository
+   was created at 01:01:33Z, replaced the three lines under "What is
+   installed on the profile" ("Listed by the human, in a commit pushed
+   before the repository is created ... Until that commit this section is
+   empty and the run is not started") with the paragraph that begins "The
+   run file asks for this list". So "the statement above is not edited"
+   is not true of that section. The expected readings were not touched.
+   The list itself is still owed.
+2. **The owner started the platform's jobs by hand, and not only when a
+   schedule was late** (cold review F4). Attempt 1's statement allowed no
+   dispatch ("the platform, by itself"; "nobody touches ... the
+   platform's workflows"), and five were made: the check at 01:34:41,
+   01:43:30 (cancelled) and 01:51:45, and the deploy at 01:49 and
+   01:56:03. The third check dispatch is what let the scheduled deploy
+   find a checked merge commit. Attempts 2, 5 and 6 allowed a dispatch
+   "if a schedule is late", and the session told the owner to dispatch
+   at once: 101 s after the template's push, 16 s after a merge, 42 s,
+   94 s, 209 s and 212 s after the events they followed. So 3,615 s, 147
+   and 152 s, 387 and 510 s, 454 s and 368 s are what the platform took
+   **once started by the owner**, not what its schedules take. Every bar
+   was met with a wide margin. What the schedules alone would have given
+   was not measured, on a night when GitHub fired a five-minute schedule
+   at gaps of up to 28 minutes. "As stated, every line", in attempt 6's
+   record, overreaches for that reason and is withdrawn.
+3. **The statement's push time for attempt 2** is 03:41:38Z by this
+   checkout's record of the push, not "03:44" (cold review N1).
+4. **The relaxation's reading** (attempt 3) is from PR 4's own token,
+   which GitHub does not show `bypass_actors`. "Held, detected" will
+   rest on the fields that token sees. The `bypass_actors: []` in the
+   record is the owner's read (cold review F7; SPEC/07 §12 corrects the
+   sentence that said the App's viewpoint would see it: it does not).
+5. **The fourteen tests** that are red on a moved pin are not repaired in
+   the close (cold review F2). The record of attempt 4 said
+   "Engineering's, in the close"; it is carried to M08's open list.
+6. **Item 13n is done in the close**: `platform-check.yml` loses the
+   seeded relaxation's dispatch input and step. Until PR 4 merges,
+   `main` still carries them, and nothing on `main` but the owner's
+   restraint stops a second dispatch (security-reviewer F7).
+7. **The retirement's three owed reads** were made five hours late, and
+   one is a finding: two network interfaces remain behind the retired
+   agent's kept security group (`runs/f7_2_removed_and_kept.md`).
+8. **Line 517's "yours to rule"** was written to the human in the
+   conversation's voice; it means Security's (cold review N12).

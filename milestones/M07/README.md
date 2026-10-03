@@ -324,7 +324,8 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   (`agentkeel-owner-check-rights`), which a redeploy would collide with.
 - **Refused again, one check further along.** With
   `CreateAgentRuntimeEndpoint` on `runtime/*` deployed (B2 from `7a9032d`,
-  22:49Z) and the stack, table and key gone, run 37074759767 (22:54Z)
+  22:49Z) and the stack and table deleted and the key scheduled for
+  deletion, run 37074759767 (22:54Z)
   created the stack again and `CreateAgentRuntime` was refused for
   `TagResource` on `runtime/*`: CloudFormation passes its three
   `aws:cloudformation:*` tags in the create, and the service checks them
@@ -333,7 +334,8 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   (`fcd9e973-0d4b-4828-8f7a-022d9b414c65`, this time with
   `alias/agentkeel-owner-check`) and the table.
 - **Deployed on the third create.** With `TagResource` added (B2 from
-  `81508ab`, 23:16Z) and the second stack, table, alias and key deleted,
+  `81508ab`, 23:16Z) and the second stack, table and alias deleted and
+  its key scheduled for deletion,
   run 37077850271 created the stack (23:31:39Z), the runtime
   `agentkeel_owner_check-G4vMbRB3Dx` answered `g-001` and `g-002` in it
   (2 observations, 0 errors, GREEN), the signed bundle and the answer
@@ -343,9 +345,9 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   is 3,600. The owner's test stays a miss.
 - **The second finding under F7.0, and a repair in the close.** The
   repair is two actions on `runtime/*` in the bootstrap stack, a widening
-  of IAM, ruled by Security and deployed by hand (`runs/pr2_by_hand.md`
-  B2, twice). It is in PR 4's branch from its first commit, before the
-  close is written.
+  of IAM, deployed by hand before any ruling (`runs/pr2_by_hand.md` B2,
+  twice) and put to Security in `rulings/pr4-security.md`. It is in PR
+  4's branch from its first commit, before the close is written.
 
 ### Before the timed run (2026-10-03)
 
@@ -411,5 +413,9 @@ Written at M07 PR 1 open. The row in `milestones/README.md` is the one
   `sts:AssumeRoleWithWebIdentity` from 03:56Z to 11:23Z (37094837939 to
   37119509159). The repair is the trust's subject (`infra/security/app.py`),
   Security's, deployed by `hector.flores` (`runs/pr2_by_hand.md`, "B1
-  again"); a third repair in the close. The relaxation waits for it:
-  only the App's viewpoint sees a ruleset's `bypass_actors`.
+  again"); a third repair in the close, also deployed before any ruling.
+  This line first said the relaxation waited for it because "only the
+  App's viewpoint sees a ruleset's `bypass_actors`": wrong, and
+  corrected in SPEC/07 §12. The observer App's Administration: read
+  does not show that field either, and the relaxation is read by PR 4's
+  own token.
