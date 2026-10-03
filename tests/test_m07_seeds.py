@@ -345,7 +345,6 @@ def test_s2_a_retired_agent_that_still_answers_is_found_by_build():
     assert denied["held"] is False and len(denied["reasons"]) == 1 and "invocation" in denied["reasons"][0], denied
 
 
-@expected_failure
 def test_s2_the_retirement_was_made():
     """The retire workflow dispatched for owner-check, its draft pull request, the merge. Made last,
     after owner-check has deployed, answered, been listed and taken S1 (SPEC/07 §5.1)."""

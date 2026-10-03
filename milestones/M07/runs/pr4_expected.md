@@ -519,3 +519,30 @@ path.
 - The invocation after the update answers: F7.2 fired. Recorded; the
   job fails and writes no `retired_at`.
 - The App's pull request carries more than the one line: read as it is.
+
+### What happened (written after; the statement above is not edited)
+
+| When (UTC) | What |
+|---|---|
+| 14:08:09 | statement on GitHub (`676c26c`) |
+| 14:11:22 | the owner dispatched `deploy.yml` with `retire=owner-check` (37128759405), once |
+| 14:12:01 | `owner-check` #6 opened by `agentkeel-upgrades[bot]`, draft, 39 s after the run began: one verified commit `2704c15`, `manifest.yaml` one line, `rollout: all-at-once` → `retired` |
+| 14:22:56 | the App passed `2704c15` |
+| 14:24:36 | marked ready and merged by andaro74, merge commit `926641f`; the pull request still one commit, the App's |
+| 14:26:05 | the App passed `926641f` |
+| 14:29:37 | the owner dispatched `deploy.yml` with no input (37129778736); `retire-agent` ran: the head still what the App passed and saying `rollout: retired`; the retired head's manifest the deployed one's but for `rollout`; the runtime's ARN kept |
+| 14:30:44 | **`DeleteAgentRuntime`** for `agentkeel_owner_check-G4vMbRB3Dx` in CloudTrail, as `agentkeel-cfn-exec`, no error: **368 s** after the merge (bar 3,600). No IAM refusal on the delete |
+| 14:35:12 | the job's one invocation of the ARN: `ResourceNotFoundException`, "No endpoint or agent found with qualifier 'DEFAULT'" (artifact `retire-invocation-owner-check`) |
+| 14:35:15 | `envelopes/agents/owner-check/retired.json` put in the security account, once |
+| 14:35:17 | `retired_at` on the registry row, with `retired_commit` `926641f` and `retire_run_id`; the row's `commit_sha` stays `840f5ab`, the last commit deployed |
+
+Read afterwards with the owner's credentials (not evidence; PR 4's run
+reads it again): `GetAgentRuntime` on the id answers
+`ResourceNotFoundException`; the stack `agentkeel-owner-check` is
+`UPDATE_COMPLETE` with one output left, `AgentRoleArn`;
+`list-agent-runtimes` shows `agentkeel_window_check` and `refagent` and
+no `agentkeel_owner_check`. As stated, every line. The owner's part was
+two dispatches and one merge.
+
+The observed entry is in `runs/f7_2_retire.yaml`; S2's run-file test's
+marker is off. **Every attempt M07 stated is now made.**

@@ -48,4 +48,13 @@ attempts:
     command: "`gh workflow run deploy.yml -f retire=owner-check` in andaro74/agentkeel on main; then merge the draft pull request the App opens in owner-check when its check is green; then nothing: the retire job runs from main on the deploy schedule"
     refused_when: a draft pull request authored by the App in owner-check within upgrade.arrive_max_seconds of the dispatched run's created_at, changing manifest.yaml's rollout to retired and nothing else; merged with the App's success; DeleteAgentRuntime for agentkeel_owner_check in CloudTrail within upgrade.retire_max_seconds (3,600 s) of merged_at; GetAgentRuntime on its ARN ResourceNotFoundException; the retire job's one invocation of that ARN after the deletion refused the same way; bundles/owner-check/<commit>.tar in the audit bucket; retired_at on the registry row; no answer record under envelopes/agents/owner-check/ after the deletion
     recorded_when: the observer reads the dispatched run, the pull request, CloudTrail's event, GetAgentRuntime, the invocation's recorded result, the bucket's listing and the registry row
-observed: null
+# Made on 2026-10-03, once, last, as stated in
+# milestones/M07/runs/pr4_expected.md (attempt 6, pushed 14:08:09Z; the
+# dispatch's run created 14:11:22Z). The observer reads the rest; `build`
+# rules on it.
+observed:
+  - what: owner-check retired through a pull request the platform opened
+    repository: agentkeel-studio/owner-check
+    run: 37128759405
+    pull_request: 6
+    at: '2026-10-03T14:24:36Z'
