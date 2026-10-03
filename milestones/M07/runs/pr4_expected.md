@@ -190,3 +190,58 @@ The new value is written quoted (`"36c97ddaee93"`) where the template
 writes it bare; the same YAML string. The first keyed `observe.yml` run
 on `main` with the ids had not fired by 03:51 (the last, 03:23, was on
 `cba3aac`).
+
+## Attempt 3: the App's token asked to relax owner-check's ruleset (S0's third attempt)
+
+Stated 2026-10-03, after `owner-check` took the platform upgrade
+(merged 12:18:18Z, deployed 12:24:41Z) and before it is retired, as
+`runs/f7_0_owner_test.yaml` has it. Made once.
+
+### What is made, in order
+
+1. **The call.** andaro74 dispatches, once:
+   `gh workflow run platform-check.yml --ref main -f relax_seed=owner-check`.
+   The `post` job, in `platform-app`, mints the App's `rulesets` token
+   for `agentkeel-studio/owner-check` and asks GitHub to put ruleset
+   24310403 back without its `required_status_checks` rule. GitHub's
+   answer is kept as the artifact `relax-seed`. The run's `created_at`
+   is the time of the call. **Nothing on `main` stops a second
+   dispatch** (the observed entry is on `m07-pr4`): it is the human who
+   makes it once.
+2. **A new head while the ruleset is changed.** andaro74 pushes one
+   empty commit to a new branch of `owner-check` and opens a pull
+   request from it. It is never merged.
+3. **Detection.** The next `platform-check.yml` run (dispatched with no
+   input if the schedule is late) fails that head, and its reasons name
+   `the repository's ruleset is the export`.
+4. **The restore.** andaro74, with the owner's own token:
+   `gh api --method PUT repos/agentkeel-studio/owner-check/rulesets/24310403 --input infra/ruleset/agent.post.json`,
+   then reads it back equal to `infra/ruleset/agent.json`. After the
+   detection, not before: the reader takes the ruleset's own
+   `updated_at` as the restore only when it is after the failing check.
+5. **A head passed after the restore.** `find` checks a head once, so
+   the failed head stays failed. andaro74 pushes one empty commit to a
+   second new branch and opens a second pull request; the next
+   platform-check run passes it. Never merged either.
+
+Nothing merges in `owner-check` from the call to the restore. Pull
+request 2 (`e3a8083`) is not touched.
+
+### Expected reading, PR 4's run
+
+| | Expected |
+|---|---|
+| GitHub's answer to the call | **200, accepted.** The App holds Administration: write on the repository, because nothing less shows it `bypass_actors` (M06's finding); GitHub does not hold that grant to reading |
+| `upgrade.F7_0.relaxation` | read, held, `outcome: detected`: the new head failed for the ruleset; no pull request merged between the call and the restore; the ruleset equals the export in every field GitHub shows, with `updated_at` after the detection; the App passed a head after that |
+| `bypass_actors_shown` | false: PR 4's run reads as the pull request's own token, which GitHub does not show them to. `main`'s observer, as the App, reads only what `main`'s run files name, and this attempt's entry is on `m07-pr4` (row 7's amendment at PR 3: read from the anonymous viewpoint alone) |
+| What it is called | **detection, not refusal.** For the minutes between the call and the restore, `owner-check`'s `main` could have taken a merge with no platform check. Nothing did, and nothing stopped it but that nobody tried |
+
+### What makes it a miss
+
+- GitHub refuses the call (403): `outcome: refused`, held, and the
+  statement above was wrong about the grant.
+- The App passes the new head while the ruleset is changed: not
+  detected. Fired; the ruleset is restored at once all the same.
+- A pull request merges in `owner-check` in the interval: fired.
+- The restore reads back different from the export: recorded, and
+  repaired by re-exporting, not by editing the reader.

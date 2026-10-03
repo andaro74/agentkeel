@@ -230,6 +230,22 @@ no replacement. Step 4's variable is already set. This time the
 template's sha256 is recorded before the upload and the stored
 template's after (the hash B1's first deploy owes).
 
+Done on 2026-10-03, about 12:15Z, by `hector.flores` in the console (the
+human's word; no session reads that account), from `m07-pr4` at
+`e68ec46`. The template uploaded was synthesised by the session on this
+machine, sha256
+`c15c8ca50b42b279fdeee14a817236af039095d13dde127c6e17b5dfa9bf7b45`, and
+differed from `main`'s synth in one line of one resource
+(`ObservationPutRole`, the `sub`). **Owed from the human:** that the
+change set showed that one modification and no replacement, the role's
+trust as the console shows it, and the time of `UPDATE_COMPLETE`. What
+a session can read: the next `observe.yml` run, 37123531195 (dispatched
+by the owner, 12:38:35Z), passed the grant step (`grant-agentkeel-observer`:
+`errors: []`, `narrower: []`), read GitHub as the App, assumed the role
+(`agentkeel-observation-put-37123531195`) and **put the first
+observation under `observations/` at 12:39:08Z**. The fifteen runs
+before it were refused at that step.
+
 ### B2. The agent account's bootstrap stack (items 13b, 13c, 13d, 13h)
 
 From the commit Security rules (above). Write the commit down first.
