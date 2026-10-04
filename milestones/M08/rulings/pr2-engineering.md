@@ -19,6 +19,7 @@ authorises:
   - tests/test_m08_seeds.py
   - tests/test_p5_disagree.py
   - tests/test_cost_cap_and_ledger.py
+  - tests/test_gate.py
 evidence:
   - SPEC/00-overview.md#8-M08
   - SPEC/08-game-day-drill.md
@@ -54,8 +55,9 @@ SPEC/08 §4, §6):
 - **`Makefile`**: the five F8 case lists and `DRILL_OBS`.
 - **tests**: the six S2..S7 markers come off (their reader landed); the three
   run-file tests stay xfail until the runs are made; P5 cases for the new
-  checks; the row-4 guard points at a neutral milestone, since M08 reads the
-  drill now.
+  checks; the row-4 guard (test_cost_cap_and_ledger) points at a neutral
+  milestone and test_gate's exhaustive required_checks(HEAD) assertion adds
+  CLAIM_8_CHECKS, since M08 reads the drill now.
 
 ## The cold review (engineering-cold-reviewer): 0 BLOCK, 1 FINDING, 7 NOTE
 
