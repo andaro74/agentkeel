@@ -1,0 +1,23 @@
+{
+  "run": "run1",
+  "window": {"opened": "2026-10-20T10:00:00Z", "closed": "2026-10-20T10:20:00Z"},
+  "records": [
+    {"key": "AWSLogs/581208540944/CloudTrail/a4.json.gz", "kind": "delivered", "found": true,
+     "versions": 2, "last_modified": "2026-10-20T10:04:00Z",
+     "retention": {"mode": "COMPLIANCE", "until": "2026-10-21T10:04:00Z"}},
+    {"key": "AWSLogs/581208540944/CloudTrail/a5.json.gz", "kind": "delivered", "found": true,
+     "versions": 1, "last_modified": "2026-10-20T10:45:00Z",
+     "retention": {"mode": "COMPLIANCE", "until": "2026-10-21T10:45:00Z"}},
+    {"key": "envelopes/agents/drill-agent/abc123.json", "kind": "at_once", "found": true,
+     "versions": 1, "last_modified": "2026-10-20T10:02:00Z", "retention": null},
+    {"key": "AWSLogs/581208540944/vpcflowlogs/a1.log.gz", "kind": "delivered", "found": false},
+    {"key": "AWSLogs/581208540944/CloudTrail/a6.json.gz", "kind": "delivered", "found": true,
+     "versions": 1, "last_modified": "2026-10-20T10:05:00Z",
+     "retention": {"mode": "COMPLIANCE", "until": "2026-10-21T10:05:00Z"}}
+  ],
+  "unnamed_refusals": [
+    {"key": "AWSLogs/581208540944/CloudTrail/unnamed.json.gz",
+     "role": "arn:aws:iam::581208540944:role/agentkeel/agents/agentkeel-drill-agent-Role",
+     "event_name": "GetItem", "error_code": "AccessDenied", "event_time": "2026-10-20T10:06:00Z"}
+  ]
+}

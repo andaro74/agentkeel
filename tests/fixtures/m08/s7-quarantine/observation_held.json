@@ -1,0 +1,13 @@
+{
+  "run": "run1-quarantine",
+  "role": "arn:aws:iam::581208540944:role/agentkeel/agents/agentkeel-drill-agent-Role",
+  "attached_at": "2026-10-20T10:12:00Z",
+  "detached_at": "2026-10-20T10:20:00Z",
+  "calls_after_attach": [
+    {"event_name": "DeleteLogStream", "answered": false, "error_code": "AccessDenied",
+     "event_time": "2026-10-20T10:13:00Z"}
+  ],
+  "refused_calls_in_window": [
+    {"event_name": "DeleteLogStream", "error_code": "AccessDenied", "event_time": "2026-10-20T10:13:00Z"}
+  ]
+}

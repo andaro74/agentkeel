@@ -109,5 +109,6 @@
 # seat: Security
 /.claude/agents/security-reviewer.md @andaro74
 /.claude/agents/platform-architect.md @andaro74
+/.claude/agents/incident-responder.md @andaro74
 # seat: Engineering
 /.claude/agents/engineering-cold-reviewer.md @andaro74

@@ -1,0 +1,26 @@
+[
+  {
+    "table_row": "r-019",
+    "title_id": "t-012",
+    "territory": "US",
+    "platform": "SVOD",
+    "window_start": "2026-12-01",
+    "window_end": "2027-06-30",
+    "exclusive": true,
+    "holdback_until": null,
+    "clearance_expiry": null,
+    "embargo_lift_local": null
+  },
+  {
+    "table_row": "r-009",
+    "title_id": "t-004",
+    "territory": "DE",
+    "platform": "PVOD",
+    "window_start": "2027-02-01",
+    "window_end": "2027-08-01",
+    "exclusive": true,
+    "holdback_until": "2027-02-01",
+    "clearance_expiry": null,
+    "embargo_lift_local": null
+  }
+]

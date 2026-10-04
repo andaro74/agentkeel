@@ -167,6 +167,30 @@ SURFACE_PLANTS: dict[str, tuple[str, ...]] = {
                                       "test_s4_a_green_row_for_a_red_envelope_is_found_by_build"),
 }  # fmt: skip
 
+# Claim 8's seeded cases (SPEC/08 section 5), the same shape. Listed at M08
+# PR 1, before the readers. S1 is the adversary: a hostile agent folder the
+# platform check passes (it reads no code), copied into an agent repository at
+# PR 2; its "reader" is agentkeel's own platform check, already in the tree,
+# so `make plants` says "in the tree" beside it and the guard test, not this
+# list, says it passes. S2 to S7 are observation fixtures, each read by a
+# function src/verdict/drill.py adds at PR 2. The three runs are run files the
+# human fills, read by scripts/observe_drill.py after PR 2 merges. The strict
+# markers, not this list, say whether a seed is read. Listing them reads
+# nothing and gates nothing. M08 builds no control (ADR-0013): these readers
+# are the instrument.
+SEEDS_M08: dict[str, tuple[str, str, str]] = {
+    "S1": ("the adversary", "tests/fixtures/m08/s1-hostile-copy/", "src/validate/agent.py"),
+    "S2": ("F8.1", "tests/fixtures/m08/s2-silent-attempt/", "src/verdict/drill.py"),
+    "S3": ("F8.1", "tests/fixtures/m08/s3-attempt-answered/", "src/verdict/drill.py"),
+    "S4": ("F8.2", "tests/fixtures/m08/s4-second-layer/", "src/verdict/drill.py"),
+    "S5": ("F8.3", "tests/fixtures/m08/s5-run3-not-clean/", "src/verdict/drill.py"),
+    "S6": ("F8.4", "tests/fixtures/m08/s6-evidence/", "src/verdict/drill.py"),
+    "S7": ("F8.5", "tests/fixtures/m08/s7-quarantine/", "src/verdict/drill.py"),
+    "run1": ("F8.1-F8.5", "milestones/M08/runs/drill_run1.yaml", "scripts/observe_drill.py"),
+    "run2": ("F8.2", "milestones/M08/runs/drill_run2.yaml", "scripts/observe_drill.py"),
+    "run3": ("F8.3", "milestones/M08/runs/drill_run3.yaml", "scripts/observe_drill.py"),
+}
+
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
 SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/01 section 5", SEEDS),
@@ -176,6 +200,7 @@ SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/05 section 5", SEEDS_M05),
     ("SPEC/06 section 5", SEEDS_M06),
     ("SPEC/07 section 5", SEEDS_M07),
+    ("SPEC/08 section 5", SEEDS_M08),
 ]
 
 

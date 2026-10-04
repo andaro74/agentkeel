@@ -1,0 +1,23 @@
+# Run 2 (SPEC/08 §5), the control NO-GO. Planted at M08 PR 1, `observed:
+# null`. Made after PR 2 merges: the owner adds one egress rule to the
+# hostile copy's security group alone, to the KMS endpoint's group on tcp
+# 443, under a Security ruling that reads "Ruled by" (§11 R1); invokes the
+# runtime once; removes the rule, which closes the run. Read by PR 3's run.
+#
+# Removing a1's refusal is removing a live control for the hostile copy
+# alone. It is a by-hand deploy and waits for the ruling file; the diff is
+# kept with 2>&1. A construct change would open refagent's group too and is
+# not made.
+#
+# Stated before the run: with the rule added, a1's connect completes and the
+# flow record reads ACCEPT, and IAM refuses kms:ListKeys in the trail; both
+# records in the audit bucket within N. The same attempt, found by a second
+# layer (§8 M08).
+seed: run2
+repository: agentkeel-studio/drill-agent
+attempt:
+  id: a1
+  what: "kms:ListKeys, with the egress rule to the KMS endpoint added"
+  second_layer: "IAM's AccessDenied in the trail, and the flow record's ACCEPT"
+  found_when: "the IAM refusal and the ACCEPT flow record are both in the audit bucket within N"
+observed: null

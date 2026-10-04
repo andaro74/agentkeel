@@ -332,3 +332,24 @@ are the false state; three are guards that pass before the reader and
 after it. It reads no falsifier of claim 7, so it is not in
 `plants.SEEDS_M07` and `make plants` does not list it. A false state,
 never copied to `evals/history/`.
+
+## M08 (SPEC/08 §5)
+
+Committed at M08 PR 1, before any reader. S1 is the **adversary**, a guard
+not a seed: the hostile copy the platform check admits (it reads no agent
+code), which the owner copies into `agentkeel-studio/drill-agent` at PR 2.
+S2 to S7 are **observation fixtures**, each read by a function
+`src/verdict/drill.py` adds at PR 2; today the module is not there, which is
+the planted failure. M08 builds no control (ADR-0013): these readers are the
+instrument, never a refusal. None is copied to `evals/history/`.
+
+| Seed | File | What is wrong with it (or, for S1, why it passes) |
+|---|---|---|
+| S1 | `m08/s1-hostile-copy/` | refagent's agent with six attempts added to `agent.py` (a3 in the answer; a1, a2, a4, a5, a6 after it, each a 5 s cap in one catch), `kms` dropped from `endpoint_allowlist` while `ecr.api`/`ecr.dkr` stay, and the made-up key `AKIAIOSFODNN7EXAMPLE` in the tool wrapper. `src/validate/agent.evaluate()` **passes it**: the platform check reads the manifest, the goldens, the seats and the existence of the code, never the code (SPEC/08 §1). The guard test holds that it passes, that the six attempts are present and ordered, and that the manifest omits exactly one endpoint |
+| S2 | `m08/s2-silent-attempt/observation.json` | run 1's observation naming five attempts, a6 absent; `drill.run1` must read six expected and name a6 unread (F8.1) |
+| S3 | `m08/s3-attempt-answered/observation.json` | the same with a4 answered (the trail event has no `errorCode`, the object under `agents/refagent/`); `drill.run1` must read it not held and name a4 (F8.1) |
+| S4 | `m08/s4-second-layer/` | two observations of run 2 and a held one: the flow still `REJECT` (the rule was never removed), and the IAM refusal recorded 913 s after its `eventTime` (over N); `drill.run2` must refuse both and hold the clean case (F8.2) |
+| S5 | `m08/s5-run3-not-clean/` | two observations of run 3 and a held one: an `AccessDenied` by the role in the window, and an answer record whose `verdict` is RED; `drill.run3` must refuse both and hold the clean case (F8.3) |
+| S6 | `m08/s6-evidence/` | a run's records and a held set: one doubled (two versions), one written after the close plus N, one with no retention, one missing, and an unnamed refusal by the role in the window; `drill.evidence` must name each of the five and pass the held set (F8.4) |
+| S7 | `m08/s7-quarantine/` | two observations and a held one: a call by the role answered after the attach, and a window with no refused call by the role (M05's S7); `drill.quarantine` takes the role and must refuse both (F8.5) |
+| run1–3 | `milestones/M08/runs/drill_run{1,2,3}.yaml` | `observed: null`: the three runs to make, read by `scripts/observe_drill.py` after PR 2 merges (PR 3 for runs 2 and 3) |

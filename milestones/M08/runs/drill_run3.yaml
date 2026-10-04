@@ -1,0 +1,15 @@
+# Run 3 (SPEC/08 §5), the fixed GO. Planted at M08 PR 1, `observed: null`.
+# Made after PR 2 merges: a pull request in drill-agent removes the six
+# attempts and declares kms, the rule restored and the quarantine detached,
+# then it is deployed and asked the same goldens. Read by PR 3's run — or by
+# PR 4's run if the platform's own deploy path needs a repair (§5.1, the
+# second named P3 exception).
+#
+# Stated before the run: the answer record GREEN; no refusal by the role and
+# no REJECT flow from its interfaces in run 3's window; its registry row read
+# as any agent's through panel 1. F8.3 reads the record's verdict; both
+# goldens' pass are recorded beside it (finding 3).
+seed: run3
+repository: agentkeel-studio/drill-agent
+clean_when: "the answer record verdict is GREEN, no refusal by the role and no REJECT flow in the window, and the registry row is read through panel 1"
+observed: null
