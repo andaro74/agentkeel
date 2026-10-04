@@ -415,7 +415,8 @@ def test_an_agent_envelope_from_m04s_readers_must_carry_claim_4s_checks(monkeypa
     monkeypatch.setattr(gate, "pin_moved", lambda commit, bundle, root: False)  # HEAD, or a swap PR's head
     # HEAD also carries claim 5's F5_1 from M05 PR 2's readers (2c88265), claim 6's F6_1 and F6_4 from
     # M06 PR 2's (c2a15d0), and claim 7's six from M07 PR 2's (eed43f5); M04's readers carry none of them.
-    later = gate.CLAIM_5_CHECKS + gate.CLAIM_6_CHECKS + gate.CLAIM_7_CHECKS
+    # ... and claim 8's five from M08 PR 2's readers (91be2c2); M04's readers carry none of them.
+    later = gate.CLAIM_5_CHECKS + gate.CLAIM_6_CHECKS + gate.CLAIM_7_CHECKS + gate.CLAIM_8_CHECKS
     assert gate.required_checks(head) == before + gate.CLAIM_4_CHECKS + later
     assert gate.required_checks(gate.M04_READERS) == before + gate.CLAIM_4_CHECKS
     assert gate.required_checks("e51892775b6b36236755f0f9a94e6d98d7628206") == before  # M04 PR 1's run
