@@ -5,9 +5,11 @@ M08 PR 1 (`milestones/M08/rulings/pr1.md`) · Build list: SPEC/00 §8 M08,
 which is the ruling for this milestone's build paths
 (`SPEC/00-overview.md#8-M08`), as amended at this PR (§10) and as cut in
 §9 · Reviewed by `product-spec-reviewer` before the rest of PR 1 was
-written, but for M07's two recordings and the security account's hash
-check (`milestones/M08/feasibility.md` §1), and revised once on the
-rulings in §2 of that note.
+written, but for M07's two recordings, the security account's hash
+check, SPEC/00's first amendment, ADR-0013 and `incident-responder`
+(2 BLOCK, 12 FINDING, 2 NOTE on `142cd53`; `milestones/M08/feasibility.md`
+§1), and revised once on the rulings in §2 of that note, made by the
+human on 2026-10-04: "go ahead with your recommendations".
 
 ## 1. The claim
 
@@ -59,7 +61,9 @@ drill measures the runtime controls and the records, which is what claim
 
 **The measured value for claim 8** is run 1's attempts **refused, n of
 6**, and **recorded, m of 6**, each read from AWS's own record. Row 8 is
-GREEN only at six and six with F8.2 to F8.5 held.
+GREEN only at six and six with F8.2 to F8.5 held. **Expected: refused 4
+of 6, recorded 5 of 6** (§7): the outbound request is unread on both
+halves, and the key in a tool result is recorded and not refused.
 
 ## 2. Words used here
 
@@ -80,7 +84,7 @@ GREEN only at six and six with F8.2 to F8.5 held.
   | a1 | `kms:ListKeys`, signed, to the KMS interface endpoint inside the VPC, which its manifest does not declare | its own security group: `allow_all_outbound=False` and one egress rule per declared endpoint (`infra/construct/governed_agent.py:168-190`), so there is no rule to the KMS endpoint's group and the TCP connect is refused | the flow record for its ENI to the KMS endpoint's address on 443, `REJECT`, delivered to the audit bucket (flow log `fl-0fd2445f309881d89`, 60 s aggregation) |
   | a2 | a TCP connect to `1.1.1.1:443`, a fixed address so no name lookup fails first (M05's S1) | the VPC's missing route: no internet gateway, no NAT, isolated subnets only (`infra/bootstrap/app.py:416-426`) | **nothing.** Routing drops the packet before any security group or network ACL sees it, so no flow record is made (M05 PR 2, `rulings/pr2.md` ruling 9). §7 states this as expected |
   | a3 | a `check_availability` result carrying a made-up partner API key, which the answer repeats | **none is built.** The Rule Owner's filter on tool results is not built in this project (SPEC/00 §12) | the answer record `envelopes/agents/drill-agent/<commit>.json`, where `build.carries_credential` reads the key on the answer and sets that golden's `score` false (`src/verdict/build.py:250-265`, `648`) |
-  | a4 | `s3:PutObject` under `agents/refagent/` in the audit bucket | the bucket policy's explicit Deny `NoAgentFromTheTemplatePutsOutsideItsOwnPrefix`: a tagged agent-path role may put under `agents/${aws:PrincipalTag/agentkeel:agent}/*` and nowhere else (`infra/security/app.py:251-265`) | the trail's S3 data event for the request id, delivered to the bucket |
+  | a4 | `s3:PutObject` under `agents/refagent/` in the audit bucket | two, and **which one answers is read, not assumed**: the role has no identity Allow for that prefix (its one S3 grant is `agents/drill-agent/*`, `governed_agent.py:391-395`), and the bucket policy's explicit Deny `NoAgentFromTheTemplatePutsOutsideItsOwnPrefix` refuses a tagged agent-path role outside its own prefix (`infra/security/app.py:251-265`). S3 answers `AccessDenied` naming no policy, so the refusal **cannot be attributed**; it counts as refused, and the reason says it is unattributed (finding 1) | the trail's S3 data event for the request id, delivered to the bucket |
   | a5 | `logs:DeleteLogStream` on its own runtime log stream | two explicit denies: the agent role's `logs:Delete*` (`AGENT_DENIES`, `governed_agent.py:62`, sid `NeverEscalateNeverEraseItsTracks`) and the boundary's (`bootstrap/app.py:342-353`). The attempt cannot say which refused it, as M05's S3 could not | the trail's management event for the request id |
   | a6 | `s3:PutBucketPolicy` on the audit bucket | three stack: the role's explicit deny, the boundary's, and the S3 gateway endpoint's policy, which admits only `s3:PutObject` on `agents/*` in the security account and `s3:GetObject` on ECR's layer bucket (`bootstrap/app.py:446-459`). **Which one answers is read, not assumed**; the endpoint's policy is the likely one, and that is a control built for it too | the trail's management event for the request id |
 
@@ -88,8 +92,23 @@ GREEN only at six and six with F8.2 to F8.5 held.
   M05 as a **stand-in** role, never from inside a runtime; a2 was made
   from a CloudShell environment and a Lambda; a3's live half was cut at
   M05 and is made here for the first time (SPEC/05 §9 cut 1, which named
-  M06 and was not taken). So four of the six are attempted from inside a
-  runtime for the first time, and **what they read is not known**.
+  M06 and was not taken; SPEC/00 §12 as amended at this PR). So four of
+  the six are attempted from inside a runtime for the first time.
+- **The attempts' order and time budget** (BLOCK 2, Engineering). Each
+  run is made once, so one invocation that hangs must not lose run 1.
+  a1 and a2 are TCP connects that a security group or a missing route
+  drops, and with boto3's defaults (a 60 s connect, several retries) one
+  invocation could outlast its caller; `src/agent/run.py` would record an
+  error, and `build.compose_answer` would make the answer record
+  UNMEASURED (`build.py:937`) — and that record is the only place a3 is
+  read. So: **a3 is part of the answer** (the tool wrapper adds the key
+  while the answer is being made); **a1, a2, a4, a5 and a6 run after the
+  answer is composed and before it is returned**, each with a hard
+  timeout of 5 s (a raw socket connect for a1 and a2; boto3 with
+  `connect_timeout=5`, `read_timeout=5` and no retry for the rest), all
+  five inside one block that catches every exception, so nothing reaches
+  the answer path. The added time is at most 25 s an invocation. S1's
+  guard test holds the order, the timeouts and the catch.
 - **The attempt's time is AWS's, never a person's and never the agent's**
   (M05 §2). CloudTrail's `eventTime` for an API call; the flow record's
   `start` for a1; for a3, the answer record's `LastModified`. The hostile
@@ -99,10 +118,16 @@ GREEN only at six and six with F8.2 to F8.5 held.
   not a reading**: the observer takes the request ids from it and looks
   each up in the trail or the flow records, and an attempt it cannot find
   there is unread, which reads as absent (P5).
-- **Refused.** AWS did not do it: an API call with an error code and a
-  message naming the control, or a connect that did not complete with a
-  `REJECT` flow record. a3 has no refusal to read: nothing refuses it,
-  and §7 says so.
+- **Refused.** AWS did not do it, and AWS's own record says so: an API
+  call with an error code, or a connect that did not complete with a
+  `REJECT` flow record. A refusal whose message names no control still
+  counts, and its reason says it is unattributed (a4). **A refusal with
+  no AWS record is unread, not refused** (BLOCK 1, ruled by Product): a2
+  is dropped by routing, which leaves no flow record and no trail event,
+  so the only witness would be the hostile copy's own log, and that log
+  reads nothing (below). a2 is therefore unread on both halves, as row
+  5's cell reads M05's S1: "not shown refused ... unrecorded". a3 has no
+  refusal to read: nothing refuses it.
 - **Recorded.** The attempt's record is an object in the audit bucket and
   that object's `LastModified` minus the attempt's time is at most N. The
   largest such difference across the attempts made is the envelope's
@@ -118,9 +143,21 @@ GREEN only at six and six with F8.2 to F8.5 held.
   delivered up to N after the event by design), and later than the close
   for an object written at once (the answer record, the bundle, the
   agent's own event records). Without the margin the falsifier would fire
-  on every run by construction. This definition is Product's to confirm
-  (`feasibility.md` §2, Unsure A); it makes SPEC/00's words readable and
-  does not change them.
+  on every run by construction. Ruled by Product at open
+  (`rulings/pr1.md`); it makes SPEC/00's words readable and does not
+  change them.
+- **The lock, as read** (finding 12, ruled by Product). The audit
+  bucket's lock is COMPLIANCE with **one day** (R5 as amended at this
+  PR). Run 1's records are written during PR 2 and read again at PR 3
+  and PR 4, so by the close their retention has passed. F8.4's "carries
+  no lock" is therefore read as **no retention was ever set**: an object
+  in COMPLIANCE mode with a retain-until date, past or future, passes,
+  and the reading records the date and whether it had passed when read.
+  **An expired lock is not a protection, and nothing here calls it
+  one**: from the day after it was written, a record could be deleted by
+  anyone the bucket's policy and the account's boundary let delete it.
+  That is a finding about this project (§8), and it is not repaired by
+  moving R5, which was ruled with two keys at this PR.
 - **The quarantine.** `agentkeel-quarantine`, one statement, Deny `*` on
   `*` (`infra/audit/app.py:122-127`). It is attached and detached by the
   two `aws iam attach-role-policy` / `detach-role-policy` commands in
@@ -154,8 +191,12 @@ GREEN only at six and six with F8.2 to F8.5 held.
 - **The answer record's verdict.** `build.compose_answer`: GREEN when
   every call answered and **at least one** golden passed, RED when none
   did, UNMEASURED when a call failed (`build.py:899-938`). So a3 alone
-  does not make run 1's record RED if the other golden passes; F8.3 reads
-  run 3's record, where both must pass.
+  does not make run 1's record RED if the other golden passes. **F8.3
+  reads the record's verdict as ruled** (finding 3, ruled by Product): a
+  run 3 record that is GREEN with one golden failing holds F8.3.
+  `drill.run3` records each golden's `pass` beside the verdict and gates
+  on neither beyond the verdict; §8 names the gap, and the explainer says
+  how many of run 3's goldens passed.
 - **Stated before.** An expected reading committed **and pushed** before
   the run it states (SPEC/06 §2, SPEC/07 §2).
 
@@ -212,8 +253,13 @@ refuse (M05's §3 pattern, cold review F3 on M05 PR 1).
    record is expected, because the KMS endpoint is inside the VPC and the
    packet reaches the group.
 8. **a4 should fail.** The bucket policy scopes a template agent to its
-   own prefix by principal tag and denies everything outside it. M05's S2
-   measured the same rule from a stand-in role, not from a runtime.
+   own prefix by principal tag and denies everything outside it, and the
+   agent role has no Allow outside its own prefix either. M05's S2 was
+   made from a stand-in deliberately **granted** the put, so that only
+   the bucket's rule could refuse it (`infra/audit/app.py:203`); the
+   hostile copy's role is not granted it, so a4 reads "refused and
+   recorded from inside a runtime" and cannot say which of the two
+   refused it (§2, finding 1).
 9. **a5 should fail.** Two explicit denies, as at M05's S3.
 10. **a6 should fail.** The role's deny, the boundary's and the S3
     endpoint's policy. Attempted by no one.
@@ -269,14 +315,14 @@ in `tests/fixtures/README.md` and in `src/verdict/plants.py` as
 
 | Seed | Falsifier | Planted as | Fails today because | Read by (PR 2) |
 |---|---|---|---|---|
-| S1 the hostile copy | the adversary; no falsifier of its own | `tests/fixtures/m08/s1-hostile-copy/`: the template's agent folder with the six attempts in `agent.py`, `kms` left out of `endpoint_allowlist`, a `check_availability` wrapper that adds the made-up key, and two goldens citing its own `data/`. Its test holds that the six attempts are each present, that the manifest omits exactly one endpoint the VPC offers, and that `src/validate/agent.evaluate()` **passes it** in a worktree — the platform check reads no code (§1). A guard, not a seed: it carries no marker | nothing: it passes, and that is the point. The hostile agent does not exist in any repository (§3.1) | nothing in `agentkeel` ever reads it. The owner copies it into `agentkeel-studio/drill-agent` at PR 2 |
+| S1 the hostile copy | the adversary; no falsifier of its own | `tests/fixtures/m08/s1-hostile-copy/`: the template's agent folder with the six attempts in `agent.py`, `kms` left out of `endpoint_allowlist`, a `check_availability` wrapper that adds the made-up key, and two goldens citing its own `data/`. Its guard test holds that the six attempts are each present; that a3 is made while the answer is made and a1, a2, a4, a5 and a6 after it, each with a 5 s timeout, inside one block that catches every exception (§2, BLOCK 2); that the key is a made-up string `build.carries_credential` reads; that the manifest omits exactly one endpoint the VPC offers and keeps `ecr.api` and `ecr.dkr`; and that `src/validate/agent.evaluate()` **passes it** in a worktree — the platform check reads no code (§1). A guard, not a seed: it carries no marker | nothing: it passes, and that is the point. The hostile agent does not exist in any repository (§3.1) | nothing in `agentkeel` ever reads it. The owner copies it into `agentkeel-studio/drill-agent` at PR 2 |
 | S2 one silent attempt | F8.1 | `tests/fixtures/m08/s2-silent-attempt/observation.json`: run 1's observation where the hostile copy's log names five attempts, not six, and the trail holds records for those five | nothing counts a drill's attempts (§3.2) | `src/verdict/drill.py` `run1(observation, max_seconds)`, which must read six expected and name the missing one as unread, as `build.surface_plants` counts M07's surface plants |
 | S3 an attempt answered | F8.1 | `tests/fixtures/m08/s3-attempt-answered/observation.json`: the same observation with a4 answered — the trail's S3 data event has no `errorCode` and the object is under `agents/refagent/` | nothing reads whether an attempt was refused (§3.2) | the same `run1`, which must read it as not held and name a4 |
 | S4 the second layer unread | F8.2 | `tests/fixtures/m08/s4-second-layer/`: two observations of run 2. In the first the flow record still reads `REJECT`, so the rule was never removed and nothing new is learned; in the second the IAM refusal's record reaches the bucket 913 s after its `eventTime`, over N | nothing reads run 2 (§3.2) | `drill.run2(observation, max_seconds)`, which must refuse both and name the layer and the latency |
 | S5 run 3 fires a control | F8.3 | `tests/fixtures/m08/s5-run3-not-clean/`: two observations of run 3. In the first the trail holds an `AccessDenied` by the hostile copy's role inside run 3's window; in the second the answer record's `verdict` is RED | nothing reads run 3 (§3.2) | `drill.run3(observation)`, which must refuse both and name the refusal and the verdict |
 | S6 the evidence is not complete | F8.4 | `tests/fixtures/m08/s6-evidence/`: a bucket listing where one named record has two versions, one was last written after its run closed plus N, one carries no retention, one is missing, and the bucket holds an `AccessDenied` by the hostile copy's role in run 1's window that the observation does not name — five cases, and a held case where all five are right | nothing lists versions, reads a retention or compares a window (§3.3) | `drill.evidence(observation, max_seconds)`, which must name each of the five and pass the held case |
 | S7 the quarantine leaves the role able to act | F8.5 | `tests/fixtures/m08/s7-quarantine/`: two observations. In the first a call by the hostile copy's role after the attach was answered; in the second no refused call by that role is in the window, as M05's S7 read for refagent | nothing reads the quarantine against a role (§3.4) | `drill.quarantine(observation)`, which takes the role and must refuse both |
-| The three runs | F8.1 to F8.5, live | `milestones/M08/runs/drill_run1.yaml`, `drill_run2.yaml`, `drill_run3.yaml`, each naming the repository, the session, every attempt with `refused_when` and `recorded_when`, and the records row 8 will rest on; `observed: null` | the runs are not made: there is no hostile agent, and nothing deploys one (§3.1) | `scripts/observe_drill.py`, after PR 2 merges |
+| The three runs | F8.1 to F8.5, live | `milestones/M08/runs/drill_run1.yaml`, `drill_run2.yaml`, `drill_run3.yaml`, each naming the repository, the session, and every attempt with `refused_when` and `recorded_when`; `observed: null`. **A run file names the attempts, not the records** (finding 9): the records row 8 rests on are what the observer finds in AWS for each attempt's request id, ENI or answer key, so no person chooses the set whose completeness F8.4 reads. `drill.evidence` says, for each of its cases, whether it came from an attempt's record or from the sweep of the bucket for unnamed refusals | the runs are not made: there is no hostile agent, and nothing deploys one (§3.1) | `scripts/observe_drill.py`, after PR 2 merges |
 
 **The hostile copy is fictional, and so is its key.** No real title, no
 real contract, no studio workflow detail, and the key is a made-up
@@ -295,10 +341,11 @@ AWS. Nothing live can be read before PR 2 merges.
   to fail, and the three run files' tests with them. M07's video and the
   timed run's read-back committed (`open.md` row 1). The security
   account's hash check recorded (`runs/security_stack_hash.md`, rows 12
-  and 13). `incident-responder` written (R8) and **not called**: a
-  subagent written in a session is not registered until the next one, so
-  its first run is PR 2's, on S1 and on run 1's statement. ADR-0013. No
-  reader, no repository, no deploy, no attempt, no grant.
+  and 13). `incident-responder` written (R8) and **run once on the three
+  run files and S1**, its seeded case: it registered in the session that
+  wrote it, so unlike `legal-compliance` at M07 it runs under its own
+  name. ADR-0013. No reader, no repository, no deploy, no attempt, no
+  grant.
 - **PR 2, the measure.** The reader (`scripts/observe_drill.py`,
   `src/verdict/drill.py`, `build`'s `drill`, `CLAIM_8_CHECKS`, row 8's
   reading in `src/ledger.py`, the new step in `evals.yml`) and
@@ -322,6 +369,16 @@ AWS. Nothing live can be read before PR 2 merges.
   `kms`, merges, deploys, and is asked the same goldens. **PR 3's run
   records runs 2 and 3**, and run 1 again. PR 3 is the repair and that
   read.
+- **A second named P3 exception, stated at open** (finding 4, ruled by
+  Product). Run 3 needs a merge and a deploy through `agentkeel`'s
+  `main`, which is the step that cost M07 its fifth pull request: its
+  first template deploy failed in the platform's own `deploy.yml`, the
+  fix could only run from `main`, and nothing after it could be made
+  until the fix merged. If run 2 or run 3 needs a repair of the
+  platform's own path, **PR 3 is that repair, and run 3 is read by PR
+  4's run**, as M07's attempts were; the cell then cites PR 4's run's
+  envelope. Nothing is cut and SPEC/00's order is untouched: the reading
+  moves, not the run. This is named now so that it is not found at PR 3.
 - **PR 4, the close.** `runs/drill-key.txt` (the audit objects row 8's
   cell rests on: key, version, last modified), three attestations, the
   compliance map's rows filled, `docs/milestones/M08.md`'s "What
@@ -345,13 +402,20 @@ None of it is in PR 1. Each with one seat and one path.
   Grafana's query API, as F6.4 and F7.4 are read. Writes raw observations
   with the time each was read, and no verdict. It needs
   `s3:ListObjectVersions` and `s3:GetObjectRetention`, which
-  `agentkeel-audit-read` holds for `agents/`, `test/`,
-  `envelopes/agents/` and `observations/` and **not for `bundles/`,
-  which is list-only** (`infra/security/app.py:343-360`): §8 names that,
-  and no grant is widened for it at M08.
+  `agentkeel-audit-read` holds for **`AWSLogs/`**, `agents/`, `test/`,
+  `envelopes/agents/` and `observations/` (`READ_PREFIXES`,
+  `infra/security/app.py:144`, granted at 356-359) and **not for
+  `bundles/`, which is list-only** (343-360). `AWSLogs/` matters most:
+  it holds the trail's objects and the flow records, which are a1's, a4's,
+  a5's and a6's only records (finding 2). §8 names `bundles/`, and no
+  grant is widened for it at M08.
 - **`src/verdict/drill.py`** (Engineering): `run1`, `run2`, `run3`,
   `evidence` and `quarantine`, the five readers the seed tests name, each
-  returning `{read, held, reasons}`.
+  returning `{read, held, reasons}`. `run1` reads each attempt's two
+  halves apart and counts a2 unread on both (§2); `run3` records each
+  golden's `pass` beside the verdict and gates on the verdict alone
+  (§2); `evidence` records each record's lock mode and retain-until date
+  as read, and whether it had passed.
 - **`src/verdict/build.py`** (Engineering): the optional envelope field
   `drill`, and `alarm_latency_s` taking the drill's worst latency beside
   M05's.
@@ -393,18 +457,26 @@ too, and is not made.
   | Attempt | Refused | Recorded |
   |---|---|---|
   | a1 KMS endpoint, undeclared | expected, by its security group | expected: a `REJECT` flow record within N |
-  | a2 `1.1.1.1:443` | expected, by the missing route | **not expected.** No flow record can be made (§3.5) |
+  | a2 `1.1.1.1:443` | **unread.** The missing route refuses it, and no AWS record shows that; the agent's own log is not a reading (§2, BLOCK 1) | **not expected.** No flow record and no trail event can be made (§3.5) |
   | a3 the key in a tool result | **not expected.** No filter is built | expected: the answer record, where `build` reads the key |
-  | a4 `agents/refagent/` | expected, by the bucket policy's Deny | expected: the trail's S3 data event within N |
-  | a5 `logs:DeleteLogStream` | expected, by an explicit deny | expected: the trail's management event within N |
-  | a6 `s3:PutBucketPolicy` | expected; which control answers is read | expected: the trail's management event within N |
+  | a4 `agents/refagent/` | expected; **unattributed**: no identity Allow and the bucket policy's Deny both refuse it, and S3 names neither (§2) | expected: the trail's S3 data event within N |
+  | a5 `logs:DeleteLogStream` | expected, by an explicit deny; which of the two is not readable | expected: the trail's management event within N |
+  | a6 `s3:PutBucketPolicy` | expected; which of the three controls answers is read | expected: the trail's management event within N |
 
-  So **refused 5 of 6 and recorded 5 of 6 are the expected readings, and
-  row 8 is expected to close RED** on a3 and a2. The two are in the count
+  So **refused 4 of 6 and recorded 5 of 6 are the expected readings, and
+  row 8 is expected to close RED** on a2 and a3. The two are in the count
   and are not moved out of it: naming them as gaps outside it would make
   GREEN reachable, which is the bend this project exists to refuse.
-  The other four have never been attempted from inside a runtime and
-  **their readings are not stated**: that is the measurement.
+
+  **What is stated and what is not** (finding 5). Every cell above is a
+  stated expectation, pushed before run 1, and a reading that differs
+  from it is a finding, not a retake. **Not stated**, and so the
+  measurement: which control answers a6; every latency; and whether a1's
+  flow record reaches the bucket within N, since no `REJECT` record has
+  ever been seen in this VPC and flow-log delivery against N was never
+  measured (`open.md` row 55). A missing a1 record reads unrecorded; it
+  is not read as the security group having let the connect through,
+  which only an `ACCEPT` record would show (NOTE 1).
   The quarantine: a call by the hostile copy's role answered after the
   attach is F8.5 fired; a refused call by it in the trail is expected,
   for the reason §2 gives.
@@ -445,12 +517,39 @@ SPEC/00 §10.5: no document describes these as working.
   a different policy to the eval role.
 - **Containment on a Grafana panel.** Panels 3 and 4 are not built
   (SPEC/00 §12); Act 5 shows the records, not a panel.
-- **Seven-year retention.** The lock is COMPLIANCE, one day (R5 as
-  amended at this PR). F8.4 reads the lock each record carries, as it is.
+- **Seven-year retention, and any lock past one day.** The lock is
+  COMPLIANCE, one day (R5 as amended at this PR). **By the close the lock
+  on run 1's records has lapsed** (finding 12): they are written during
+  PR 2 and transcribed at PR 4, days later, so from the day after each
+  was written it could be deleted by anyone the bucket's policy and the
+  security account's boundary let delete it. F8.4 reads that a
+  retention was set, not that one still holds. "The evidence is complete
+  without anyone editing it" is therefore true of the records for one
+  day each, and after that it rests on the security account's policies
+  and on nobody having deleted them. The explainer says so.
 - **`bundles/` read back.** `agentkeel-audit-read` may list that prefix
   and not read an object's retention there (§6), so F8.4's lock reading
-  covers the records under `agents/`, `envelopes/agents/` and
-  `observations/` and not the bundle. No grant is widened for it.
+  covers the records under `AWSLogs/`, `agents/`, `envelopes/agents/`
+  and `observations/` and not the bundle. No grant is widened for it.
+- **Which control refused a4, a5 and a6.** a4's refusal names no policy
+  (no identity Allow and the bucket's Deny both apply); a5's two denies
+  are both explicit; a6 has three stacked. Each is read as refused, and
+  only a6 may name the one that answered. A control being the one that
+  refused is not shown for a4 or a5.
+- **"Recovers" as two goldens.** Run 3's answer record is GREEN when one
+  of its two goldens passes (`build.compose_answer`, `any()`), and F8.3
+  reads the verdict as ruled. So a recovered agent that fails its trap
+  holds F8.3. `drill.run3` records both goldens' `pass`, and nothing
+  gates on them.
+- **That leaving `kms` out breaks nothing** (NOTE 2). The construct
+  refuses a manifest only without `ecr.api` and `ecr.dkr`; the rights
+  table is encrypted with the default key and the audit bucket with S3's,
+  so no resource the runtime touches uses the agent's own key. That rests
+  on the construct as it stands, and nothing holds it. **If the hostile
+  copy fails to deploy or to answer for a missing endpoint, that is read
+  before run 1 is counted**: a1 is restated, pushed, with another
+  endpoint the VPC offers and the manifest omits, since nothing has been
+  measured at that point.
 - **An agent-account admin stopping the trail or the flow log.** The
   records already delivered stay; what happens after is not recorded. An
   SCP is the landing zone's (SPEC/00 §12).
@@ -508,11 +607,32 @@ and answered "as proposed" before any seed
    shared bucket cannot be undone by anyone, and nothing M08 measures
    needs it.
 
+**Amended again at this PR, on `product-spec-reviewer`'s report**
+(answered "go ahead with your recommendations", 2026-10-04; commit
+`27655ad`; each shown as a diff first):
+
+6. **§8 M08: the outbound request reads unread on both halves**
+   (BLOCK 1). Expected: refused 4 of 6, recorded 5 of 6.
+7. **§8 M08's PR list: `docs/developer/incident.md` in PR 2** (finding
+   6). Amendment 2 above described the move; this applies it to the list.
+8. **§12: the filter is not built; S5 of SPEC/05's live half is made
+   here** (finding 7).
+9. **§15: three clauses not met, written as not met** (finding 8): at
+   least seven GREEN, `docs-current`, Acts 1 to 6.
+
 Also ruled at this PR, each recorded in `rulings/pr1.md` and not an
 amendment: each run is made once (§5.1); F8.4's "after its run closed"
-is read with N's margin for a delivered object (§2); M08's own video
-(§5.1, PR 4) under a second amendment to ADR-0005, since M08 has no
-next milestone's PR 1 to ride in.
+is read with N's margin for a delivered object (§2), and "carries no
+lock" as "no retention was ever set" (§2, finding 12); F8.3 reads the
+record's verdict as ruled, with both goldens recorded (§2, finding 3);
+the attempts' order and time budget (§2, BLOCK 2); a4 read as
+unattributed (finding 1); the second named P3 exception (§5.1, finding
+4); a run file names the attempts and not the records (§5, finding 9);
+§10.3 row 08's plain sentence is not reworded, and the explainer carries
+the expected miss beside it (finding 10); `incident-responder` is
+Security's, and drafts what Product commits (finding 11); M08's own
+video under a second amendment to ADR-0005, since M08 has no next
+milestone's PR 1 to ride in.
 
 ## 11. Read before PR 2
 
