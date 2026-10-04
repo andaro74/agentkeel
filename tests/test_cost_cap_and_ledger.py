@@ -145,7 +145,10 @@ def test_row_4_reads_the_swaps_and_closes_red_on_f4_2():
     # the envelope alone. Not M05 from M05 PR 2: row 5 reads `containment` (READ_THE_CONTAINMENT), and this
     # envelope has none. Not M06 from M06 PR 2: row 6 reads `template` (READ_THE_TEMPLATE), which it has not
     # either. Not M07 from M07 PR 2: row 7 reads `upgrade` (READ_THE_UPGRADE).
-    assert gate.measured_at(envelope, history, milestone="M08") == gate.measured_at(envelope, history)
+    # M08 is now a reading row too (READ_THE_DRILL, M08 PR 2): as row 8 this swaps-only envelope has no
+    # `drill`, so it reads RED "drill not read". M03 reads nothing special, so it reads the envelope alone.
+    assert gate.measured_at(envelope, history, milestone="M03") == gate.measured_at(envelope, history)
+    assert "drill not read" in gate.measured_at(envelope, history, milestone="M08")
     assert "containment not read" in gate.measured_at(envelope, history, milestone="M05")
     assert "template not read" in gate.measured_at(envelope, history, milestone="M06")
     assert "upgrade not read: the envelope records no attempt; RED; " in gate.measured_at(envelope, history, milestone="M07")

@@ -199,3 +199,65 @@ def test_build_says_every_claim_7_check_passed_and_the_gate_still_requires_each(
     verdict, reasons = gate.judge(carried, load_golden_kinds(GOLDENS_DIR), {}, [],
                                   required=gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_7_CHECKS)  # fmt: skip
     assert verdict == "RED" and "checks.F7_5 is missing from an agent envelope" in reasons
+
+
+# --- M08 PR 2 (SPEC/08 §4, P5): a case for each new check ---------------------
+
+
+def test_the_observer_claims_refused_and_build_reads_the_record():
+    """observe_drill writes raw records; drill rules. An attempt the observer marked refused, whose record
+    shows no error, is read as not refused by build, and run 1 names it (F8.1)."""
+    from src.verdict import drill
+
+    observation = {"attempts": [
+        {"id": "a1", "refused": True, "record": {"found": True, "kind": "flow", "flow_action": "REJECT",
+            "event_time": "2026-10-20T10:00:05Z", "last_modified": "2026-10-20T10:03:00Z"}},
+        {"id": "a2", "refused": None, "record": {"found": False}},
+        {"id": "a3", "refused": False, "record": {"found": True, "kind": "answer"}},
+        {"id": "a4", "refused": True, "record": {"found": True, "kind": "trail", "error_code": None,  # the observer lied
+            "event_time": "2026-10-20T10:00:06Z", "last_modified": "2026-10-20T10:04:00Z"}},
+        {"id": "a5", "refused": True, "record": {"found": True, "kind": "trail", "error_code": "AccessDenied",
+            "event_time": "2026-10-20T10:00:07Z", "last_modified": "2026-10-20T10:04:30Z"}},
+        {"id": "a6", "refused": True, "record": {"found": True, "kind": "trail", "error_code": "AccessDenied",
+            "event_time": "2026-10-20T10:00:08Z", "last_modified": "2026-10-20T10:05:00Z"}},
+    ]}
+    entry = drill.run1(observation, 600.0)
+    assert entry["held"] is False and "a4" in " ".join(entry["reasons"])
+    assert entry["refused"] == 3  # a1, a5, a6: a4's record shows no error, whatever the observer wrote
+
+
+def test_build_writes_no_claim_8_checks_and_the_gate_requires_them(chain):
+    """F8_1 to F8_5 from M08's readers: build says GREEN without them, the gate does not (SPEC/08 §4)."""
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    assert envelope["verdict"] == "GREEN"
+    required = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_8_CHECKS
+    verdict, reasons = gate.judge(envelope, load_golden_kinds(GOLDENS_DIR), {}, [], required=required)
+    assert verdict == "RED"
+    for name in ("F8_1", "F8_2", "F8_3", "F8_4", "F8_5"):
+        assert f"checks.{name} is missing from an agent envelope" in reasons
+
+
+def test_build_holds_a_drill_and_row_8_reads_it_again_at_the_commits_n():
+    """build ruled the drill on the N it was given; the gate's row 8 reading holds the counts and each run
+    again, and the two known misses (a2 unread, a3 not refused) keep run 1 short of six, so row 8 is RED."""
+    import json
+
+    from src.verdict import drill
+
+    observation = {"looked_up_at": "2026-10-20T10:30:00Z", "readable": True,
+        "run1": json.loads((build.ROOT / "tests/fixtures/m08/s3-attempt-answered/observation.json").read_text()),
+        "run2": json.loads((build.ROOT / "tests/fixtures/m08/s4-second-layer/observation_held.json").read_text()),
+        "run3": json.loads((build.ROOT / "tests/fixtures/m08/s5-run3-not-clean/observation_held.json").read_text()),
+        "evidence": json.loads((build.ROOT / "tests/fixtures/m08/s6-evidence/observation_held.json").read_text()),
+        "quarantine": json.loads((build.ROOT / "tests/fixtures/m08/s7-quarantine/observation_held.json").read_text())}
+    reading = drill.record(observation, 600.0)
+    misses = gate.drill_misses({"drill": reading}, 600.0, "the envelope's commit")
+    assert any("refused" in m and "of 6" in m for m in misses)  # short of six: row 8 RED
+    # the gate reads N again: a drill read against another N is a miss
+    assert any("read against N" in m for m in gate.drill_misses({"drill": reading}, 900.0, "here"))
+
+
+def test_the_gate_requires_f8_checks_from_m08s_readers_and_not_before():
+    assert {"F8_1", "F8_2", "F8_3", "F8_4", "F8_5"} <= set(gate.required_checks("HEAD"))
+    assert "F8_1" not in gate.required_checks("1083722")  # M08 PR 1's merge, before the readers

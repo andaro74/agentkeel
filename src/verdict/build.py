@@ -57,6 +57,10 @@ entry says which viewpoint it was ruled on. Recorded: the gate's verdict
 reads only its surfaces' plant counts, and row 7's reading reads the rest
 (SPEC/07 §4).
 
+From M08 PR 2, with `--drill`, `drill`: the game-day drill's three runs, ruled
+here (src/verdict/drill.py) on what `scripts/observe_drill.py` read, against N
+(`detection.max_seconds`). Recorded, never gated (SPEC/08 §4); row 8 reads it.
+
 From M04 PR 3, with `--swaps`, `swaps`: what `scripts/rule_swaps.py` wrote,
 the gate's verdict on each swap PR's own envelope beside GitHub's record of
 the pull. Copied, not read: build rules on no envelope (P5), and nothing
@@ -91,7 +95,7 @@ from typing import Any
 
 import yaml
 
-from src.verdict import containment, template, upgrade
+from src.verdict import containment, drill, template, upgrade
 # M06 PR 2 (SPEC/06 §4, BLOCK 3): build is the comparer of panel 1's rows with the registry's.
 from src.verdict.template import panel_not_in_registry  # noqa: F401  (S4's reader, by this name)
 # M07 PR 2 (SPEC/07 §4): build is the reader of a retirement's records, of a rollback's digests, of panel
@@ -704,6 +708,14 @@ def containment_record(path: Path, thresholds: dict[str, Any]) -> tuple[dict[str
         raise Refused(f"{path}: {exc}") from exc
 
 
+def drill_record(path: Path, thresholds: dict[str, Any]) -> dict[str, Any]:
+    """scripts/observe_drill.py's observation, ruled into `drill` (SPEC/08 §4). N is detection.max_seconds."""
+    try:
+        return drill.record(load_json(path), detection_bar(thresholds))
+    except drill.Unreadable as exc:
+        raise Refused(f"{path}: {exc}") from exc
+
+
 def quickstart_bar(thresholds: dict[str, Any]) -> float:
     """`quickstart.max_seconds` (SPEC/06 section 1): refused when it is absent, as N is."""
     bar = (thresholds.get("quickstart") or {}).get("max_seconds")
@@ -771,6 +783,7 @@ def compose_envelope(
     containment: tuple[dict[str, Any], float | None] | None = None,
     template_reading: dict[str, Any] | None = None,
     upgrade_reading: dict[str, Any] | None = None,
+    drill_reading: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """`bars` and `incumbent` (its runs, and where the pin was read) give F4_4; `second`, the
     agent's second raw and its scores, gives A-vs-A and F4_3; `control_second`, the control's
@@ -864,6 +877,9 @@ def compose_envelope(
     # M07 PR 2 (SPEC/07 section 4): claim 7's readings, recorded and gated by nothing; row 7 reads them.
     if gated and upgrade_reading is not None:
         one_subject["upgrade"] = upgrade_reading
+    # M08 PR 2 (SPEC/08 section 4): the game-day drill, recorded and gated by nothing; row 8 reads it.
+    if gated and drill_reading is not None:
+        one_subject["drill"] = drill_reading
     return {
         "commit": raw["commit"],
         "tag": tag,
@@ -1016,6 +1032,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--template", type=Path, metavar="OBSERVATION")
     # M07 PR 2 (SPEC/07 §4): claim 7's records, as scripts/observe_upgrade.py read them. Recorded only.
     parser.add_argument("--upgrade", type=Path, metavar="OBSERVATION")
+    # M08 PR 2 (SPEC/08 §4): the game-day drill, as scripts/observe_drill.py read it. Recorded only.
+    parser.add_argument("--drill", type=Path, metavar="OBSERVATION")
     parser.add_argument("--app-observation", type=Path, metavar="STORED")
     parser.add_argument("--surfaces", type=Path, metavar="JUNIT_XML")
     parser.add_argument("--run-url")
@@ -1144,6 +1162,7 @@ def main(argv: list[str] | None = None) -> int:
                     template_reading=shipped,
                     upgrade_reading=upgrade_record(args.upgrade, thresholds, args.history_dir, template_reading=shipped,
                                                    app=stored, surfaces=args.surfaces) if args.upgrade else None,
+                    drill_reading=drill_record(args.drill, thresholds) if args.drill else None,
                 )  # fmt: skip
             emit(envelope, args.out, envelope=True)
     except Refused as refusal:

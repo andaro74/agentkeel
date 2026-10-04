@@ -80,7 +80,7 @@ from typing import Any
 import yaml
 
 from src.verdict import M04_READERS as verdict_m04_readers
-from src.verdict import M05_READERS, M06_READERS, M07_READERS
+from src.verdict import M05_READERS, M06_READERS, M07_READERS, M08_READERS
 from src.verdict import (
     ROOT,
     canonical_sha256,
@@ -152,6 +152,12 @@ CLAIM_6_CHECKS = ("F6_1", "F6_4")
 # readings are in `upgrade`, read by row 7 (READ_THE_UPGRADE), never required here: an attempt that
 # missed must not make every later pull request's `evals` red. Held from M07_READERS, which wired them.
 CLAIM_7_CHECKS = ("F7_0", "F7_1", "F7_2", "F7_3", "F7_4", "F7_5")
+# What an agent envelope must carry from M08 PR 2 (SPEC/08 section 4): F8_1 to F8_5, from the six fixture
+# tests of S2 to S7 (F8_1 from both the S2 and S3 tests, through both()). Test-only witnesses: each says a
+# reader refused its fixture, not that a drill was run. The live readings are in `drill`, read by row 8
+# (READ_THE_DRILL), never required here: a missed attempt must not make every later pull request's `evals`
+# red. Held from M08_READERS, which wired them. M08 builds no control (ADR-0013): these are the instrument.
+CLAIM_8_CHECKS = ("F8_1", "F8_2", "F8_3", "F8_4", "F8_5")
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -197,6 +203,12 @@ TEMPLATE_READINGS = ("F6_1", "F6_2", "F6_3", "F6_4")
 READ_THE_UPGRADE = {"M07"}
 UPGRADE_READINGS = ("F7_0", "F7_1", "F7_2", "F7_3", "F7_4", "F7_5")
 UPGRADE_BARS = ("arrive_max_seconds", "deploy_max_seconds", "retire_max_seconds")
+# Rows whose claim is read from the game-day drill an envelope keeps in `drill` (SPEC/08 §4, §7). Gated by
+# nothing, but a run not made, a count short of six, a falsifier unread or not held makes the row's reading
+# RED whatever the run's own verdict, as READ_THE_UPGRADE does for row 7. The six attempts' expected
+# reading is refused 4 of 6 and recorded 5 of 6, so row 8 is expected RED (SPEC/08 §7).
+READ_THE_DRILL = {"M08"}
+DRILL_RUNS = ("run1", "run2", "run3", "evidence", "quarantine")
 
 
 class Rejected(Exception):
@@ -349,7 +361,8 @@ def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
     claim_5 = CLAIM_5_CHECKS if descends_from(commit, M05_READERS, root) else ()
     claim_6 = CLAIM_6_CHECKS if descends_from(commit, M06_READERS, root) else ()
     claim_7 = CLAIM_7_CHECKS if descends_from(commit, M07_READERS, root) else ()
-    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6 + claim_7
+    claim_8 = CLAIM_8_CHECKS if descends_from(commit, M08_READERS, root) else ()
+    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6 + claim_7 + claim_8
 
 
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:
@@ -627,7 +640,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
              *, in_the_runtime: bool = False, read_the_swaps: bool = False,
              detection: tuple[float | None, str] | None = None,
              quickstart: tuple[float | None, str] | None = None,
-             upgrade: tuple[dict[str, float] | None, str] | None = None) -> str:
+             upgrade: tuple[dict[str, float] | None, str] | None = None,
+             drill: tuple[float | None, str] | None = None) -> str:
     """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's.
 
     An M00 envelope: its control tallies. From M01: the agent's tallies, then
@@ -656,6 +670,12 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     whose claim is read from `upgrade` (`READ_THE_UPGRADE`): `taken`, each
     falsifier's reading and each miss are named, claim 6's later reading is
     quoted from `template` beside them, and a GREEN run reads RED (M07 PR 2).
+
+    `drill` is N and where it was read, for a row whose claim is read from the
+    game-day drill (`READ_THE_DRILL`): run 1's two counts, each run's reading
+    and each miss are named, and a GREEN run reads RED (M08 PR 2). The six
+    attempts' expected reading is refused 4 of 6 and recorded 5 of 6, so row 8
+    is expected RED (SPEC/08 §7).
     """
     results = envelope["goldens"]
     agent = {g: r for g, r in results.items() if r["scope"] == "agent"}
@@ -676,7 +696,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     held = containment_misses(envelope, *detection) if detection is not None and agent else []
     shipped = template_misses(envelope, *quickstart) if quickstart is not None and agent else []
     upgraded = upgrade_misses(envelope, *upgrade) if upgrade is not None and agent else []
-    if (misses or held or shipped or upgraded) and verdict == "GREEN":
+    drilled = drill_misses(envelope, *drill) if drill is not None and agent else []
+    if (misses or held or shipped or upgraded or drilled) and verdict == "GREEN":
         verdict = "RED"
     parts = [
         *heads,
@@ -692,6 +713,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         *shipped,
         *(upgrade_reading(envelope) if upgrade is not None and agent else []),
         *upgraded,
+        *(drill_reading(envelope) if drill is not None and agent else []),
+        *drilled,
         verdict,
         f"envelope `{envelope['commit']}`",
     ]
@@ -982,6 +1005,58 @@ def upgrade_reading(envelope: dict[str, Any]) -> list[str]:
     return parts
 
 
+def drill_misses(envelope: dict[str, Any], n: float | None, where: str) -> list[str]:
+    """What row 8 finds wrong with the game-day drill an envelope recorded; [] if nothing (SPEC/08 §4, §7).
+
+    build ruled each run on AWS's own records. This holds N again to the one read at the envelope's commit,
+    and holds run 1 to six and six: the two known misses (a2 unread, a3 not refused) stay in the count, so
+    refused 4 of 6 and recorded 5 of 6 are each a miss and row 8 is RED (SPEC/08 §7). A run not made, or a
+    falsifier not held, is a miss; a run unread reads as not read, not as held."""
+    reading = envelope.get("drill")
+    if reading is None:
+        return ["drill not read: the envelope records no run"]
+    misses = []
+    if n is None:
+        misses.append(f"no detection.max_seconds in thresholds.yaml at {where}: N cannot be read")
+    elif reading.get("max_seconds") != n:
+        misses.append(f"drill was read against N {reading.get('max_seconds')}, the commit's is {n} ({where})")
+    run1 = reading["run1"]
+    if not run1["read"]:
+        misses.append(f"run 1 not made: {'; '.join(run1['reasons'][:2]) or 'no reason recorded'}")
+    else:
+        if run1["refused"] != len(DRILL_ATTEMPTS):
+            misses.append(f"run 1: refused {run1['refused']} of {len(DRILL_ATTEMPTS)}, not all six")
+        if run1["recorded"] != len(DRILL_ATTEMPTS):
+            misses.append(f"run 1: recorded {run1['recorded']} of {len(DRILL_ATTEMPTS)}, not all six")
+        if run1["held"] is not True:
+            misses.append(f"run 1 not held: {'; '.join(run1['reasons'][:3])}")
+    for name in DRILL_RUNS[1:]:  # run1 is read above with its counts; the other four are read or not, held or not
+        one = reading[name]
+        if not one["read"]:
+            misses.append(f"{name} not read: {'; '.join(one['reasons'][:2]) or 'no reason recorded'}")
+        elif one["held"] is not True:
+            misses.append(f"{name} not held: {'; '.join(one['reasons'][:3]) or 'no reason recorded'}")
+    return misses
+
+
+# The six attempts run 1 makes (SPEC/08 §2): a count short of six is a miss, which row 8 is expected to read.
+DRILL_ATTEMPTS = ("a1", "a2", "a3", "a4", "a5", "a6")
+
+
+def drill_reading(envelope: dict[str, Any]) -> list[str]:
+    """Each run in the Measured cell, as the envelope recorded it: printed; the misses decide."""
+    reading = envelope.get("drill")
+    if reading is None:
+        return []
+    run1 = reading["run1"]
+    state = "not made" if not run1["read"] else ("held" if run1["held"] else "not held")
+    parts = [f"run 1 {state} (refused {run1['refused']}/{len(DRILL_ATTEMPTS)}, recorded {run1['recorded']}/{len(DRILL_ATTEMPTS)})"]
+    for name in DRILL_RUNS[1:]:
+        one = reading[name]
+        parts.append(f"{name} " + ("not read" if not one["read"] else ("held" if one["held"] else "not held")))
+    return parts
+
+
 def latest(history_dir: Path = HISTORY) -> Path | None:
     """The envelope for the nearest commit at or behind HEAD."""
     have = {p.stem: p for p in replay_history.envelope_paths(history_dir)}
@@ -1064,7 +1139,8 @@ def measured_at(path: Path, history_dir: Path = HISTORY, *, milestone: str | Non
                     read_the_swaps=milestone in READ_THE_SWAPS,
                     detection=detection_at(envelope["commit"]) if milestone in READ_THE_CONTAINMENT else None,
                     quickstart=quickstart_at(envelope["commit"]) if milestone in READ_THE_TEMPLATE else None,
-                    upgrade=upgrade_bars_at(envelope["commit"]) if milestone in READ_THE_UPGRADE else None)  # fmt: skip
+                    upgrade=upgrade_bars_at(envelope["commit"]) if milestone in READ_THE_UPGRADE else None,
+                    drill=detection_at(envelope["commit"]) if milestone in READ_THE_DRILL else None)  # fmt: skip
 
 
 def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> str | None:

@@ -125,7 +125,6 @@ def test_s1_the_manifest_omits_one_vpc_endpoint_and_keeps_ecr():
 RUN1_WHAT = "nothing reads a drill's attempts"
 
 
-@expected_failure
 def test_s2_a_silent_attempt_is_read_as_unread():
     """Run 1's observation names five attempts, not six: a6 has no entry. `drill.run1(observation,
     max_seconds)` must read six expected and name the missing one as unread (F8.1), as
@@ -139,7 +138,6 @@ def test_s2_a_silent_attempt_is_read_as_unread():
     assert "a6" in " ".join(entry["reasons"]), entry["reasons"]
 
 
-@expected_failure
 def test_s3_an_answered_attempt_is_read_as_not_refused():
     """Run 1's observation with a4 answered: the trail's S3 data event has no errorCode and the object is
     under agents/refagent/. `drill.run1` must read it as not held and name a4 (F8.1). The expected run 1
@@ -159,7 +157,6 @@ def test_s3_an_answered_attempt_is_read_as_not_refused():
 # --- S4: run 2's second layer, read by drill.run2 -----------------------------
 
 
-@expected_failure
 def test_s4_run_2_is_refused_when_the_rule_held_or_the_record_is_late():
     """Run 2 is held only when a1's connect completed (the flow reads ACCEPT, so the rule was removed) AND
     IAM refused it in the trail, both within N. `drill.run2(observation, max_seconds)` must refuse the case
@@ -180,7 +177,6 @@ def test_s4_run_2_is_refused_when_the_rule_held_or_the_record_is_late():
 # --- S5: run 3 fires a control, read by drill.run3 ----------------------------
 
 
-@expected_failure
 def test_s5_run_3_is_refused_on_a_refusal_or_a_red_verdict():
     """Run 3 is clean only when its answer record is GREEN, no refusal by the role and no REJECT flow in its
     window, and its registry row is read. `drill.run3(observation)` must refuse the case with an AccessDenied
@@ -201,7 +197,6 @@ def test_s5_run_3_is_refused_on_a_refusal_or_a_red_verdict():
 # --- S6: the evidence is not complete, read by drill.evidence -----------------
 
 
-@expected_failure
 def test_s6_incomplete_evidence_is_found_by_drill_evidence():
     """Five faults in one run's records: one doubled (two versions), one written after its run closed plus
     N, one with no retention, one missing, and an unnamed refusal by the role in the window. `drill.evidence
@@ -224,7 +219,6 @@ def test_s6_incomplete_evidence_is_found_by_drill_evidence():
 # --- S7: the quarantine leaves the role able to act, read by drill.quarantine -
 
 
-@expected_failure
 def test_s7_the_quarantine_is_read_against_the_role():
     """After the attach, a call by the hostile copy's role that was answered fires F8.5; and a window with no
     refused call by that role reads unread, as M05's S7 read for refagent (the deny-all may refuse the agent
