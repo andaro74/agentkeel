@@ -118,6 +118,22 @@ F7_4_CASES := test_s4_a_panel_2_query_that_computes_the_verdict_is_refused,test_
 F7_5_CASES := test_s5_a_silent_surface_plant_is_counted
 UPGRADE_OBS ?=
 APP_OBS ?=
+# M08 PR 2 (SPEC/08 section 4). F8_1 to F8_5: each fixture of S2 to S7 refused by
+# its own reader in src/verdict/drill.py, read from the six fixture tests;
+# test-only witnesses, the only claim 8 checks on an envelope. F8_1 reads both
+# S2 (a silent attempt) and S3 (an answered attempt), which must both pass. The
+# three run-file tests are in no list: they read what the human filled, and stay
+# expected failures until each run is recorded (PR 3). The live records are
+# DRILL_OBS, scripts/observe_drill.py's reading of the audit bucket, the trail,
+# the flow records, the answer record, the registry and panel 1: build rules
+# them into `drill`, and only the ledger's row 8 reading reads it. M08 builds no
+# control (ADR-0013): these readers are the instrument.
+F8_1_CASES := test_s2_a_silent_attempt_is_read_as_unread,test_s3_an_answered_attempt_is_read_as_not_refused
+F8_2_CASES := test_s4_run_2_is_refused_when_the_rule_held_or_the_record_is_late
+F8_3_CASES := test_s5_run_3_is_refused_on_a_refusal_or_a_red_verdict
+F8_4_CASES := test_s6_incomplete_evidence_is_found_by_drill_evidence
+F8_5_CASES := test_s7_the_quarantine_is_read_against_the_role
+DRILL_OBS ?=
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \
           $(if $(F0_3_OBS),--check-pr F0_3 "$(F0_3_OBS)") \
           $(if $(JUNIT),--check-cases F1_1 "$(F1_1_CASES)" "$(JUNIT)") \
@@ -146,6 +162,11 @@ CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)")
           $(if $(JUNIT),--check-cases F7_3 "$(F7_3_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F7_4 "$(F7_4_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F7_5 "$(F7_5_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F8_1 "$(F8_1_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F8_2 "$(F8_2_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F8_3 "$(F8_3_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F8_4 "$(F8_4_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F8_5 "$(F8_5_CASES)" "$(JUNIT)") \
           $(if $(RUN_URL),--run-url "$(RUN_URL)")
 # CI passes a file path; the gate's exit code is written there, so a REJECTED
 # envelope (exit 2) is told from a RED one and is not recorded (M01 item 9).
@@ -178,7 +199,7 @@ define chain
 	$(if $(A_VS_A),-uv run python -m src.agent.run --out $(1)/$(2).agent-raw-b.json --recheck-runtime)
 	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json $(A_VS_A_RUNS)
 	$(if $(SWAPS_OBS),uv run python scripts/rule_swaps.py "$(SWAPS_OBS)" --out "$(SWAPS_RULED)")
-	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)") $(if $(TEMPLATE_OBS),--template "$(TEMPLATE_OBS)") $(if $(UPGRADE_OBS),--upgrade "$(UPGRADE_OBS)" $(if $(JUNIT),--surfaces "$(JUNIT)")) $(if $(APP_OBS),--app-observation "$(APP_OBS)")
+	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)") $(if $(TEMPLATE_OBS),--template "$(TEMPLATE_OBS)") $(if $(UPGRADE_OBS),--upgrade "$(UPGRADE_OBS)" $(if $(JUNIT),--surfaces "$(JUNIT)")) $(if $(APP_OBS),--app-observation "$(APP_OBS)") $(if $(DRILL_OBS),--drill "$(DRILL_OBS)")
 	uv run python -m src.verdict.gate $(1)/$(2).json; code=$$?; $(if $(GATE_EXIT),echo $$code > "$(GATE_EXIT)";) exit $$code
 endef
 else

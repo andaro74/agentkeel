@@ -47,9 +47,10 @@
 # Rewritten at M07 PR 3 after the seat reviews: observe.yml's header says what is still read from an agent repository beside the App's tokens, and that each token is revoked (cold review N4, security-reviewer 14). No step changes.
 # Rewritten at M07 PR 3 after the seat reviews: platform-upgrade.yml's header says text, not bytes (security-reviewer 9). No step changes.
 # M07 PR 4 (item 13n): platform-check.yml loses the seeded relaxation's dispatch input and step, made once on 2026-10-03 (run 37123843294). Security, rulings/pr4-security.md.
+# Rewritten at M08 PR 2 (SPEC/08 §4): evals.yml gains one step that runs scripts/observe_drill.py on the three M08 run files in the security account, and hands make evals DRILL_OBS. Security, rulings/pr2-security.md.
 bedf184401fe99b3e2e3d893c3e7e3569f7dc6eecc689d8585b12fd5ffb98d48  .github/workflows/cold-review-ruling.yml
 865b89ef9ce12d39cf923f274da9f5fc988725e8c0b2b35c57918216fcf03d82  .github/workflows/deploy.yml
-2801eb4da8a685088687f046b9ad6a461a352978e74e9f13e49ef2bcd420af7b  .github/workflows/evals.yml
+f5fa654806198ffde8a2ff7da1d303ea99047a5350c5ba4f6efea679671259d7  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 977005d6918897772b83d279230d5febb4c3c35150d0037d08ed139af8727414  .github/workflows/model-watch.yml
 33550c4d1d9d15db10dbf6409d679856084f178179fe45004b219c774750fd0a  .github/workflows/observe.yml

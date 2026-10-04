@@ -696,6 +696,70 @@
         }
       }
     },
+    "drill": {
+      "description": "From M08 PR 2 (SPEC/08 §4, §6). The game-day drill's three runs as scripts/observe_drill.py read the audit bucket, the trail, the flow records, the answer record, the registry and panel 1, and verdict.build (src/verdict/drill.py) ruled on them: run 1's six attempts (each refused and recorded apart, with the two counts n of 6 and m of 6), run 2's second layer, run 3's answer record, run 1's evidence, and the quarantine against the hostile copy's role, each read or not and held or not with its reasons. M08 builds no control (ADR-0013): this is the instrument. The gate rules nothing on it; the ledger's row 8 reading (gate.drill_misses) is the measurement. Optional, so no envelope before it becomes invalid.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["looked_up_at", "max_seconds", "readable", "run1", "run2", "run3", "evidence", "quarantine"],
+      "properties": {
+        "looked_up_at": {"type": ["string", "null"]},
+        "max_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "readable": {"type": "boolean"},
+        "run1": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "refused", "recorded"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "refused": {"type": "integer", "minimum": 0},
+            "recorded": {"type": "integer", "minimum": 0}
+          }
+        },
+        "run2": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "run3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "goldens"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "goldens": {"type": "object", "additionalProperties": {"type": ["boolean", "null"]}}
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "quarantine": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    },
     "swaps": {
       "description": "From M04 PR 3 (SPEC/04 §4). The M04 swap PRs as scripts/rule_swaps.py read them: GitHub's record of each pull and the gate's verdict on that pull's own envelope. Recorded, never gated (Product, M04 PR 3). Optional, so no envelope before it becomes invalid.",
       "type": "array",
