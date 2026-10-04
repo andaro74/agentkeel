@@ -1030,7 +1030,7 @@ def drill_misses(envelope: dict[str, Any], n: float | None, where: str) -> list[
             misses.append(f"run 1: recorded {run1['recorded']} of {len(DRILL_ATTEMPTS)}, not all six")
         if run1["held"] is not True:
             misses.append(f"run 1 not held: {'; '.join(run1['reasons'][:3])}")
-    for name in ("run2", "run3", "evidence", "quarantine"):
+    for name in DRILL_RUNS[1:]:  # run1 is read above with its counts; the other four are read or not, held or not
         one = reading[name]
         if not one["read"]:
             misses.append(f"{name} not read: {'; '.join(one['reasons'][:2]) or 'no reason recorded'}")
@@ -1051,7 +1051,7 @@ def drill_reading(envelope: dict[str, Any]) -> list[str]:
     run1 = reading["run1"]
     state = "not made" if not run1["read"] else ("held" if run1["held"] else "not held")
     parts = [f"run 1 {state} (refused {run1['refused']}/{len(DRILL_ATTEMPTS)}, recorded {run1['recorded']}/{len(DRILL_ATTEMPTS)})"]
-    for name in ("run2", "run3", "evidence", "quarantine"):
+    for name in DRILL_RUNS[1:]:
         one = reading[name]
         parts.append(f"{name} " + ("not read" if not one["read"] else ("held" if one["held"] else "not held")))
     return parts

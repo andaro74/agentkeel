@@ -229,8 +229,6 @@ def quarantine(observation: dict[str, Any]) -> dict[str, Any]:
 
 # --- the whole drill, for build ------------------------------------------------
 
-READERS = ("run1", "run2", "run3", "evidence", "quarantine")
-
 
 def record(observation: dict[str, Any], max_seconds: float) -> dict[str, Any]:
     """`scripts/observe_drill.py`'s observation, ruled into the envelope's `drill` (SPEC/08 §4).
