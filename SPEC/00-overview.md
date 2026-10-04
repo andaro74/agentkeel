@@ -613,13 +613,19 @@ code, so it passes; that is stated here, not found later.
    itself (SPEC/05 §8); the time from the first attempt to the attach is
    recorded and held to no bar.
    **Stated at open, from what is already measured or ruled:** the
-   internet attempt is expected refused and not recorded (the missing
-   route leaves no flow record, row 5), and the made-up key is expected
-   to reach the answer (no filter on tool results was built, §12), where
-   `build` reads it on the answer record. Both stay in the count. So
-   run 1 is expected to read under six of six, and row 8 is expected to
-   close RED on those two. The other four have never been attempted from
-   inside a runtime; what they read is not known.
+   outbound request is expected **unread on both halves** — the missing
+   route drops the packet before any rule sees it, so no flow record and
+   no trail event is made, and the only witness that it was refused
+   would be the hostile copy's own log, which reads nothing (P5; row 5's
+   finding, where row 5's cell reads "S1 not shown refused ...
+   unrecorded"). The made-up key is expected to **reach the answer**, not
+   refused, because no filter on tool results was built (§12), and to be
+   recorded, because `build` reads it on the answer record. Both stay in
+   the count. So run 1 is expected to read **refused four of six and
+   recorded five of six**, and row 8 is expected to close RED on those
+   two. The other four have never been attempted from inside a runtime;
+   each has a stated expected reading, and which control answers two of
+   them, and every latency, are not stated.
 2. **Control NO-GO.** One control removed for the hostile copy alone, by
    the Security seat under a ruling in a pull request: the egress rule
    that keeps its security group from an endpoint its manifest does not
@@ -652,10 +658,13 @@ run; Act 5 captured during it. (3) Runs 2 and 3, each stated first, with
 the remove and the restore under Security's ruling, read by PR 3's run
 (a named P3 exception); and whatever the cold review of PR 2 found.
 (4) Close: three attestations, `milestones/M08/runs/drill-key.txt` (the
-audit objects row 8's cell rests on: key, version, last modified),
-compliance map rows filled with evidence paths,
-`docs/developer/incident.md`, `docs/milestones/M08.md` and video, Act 5,
-`docs/story.md`, tag `m08`. Then building stops.
+audit objects row 8's cell rests on: key, version, last modified, and
+the lock each carries as read), compliance map rows filled with evidence
+paths, `docs/milestones/M08.md` and video, Act 5, `docs/story.md`, tag
+`m08`. Then building stops. **`docs/developer/incident.md` is PR 2's,
+not PR 4's** (amended at M08 PR 1): run 1's quarantine is attached by
+hand following it, and that happens in PR 2. PR 4 fills its evidence
+paths with what the runs left.
 Produces: the incident runbook (detect → quarantine → forensics →
 restore), the lock read on every record row 8 rests on (F8.4; one day,
 R5), and real evidence links on the compliance page.
@@ -1007,8 +1016,15 @@ code path). Each is named so that no document describes it as working.
   gateway; credentials only via Identity; the per-agent Budgets filter;
   the nightly declared-vs-observed graph diff; k6; Promptfoo as the
   red-team runner; the CLI (`agent upgrade`, `agent evals --local`, P11).
-- The Rule Owner's filter on tool results. **Not measured in this
-  project**: S5 of SPEC/05's live half.
+- The Rule Owner's filter on tool results. Nothing refuses a credential
+  in a tool result, at M05 or ever.
+  Amended at M08 PR 1 (`milestones/M08/rulings/pr1.md`; SPEC/08 §2): the
+  **filter** is not built, and S5 of SPEC/05's live half **is** made at
+  M08, by the hostile copy's third attempt. What is measured there is
+  what the platform does with a key it was handed: the key reaches the
+  answer, nothing refused it, and `build` reads it on the answer record
+  in the security account. That attempt counts as recorded and not
+  refused (§8 M08).
 - Grafana panels 3 and 4, described in `docs/platform/surfaces.md` only.
 - Playwright (§13): no surface is asserted as rendered.
 
@@ -1045,3 +1061,30 @@ compliance page links to evidence for every control it names,
 `quickstart.md` carries a measured time under one day,
 `docs/milestones/` holds nine explainers and nine videos, `docs/story.md`
 exists, and `git tag m08` exists on `main`.
+
+Amended at M08 PR 1 (`milestones/M08/rulings/pr1.md`;
+`product-spec-reviewer` finding 8 on SPEC/08). M08 is the last
+milestone, so this is the last place this section can be made true.
+Three of its clauses are not met and are not moved to fit:
+
+- **"At least seven are GREEN" is not met and was unreachable from
+  M06's close.** Rows 0, 2 and 3 are GREEN; rows 1, 4, 5, 6 and 7 are
+  RED; row 8 is expected RED (§8 M08). The bar of seven was written
+  before any milestone ran. What this project leaves instead is a
+  measured value on every row and a ruling file on every RED one, which
+  the clauses above already ask for. The number is recorded, not raised
+  and not lowered.
+- **`docs-current` is not built.** §10.4 describes a check that is in no
+  `validate` run and in no script (`milestones/M08/open.md` row 63). Its
+  four conditions are read by hand at each close, by `docs-writer` from
+  M07; M08's close is the last such reading, and it says so.
+- **Acts 1 to 6 are not six.** Act 1 was not captured during the one
+  timed run and is not remade (§10.5); Acts 2, 3, 4 and 6 were not
+  recorded. Act 5 is M08's and is captured during run 1. So one act is
+  committed, and §10.2's table says of each what became of it.
+
+Met as written: `quickstart.md`'s measured time (3,615 s, once, M07);
+nine explainers; nine milestone videos, M08's ruled at M08's close; the
+ledger page generated; a ruling file per pull request. The compliance
+page lists the controls that fired with their evidence paths and the
+rest under "Not evidenced" (SPEC/08 §9 may leave those rows unfilled).
