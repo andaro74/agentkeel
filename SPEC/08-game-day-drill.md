@@ -168,14 +168,28 @@ halves, and the key in a tool result is recorded and not refused.
   policy, `agentkeel-budget-stop`, to the **eval role** only
   (`bootstrap/app.py:1289-1302`). So the time from the first attempt to
   the attach is a person's reaction time: it is recorded and **held to no
-  bar**.
-- **Why F8.5 can be read here, where M05's S7 could not.** Under the
-  deny-all, refagent reached no model and made no call the trail records,
-  so its refusal was invisible (M05 `rulings/pr3.md` ruling 1). The
-  hostile copy makes a1, a4, a5 and a6 on every invocation, and four of
-  those are calls this trail records (management events, and S3 data
-  events on `agents/`). So a refused call by its role is expected in the
-  trail, and F8.5 has something to read.
+  bar**. **The lookup command names `agentkeel-refagent`** (`infra/audit/
+  README.md:36-39`); run 1 quarantines the hostile copy, so the on-call
+  substitutes `agentkeel-drill-agent` for that stack name before running
+  it (incident-responder finding 1). Quarantining refagent would leave
+  the hostile copy acting and give F8.5 no call of the right role to
+  read. The runbook says so, and Security reconciles the README before
+  run 1.
+- **What F8.5 reads, and its hazard** (incident-responder finding 2).
+  F8.5 reads, after the attach: no call by the hostile copy's role is
+  answered, and a refused call by that role is in the trail. The hostile
+  copy makes a1, a4, a5 and a6 on every invocation, four of them calls
+  this trail records, so a refused call by its role is **expected**. But
+  under a role-wide deny-all the runtime may not start at all — it cannot
+  pull its image, write its logs or call its model — and then `agent.py`'s
+  attempts never run and no call by that role reaches the trail, exactly
+  as refagent reached no model at M05's S7 (`rulings/pr3.md` ruling 1).
+  So the expected reading carries a hazard: the quarantined invocation
+  may leave **no refused call to read**, which reads as F8.5 unread, not
+  held and not fired. That is the measurement; it is stated here so a
+  miss is read as the finding it is, and the runbook (§2) carries the
+  caveat. If F8.5 reads unread for this reason, row 8 is RED on it with
+  that as the finding, as row 5 closed RED on S7.
 - **N.** R10's 600 s, `thresholds.yaml` `detection.max_seconds`,
   `relaxes: up`. **No bar is added at M08** and none is moved. The
   quarantine's reaction time and run 3's deploy have no bar.
@@ -294,7 +308,11 @@ planned at open).
   request, and PR 2 and PR 3 can merge with it in them.
 - **Which run the cell cites.** PR 3's run's envelope: runs 2 and 3 are
   made after PR 2 merges and are read by PR 3's run (§5.1, a named P3
-  exception). Run 1 is read by PR 2's run and again by PR 3's.
+  exception). Run 1's attempts are read by PR 2's run and again by PR
+  3's; run 1's evidence (F8.4) is read only at PR 3's run, after the
+  detach closes it (§5.1). If the platform's own deploy path needs a
+  repair, run 3 is read by PR 4's run and the cell cites that (§5.1, the
+  second named P3 exception).
 - **A human-written file feeds no reading by itself**, and neither does
   the hostile copy's own log (§2).
 - **P5.** `tests/test_p5_disagree.py` gains a case for each new check.
@@ -358,8 +376,15 @@ AWS. Nothing live can be read before PR 2 merges.
   2. **Run 1.** `deploy.yml` invokes it once per golden. Act 5 is
      captured during it, unedited (§10.2; Act 1's loss is the lesson).
   3. The on-call attaches the quarantine by hand, following
-     `docs/developer/incident.md`, and invokes the runtime once.
-  4. PR 2's run records run 1 and the quarantine.
+     `docs/developer/incident.md` (substituting the drill-agent stack,
+     §2), and invokes the runtime once.
+  4. PR 2's run records run 1's attempts and the quarantine. **Run 1's
+     evidence (F8.4) is not read at PR 2's run** (incident-responder
+     finding 3): run 1 closes at the detach, which is after PR 2 merges,
+     so there is no close to compare a record's last write against until
+     then. `drill.evidence` of run 1 is read at PR 3's run, with runs 2
+     and 3. The gate at PR 2 rests on S6's fixture test, not on a live
+     reading, so it is not waiting on the close.
 - **After PR 2 merges.** The quarantine is detached, which closes run 1.
   Then **run 2**: the owner adds one egress rule to the hostile copy's
   security group alone, to the KMS endpoint's group on tcp 443, under a
