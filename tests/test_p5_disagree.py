@@ -259,4 +259,5 @@ def test_build_holds_a_drill_and_row_8_reads_it_again_at_the_commits_n():
 
 
 def test_the_gate_requires_f8_checks_from_m08s_readers_and_not_before():
+    assert {"F8_1", "F8_2", "F8_3", "F8_4", "F8_5"} <= set(gate.required_checks("HEAD"))
     assert "F8_1" not in gate.required_checks("1083722")  # M08 PR 1's merge, before the readers

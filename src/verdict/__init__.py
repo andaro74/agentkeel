@@ -205,9 +205,8 @@ M07_READERS = "eed43f5"
 # The commit that wired claim 8's five checks, F8_1 to F8_5 from the six fixture tests of S2 to S7, into
 # the Makefile (M08 PR 2; SPEC/08 section 4). The gate requires them from here. Named in the commit after
 # it, as M05's, M06's and M07's were. On PR 2's branch, and main keeps it because pull requests land as
-# merge commits (ADR-0004 amendment 1). Until that follow-up commit it is a placeholder git cannot place,
-# so claim 8 is required of no envelope: `descends_from` is False for an anchor git does not know.
-M08_READERS = "0000000000000000000000000000000000000000"
+# merge commits (ADR-0004 amendment 1). Named here, in the commit after it, so no later PR has to set it.
+M08_READERS = "91be2c298ba0"
 
 
 def descends_from(commit: str, anchor: str, root: Path = ROOT) -> bool:
