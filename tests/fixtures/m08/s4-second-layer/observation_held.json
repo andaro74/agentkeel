@@ -1,0 +1,11 @@
+{
+  "run": "run2",
+  "attempt": "a1",
+  "window": {"opened": "2026-10-21T10:00:00Z", "closed": "2026-10-21T10:15:00Z"},
+  "flow": {"found": true, "flow_action": "ACCEPT",
+    "key": "AWSLogs/581208540944/vpcflowlogs/2026/10/21/a1.log.gz",
+    "event_time": "2026-10-21T10:00:05Z", "last_modified": "2026-10-21T10:03:00Z",
+    "eni": "eni-0abc", "destination": "10.20.0.242"},
+  "iam": {"found": true, "error_code": "AccessDenied", "event_name": "ListKeys", "request_id": "r-a1",
+    "event_time": "2026-10-21T10:00:06Z", "last_modified": "2026-10-21T10:04:00Z"}
+}

@@ -1,0 +1,8 @@
+{
+  "run": "run3",
+  "window": {"opened": "2026-10-22T10:00:00Z", "closed": "2026-10-22T10:30:00Z"},
+  "answer_record": {"verdict": "GREEN", "goldens": {"g-001": {"pass": true}, "g-010": {"pass": true}}},
+  "refusals": [],
+  "rejected_flows": [],
+  "registry_row_in_panel1": true
+}

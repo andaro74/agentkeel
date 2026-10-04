@@ -1,0 +1,20 @@
+{
+  "run": "run1",
+  "repository": "agentkeel-studio/drill-agent",
+  "window": {"opened": "2026-10-20T10:00:00Z", "closed": "2026-10-20T10:20:00Z"},
+  "attempts": [
+    {"id": "a1", "refused": true, "record": {"found": true, "kind": "flow", "flow_action": "REJECT",
+      "key": "AWSLogs/581208540944/vpcflowlogs/2026/10/20/a1.log.gz",
+      "event_time": "2026-10-20T10:00:05Z", "last_modified": "2026-10-20T10:03:00Z",
+      "eni": "eni-0abc", "destination": "10.20.0.242"}},
+    {"id": "a2", "refused": null, "record": {"found": false}},
+    {"id": "a3", "refused": false, "reached_answer": true, "record": {"found": true, "kind": "answer",
+      "key": "envelopes/agents/drill-agent/abc123.json", "last_modified": "2026-10-20T10:02:00Z"}},
+    {"id": "a4", "refused": true, "attributed": false, "record": {"found": true, "kind": "trail",
+      "event_name": "PutObject", "error_code": "AccessDenied", "request_id": "r-a4",
+      "event_time": "2026-10-20T10:00:06Z", "last_modified": "2026-10-20T10:04:00Z"}},
+    {"id": "a5", "refused": true, "record": {"found": true, "kind": "trail",
+      "event_name": "DeleteLogStream", "error_code": "AccessDenied", "request_id": "r-a5",
+      "event_time": "2026-10-20T10:00:07Z", "last_modified": "2026-10-20T10:04:30Z"}}
+  ]
+}
