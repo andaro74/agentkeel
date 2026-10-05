@@ -100,3 +100,18 @@ Reports pasted in `rulings/pr3-engineering.md` and the PR body.
   a3), plus any unnamed refusal the observer finds. Seat: Product (names
   the records), Engineering (the reader runs). Recorded under the M08
   decision rule.
+- **The by-hand CLI invocation 404'd on both the quarantine run (run 1,
+  00:52:06Z) and the egress-rule run (run 2, 03:27:36Z).** AWS CLI
+  2.37.4's `aws bedrock-agentcore invoke-agent-runtime` returned
+  UnknownOperationException 404 at the data-plane endpoint on this box,
+  while the Python SDK (deploy.yml, 00:48:03Z) worked. Likely cause: the
+  invocation shape the CLI used (missing `--qualifier`, or the ARN
+  segment resolution) left the request on the wrong endpoint path.
+  **Recommendation: stand as-is.** Row 8's state is unchanged (still
+  RED), SPEC/08 §5.1 "each run is made once" refuses a retake, and run 3
+  does not need by-hand invocation (deploy.yml uses the Python SDK). The
+  reading surfaces two findings worth writing down (the deny-all is not
+  the one that fired on F8.5, and the egress-rule layer F8.2 reads
+  unread). Seat: Product (the reading), Engineering (the by-hand step).
+  Recorded under the M08 decision rule; undone by a retake flow and a
+  CLI incantation we have not confirmed.

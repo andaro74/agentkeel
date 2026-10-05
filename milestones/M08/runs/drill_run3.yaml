@@ -12,4 +12,24 @@
 seed: run3
 repository: agentkeel-studio/drill-agent
 clean_when: "the answer record verdict is GREEN, no refusal by the role and no REJECT flow in the window, and the registry row is read through panel 1"
+# Pushed at M08 PR 3 before the owner merges drill-agent#2 (the recovery
+# PR: six attempts removed from agent.py and `kms` added to
+# endpoint_allowlist). deploy.yml's next schedule tick (or dispatch) picks
+# up the new HEAD, redeploys, and asks the two goldens. That merge+deploy
+# is run 3's "go". The invocation uses the Python SDK, not the CLI, so the
+# run 1 / run 2 CLI 404 does not bite here.
+expected:
+  pushed_at: 2026-10-05
+  pushed_before: "the owner's drill-agent#2 merge (the recovery PR)"
+  statement: "the recovered hostile copy answers as any agent: the answer record reads GREEN, no refusal by its role and no REJECT flow from its interfaces in run 3's window, and its registry row is read (through the registry table directly if the Grafana observer token is not renewed by 2026-10-31, SPEC/08 §9 cut 1; see pr3.md Unsure)"
+  per_arm:
+    answer_verdict: "GREEN — build.compose_answer any() rule; one of the two goldens passing is enough"
+    both_goldens_pass: "RECORDED but gates nothing; the explainer at PR 4 says how many of two passed (SPEC/08 §2 finding 3)"
+    role_refusals_in_window: "zero (the attempts are gone)"
+    reject_flows_in_window: "zero (kms is declared, so the SG opens one egress rule to its endpoint; a1 would ACCEPT, but a1 is not attempted post-recovery, so the flow records should be routine)"
+    registry_row_in_panel1: "unread via panel 1 (the Grafana token's status at PR 4 close determines read method); read via the registry table directly per SPEC/08 §9 cut 1 as the recommendation stands"
+  not_stated:
+    - "every latency"
+    - "which model was used for the answer (refagent's pin flows through the template)"
+    - "whether run 3's answer differs from refagent's own on the same goldens (equivalence is not F8.3's third arm)"
 observed: null
