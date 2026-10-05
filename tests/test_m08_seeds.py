@@ -253,6 +253,10 @@ def test_run2_was_made():
     assert made(run_file("drill_run2.yaml", "run2"))
 
 
-@expected_failure
 def test_run3_was_made():
+    # Marker off at M08 PR 3: run 3's observed block was filled on 2026-10-05
+    # after the owner merged the recovery (drill-agent#4) and it was deployed
+    # and asked its goldens (drill_run3.yaml, SPEC/08 §5.1, the second named
+    # P3 exception). The record is MEASURED and RED (the drill-agent fixture
+    # finding, recorded in the run file), which is the reading, not the plant.
     assert made(run_file("drill_run3.yaml", "run3"))
