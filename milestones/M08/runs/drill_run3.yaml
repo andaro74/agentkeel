@@ -12,15 +12,17 @@
 seed: run3
 repository: agentkeel-studio/drill-agent
 clean_when: "the answer record verdict is GREEN, no refusal by the role and no REJECT flow in the window, and the registry row is read through panel 1"
-# Pushed at M08 PR 3 before the owner merges drill-agent#2 (the recovery
-# PR: six attempts removed from agent.py and `kms` added to
-# endpoint_allowlist). deploy.yml's next schedule tick (or dispatch) picks
-# up the new HEAD, redeploys, and asks the two goldens. That merge+deploy
-# is run 3's "go". The invocation uses the Python SDK, not the CLI, so the
-# run 1 / run 2 CLI 404 does not bite here.
+# Pushed at M08 PR 3 before the owner merges drill-agent#4 (the recovery
+# PR: six attempts removed from agent.py, which is restored to the template
+# inlined verbatim and flat, and `kms` added to endpoint_allowlist).
+# drill-agent#2 was the first attempt's recovery, superseded here; the
+# retake's recovery is #4. deploy.yml's next schedule tick (or dispatch)
+# picks up the new HEAD, redeploys, and asks the two goldens. That
+# merge+deploy is run 3's "go". The invocation uses the Python SDK, not the
+# CLI, so the run 1 / run 2 CLI 404 does not bite here.
 expected:
   pushed_at: 2026-10-05
-  pushed_before: "the owner's drill-agent#2 merge (the recovery PR)"
+  pushed_before: "the owner's drill-agent#4 merge (the recovery PR)"
   statement: "the recovered hostile copy answers as any agent: the answer record reads GREEN, no refusal by its role and no REJECT flow from its interfaces in run 3's window, and its registry row is read (through the registry table directly if the Grafana observer token is not renewed by 2026-10-31, SPEC/08 §9 cut 1; see pr3.md Unsure)"
   per_arm:
     answer_verdict: "GREEN — build.compose_answer any() rule; one of the two goldens passing is enough"
