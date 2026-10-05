@@ -56,22 +56,36 @@ observed:
     referenced_group_id: "sg-01b80a6e3c1600fd9"   # KMS_SG
     protocol: tcp
     port: 443
+    # The authorize/revoke console output (2>&1), as rulings/pr3-security.md
+    # requires it be transcribed here:
+    authorize_returned: "Return: true; SecurityGroupRuleId sgr-071300307a9132ebe (egress, tcp 443, referenced sg-01b80a6e3c1600fd9) at 14:28:08Z"
+    revoke_returned: "Return: true; RevokedSecurityGroupRules sgr-071300307a9132ebe at 14:28:40Z"
   invocation:
-    at: "2026-10-05T14:28:32Z"
+    # The Python SDK invoke_agent_runtime call. `returned_at` is when the 200
+    # response came back and the one-liner printed; the call was in flight
+    # from a few seconds before, which is when the runtime composed the
+    # answer and a1 fired — hence a1's IAM event at 14:28:22Z, before the
+    # return. The attempt time of record is a1_iam.at, not this field.
+    returned_at: "2026-10-05T14:28:32Z"
     result: "200 (Python SDK invoke_agent_runtime; the agent answered, so a1 fired with egress open)"
   second_layer:
-    # F8.2's two halves, both read within N (the 32 s window is well inside N=600 s):
+    # F8.2's two halves. The authoritative attempt time is a1_iam.at
+    # (14:28:22Z), inside the egress window 14:28:08-14:28:40Z. a1_flow's
+    # times are VPC flow-log CAPTURE-WINDOW boundaries (~60 s aggregation),
+    # not packet times, so the window start (14:28:06Z) can precede the
+    # egress add; the connection itself is the 14:28:22Z call. Both halves
+    # are well within N=600 s.
+    a1_iam:
+      event: ListKeys
+      error: AccessDenied
+      at: "2026-10-05T14:28:22Z"            # the attempt (authoritative)
+      by: "agentkeel-drill-agent-AgentRole9D587F56-xjMSK91vrWoR"
     a1_flow:
       action: ACCEPT
       path: "drill ENI 10.20.1.55 -> KMS endpoint 10.20.1.24 :443"
       enis: ["eni-06666a876d629c16b", "eni-0ac00b7e4da68b771"]
       bytes: "4465 out / 8032 in (full TLS exchange)"
-      at: "2026-10-05T14:28:06Z"
-    a1_iam:
-      event: ListKeys
-      error: AccessDenied
-      at: "2026-10-05T14:28:22Z"
-      by: "agentkeel-drill-agent-AgentRole9D587F56-xjMSK91vrWoR"
+      capture_window: "14:28:06-14:28:46Z (VPC flow-log aggregation boundary, not the packet time; the packet is the 14:28:22Z call)"
   findings:
     - "F8.2 READ (held): with the egress rule added, a1's kms:ListKeys reached the KMS endpoint (ACCEPT flow, full TLS exchange, 14:28:06-14:28:37Z) and IAM refused it (AccessDenied on ListKeys, 14:28:22Z). The same attempt run 1 refused at the network layer (REJECT flow) is caught by the second layer once the SG is opened"
     - "The Python SDK invoke worked where the first attempt's CLI invoke 404'd; no retake was needed for the tool, this is the retake of the whole run under the owner's overlay ruling"

@@ -89,9 +89,10 @@ Reports pasted in `rulings/pr3-engineering.md` and the PR body.
   Recorded under the M08 decision rule; undone by a renewed token before
   PR 3 closes.
 - **The two orphan KMS keys (`ce2d6f46…`, `fcd9e973…`).** `open.md` row 6
-  says they are read as gone after 2026-10-09; today is 2026-10-04. Read
-  by hand before PR 3 closes, recorded in the explainer's "In one
-  sentence" neighbour at PR 4 if gone, or carried as a finding if not.
+  says they are read as gone after 2026-10-09; today is 2026-10-05, still
+  before that date. Read by hand before PR 3 closes, recorded in the
+  explainer's "In one sentence" neighbour at PR 4 if gone, or carried as a
+  finding if not.
   Seat: Security. Recorded under the M08 decision rule.
 - **The `evidence:` record set for run 1 (as the retake read it).** F8.4
   rests on the one object actually written for the run: the **answer

@@ -87,6 +87,13 @@ observed:
   window:
     opened: "2026-10-05T14:06:19Z"   # deploy-agent job start (cd92774's image built and deployed)
     closed: "2026-10-05T14:11:35Z"   # the quarantine detach (SPEC/08 §2)
+  # The measured value row 8 carries (SPEC/08 §7). Stated at open: refused 4
+  # of 6, recorded 5 of 6. The retake reads refused 4 of 6 (a1, a4, a5, a6)
+  # but recorded ONLY 3 of 6 (a1's REJECT flow, a3's answer record, a5's
+  # trail event) — a4 and a6 were refused below the API and left no record.
+  # So F8.1 ("an attempt is not refused, or has no record within N") FIRES on
+  # a4 and a6. PR 4's Measured cell carries "refused 4/6, recorded 3/6".
+  counts: {refused: 4, recorded: 3, of: 6, f8_1: fired, f8_1_on: [a4, a6]}
   attempts:
     # a1: refused by the security group (no egress rule to the KMS endpoint);
     # the REJECT flow record that "had never been seen in this VPC" (SPEC/08
