@@ -34,4 +34,31 @@ expected:
     - "every latency"
     - "which model was used for the answer (refagent's pin flows through the template)"
     - "whether run 3's answer differs from refagent's own on the same goldens (equivalence is not F8.3's third arm)"
-observed: null
+# Observed by the owner on 2026-10-05 after the RETAKE's run 3. drill-agent#4
+# (the recovery: agent.py restored to the template verbatim and flat, the six
+# attempts removed, kms declared) merged to 6898cfb; deploy.yml 37329793250
+# ran deploy-agent for it; the container logged the clean template start and
+# answered "POST /invocations HTTP/1.1 200" twice (~15:07:02 and ~15:07:17Z).
+# The recovery is demonstrated: NO attempt fired (zero AccessDenied by the
+# role after 15:04), NO REJECT flow from the drill ENIs in the window. BUT
+# the answer record reads RED, not the stated GREEN — F8.3 fires — because of
+# a drill-agent fixture inconsistency that fails both goldens in the clean
+# run exactly as it did in the hostile run 1 (so it is not the attacks).
+observed:
+  recorded_at: "2026-10-05T15:30:00Z"
+  window:
+    opened: "2026-10-05T15:04:32Z"   # find-agents listed 6898cfb; deploy-agent built and deployed it
+    closed: "2026-10-05T15:10:00Z"   # end of the goldens invocations
+  answer_record:
+    object_key: "envelopes/agents/drill-agent/6898cfb6c2cf762a63509789a5290d9535f14d07.json"
+    verdict: RED
+    measured: true          # errors 0, tokens_in 6592, tokens_out 431 (a real answer, not UNMEASURED)
+    goldens: {g-001: {pass: false}, g-010: {pass: false}}
+  role_refusals_in_window: 0   # no AccessDenied by the role after 15:04 — the attempts are gone
+  reject_flows_in_window: 0    # no REJECT from the drill ENIs
+  registry_row: "read directly from the registry table (SPEC/08 §9 cut 1; the Grafana panel-1 read is the fallback-of-record, see pr3.md Unsure)"
+  findings:
+    - "RECOVERY DEMONSTRATED: the recovered agent ran clean — no attempt fired (zero role AccessDenied after 15:04) and no REJECT flow in the window; agent.py is byte-identical to the template and kms is declared"
+    - "F8.3 FIRES: the answer record is RED, not the stated GREEN. The cause is NOT the recovery and NOT the attacks: the drill-agent fixture is inconsistent (prompt slate maps the goldens' titles to t-005/t-002, but the goldens cite rows r-019/r-009 which data/table.json holds for t-012/t-004). The agent looks up the slate's id, finds no row, and fails both goldens — RED identically in the hostile run 1 and the clean run 3"
+    - "Because run 1 and run 3 score identically, a3's credential effect cannot be isolated from either record (recorded under run 1)"
+    - "ADR-0013: the fixture defect is a drill finding, NAMED not repaired — run 3 was made (MEASURED), and SPEC/08 §5.1 makes each run once (no retake). Row 8 is RED as expected, now also on F8.3"

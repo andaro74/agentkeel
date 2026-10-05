@@ -93,25 +93,50 @@ Reports pasted in `rulings/pr3-engineering.md` and the PR body.
   by hand before PR 3 closes, recorded in the explainer's "In one
   sentence" neighbour at PR 4 if gone, or carried as a finding if not.
   Seat: Security. Recorded under the M08 decision rule.
-- **The `evidence:` record set for run 1.** `drill.evidence` reads each
-  record by `key` and `kind`; my recommendation: name the records F8.4
-  rests on in `drill_run1.yaml.observed.evidence.records` (the trail
-  objects for a4, a5, a6; the flow object for a1; the answer object for
-  a3), plus any unnamed refusal the observer finds. Seat: Product (names
-  the records), Engineering (the reader runs). Recorded under the M08
-  decision rule.
-- **The by-hand CLI invocation 404'd on both the quarantine run (run 1,
-  00:52:06Z) and the egress-rule run (run 2, 03:27:36Z).** AWS CLI
-  2.37.4's `aws bedrock-agentcore invoke-agent-runtime` returned
-  UnknownOperationException 404 at the data-plane endpoint on this box,
-  while the Python SDK (deploy.yml, 00:48:03Z) worked. Likely cause: the
-  invocation shape the CLI used (missing `--qualifier`, or the ARN
-  segment resolution) left the request on the wrong endpoint path.
-  **Recommendation: stand as-is.** Row 8's state is unchanged (still
-  RED), SPEC/08 §5.1 "each run is made once" refuses a retake, and run 3
-  does not need by-hand invocation (deploy.yml uses the Python SDK). The
-  reading surfaces two findings worth writing down (the deny-all is not
-  the one that fired on F8.5, and the egress-rule layer F8.2 reads
-  unread). Seat: Product (the reading), Engineering (the by-hand step).
-  Recorded under the M08 decision rule; undone by a retake flow and a
-  CLI incantation we have not confirmed.
+- **The `evidence:` record set for run 1 (as the retake read it).** F8.4
+  rests on the one object actually written for the run: the **answer
+  record** `envelopes/agents/drill-agent/cd927740….json`, under ObjectLock
+  COMPLIANCE, RetainUntil 2026-10-06T14:08:49Z (the 1-day lock), a single
+  VersionId — named in `drill_run1.yaml.observed.evidence.records`. The
+  trail objects the role's calls produced (a5's DeleteLogStream
+  AccessDenied; a1's REJECT flow) are delivered under
+  `AWSLogs/.../CloudTrail/` and the observer's `unnamed_refusals` arm reads
+  them; a4 and a6 produced **no** record (refused below the API), which is
+  itself the finding. Seat: Product (names the records), Engineering (the
+  reader runs). Recorded under the M08 decision rule.
+- **RETAKE (supersedes the CLI-404 "stand").** The first attempt's overlay
+  (`_agent.py`/`_tool.py`) crashed at container import — the platform
+  Dockerfile ships only `agent.py`, not `_*.py` — so both runs were
+  UNMEASURED, no attempt fired, and the by-hand CLI invocations 404'd on
+  top of that. The owner ruled a retake (stop point 1, the adversary): a
+  **flat `agent.py`** (the template inlined, the attempts in it) for run 1,
+  and a **flat recovery** for run 3, with every by-hand invocation on the
+  **Python SDK**, not the CLI. All three runs were re-made on 2026-10-05
+  (14:06–15:10Z) and are now MEASURED. The CLI-404 no longer arises.
+  What the retake read, replacing the first attempt's `observed:` blocks:
+  - **Run 1 MEASURED** (tokens_in 6626): a1 refused by the SG with a
+    **REJECT flow** delivered (the flow SPEC/08 §3.5 said had never been
+    seen); a5 **refused AND recorded** (explicit-deny AccessDenied in the
+    trail); **F8.5 HELD** (a refused CreateLogStream by the role at
+    14:10:45Z, nothing answered after the attach — the incident-responder
+    F2 hazard did not realize).
+  - **Run 2 F8.2 READ** (not unread): with the egress rule added, a1's
+    `kms:ListKeys` gave an **ACCEPT flow** and an **IAM AccessDenied**
+    (14:28:22Z) — the second layer caught what run 1 refused at the network.
+  - **Two findings the retake surfaced**, both recorded in the run files
+    and carried to the explainer at PR 4:
+    - **a4 and a6 refused but NOT recorded** — no S3 data event / no
+      PutBucketPolicy management event by the role in either account; the
+      calls were stopped below the API. Deviates from the stated "recorded".
+    - **drill-agent fixture defect** — the prompt slate maps the goldens'
+      titles to t-005/t-002 but the goldens cite rows r-019/r-009
+      (t-012/t-004), so the agent finds no row and fails both goldens. This
+      makes **run 3 RED, not the stated GREEN (F8.3 fires)**, identically in
+      the hostile and clean runs, so it is a fixture issue, not the attacks
+      or a control failure. ADR-0013: named, not repaired (the run was made;
+      SPEC/08 §5.1 makes each run once). a3's credential effect cannot be
+      isolated for the same reason.
+  Row 8 stays RED — as always expected — now on a2, a3, **F8.3**, the
+  a4/a6 recording gap, with F8.5 and F8.2 held. Seat: Product (the reading),
+  Engineering (the flat files and the by-hand steps). Recorded under the M08
+  decision rule and the owner's retake ruling (option A, 2026-10-05).
