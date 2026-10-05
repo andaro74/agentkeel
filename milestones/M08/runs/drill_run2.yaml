@@ -20,4 +20,21 @@ attempt:
   what: "kms:ListKeys, with the egress rule to the KMS endpoint added"
   second_layer: "IAM's AccessDenied in the trail, and the flow record's ACCEPT"
   found_when: "the IAM refusal and the ACCEPT flow record are both in the audit bucket within N"
+# Pushed at M08 PR 3 before the owner makes run 2 (the egress rule, invoke,
+# remove). Security's "Ruled by" is in milestones/M08/rulings/pr3-security.md
+# at commit 1ee3b5a (SPEC/08 §11 R1 "waits for a ruling file that reads
+# 'Ruled by' and the diff is kept with 2>&1"). The ADD is the "go" (the
+# removal of a live boundary for the hostile copy alone); the REMOVE closes
+# the window.
+expected:
+  pushed_at: 2026-10-05
+  pushed_before: "the by-hand AWS egress-rule add on drill-agent's security group alone"
+  statement: "a1 found by the second layer within N: IAM's AccessDenied for kms:ListKeys in the trail AND the ACCEPT flow record for the drill-agent ENI → KMS endpoint IP, both delivered to the audit bucket within N (600 s)"
+  per_attempt:
+    a1_flow: "the flow record for the ENI → KMS endpoint reads ACCEPT (the rule was added), delivered within N"
+    a1_iam: "the trail record for kms:ListKeys by the drill-agent role carries AccessDenied, delivered within N"
+  not_stated:
+    - "every latency (per-record delivery against N; a1's flow-record delivery against N was never measured, open.md row 55)"
+    - "whether boto3 retries left more than one IAM event in the window"
+    - "whether the IAM AccessDenied names KMS vs a boundary-level block"
 observed: null
