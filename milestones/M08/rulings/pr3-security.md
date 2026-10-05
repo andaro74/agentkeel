@@ -20,9 +20,9 @@ evidence:
 pr: 47
 ---
 
-# Ruling: M08 PR 3, Security — DRAFT
+# Ruling: M08 PR 3, Security
 
-To be ruled by andaro74 as Security before run 2 is made.
+Ruled by andaro74 as Security, 2026-10-05, as written.
 
 ## What this authorises
 
