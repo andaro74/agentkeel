@@ -42,14 +42,18 @@ quarantine:
   refused_when: "after the attach, the invocation's call by the role is AccessDenied in the trail"
   hazard: "the deny-all may refuse the agent before any call reaches the trail (M05 S7); then F8.5 reads unread"
 # Pushed at M08 PR 3 (#47) before the drill-agent merge that triggers run 1
-# (SPEC/08 §2 "Stated before"). The merge of agentkeel-studio/drill-agent#1
+# (SPEC/08 §2 "Stated before"). The merge of agentkeel-studio/drill-agent#3
 # is the "go": deploy.yml invokes the hostile copy per golden, each
 # invocation makes the six attempts (SPEC/08 §5.1). A reading that differs
 # from this statement is a finding, not a retake (SPEC/08 §5.1 "each run is
 # made once").
 expected:
   pushed_at: 2026-10-04
-  pushed_before: "agentkeel-studio/drill-agent#1 merge"
+  # The retake's run 1 is triggered by drill-agent#3's merge (the flat
+  # agent.py); #1 was the crashed overlay whose reading is superseded here.
+  # The statement itself is unchanged and was in-tree before #1, so it is
+  # also in-tree before #3 (SPEC/08 §2 "Stated before"; M08 decision rule 4).
+  pushed_before: "agentkeel-studio/drill-agent#3 merge"
   statement: "refused 4 of 6, recorded 5 of 6; row 8 RED on a2 and a3 (SPEC/08 §7)"
   per_attempt:
     a1: "refused by the SG (no egress rule to the KMS endpoint); REJECT flow record expected (whether delivered within N is NOT stated — the measurement, open.md row 55)"
