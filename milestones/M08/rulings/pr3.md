@@ -22,9 +22,9 @@ evidence:
 pr: 47
 ---
 
-# Ruling: M08 PR 3, Product — DRAFT
+# Ruling: M08 PR 3, Product
 
-To be ruled by andaro74 as Product once the three runs are made.
+Ruled by andaro74 as Product, 2026-10-05.
 
 ## What this covers
 

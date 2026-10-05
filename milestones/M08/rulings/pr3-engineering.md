@@ -19,9 +19,9 @@ evidence:
 pr: 47
 ---
 
-# Ruling: M08 PR 3, Engineering — DRAFT
+# Ruling: M08 PR 3, Engineering
 
-To be ruled by andaro74 as Engineering.
+Ruled by andaro74 as Engineering, 2026-10-05.
 
 ## What this covers
 
