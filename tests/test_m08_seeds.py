@@ -246,8 +246,10 @@ def test_run1_was_made():
     assert made(run_file("drill_run1.yaml", "run1"))
 
 
-@expected_failure
 def test_run2_was_made():
+    # Marker off at M08 PR 3: run 2's observed block was filled on 2026-10-05
+    # after the owner added and removed the egress rule, under rulings/pr3-security.md
+    # (SPEC/08 §5.1, §11 R1).
     assert made(run_file("drill_run2.yaml", "run2"))
 
 
