@@ -239,8 +239,10 @@ def test_s7_the_quarantine_is_read_against_the_role():
 # --- the three run files (made at PR 2 and PR 3; observed: null today) ---------
 
 
-@expected_failure
 def test_run1_was_made():
+    # Marker off at M08 PR 3: run 1's observed block was filled on 2026-10-05
+    # after the owner made the run and the quarantine was attached and detached
+    # (drill_run1.yaml, SPEC/08 §5.1).
     assert made(run_file("drill_run1.yaml", "run1"))
 
 

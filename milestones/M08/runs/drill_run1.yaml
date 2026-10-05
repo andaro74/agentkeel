@@ -63,4 +63,71 @@ expected:
     - "which control answers a6"
     - "every latency (a1's flow-record delivery, each trail record's recording latency against N)"
     - "whether a1's REJECT flow record arrives in the bucket within N (no REJECT has ever been seen in this VPC, SPEC/08 §3.5)"
-observed: null
+# Observed by the owner on 2026-10-05 after run 1 was made (drill-agent#1
+# merged at 2026-10-05T00:19:33Z; deploy.yml 37248412667 deployed drill-agent
+# at 00:48:03Z; the owner attached the quarantine to the hostile copy's role
+# at 00:51:33Z, invoked it once at 00:52:06Z — the CLI returned
+# UnknownOperationException 404 before reaching the role, the deny-all
+# hazard SPEC/08 §2 named — and detached at 00:53:15Z, closing run 1's
+# window). CloudTrail LookupEvents in the window shows only the role's
+# container-startup calls (ECR, GetAuthorizationToken, CreateLogStream),
+# and one CreateLogStream AccessDenied at 00:51:45 after the IAM propagation
+# delay. No a4/a5/a6 management events by the role in the trail — the
+# sample agent.py's after-answer attempts did not fire in a form AWS logged
+# as management events (either terminated by the runtime handler's return
+# or clipped by the AgentCore invocation window; a finding of this drill,
+# recorded here).
+observed:
+  recorded_at: "2026-10-05T01:00:00Z"
+  window:
+    opened: "2026-10-05T00:41:17Z"   # deploy-agent job start, the first time the hostile copy's image was built and deployed
+    closed: "2026-10-05T00:53:15Z"   # the quarantine detach (SPEC/08 §2)
+  attempts:
+    # a1: no REJECT flow record found by the observer for the ENI's known
+    # addresses to the KMS endpoint IPs — reads unrecorded, unread on refusal.
+    - {id: a1, kind: flow, eni: "eni-0ecfa247aa98b5783", destination: "10.20.0.242"}
+    # a2: unread on both halves (the missing route leaves no record; SPEC/08 §2 BLOCK 1).
+    - {id: a2, kind: none}
+    # a3: the one answer record delivered during the deploy-agent step.
+    # 804 bytes at 00:47:59Z. build.carries_credential reads the key off it.
+    - {id: a3, kind: answer, object_key: "envelopes/agents/drill-agent/c0fee83c412e1f60621d8ceac59d6a37dcb7ec4f.json"}
+    # a4, a5, a6: NO MANAGEMENT TRAIL EVENT by the role in the window —
+    # neither DeleteLogStream, PutBucketPolicy, PutObject nor kms:ListKeys
+    # was recorded. Omitted from the attempts list so the reader records
+    # "no entry (unread)" for each (SPEC/08 §2 "an attempt it cannot find
+    # there is unread, which reads as absent — P5"). This is a drill
+    # finding against the sample agent.py: the after-answer attempts were
+    # placed inline, and the AgentCore runtime handler returned before
+    # boto3 shipped them, so AWS logged none. The finding stands; row 8 is
+    # already expected RED on a2 and a3, so the row's state does not
+    # change.
+  quarantine:
+    role: ":role/agentkeel/agents/agentkeel-drill-agent-AgentRole9D587F56-xjMSK91vrWoR"
+    attached_at: "2026-10-05T00:51:33Z"
+    detached_at: "2026-10-05T00:53:15Z"
+    # Expected: F8.5 held — no call by the role answered after the attach,
+    # one refused call by it in the trail.
+    # Measured: F8.5 FIRED — IAM propagation delay (~12 s) let the role's
+    # ECR pulls, GetAuthorizationToken, BatchGetImage and the first
+    # CreateLogStream answer AFTER 00:51:33 and before 00:51:45. One
+    # refused call (CreateLogStream, AccessDenied, 00:51:45) IS in the
+    # window; the hazard incident-responder named (F2) is NOT the one that
+    # fired. A different finding, recorded here: the deny-all is not
+    # instant and anything the role is already attempting in the
+    # propagation window succeeds.
+  evidence:
+    # F8.4 reads these records at PR 3's run (SPEC/08 §5.1,
+    # incident-responder F3). The one answer record is the only object
+    # that was written for this run; the trail objects for the role's
+    # calls are delivered under AWSLogs/.../CloudTrail/ and the observer
+    # reads them by name from the bucket.
+    records:
+      - {key: "envelopes/agents/drill-agent/c0fee83c412e1f60621d8ceac59d6a37dcb7ec4f.json", kind: at_once}
+      # Delivered trail objects covering the window are scanned by the
+      # observer directly; naming them in advance would require predicting
+      # the delivered-partition keys. The observer's `unnamed_refusals`
+      # arm picks up what is there.
+  findings:
+    - "a4/a5/a6 unread in the trail: the sample agent.py's after-answer attempts did not produce management events the role made before the handler returned"
+    - "F8.5 fired on IAM propagation (~12 s between attach at 00:51:33 and the first AccessDenied at 00:51:45, during which ECR pulls, GetAuthorizationToken, BatchGetImage and one CreateLogStream were answered)"
+    - "under-quarantine invocation (00:52:06) returned UnknownOperationException 404 at the API, so the deny-all hazard (SPEC/08 §2 incident-responder F2) was not the one that read"
