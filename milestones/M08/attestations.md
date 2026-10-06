@@ -31,7 +31,7 @@ wrote them. `src/baseline/` is unchanged since tag `m00`. No reader changed
 in M08: nothing under `src/` or `scripts/` in this PR beyond the corrected
 `observed:` blocks, which are data the observer reads, not the observer.
 
-_Signed: ______________________________ , 2026-10-___
+_Signed: andaro74, 2026-10-05_
 
 **2. Security — the records are from the separate account, read by their own time.**
 
@@ -43,7 +43,7 @@ hostile copy's security group alone, each under a ruling that reads
 "Ruled by" (`rulings/pr3-security.md`). No live control was left relaxed: the
 egress rule was revoked (run 2) and the quarantine detached (run 1).
 
-_Signed: ______________________________ , 2026-10-___
+_Signed: andaro74, 2026-10-05_
 
 **3. Product — the row is RED and the prose says what RED means.**
 
@@ -54,7 +54,7 @@ behaviour but the "answers GREEN" arm was not measured (a fixture defect), and
 that a4 and a6 were refused with no record. No "governed", "secure" or
 "proven" is written about a control that did not fire on its seeded case.
 
-_Signed: ______________________________ , 2026-10-___
+_Signed: andaro74, 2026-10-05_
 
 **4. Product — the recording is as recorded.**
 
@@ -65,4 +65,4 @@ narrated as scripted, exported unedited. It is over the 40 MiB size ceiling by
 fit (SPEC/00 §10.2). It shows the attempts firing, the quarantine attached and
 detached, and the records in the security account's console.
 
-_Signed: ______________________________ , 2026-10-___
+_Signed: andaro74, 2026-10-05_

@@ -39,9 +39,9 @@ evidence:
 pr: 48
 ---
 
-# Ruling: M08 PR 4, the close — DRAFT
+# Ruling: M08 PR 4, the close
 
-To be ruled by andaro74 as Product.
+Ruled by andaro74 as Product, 2026-10-05.
 
 ## What this closes
 
