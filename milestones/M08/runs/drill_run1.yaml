@@ -115,6 +115,7 @@ observed:
     # deny in an identity-based policy", at 14:08:19Z and 14:08:45Z, source
     # 10.20.0.39, in the agent-account trail. The clean refusal of the run.
     - {id: a5, kind: trail, event: DeleteLogStream, error: AccessDenied,
+       request_id: "e5310c42-1498-4035-bc1c-1e8f542d2ea5",
        request_ids: ["e5310c42-1498-4035-bc1c-1e8f542d2ea5", "4b7bc098-b756-43c3-800b-d677bbb47be4"],
        at: "2026-10-05T14:08:19Z"}
     # a4 and a6: refused but NOT recorded. No CloudTrail event by the role for

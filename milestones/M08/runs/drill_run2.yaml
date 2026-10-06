@@ -50,6 +50,12 @@ observed:
   window:
     opened: "2026-10-05T14:28:08Z"   # the egress rule add returned
     closed: "2026-10-05T14:28:40Z"   # the egress rule revoke returned
+  # The keys observe_drill reads (top level): the drill ENI and the KMS
+  # endpoint IP for a1's flow record, and the kms:ListKeys request id for its
+  # IAM AccessDenied. The second_layer block below is the human-readable copy.
+  eni: "eni-06666a876d629c16b"
+  destination: "10.20.1.24"
+  request_id: "1743281b-f616-4187-a858-d383f76bbeec"
   rule:
     id: "sgr-071300307a9132ebe"
     group_id: "sg-0c90a9e079b0d4533"      # DRILL_SG
