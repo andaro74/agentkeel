@@ -12,4 +12,4 @@ Generated from `milestones/README.md` by `make ledger-plain`. Do not edit.
 | [M05 — The agent stays in its box](M05.md) | An agent is stopped from reaching the internet, writing to another agent's files, or deleting its own logs, and each attempt is recorded in a separate account it cannot change. | RED | [watch](../video/milestones/M05.mp4) |
 | [M06 — A team can do this in a day](M06.md) | One developer creates an agent from the template and ships it in a day, without touching the safety pipeline. | RED | [watch](../video/milestones/M06.mp4) |
 | [M07 — Upgrades come to you](M07.md) | A new platform version, a new model, or a retirement arrives as a PR; the team never edits the pipeline. | RED | [watch](../video/milestones/M07.mp4) |
-| [M08 — We rehearsed the bad day](M08.md) | A hostile agent tried six things; all six were stopped, recorded, and recovered from. | OPEN | not recorded |
+| [M08 — We rehearsed the bad day](M08.md) | A hostile agent tried six things; all six were stopped, recorded, and recovered from. | RED | [watch](../video/milestones/M08.mp4) |

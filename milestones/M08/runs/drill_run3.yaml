@@ -49,6 +49,13 @@ observed:
   window:
     opened: "2026-10-05T15:04:32Z"   # find-agents listed 6898cfb; deploy-agent built and deployed it
     closed: "2026-10-05T15:10:00Z"   # end of the goldens invocations
+  # The keys observe_drill reads (top level): the answer record to read the
+  # verdict from, the role to scan for refusals, and the registry row to look
+  # for in panel 1. The answer_record block below is the human-readable copy.
+  answer_key: "envelopes/agents/drill-agent/6898cfb6c2cf762a63509789a5290d9535f14d07.json"
+  role: ":role/agentkeel/agents/agentkeel-drill-agent-AgentRole9D587F56-xjMSK91vrWoR"
+  registry_row: "agentkeel_drill_agent-jUPi0ADoVd"   # unread via panel 1 if the Grafana token has lapsed (SPEC/08 §9 cut 1)
+  rejected_flows: []
   answer_record:
     object_key: "envelopes/agents/drill-agent/6898cfb6c2cf762a63509789a5290d9535f14d07.json"
     verdict: RED
@@ -56,7 +63,7 @@ observed:
     goldens: {g-001: {pass: false}, g-010: {pass: false}}
   role_refusals_in_window: 0   # no AccessDenied by the role after 15:04 — the attempts are gone
   reject_flows_in_window: 0    # no REJECT from the drill ENIs
-  registry_row: "read directly from the registry table (SPEC/08 §9 cut 1; the Grafana panel-1 read is the fallback-of-record, see pr3.md Unsure)"
+  registry_row_note: "read directly from the registry table (SPEC/08 §9 cut 1; the Grafana panel-1 read is the fallback-of-record, see pr3.md Unsure)"
   green_arm: unmeasured   # claim 8's "recovers ... answers GREEN" is NOT positively observed (see findings)
   findings:
     - "RECOVERY (removal of the hostile behaviour) DEMONSTRATED: the recovered agent ran clean — no attempt fired (zero role AccessDenied after 15:04) and no REJECT flow in the window; agent.py is byte-identical to the template and kms is declared"
