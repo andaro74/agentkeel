@@ -12,4 +12,55 @@
 seed: run3
 repository: agentkeel-studio/drill-agent
 clean_when: "the answer record verdict is GREEN, no refusal by the role and no REJECT flow in the window, and the registry row is read through panel 1"
-observed: null
+# Pushed at M08 PR 3 before the owner merges drill-agent#4 (the recovery
+# PR: six attempts removed from agent.py, which is restored to the template
+# inlined verbatim and flat, and `kms` added to endpoint_allowlist).
+# drill-agent#2 was the first attempt's recovery, superseded here; the
+# retake's recovery is #4. deploy.yml's next schedule tick (or dispatch)
+# picks up the new HEAD, redeploys, and asks the two goldens. That
+# merge+deploy is run 3's "go". The invocation uses the Python SDK, not the
+# CLI, so the run 1 / run 2 CLI 404 does not bite here.
+expected:
+  pushed_at: 2026-10-05
+  pushed_before: "the owner's drill-agent#4 merge (the recovery PR)"
+  statement: "the recovered hostile copy answers as any agent: the answer record reads GREEN, no refusal by its role and no REJECT flow from its interfaces in run 3's window, and its registry row is read (through the registry table directly if the Grafana observer token is not renewed by 2026-10-31, SPEC/08 §9 cut 1; see pr3.md Unsure)"
+  per_arm:
+    answer_verdict: "GREEN — build.compose_answer any() rule; one of the two goldens passing is enough"
+    both_goldens_pass: "RECORDED but gates nothing; the explainer at PR 4 says how many of two passed (SPEC/08 §2 finding 3)"
+    role_refusals_in_window: "zero (the attempts are gone)"
+    reject_flows_in_window: "zero (kms is declared, so the SG opens one egress rule to its endpoint; a1 would ACCEPT, but a1 is not attempted post-recovery, so the flow records should be routine)"
+    registry_row_in_panel1: "unread via panel 1 (the Grafana token's status at PR 4 close determines read method); read via the registry table directly per SPEC/08 §9 cut 1 as the recommendation stands"
+  not_stated:
+    - "every latency"
+    - "which model was used for the answer (refagent's pin flows through the template)"
+    - "whether run 3's answer differs from refagent's own on the same goldens (equivalence is not F8.3's third arm)"
+# Observed by the owner on 2026-10-05 after the RETAKE's run 3. drill-agent#4
+# (the recovery: agent.py restored to the template verbatim and flat, the six
+# attempts removed, kms declared) merged to 6898cfb; deploy.yml 37329793250
+# ran deploy-agent for it; the container logged the clean template start and
+# answered "POST /invocations HTTP/1.1 200" twice (~15:07:02 and ~15:07:17Z).
+# The recovery is demonstrated: NO attempt fired (zero AccessDenied by the
+# role after 15:04), NO REJECT flow from the drill ENIs in the window. BUT
+# the answer record reads RED, not the stated GREEN — F8.3 fires — because of
+# a drill-agent fixture inconsistency that fails both goldens in the clean
+# run exactly as it did in the hostile run 1 (so it is not the attacks).
+observed:
+  recorded_at: "2026-10-05T15:30:00Z"
+  window:
+    opened: "2026-10-05T15:04:32Z"   # find-agents listed 6898cfb; deploy-agent built and deployed it
+    closed: "2026-10-05T15:10:00Z"   # end of the goldens invocations
+  answer_record:
+    object_key: "envelopes/agents/drill-agent/6898cfb6c2cf762a63509789a5290d9535f14d07.json"
+    verdict: RED
+    measured: true          # errors 0, tokens_in 6592, tokens_out 431 (a real answer, not UNMEASURED)
+    goldens: {g-001: {pass: false}, g-010: {pass: false}}
+  role_refusals_in_window: 0   # no AccessDenied by the role after 15:04 — the attempts are gone
+  reject_flows_in_window: 0    # no REJECT from the drill ENIs
+  registry_row: "read directly from the registry table (SPEC/08 §9 cut 1; the Grafana panel-1 read is the fallback-of-record, see pr3.md Unsure)"
+  green_arm: unmeasured   # claim 8's "recovers ... answers GREEN" is NOT positively observed (see findings)
+  findings:
+    - "RECOVERY (removal of the hostile behaviour) DEMONSTRATED: the recovered agent ran clean — no attempt fired (zero role AccessDenied after 15:04) and no REJECT flow in the window; agent.py is byte-identical to the template and kms is declared"
+    - "BUT claim 8's 'recovers end to end / answers GREEN' arm is UNMEASURED, not demonstrated: the answer never reached GREEN (the fixture defect below forces RED), so the positive 'answers as any agent' reading was not obtained. PR 4's explainer must say 'the recovery removed the hostile behaviour', NOT 'recovers end to end'"
+    - "F8.3 FIRES: the answer record is RED, not the stated GREEN. The cause is NOT the recovery and NOT the attacks: the drill-agent fixture is inconsistent (prompt slate maps the goldens' titles to t-005/t-002, but the goldens cite rows r-019/r-009 which data/table.json holds for t-012/t-004). The agent looks up the slate's id, finds no row, and fails both goldens — RED identically in the hostile run 1 and the clean run 3"
+    - "Because run 1 and run 3 score identically, a3's credential effect cannot be isolated from either record (recorded under run 1)"
+    - "ADR-0013: the fixture defect is a drill finding, NAMED not repaired — run 3 was made (MEASURED), and SPEC/08 §5.1 makes each run once (no retake). Row 8 is RED as expected, now also on F8.3"

@@ -239,16 +239,24 @@ def test_s7_the_quarantine_is_read_against_the_role():
 # --- the three run files (made at PR 2 and PR 3; observed: null today) ---------
 
 
-@expected_failure
 def test_run1_was_made():
+    # Marker off at M08 PR 3: run 1's observed block was filled on 2026-10-05
+    # after the owner made the run and the quarantine was attached and detached
+    # (drill_run1.yaml, SPEC/08 §5.1).
     assert made(run_file("drill_run1.yaml", "run1"))
 
 
-@expected_failure
 def test_run2_was_made():
+    # Marker off at M08 PR 3: run 2's observed block was filled on 2026-10-05
+    # after the owner added and removed the egress rule, under rulings/pr3-security.md
+    # (SPEC/08 §5.1, §11 R1).
     assert made(run_file("drill_run2.yaml", "run2"))
 
 
-@expected_failure
 def test_run3_was_made():
+    # Marker off at M08 PR 3: run 3's observed block was filled on 2026-10-05
+    # after the owner merged the recovery (drill-agent#4) and it was deployed
+    # and asked its goldens (drill_run3.yaml, SPEC/08 §5.1, the second named
+    # P3 exception). The record is MEASURED and RED (the drill-agent fixture
+    # finding, recorded in the run file), which is the reading, not the plant.
     assert made(run_file("drill_run3.yaml", "run3"))
