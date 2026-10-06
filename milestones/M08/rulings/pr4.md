@@ -34,7 +34,8 @@ evidence:
   - milestones/M08/rulings/pr3.md
   - milestones/M08/rulings/pr3-engineering.md
   - milestones/M08/rulings/pr3-security.md
-  # The envelope and run URL of this PR's evals run are filled once it lands.
+  - evals/history/e930e4da1e528fdfee77e62c52154970873add79.json
+  - https://github.com/andaro74/agentkeel/actions/runs/37402273717
 pr: 48
 ---
 

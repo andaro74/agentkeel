@@ -21,9 +21,10 @@ so none of those seats signs a line. M08 built no control (ADR-0013).
 
 **1. Engineering — the evidence is CI-written and unedited.**
 
-The envelope `evals/history/<PR4-commit>.json` and its control card were
-written by `src/verdict/build.py` and `src/baseline/run.py` in this PR's
-evals run, with `drill` read from the security account's audit bucket by
+The envelope `evals/history/e930e4da1e528fdfee77e62c52154970873add79.json`
+and its control card were written by `src/verdict/build.py` and
+`src/baseline/run.py` in this PR's evals run (37402273717), with `drill`
+read from the security account's audit bucket by
 `scripts/observe_drill.py` (as `agentkeel-audit-read`) in the same run, and
 committed by `github-actions[bot]`. No human edited any of them after CI
 wrote them. `src/baseline/` is unchanged since tag `m00`. No reader changed
