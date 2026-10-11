@@ -735,7 +735,7 @@ described as working until it has fired on the seeded case (§10.5).
 Falsifiers: F9.1 an agent repository's rules are not in the guardrail its
 run carries. F9.2 an agent removes or weakens a baseline rule and is
 merged. F9.3 a planted rule is silent: a plant in an agent repository is
-answered, or blocked by a rule other than the one its `blocks` names.
+answered, or blocked with its named rule absent from the trace.
 F9.4 the platform check refuses an agent's own pin or its guardrail
 golden, or admits a guardrail golden with no named rule. F9.5 the split
 relaxes refagent: a topic or entity leaves refagent's guardrail, or its
@@ -743,7 +743,8 @@ plants stop firing. The measured value is the fixture agent's planted
 rules fired, n of m, read from its answer record after the merge; row 9
 is GREEN only at m of m with F9.1 to F9.5 held.
 PRs: (1) SPEC/09; this entry; ADR-0014; the fixture agent with
-`rules/guardrail.yaml`, one golden and one `blocks` entry, the other
+`rules/guardrail.yaml`, one guardrail golden beside the template's
+minimum of one ordinary and one trap, and one `blocks` entry, the other
 seeds, and the run file with `observed: null`, each before any reader;
 ledger row; explainer draft. (2) The baseline; the merge and its
 refusals; the per-agent guardrail; the platform check's three changed
@@ -1018,8 +1019,10 @@ not check recordings.
   own at M08 open. A milestone is not finished until its video is
   committed. Amended at M09 PR 1: M08's video was committed at M08's own
   close under that ruling (ADR-0005 amendment 2), so M09 PR 1 carries no
-  recording; M09's own video follows amendment 1 and rides M10's PR 1 if
-  there is one, else M09's close rules it as M08 did.
+  recording; M09's own video is committed at M09's close as M08's was,
+  under the same amendment, since SPEC/00 plans no M10 (M10 is proposed,
+  not opened, SPEC/09 §11 R6). §15's ten videos are then met at M09's
+  close, not at M10's open.
 
 ## 11. Rulings recorded in this SPEC
 

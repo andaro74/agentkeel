@@ -106,12 +106,39 @@ a model, and the baseline's content is not yet ruled.
   guardrail action but Apply (`infra/bootstrap/app.py:134-136`), and only
   the bootstrap stack, deployed by hand, builds one, from refagent's
   files alone (`app.py:151-154`, `:1055-1108`).
+  **The placeholder pin, and what the first deploy does with it**
+  (`product-spec-reviewer` finding 2). Before its guardrail exists an
+  agent cannot pin it, and the construct conditions the agent role's
+  invoke on the pin (`governed_agent.py:257`, `:409`). Proposed, for
+  Security and Product (§11 R3): for an agent with its own rules the
+  construct builds the guardrail in the agent's own stack and conditions
+  the invoke, and the server's converse, on **the stack's own guardrail
+  resource**, not on the manifest's pin; it reads the pin only to refuse
+  null and refagent's. The stack's output (id, version, description
+  digest) is written to the registry row by the deploy, and the owner
+  copies it into the manifest in a second pull request (§9 cut 2 names
+  the by-hand form). So the fixture's first pull request carries a
+  placeholder pin, `fest1va1desk:1`, that nothing answers to; the first
+  deploy builds the real guardrail and guards the agent with it; F9.1
+  reads the pin the **answer record** names, which is the stack's, never
+  the placeholder. The feasibility note records the step at which the
+  manifest gets the id.
 - **A plant in an agent repository.** A golden of `kind: guardrail`
   (`expected: BLOCKED` or `MASKED`) or `kind: redteam` (`BLOCKED`) in the
   agent's `goldens/`, named by id in its control file's `plants`, with a
   `blocks` entry naming the rule that must block it. The platform check
   refuses a plant with no named rule, and a named rule that the merged
-  guardrail does not build (`guardrail_spec`'s rule, `app.py:180-182`).
+  guardrail does not build (`guardrail_spec`'s rule, `app.py:180-182`);
+  seed S5 plants both.
+- **Where an agent's `rules/` goes** (`product-spec-reviewer` note 15).
+  Into the signed bundle: `src/bundle/pack.py` packs the agent folder as
+  a tree, so a `rules/` folder present at the merge commit enters the
+  bundle digest with no change to `pack.py`. Not into the image: the
+  Dockerfile's copy list (`agent.Dockerfile:23-24`) is unchanged, since
+  the runtime reads no rule file; the guardrail is what carries the rules
+  at run time. F9.1's digest is the **guardrail version description's**,
+  the sha256 of the baseline and the agent's rule files with LF endings
+  as `guardrail_spec` computes it, and not the bundle digest.
 - **Fired.** In the agent's answer record, the plant's observation has
   `stop_reason: guardrail_intervened` and its named rule is among
   `guardrail_topics`, the topic names the converse trace records
@@ -200,10 +227,10 @@ reader can open. **Live today, at `0ba6d1d` (tag `m08`).**
 
 | Id | Fires when | What it looks like in the repo |
 |---|---|---|
-| F9.1 | an agent repository's rules are not in the guardrail its run carries: the pin its answer record names is refagent's, or is a guardrail whose version description does not carry the digest of the baseline and the agent's files as the tree holds them | `checks.F9_1: fail` from S1's fixture test; live, `agent_rules.guardrail` reads the pin from the answer record and the description from the read-back and they do not match the tree at the merge |
-| F9.2 | an agent removes or weakens a baseline rule and is merged: a baseline PII entity's action lowered or a baseline topic redefined in the agent's file, and the platform check passes the head; or the merged guardrail lacks a baseline rule | `checks.F9_2: fail` from S2's fixture test; live, the platform check's result on the agent repository's head, and the read-back of the built guardrail against the baseline |
+| F9.1 | an agent repository's rules are not in the guardrail its run carries: the pin its answer record names is refagent's, or is a guardrail whose version description does not carry the digest of the baseline and the agent's files as the tree holds them | `checks.F9_1: fail` from S1's fixture test; live, `agent_rules.guardrail` reads the pin from the answer record and the description from the read-back and they do not match the digest **the observer computes itself**, from the agent repository's merge commit and `rules/baseline.yaml` on the platform's `main`, independently of the builder (note 9) |
+| F9.2 | an agent removes or weakens a baseline rule and is merged: a baseline PII entity's action lowered or a baseline topic redefined in the agent's file, and the platform check passes the head; or the merged guardrail lacks a baseline rule | `checks.F9_2: fail` from S2's fixture test; live, **a second pull request in the fixture repository carrying S2's `weakened.yaml`**, which the platform check must refuse and the observer reads (M02's seed-PR pattern; the run file names it), and the read-back of the built guardrail against the baseline |
 | F9.3 | a planted rule is silent: a plant in an agent repository is answered, or blocked with its named rule absent from the trace's topics, in the run after the merge | `checks.F9_3: fail` from S3's fixture test; live, `agent_rules.plants` on the answer record names the golden and what the trace recorded; the run file's `observed` block |
-| F9.4 | the platform check refuses an agent's own pin or its guardrail golden; or admits a guardrail or red-team golden with no `blocks` entry, or one naming a rule the merged guardrail does not build | `checks.F9_4: fail` from S1's fixture test; live, the platform check's result on the fixture agent's first pull request |
+| F9.4 | the platform check refuses an agent's own pin or its guardrail golden; or admits a guardrail or red-team golden with no `blocks` entry, or one naming a rule the merged guardrail does not build | `checks.F9_4: fail` from S1's fixture test (the admitted case) and S5's (the two refused cases); live, the platform check's result on the fixture agent's first pull request |
 | F9.5 | the split relaxes refagent: a topic or PII entity leaves refagent's guardrail, or refagent's plants read under 7 of 7 on the first envelope after the baseline is separated | `checks.F9_5: fail` from S4's guard; live, refagent's envelope at PR 2's merge (`plants_fired`), and `two-key` on the diff to `agents/refagent/rules/` (§11 R2) |
 
 **Where each reading comes from** (M04's to M08's lesson, planned at
@@ -249,7 +276,8 @@ read; preconditions raise `SeedBroken`. Each is named in
 | S2 a weakened baseline | F9.2 | `tests/fixtures/m09/s2-weakened-baseline/`: two agent rule files. `weakened.yaml` lists `EMAIL` with action `NONE`; `empty_pii.yaml` lists `pii: []` beside one topic of its own. The reader must refuse the first naming `EMAIL` and the way, and must merge the second to a spec that still holds `PHONE` and `EMAIL` as `ANONYMIZE` | there is no baseline to merge onto (`rules/baseline.yaml` is absent) and no merge reads two files | `rules/baseline.yaml` (Rule Owner) and `src/validate/agent_rules.py`: `merge(baseline, agent)` and `merge_errors(baseline, agent)` |
 | S3 a silent plant | F9.3 | `tests/fixtures/m09/s3-silent-plant/`: three answer records for the fixture agent. In `record_blocked_by_another_rule.json` `g-030` is blocked with `guardrail_topics: [some-other-rule]`; in `record_answered.json` it is answered (`stop_reason: end_turn`); `record_held.json` has it blocked by its named rule. The reader must refuse the first two, naming `g-030` and what the trace recorded, and hold the third | nothing reads an agent's plant from an answer record (§3.5) | `src/verdict/agent_rules.py`: `plants(record, blocks)` |
 | S4 refagent's rules after the split | F9.5 | a **guard**, no fixture: `agents/refagent/rules/guardrail.yaml` holds the six topics by name and `PHONE` and `EMAIL` as `ANONYMIZE`, and `redteam.yaml` its five plants. It passes today and must pass after the baseline is separated; a split that moves a rule out of refagent's file fails it | nothing: it passes, and that is the point | `src/verdict/gate.py` (`plants_fired` on refagent's envelope, in the tree) and the guard itself |
-| The run | F9.1 to F9.4, live | `milestones/M09/runs/f9_3_plant_run.yaml`: the repository, the head to merge, the deploy run and the answer record to read, `observed: null` | the run is not made: no agent repository with rules exists, and nothing would read it | `scripts/observe_rules.py`, after PR 2 merges |
+| S5 an unnamed plant | F9.4 | `tests/fixtures/m09/s5-unnamed-plant/`: two agent rule files beside the fixture agent's golden. `no_blocks.yaml` lists `plants: [g-030]` with no `blocks` entry; `unbuilt_rule.yaml` names for `g-030` a rule its `denied_topics` does not build. The reader must refuse both, naming the golden and the rule | nothing reads a plant's named rule in an agent repository (§3.4) | `src/validate/agent_rules.py`: `rules_errors` |
+| The run | F9.1 to F9.4, live | `milestones/M09/runs/f9_3_plant_run.yaml`: the repository, the first pull request's head to merge, the deploy run and the answer record to read, and the second pull request carrying S2's `weakened.yaml` to be refused (F9.2's live arm), `observed: null` | the run is not made: no agent repository with rules exists, and nothing would read it | `scripts/observe_rules.py`, after PR 2 merges |
 
 **The fixture agent is fictional.** Its festival, its rule and its
 titles are the slate's (SPEC/00 §9); no real festival, title, contract,
@@ -257,7 +285,7 @@ product or workflow detail, and nothing pharmaceutical.
 
 ### 5.1 When each is measured
 
-- **S1, S2, S3 and S4 are read on every run from PR 2**, in the
+- **S1, S2, S3, S4 and S5 are read on every run from PR 2**, in the
   tree, by their readers: test-only witnesses for `F9_1` to `F9_5`.
 - **The live reading is after PR 2 merges, a named P3 exception.** The
   fixture agent cannot be deployed from a pull request: `deploy.yml`
@@ -266,11 +294,20 @@ product or workflow detail, and nothing pharmaceutical.
   (§11 R3), which may be a by-hand deploy. So, after PR 2 merges and in
   this order, each stated in the run file first: the owner makes
   `agentkeel-studio/festival-desk` from the template and opens its first
-  pull request carrying S1's folder; the platform check reads its rules
-  and admits its pin and its plant; it merges; the platform builds its
-  guardrail and deploys it; the deploy asks it its three goldens; the
-  observer reads the answer record and the read-back. PR 3's run carries
-  the reading; the cell cites it.
+  pull request carrying S1's folder with its placeholder pin; the
+  platform check reads its rules and admits the pin (not null, not
+  refagent's) and its plant; it merges; the deploy builds its guardrail
+  in its stack from the merged rules and guards the agent with the
+  stack's own resource (§2, "The placeholder pin"); the deploy writes the
+  id, version and digest to the registry row and asks the agent its three
+  goldens; the owner opens the second pull request, carrying the pin from
+  the registry row **and** S2's `weakened.yaml`, which the platform check
+  must refuse on the rules file (F9.2's live arm), then a third with the
+  pin alone, which merges; the observer reads the answer record, the
+  read-back and the three check results. PR 3's run carries the reading;
+  the cell cites it. The manifest carries the built guardrail's id from
+  the third pull request on; the answer record row 9 reads carries it
+  from the first deploy.
 - **Which run PR 3 reads if the deploy fails.** As M07 and M08: if the
   platform's own deploy path needs a repair, PR 3 is that repair and the
   plant run is read by PR 4's run, which the cell cites. Stated here so
@@ -288,7 +325,8 @@ not choose them.
 | The platform check's three changed readings | `src/validate/agent.py`: `guardrail_errors` accepts, for an agent that is not refagent, a pin that is not null and not refagent's; `agent_goldens.KINDS` grows to the four kinds with `expected` shaped per kind, and a guardrail or red-team golden must be named in the agent's control file's `plants` with a `blocks` entry; `evaluate()` calls `rules_errors` | Engineering (the readings); Rule Owner (that a pin may be the agent's own) |
 | The guardrail builder | the construct or the bootstrap stack, as Security rules (§11 R3): `guardrail_spec` takes the merged rules; the version description carries the digest of the baseline and the agent's files | Security |
 | The plant reading | `src/verdict/agent_rules.py`: `plants(record, blocks)` and `guardrail(record, read_back, tree_digest)` | Engineering |
-| The observer | `scripts/observe_rules.py`, in `evals.yml` on `main` (as `observe_drill.py`) | Engineering (the script); Security (the workflow step and any read-back grant, §11 R4) |
+| The observer | `scripts/observe_rules.py`, in `evals.yml` on `main` (as `observe_drill.py`); `.github/CODEOWNERS` already takes `scripts/observe_*.py` as Engineering's with no edit (its own comment, security-reviewer 18 on M07 PR 3) | Engineering (the script); Security (the workflow step and any read-back grant, §11 R4) |
+| The registry row | `scripts/registry.py` and the deploy's put gain the guardrail's id, version and description digest for an agent with its own rules (today the row carries none, note 10); the observer and §9 cut 3 read it | Engineering (the script); Security (the deploy step) |
 | The envelope | `agent_rules` in `src/verdict/schema.json`; `build` composes it; `CLAIM_9_CHECKS` and `READ_THE_RULES` in `gate.py`; row 9's reading in `src/ledger.py` | Engineering |
 | The documents | `docs/developer/template-README.md` and `quickstart.md` say a `rules/` folder is read, add-only, and how a plant is written | Product |
 | refagent's own rules | `agents/refagent/rules/guardrail.yaml`: unchanged, or the two PII entries kept beside the baseline's (§11 R2) | Rule Owner |
@@ -300,13 +338,14 @@ change to a bar, a golden under `evals/goldens/`, or `src/baseline/`.
 
 **PR 1.** refagent's envelope as at M08: `plants 7/7`, the M01 to M08
 checks as row 8's cell has them; it says nothing about claim 9.
-`make plants` lists S1 to S4 and the run (seeded cases, not golden
-plants); `tests/test_m09_seeds.py` shows 2 passed (S1's format guard,
-S4's guard) and 5 xfailed; `--runxfail` shows 2 passed, 5 failed, each
-with its planted message. `make validate`'s twenty checks pass: none
+`make plants` lists S1 to S5 and the run (seeded cases, not golden
+plants); `tests/test_m09_seeds.py` shows **2 passed** (S1's format guard,
+S4's guard) and **7 xfailed** (S1 admitted, S1 rules read, S2 weakened
+refused, S2 empty list merged, S3, S5, the run); `--runxfail` shows 2
+passed, 7 failed, each with its planted message. `make validate`'s twenty checks pass: none
 reads a fixture, a run file or `rules/`.
 
-**PR 2, on the PR.** S1, S2 and S3 refused or read by their readers,
+**PR 2, on the PR.** S1, S2, S3 and S5 refused or read by their readers,
 each with its planted reason; S4 still passing; from PR 2's merge the
 gate requires `F9_1` to `F9_5` on every agent envelope, test-only
 witnesses. On PR 2's own envelope `agent_rules` reads **unread: no agent
@@ -353,6 +392,16 @@ read the record; or if `make ledger` stops matching rows 0 to 8.
 
 SPEC/00 §10.5: no document describes these as working.
 
+- **A baseline rule firing on a template agent** (`product-spec-reviewer`
+  finding 1). The proposed day-one baseline is the two PII entities, and
+  no PII rule has fired on a counted plant in this project: `g-014`
+  (MASKED) reads `never_passed` in every cell from row 3 to row 8, and the
+  membership reader reads topic names, not an anonymisation. So at M09
+  the baseline's presence in an agent's guardrail is read by F9.1's
+  digest and the read-back, and its **firing** is not. The measured
+  reading is of the agent's own rule. Whether the day-one baseline must
+  hold a rule of a kind the reader can see fire is §11 R1's; the template
+  README says this at PR 2.
 - **A baseline change after agents exist.** A new baseline rule reaches
   an agent's guardrail only when that agent's guardrail is rebuilt; who
   rebuilds every agent's, and whether the platform-upgrade path (M07)
@@ -395,14 +444,14 @@ SPEC/00 §10.5: no document describes these as working.
 
 In order, if the cap is threatened. **Never cut:** the baseline, the
 add-only merge and its refusal, the per-agent guardrail, the fixture
-agent's plant run after the merge, S1 to S4 or their readers, row 9's
+agent's plant run after the merge, S1 to S5 or their readers, row 9's
 reading of `agent_rules`, or the measured value.
 
 | # | Item | Then | Why |
 |---|---|---|---|
 | 1 | Red-team goldens in an agent repository | `rules/redteam.yaml` read and its plants admitted, no red-team golden in the fixture; the measured value stays n of m over guardrail plants | one plant proves the reading; a second kind proves the same reading twice |
 | 2 | The platform opening the pin pull request in the agent repository | the owner copies the id and version from the stack's output into the manifest by hand, as refagent's Rule Owner does today; the platform check accepts it | M07's path exists but binding it to a stack output is a workflow change under Security |
-| 3 | The read-back of the built guardrail (F9.1's second half) | F9.1 reads the version's description digest as the deploy records it in the registry row, and the pin from the answer record; the read-back is named unread | a `GetGuardrail` grant to the observer's role is a Security ruling (§11 R4) |
+| 3 | The read-back of the built guardrail (F9.1's second half) | F9.1 reads the version's description digest as the deploy records it in the registry row (§6, the registry row: that record is PR 2's work either way, so the cut removes the read-back only), and the pin from the answer record; the read-back is named unread | a `GetGuardrail` grant to the observer's role is a Security ruling (§11 R4) |
 | 4 | The template README and quickstart rewritten | one paragraph in each naming the change, the rewrite at the close by `docs-writer` | documents, not readings |
 | 5 | `src/validate/agent_rules.py`'s per-topic limits (name, definition, example lengths) duplicated from `guardrail_spec` | `guardrail_spec` alone refuses them at synth | the refusal moves from the platform check to the build; the reading is the same |
 
@@ -485,6 +534,13 @@ precede. Each is also an **Unsure** item in PR 1's body, with its seat.
   the template ships, so the M08 fixture's row defect, finding 2 of row
   8, is not repeated), and `g-030` the plant, whose wording is the Data
   Owner's and is not changed to make a rule fire.
+- **R10 (Rule Owner).** The re-ruling of `milestones/M08/open.md` row
+  37 itself: that an agent from the template may pin a guardrail of its
+  own, built from its rules on the baseline, in place of refagent's.
+  SPEC/00 §8 M09 item 3 states it; the Rule Owner's ruling file at PR 2
+  carries it, since `guardrail_errors`'s change in `src/validate/agent.py`
+  is Engineering's code under that seat's rule (`product-spec-reviewer`
+  note 11).
 
 ## 12. Not in M09
 
