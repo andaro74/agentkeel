@@ -375,7 +375,7 @@ def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
     claim_6 = CLAIM_6_CHECKS if descends_from(commit, M06_READERS, root) else ()
     claim_7 = CLAIM_7_CHECKS if descends_from(commit, M07_READERS, root) else ()
     claim_8 = CLAIM_8_CHECKS if descends_from(commit, M08_READERS, root) else ()
-    claim_9 = CLAIM_9_CHECKS if M09_READERS and descends_from(commit, M09_READERS, root) else ()
+    claim_9 = CLAIM_9_CHECKS if descends_from(commit, M09_READERS, root) else ()
     return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6 + claim_7 + claim_8 + claim_9
 
 
@@ -1128,6 +1128,8 @@ def rules_reading(envelope: dict[str, Any]) -> list[str]:
         state = "unread" if not one["read"] else ("held" if one["held"] else "not held")
         if name == "F9_1" and one.get("source"):
             state += f" ({one['source']})"
+        if name == "F9_2" and one["read"] and one.get("baseline_in_guardrail") is None:
+            state += " (guardrail half unread)"
         parts.append(f"{name} {state}")
     return parts
 

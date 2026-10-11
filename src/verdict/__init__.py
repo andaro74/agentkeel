@@ -211,7 +211,7 @@ M08_READERS = "91be2c298ba0"
 # guard, into the Makefile (M09 PR 2; SPEC/09 section 4). The gate requires them from here. Named in the
 # commit after it, as M05's to M08's were. On PR 2's branch, and main keeps it because pull requests land as
 # merge commits (ADR-0004 amendment 1).
-M09_READERS: str | None = "9d2f3a7356d5"
+M09_READERS = "9d2f3a7356d5"
 
 
 def descends_from(commit: str, anchor: str, root: Path = ROOT) -> bool:

@@ -129,8 +129,8 @@ messages:
 Three rules of the merge. **Add-only**: you can add a topic with a name the
 platform does not use and a PII entity it does not list; a file that names
 a platform topic, changes a platform entity's action, carries a
-`content_filters` key or a key the format does not have is refused, with
-the rule and the way named. **Every rule has a planted question**: each
+`content_filters` key that differs from the platform's, or a key the
+format does not have, is refused, with the rule and the way named. **Every rule has a planted question**: each
 topic you add is shown to work by a golden of `kind: guardrail` with
 `expected: BLOCKED`, named in `plants`, with a `blocks` entry naming the
 rule that must stop it; a plant with no named rule, or naming a rule your
@@ -150,7 +150,9 @@ on the check holds you to it, and a change to your rules gets a new version
 the same way. Whether each rule stopped its planted question is read from
 the guardrail's trace after the merge and recorded; at M09 a silent rule
 does not stop your merge, and the platform's own two rules (phone and
-email hidden) have no planted question of their own.
+email hidden) have no planted question of their own. No agent with a
+`rules/` folder has been deployed yet: the first is M09's fixture agent,
+whose run is what shows this page's path works.
 
 ## 6. Push, wait for the check, merge
 

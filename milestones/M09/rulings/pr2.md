@@ -8,6 +8,7 @@
 ruling: pr2
 seat: Product
 authorises:
+  - SPEC/09-per-agent-rules.md
   - docs/developer/template-README.md
   - docs/developer/quickstart.md
   - docs/milestones/M09.md
@@ -43,7 +44,11 @@ this PR's four ruling files; each is a draft until it reads "Ruled by".
    falsifiers reads a caller, and nothing in this PR builds one (SPEC/09
    §11 R6, §12). A tenth claim is opened, if at all, by a Product ruling
    as this one was (ADR-0014 decision 1), not folded into row 9.
-2. **The template README and the quickstart say what is now true**: a
+2. **SPEC/09 §2's `content_filters` sentence** reads "that differs from
+   the baseline's" from this PR, as the Rule Owner rules it (`rule-owner`
+   finding 1 on PR 2); the quickstart says the same, and says no agent
+   with `rules/` has been deployed yet (cold review note 4).
+3. **The template README and the quickstart say what is now true**: a
    `rules/guardrail.yaml` is read and merged onto the platform's baseline
    add-only; every rule a team writes carries a planted question; the
    platform builds the agent's guardrail from the merged rules; the
@@ -51,15 +56,15 @@ this PR's four ruling files; each is a draft until it reads "Ruled by".
    (SPEC/09 §8; feasibility §2 finding 1). The sentence "A `rules/`
    folder here is not read", the false state, is corrected now that the
    reader exists (ADR-0014, Consequences), never before.
-3. **The ledger's header row for M09 PR 2**: twenty-one checks, one new
+4. **The ledger's header row for M09 PR 2**: twenty-one checks, one new
    and two changed, with what `validate` still does not read. Put to
    Product as the brief asked; the row is written as proposed.
-4. **The run file's `observed` keys**, stated as a comment above
+5. **The run file's `observed` keys**, stated as a comment above
    `observed: null` so the owner fills what the observer reads and nothing
    else (SPEC/09 §5.1). The file's prose feeds no reading.
-5. **The explainer's engineer rows** say the check landed; "What happened"
+6. **The explainer's engineer rows** say the check landed; "What happened"
    stays empty until the close.
-6. **R7 and R11 are the Data Owner's and are not ruled here.** R7 is built
+7. **R7 and R11 are the Data Owner's and are not ruled here.** R7 is built
    as proposed (the answer record carries each golden's observation in the
    shape `build` writes for refagent's plants, `stop_reason` and
    `guardrail_topics`; `pass` true only when the named rule is among them);

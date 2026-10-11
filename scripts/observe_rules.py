@@ -296,8 +296,16 @@ def main(argv: list[str] | None = None) -> int:
     if unknown := sorted(set(parts) - set(PARTS)):
         print(f"unknown parts {unknown}", file=sys.stderr)
         return 1
-    observation = json.loads(args.out.read_text(encoding="utf-8")) if args.out.is_file() else blank(run_file(args.run))
-    observation = observe(parts, observation)
+    # A run file or an earlier part's file that does not parse is an observation too (security-reviewer on
+    # PR 2): written with its error, every part null, never a failed job.
+    try:
+        observation = json.loads(args.out.read_text(encoding="utf-8")) if args.out.is_file() else blank(run_file(args.run))
+    except (OSError, ValueError, yaml.YAMLError) as exc:
+        observation = {**blank({}), "error": f"{type(exc).__name__}: {exc}"}
+    try:
+        observation = observe(parts, observation)
+    except Exception as exc:  # noqa: BLE001 - a part that cannot be read is written as such, never a failed job
+        observation["error"] = f"{type(exc).__name__}: {exc}"
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(observation, indent=2, default=str) + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {args.out} ({', '.join(observation['parts'])}; made {observation['made']})")

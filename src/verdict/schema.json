@@ -791,12 +791,13 @@
         "F9_2": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["read", "held", "reasons", "refused_on"],
+          "required": ["read", "held", "reasons", "refused_on", "baseline_in_guardrail"],
           "properties": {
             "read": {"type": "boolean"},
             "held": {"type": ["boolean", "null"]},
             "reasons": {"type": "array", "items": {"type": "string"}},
-            "refused_on": {"type": ["array", "null"], "items": {"type": "string"}}
+            "refused_on": {"type": ["array", "null"], "items": {"type": "string"}},
+            "baseline_in_guardrail": {"description": "The second half, from the read-back alone: true when every baseline PII entry is in the built guardrail, false when one is missing, null when the guardrail was not read back (R4's grant not deployed; SPEC/09 section 9 cut 3), which is unread, not a miss.", "type": ["boolean", "null"]}
           }
         },
         "F9_3": {

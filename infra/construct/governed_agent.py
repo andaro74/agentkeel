@@ -490,6 +490,9 @@ class GovernedAgent(Construct):
             description=f"rules sha256 {self.rules_digest}",
         )  # fmt: skip
         # A rules change replaces the version; the one the record names, and old envelopes name, outlives it.
+        # Both retained: a stack delete would otherwise take the guardrail and its versions with it
+        # (security-reviewer on M09 PR 2). Old guardrails and versions are removed by hand, as refagent's.
+        guardrail.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
         version.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
         self.built_guardrail, self.built_version = guardrail, version
 

@@ -43,9 +43,13 @@ def read_back(**override: Any) -> dict[str, Any]:
             "pii": [{"entity": "PHONE", "action": "ANONYMIZE"}, {"entity": "EMAIL", "action": "ANONYMIZE"}], **override}  # fmt: skip
 
 
-def check_run(conclusion: str, refused: list[str] | None = None, summary: str = "") -> dict[str, Any]:
-    return {"name": "platform-check", "conclusion": conclusion, "refused": refused if conclusion != "success" else [],
-            "summary": summary}  # fmt: skip
+APP_ID = 5144253  # infra/platform_identity.json's platform_app_id
+
+
+def check_run(conclusion: str, refused: list[str] | None = None, summary: str = "", app_id: int = APP_ID,
+              completed_at: str = "2026-10-20T09:00:00Z") -> dict[str, Any]:  # fmt: skip
+    return {"name": "platform-check", "app_id": app_id, "conclusion": conclusion, "completed_at": completed_at,
+            "refused": refused if conclusion != "success" else [], "summary": summary}  # fmt: skip
 
 
 def pulls(**override: Any) -> dict[str, Any]:
@@ -93,8 +97,10 @@ def test_the_registry_row_stands_in_for_the_read_back_when_the_read_is_not_grant
     row = {"guardrail_id": STACK["id"], "guardrail_version": "1", "rules_digest": DIGEST}
     reading = agent_rules.record(observation(read_back=None, registry=row))
     assert reading["F9_1"]["held"] is True and reading["F9_1"]["source"] == "registry"
-    # and F9_2's second half is then unread: whether the built guardrail holds every baseline rule rests on the digest
-    assert reading["F9_2"]["held"] is False and any("not read back" in r for r in reading["F9_2"]["reasons"])
+    # and F9_2's second half is unread, not a miss (cold review F1): the refusal holds it, the digest holds the rest
+    assert reading["F9_2"]["held"] is True and reading["F9_2"]["baseline_in_guardrail"] is None
+    assert gate.rules_misses({"agent_rules": reading}) == []
+    assert "F9_2 held (guardrail half unread)" in gate.rules_reading({"agent_rules": reading})
 
 
 # --- F9.2 and F9.4: the three heads ---------------------------------------------------
@@ -110,13 +116,20 @@ def test_the_three_heads_are_read_from_the_platform_checks_own_runs():
     on_more = agent_rules.heads(pulls(second={**pulls()["second"], "check_runs": [check_run("failure", [RULES_CHECK, "seats"])]}))
     assert on_more["held"] is False and any("not on the rules file alone" in r for r in on_more["reasons"])
     assert agent_rules.heads(None)["read"] is False
+    # A check run of the name posted by another App (a workflow job in the agent repository) is not the platform's
+    # (cold review F2); the platform's latest run by completed_at is the one read, not the list's last (N2).
+    impostor = agent_rules.heads(pulls(second={**pulls()["second"], "check_runs": [check_run("success", app_id=15)]}))
+    assert impostor["heads"]["second"] == "unread"
+    older = check_run("failure", ["seats"], completed_at="2026-10-20T08:00:00Z")
+    latest = agent_rules.heads(pulls(first={**pulls()["first"], "check_runs": [check_run("success"), older]}))
+    assert latest["heads"]["first"] == "admitted"
     partial = agent_rules.heads({"first": pulls()["first"]})
     assert partial["read"] is True and partial["heads"]["second"] == "unread" and partial["held"] is False
 
 
 def test_the_weakened_file_is_refused_naming_email_and_the_built_guardrail_holds_the_baseline():
     held = agent_rules.weakened(pulls(), read_back(), {"pii": BASELINE["pii"]})
-    assert held["held"] is True and held["refused_on"] == [RULES_CHECK]
+    assert held["held"] is True and held["refused_on"] == [RULES_CHECK] and held["baseline_in_guardrail"] is True
     unnamed = agent_rules.weakened(pulls(second={**pulls()["second"], "check_runs": [check_run("failure", [RULES_CHECK], "refused")]}),
                                    read_back(), {"pii": BASELINE["pii"]})  # fmt: skip
     assert unnamed["held"] is False and any("EMAIL" in r for r in unnamed["reasons"])
@@ -247,8 +260,11 @@ def test_the_observer_writes_a_run_not_made_as_not_made_and_reads_nothing(tmp_pa
         raise AssertionError("a run not made reads nothing")
 
     monkeypatch.setattr(observer, "gh", never)
+    run = tmp_path / "run.yaml"  # its own run file, not the tree's, which the owner fills at PR 3 (cold review F4)
+    run.write_text(yaml.safe_dump({"seed": "run", "repository": "agentkeel-studio/festival-desk", "agent": "festival-desk",
+                                   "observed": None}), encoding="utf-8")  # fmt: skip
     out = tmp_path / "rules.json"
-    assert observer.main(["--read", "github,bucket,registry,guardrail", "--out", str(out)]) == 0
+    assert observer.main(["--read", "github,bucket,registry,guardrail", "--run", str(run), "--out", str(out)]) == 0
     written = json.loads(out.read_text(encoding="utf-8"))
     assert written["made"] is False and written["answer"] is None and written["pulls"] is None
     assert agent_rules.record(written)["F9_1"]["read"] is False
@@ -299,3 +315,11 @@ def test_the_observer_computes_the_digest_from_the_merge_commit_and_main_and_rea
     # build reads it as the observer handed it over: the heads held, the weakened file refused naming EMAIL
     reading = agent_rules.record({**written, "answer": record(guardrail=STACK), "read_back": read_back(description=f"rules sha256 {written['tree_digest']}")})
     assert reading["F9_4"]["held"] is True and reading["F9_2"]["held"] is True
+
+
+def test_a_messages_key_that_is_not_two_strings_is_refused_not_a_crash():
+    """cold review F5 on PR 2: every refusal named, including a messages value the format does not have."""
+    for bad in ("a string", ["a", "list"], {"blocked_input": 1, "blocked_output": "x"}, {"other": "x"}):
+        errors = merge_module.merge_errors(BASELINE, {**RULES, "messages": bad})
+        assert any("messages carries blocked_input and blocked_output" in e for e in errors), bad
+        merge_module.merge(BASELINE, {**RULES, "messages": bad})  # merges without raising; merge_errors said why

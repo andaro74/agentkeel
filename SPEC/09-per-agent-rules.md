@@ -92,8 +92,10 @@ a model, and the baseline's content is not yet ruled.
   added to a topic only by naming it, and it steers what the rule
   matches), lists a baseline PII entity with any action but the
   baseline's (`ANONYMIZE` to `NONE` is the seeded case), carries a
-  `content_filters` key at all (the filters are the baseline's alone;
-  `rule-owner` finding 4 on PR 1), or an unknown top-level key (so a
+  `content_filters` key that differs from the baseline's (the filters are
+  the baseline's alone, `rule-owner` finding 4 on PR 1; an identical one
+  dedupes, as an identical PII entry does, R1 at PR 2), or an unknown
+  top-level key (so a
   misspelled `pii:` cannot add nothing silently), is **refused** with the
   rule and the way named. `topics_apply_to` is in both files; the merge
   takes the stricter of the two ("input and output" over "input"), and

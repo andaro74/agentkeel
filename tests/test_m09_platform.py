@@ -92,8 +92,9 @@ def test_the_version_carries_the_digest_of_the_baseline_and_the_agents_files_and
     _, version = the_one(fixture_template, "AWS::Bedrock::GuardrailVersion")
     digest = agent_rules.digest(BASELINE.read_bytes(), (FIXTURE / "rules" / "guardrail.yaml").read_bytes())
     assert version["Description"] == f"rules sha256 {digest}"
-    (resource,) = of_type(fixture_template, "AWS::Bedrock::GuardrailVersion").values()
-    assert resource.get("DeletionPolicy") == "Retain" and resource.get("UpdateReplacePolicy") == "Retain"
+    for kind in ("AWS::Bedrock::GuardrailVersion", "AWS::Bedrock::Guardrail"):
+        (resource,) = of_type(fixture_template, kind).values()
+        assert resource.get("DeletionPolicy") == "Retain" and resource.get("UpdateReplacePolicy") == "Retain", kind
     outputs = fixture_template["Outputs"]
     assert outputs["GuardrailDigest"]["Value"] == digest
     assert {"GuardrailId", "GuardrailVersion"} <= set(outputs)
@@ -195,6 +196,14 @@ def test_the_execution_role_makes_a_guardrail_only_with_the_tag_and_touches_only
     by_sid = {s["Sid"]: s for s in found}
     assert set(by_sid) == {"MakeAnAgentsGuardrailOnlyWithItsTag", "ReadUpdateVersionAndRemoveATaggedAgentsGuardrailOnly"}
     assert by_sid["MakeAnAgentsGuardrailOnlyWithItsTag"]["Condition"] == {"Null": {f"aws:RequestTag/{TAG}": "false"}}
+    # CreateGuardrail alone on the request-tag side: TagResource there could tag refagent's untagged guardrail and
+    # bring it under the resource-tag statement (security-reviewer and cold review F3 on PR 2).
+    assert actions(by_sid["MakeAnAgentsGuardrailOnlyWithItsTag"]) == {"bedrock:CreateGuardrail"}
+    tagging = [s for s in statements(named(bootstrap_template, "agentkeel-deploy-boundary"), "Deny")
+               if "bedrock:TagResource" in actions(s)]  # fmt: skip
+    assert len(tagging) == 1 and actions(tagging[0]) == {"bedrock:TagResource", "bedrock:UntagResource"}
+    assert tagging[0]["Condition"] == {"Null": {f"aws:RequestTag/{TAG}": "true", f"aws:ResourceTag/{TAG}": "true"}}
+    assert "guardrail/*" in json.dumps(tagging[0]["Resource"]) and "profile" not in json.dumps(tagging[0]["Resource"])
     assert by_sid["ReadUpdateVersionAndRemoveATaggedAgentsGuardrailOnly"]["Condition"] == {"Null": {f"aws:ResourceTag/{TAG}": "false"}}
     assert "bedrock:ListGuardrails" not in {a for s in found for a in actions(s)}
 

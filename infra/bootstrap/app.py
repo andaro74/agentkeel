@@ -453,6 +453,16 @@ class BootstrapStack(cdk.Stack):
                     resources=["*"],
                     conditions=UNTAGGED_GUARDRAIL,
                 ),
+                # And never tag or untag one: a tag put on refagent's untagged guardrail would bring it under
+                # every grant above (security-reviewer on M09 PR 2). On guardrails alone, so the inference
+                # profiles' and runtimes' tags are untouched.
+                iam.PolicyStatement(
+                    sid="NeverTagAGuardrailThatIsNotATaggedAgentsOwn",
+                    effect=iam.Effect.DENY,
+                    actions=["bedrock:TagResource", "bedrock:UntagResource"],
+                    resources=[f"arn:aws:bedrock:{REGION}:{self.account}:guardrail/*"],
+                    conditions=UNTAGGED_GUARDRAIL,
+                ),
             ]),
         )  # fmt: skip
 
@@ -761,9 +771,13 @@ class BootstrapStack(cdk.Stack):
         # refagent's guardrail is the bootstrap's, untagged, and this role may not reach it (the deploy
         # boundary's narrowed deny above says the same).
         guardrails = f"arn:aws:bedrock:{REGION}:{self.account}:guardrail/*"
+        # CreateGuardrail alone: CloudFormation passes the tags in the create request, and TagResource on an
+        # existing guardrail is in the statement below, held to one already tagged. With TagResource here a
+        # request carrying the tag could tag refagent's untagged guardrail and bring it under the statement
+        # below (security-reviewer and cold review F3 on M09 PR 2); the deploy boundary denies that too.
         role.add_to_policy(iam.PolicyStatement(
             sid="MakeAnAgentsGuardrailOnlyWithItsTag",
-            actions=["bedrock:CreateGuardrail", "bedrock:TagResource"],
+            actions=["bedrock:CreateGuardrail"],
             resources=[guardrails],
             conditions={"Null": {f"aws:RequestTag/{AGENT_TAG}": "false"}},
         ))  # fmt: skip
@@ -1521,9 +1535,10 @@ SUPPRESSIONS = {
         f"37074759767 were refused without them); that one statement is wider than the platform's runtimes: it "
         f"reaches every runtime in this shared account. M09 PR 2 (SPEC/01 §6's execution role, as SPEC/09 §6's "
         f"guardrail builder extends it, R3): guardrail/* is an agent's own guardrail, whose id AWS assigns at "
-        f"create; CreateGuardrail and TagResource are held to a request tagged agentkeel:agent, and every action "
-        f"on an existing guardrail to one carrying that tag, so refagent's, untagged, and any other in this "
-        f"shared account are out of reach; the deploy boundary's narrowed deny says the same. {CEILING}"
+        f"create; CreateGuardrail is held to a request tagged agentkeel:agent, and every action on an existing "
+        f"guardrail, tagging included, to one carrying that tag, so refagent's, untagged, and any other in this "
+        f"shared account are out of reach; the deploy boundary denies the same, and denies tagging an untagged "
+        f"guardrail. {CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "

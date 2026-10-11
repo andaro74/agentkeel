@@ -108,7 +108,8 @@ def merge(baseline: dict[str, Any], agent: dict[str, Any]) -> dict[str, Any]:
         "denied_topics": [dict(t) for t in _topics(baseline)],
         "pii": [dict(e) for e in _pii(baseline)],
         "content_filters": dict(baseline.get("content_filters") or {}),
-        "messages": {**(baseline.get("messages") or {}), **(agent.get("messages") or {})},
+        "messages": {**(baseline.get("messages") if isinstance(baseline.get("messages"), dict) else {}),
+                     **(agent.get("messages") if isinstance(agent.get("messages"), dict) else {})},
     }
     base_names = {_name_key(t.get("name")) for t in merged["denied_topics"]}
     for topic in _topics(agent):
@@ -203,6 +204,10 @@ def merge_errors(baseline: dict[str, Any], agent: Any, where: str = "rules/guard
         errors.append(f"{where}: denied_topics is not a list")
     if "pii" in agent and not isinstance(agent["pii"], list):
         errors.append(f"{where}: pii is not a list")
+    messages = agent.get("messages")
+    if "messages" in agent and (not isinstance(messages, dict) or not set(messages) <= {"blocked_input", "blocked_output"}
+                                or not all(isinstance(v, str) and v for v in messages.values())):  # fmt: skip
+        errors.append(f"{where}: messages carries blocked_input and blocked_output, each a string, and nothing else")
     if "content_filters" in agent and agent["content_filters"] != baseline.get("content_filters"):
         errors.append(f"{where}: content_filters {agent['content_filters']!r}: the filters are the baseline's alone "
                       f"({baseline.get('content_filters')!r}), and the prompt-attack filter is off (the Rule Owner, M03 "

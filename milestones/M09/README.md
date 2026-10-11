@@ -151,14 +151,21 @@ for a ruling file that reads "Ruled by".
    repair, not a finding of the claim.
 2. **The Rule Owner moves refagent's manifest to the new version** once
    the stack's `GuardrailVersionForTheManifest` output reads it (R2: one
-   key; the id is unchanged). Before PR 3's run, so refagent's envelope at
-   that run carries the baseline's digest. `plants_fired` must stay 7 of 7.
+   key; the id is unchanged), in a pull request of its own citing
+   `milestones/M09/rulings/refagent-version-6.md` (Rule Owner,
+   `authorises: agents/refagent/manifest.yaml`). Before PR 3's run, so
+   refagent's envelope at that run carries the baseline's digest; until
+   then refagent's runtime carries version 5, the same rules, and no page
+   calls it the baseline's. `plants_fired` must stay 7 of 7.
 3. **The owner makes `agentkeel-studio/festival-desk`** (R8, public) and
    opens the three pull requests in the order the run file states (R9: the
    golden is never edited), filling `observed` with the numbers and the
    answer record's key; the observer reads the rest.
 4. If R4's grant is not deployed when PR 3's run reads, F9.1 reads the
-   registry row's digest and the envelope says so (`source: registry`).
+   registry row's digest and the envelope says so (`source: registry`), and
+   F9.2's guardrail half is unread (`baseline_in_guardrail: null`), named
+   in the cell; neither is a miss. Step 1 before the run is what makes
+   both read whole.
 
 ### What a reader can run
 

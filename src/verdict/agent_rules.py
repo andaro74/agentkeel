@@ -38,6 +38,7 @@ is unread, which row 9 reads as RED (SPEC/09 §4).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +50,7 @@ READINGS = ("F9_1", "F9_2", "F9_3", "F9_4")
 # The platform check's name for the rules reading (src/validate/agent.evaluate), as its App posts it.
 RULES_CHECK = "an agent's rules on the platform baseline, add-only, each plant naming a rule it builds"
 BLOCKED = "guardrail_intervened"
+PLATFORM_CHECK = "platform-check"
 
 
 class Unreadable(Exception):
@@ -148,12 +150,29 @@ def guardrail(record: dict[str, Any] | None, read_back: dict[str, Any] | None, t
 # --- F9.2 and F9.4: the platform check's results on the three heads --------------
 
 
-def _check(pull: dict[str, Any] | None) -> dict[str, Any] | None:
-    """The platform's check run on a head, as the observer recorded it; None when unread."""
+IDENTITY = ROOT / "infra" / "platform_identity.json"
+
+
+def platform_app_id(path: Path = IDENTITY) -> int | None:
+    """The App whose check an agent repository's ruleset requires (Security's identity file); None when unread."""
+    try:
+        found = json.loads(path.read_text(encoding="utf-8")).get("platform_app_id")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return found if isinstance(found, int) else None
+
+
+def _check(pull: dict[str, Any] | None, app_id: int | None = None) -> dict[str, Any] | None:
+    """The platform App's latest `platform-check` run on a head, as the observer recorded it; None when unread.
+
+    Held to the App's id (cold review F2 on PR 2): a workflow job in the agent repository may post a check
+    run of that name, and it is not the platform's. The latest by `completed_at`, not the list's last (N2)."""
     if not isinstance(pull, dict) or not pull.get("found"):
         return None
-    runs = [r for r in pull.get("check_runs") or [] if isinstance(r, dict) and r.get("name") == "platform-check"]
-    return runs[-1] if runs else None
+    app_id = platform_app_id() if app_id is None else app_id
+    runs = [r for r in pull.get("check_runs") or [] if isinstance(r, dict) and r.get("name") == PLATFORM_CHECK
+            and (app_id is None or r.get("app_id") == app_id)]  # fmt: skip
+    return max(runs, key=lambda r: str(r.get("completed_at") or "")) if runs else None
 
 
 def heads(pulls: dict[str, Any] | None) -> dict[str, Any]:
@@ -192,11 +211,16 @@ def heads(pulls: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def weakened(pulls: dict[str, Any] | None, read_back: dict[str, Any] | None, baseline: dict[str, Any] | None) -> dict[str, Any]:
-    """F9.2: the weakened file refused naming EMAIL, and the built guardrail holds every baseline rule."""
+    """F9.2: the weakened file refused naming EMAIL, and the built guardrail holds every baseline rule.
+
+    The second half is read from the read-back alone. Without it (R4's grant not deployed; SPEC/09 section 9
+    cut 3) that half is **unread**, `baseline_in_guardrail: null`, and the entry rests on the refusal and on
+    F9_1's digest of the whole tree; it is not a miss (cold review F1 on PR 2). Row 9's cell names it."""
     second, check = (pulls or {}).get("second") if isinstance(pulls, dict) else None, _check((pulls or {}).get("second") if isinstance(pulls, dict) else None)
     reasons: list[str] = []
     if check is None:
-        return _entry(False, ["the second pull request's platform-check run was not read"], refused_on=None)
+        return _entry(False, ["the second pull request's platform-check run was not read"], refused_on=None,
+                      baseline_in_guardrail=None)  # fmt: skip
     summary = check.get("summary") or ""
     refused = check.get("refused")
     if check.get("conclusion") == "success":
@@ -208,13 +232,13 @@ def weakened(pulls: dict[str, Any] | None, read_back: dict[str, Any] | None, bas
     if isinstance(second, dict) and second.get("merged"):
         reasons.append("the second pull request merged")
     wanted = {(e.get("entity"), e.get("action")) for e in (baseline or {}).get("pii") or [] if isinstance(e, dict)}
+    in_guardrail: bool | None = None
     if isinstance(read_back, dict) and read_back.get("source") == "read_back":
         held = {(e.get("entity"), e.get("action")) for e in read_back.get("pii") or [] if isinstance(e, dict)}
+        in_guardrail = not (wanted - held)
         if missing := sorted(wanted - held):
             reasons.append(f"the built guardrail lacks the baseline's {missing}")
-    else:
-        reasons.append("the built guardrail was not read back: whether it holds every baseline rule rests on F9_1's digest")
-    return _entry(True, reasons, refused_on=refused)
+    return _entry(True, reasons, refused_on=refused, baseline_in_guardrail=in_guardrail)
 
 
 # --- the whole reading, for build ---------------------------------------------------
@@ -260,7 +284,7 @@ def record(observation: dict[str, Any]) -> dict[str, Any]:
         unread = ["the run has not been made: no agent repository with rules exists"]
         return {**out, "pin": None, "expected": 0, "fired": 0,
                 "F9_1": _entry(False, unread, pin=None, digest_expected=None, digest_read=None, source=None),
-                "F9_2": _entry(False, unread, refused_on=None),
+                "F9_2": _entry(False, unread, refused_on=None, baseline_in_guardrail=None),
                 "F9_3": _entry(False, unread, expected=0, fired=0, fired_by={}),
                 "F9_4": _entry(False, unread, heads={})}  # fmt: skip
     planted = plants(answer, blocks_of(observation.get("rules")))
