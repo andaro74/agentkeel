@@ -750,7 +750,8 @@ def test_panel_1s_check_does_not_read_panel_2_and_the_other_way(tmp_path):
 
     names = [name for name in checks.CHECKS if "panel 2" in name]
     assert names == ["panel 2 selects the verdict as stored, from the envelopes' table and nothing else"]
-    assert checks.CHECKS[names[0]] is panel.check_panel_2 and len(checks.CHECKS) == 20
+    # Twenty at M07 PR 2; twenty-one from M09 PR 2 (the platform baseline, SPEC/09 section 6).
+    assert checks.CHECKS[names[0]] is panel.check_panel_2 and len(checks.CHECKS) == 21
 
 
 # --- inherited from PR 1's review: claim 6's readers (src/verdict/template.py) ----

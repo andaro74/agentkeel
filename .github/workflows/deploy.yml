@@ -105,6 +105,24 @@
 #
 # None of the retirement has run: S2's attempt is made after M07 PR 2
 # merges, last.
+#
+# **From M09 PR 2 an agent with `rules/` gets its own guardrail** (SPEC/09 §2,
+# §6; milestones/M09/rulings/pr2-security.md, R3). Nothing new runs: the
+# construct builds `agentkeel-<name>` in the agent's stack from its rules
+# merged onto `rules/baseline.yaml`, tagged with the agent's name, and the
+# execution role may make a guardrail only with that tag (the bootstrap's
+# deploy boundary and execution role, narrowed at M09 PR 2). `deploy-agent`
+# then reads the stack's GuardrailId, GuardrailVersion and GuardrailDigest
+# outputs, hands the pin to `build answer` so the answer record names the
+# guardrail the call carried (never the manifest's placeholder), and writes
+# all three to the registry row. Before the stack is touched it runs the
+# platform check once more with the pin the registry row holds
+# (`--held-guardrail`): a head whose manifest pins anything but the built
+# guardrail is refused here, so a placeholder is admitted only while the row
+# holds no guardrail for the agent (the placeholder's life, R3, R10); the
+# check's own job holds no AWS credential and cannot read the row. An agent
+# without `rules/` is deployed as at M06, with refagent's pin and no outputs.
+# None of this has run on an agent with rules/: the first is PR 3's run.
 name: deploy
 
 on:
@@ -533,6 +551,19 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # M09 PR 2 (SPEC/09 §2 "The placeholder pin"; R3, R10): the platform check once more, with the pin the
+      # registry row holds. A head that pins a guardrail the row does not hold is refused before the stack is
+      # touched; a row with no guardrail yet admits the placeholder, which the first deploy replaces with the
+      # built one. The check's own job (platform-check.yml) holds no AWS credential, so this is where the row
+      # is read. Nothing of the agent's runs: the folder is parsed as data.
+      - name: The head's pin is the one the registry holds, or the row holds none yet
+        if: steps.registry.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          held=$(uv run python scripts/registry.py guardrail --name "$NAME")
+          uv run python -m src.validate.agent evaluate --agent "agents/$NAME" --repository "$REPOSITORY" \
+            --head "$COMMIT" --defer-seat-access --held-guardrail "$held" --out "$RUNNER_TEMP/check-held.json"
+
       - uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
         if: steps.registry.outputs.skip == 'false'
         id: ecr
@@ -578,11 +609,35 @@ jobs:
           uv run python scripts/load_rights_table.py --table "agentkeel-$NAME-rights"
           --rights "agents/$NAME/data/table.json" --marker "/agentkeel/marker/$NAME/rights-table-digest"
 
-      # Item 4 (R7): the deployed agent, asked its own goldens in its runtime, scored by build.
+      # M09 PR 2 (SPEC/09 §2, §6; R3): the guardrail the stack built for an agent with rules/, from its outputs.
+      # Empty for an agent without rules/, whose stack has no such outputs. The pin reaches the answer record
+      # and the registry row; the owner copies it into the manifest (SPEC/09 §5.1, the third pull request).
+      - name: The guardrail the stack built
+        if: steps.registry.outputs.skip == 'false'
+        id: guardrail
+        run: |
+          set -euo pipefail
+          outputs=$(aws cloudformation describe-stacks --stack-name agentkeel-"$NAME" --query "Stacks[0].Outputs" --output json)
+          read_output() { printf '%s' "$outputs" | python3 -c 'import json, sys; o = json.load(sys.stdin) or []; print(next((x["OutputValue"] for x in o if x["OutputKey"] == sys.argv[1]), ""))' "$1"; }
+          id=$(read_output GuardrailId); version=$(read_output GuardrailVersion); digest=$(read_output GuardrailDigest)
+          if [ -n "$id" ] && [ -n "$version" ]; then
+            echo "pin=$id:$version" >> "$GITHUB_OUTPUT"
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+            echo "guardrail $id:$version, rules sha256 $digest" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "pin=" >> "$GITHUB_OUTPUT"
+            echo "digest=" >> "$GITHUB_OUTPUT"
+            echo "no guardrail built by the stack: the agent carries no rules/ and pins the platform's" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Item 4 (R7): the deployed agent, asked its own goldens in its runtime, scored by build. From M09 PR 2 the
+      # record also names the guardrail the stack built, which the call carried (the construct conditions the
+      # invoke on it), never the manifest's pin.
       - name: The agent answers its own goldens
         if: steps.registry.outputs.skip == 'false'
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PIN: ${{ steps.guardrail.outputs.pin }}
         run: |
           set -euo pipefail
           arn=$(aws cloudformation describe-stacks --stack-name agentkeel-"$NAME" \
@@ -590,7 +645,7 @@ jobs:
           AGENTKEEL_RUNTIME_ARN="$arn" uv run python -m src.agent.run --bundle "agents/$NAME" --commit "$COMMIT" \
             --goldens "agents/$NAME/goldens" --out "$RUNNER_TEMP/answer-raw.json" || true
           uv run python -m src.verdict.build answer --raw "$RUNNER_TEMP/answer-raw.json" --agent-dir "agents/$NAME" \
-            --repository "$REPOSITORY" --run-url "$RUN_URL" --out "$RUNNER_TEMP/answer.json"
+            --repository "$REPOSITORY" --run-url "$RUN_URL" --guardrail "$PIN" --out "$RUNNER_TEMP/answer.json"
           echo "deployed $arn; $(uv run python -c 'import json,sys; print(json.load(open(sys.argv[1]))["verdict"])' "$RUNNER_TEMP/answer.json")" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -665,9 +720,12 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
           ANSWER_PUT: ${{ steps.answer.outputs.put }}
+          PIN: ${{ steps.guardrail.outputs.pin }}
+          DIGEST: ${{ steps.guardrail.outputs.digest }}
         run: >-
           uv run python scripts/registry.py write --name "$NAME" --repository "$REPOSITORY"
           --repository-id "$REPOSITORY_ID" --commit "$COMMIT" --run-id "$RUN_ID" --answer-put "$ANSWER_PUT"
+          --guardrail "$PIN" --rules-digest "$DIGEST"
 
   # --- M07 PR 2: a retirement (SPEC/07 section 6; rulings/pr2-security.md items 4 and 11) -----
 

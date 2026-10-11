@@ -3,7 +3,8 @@
     python scripts/registry.py deployed --name NAME --commit SHA             # exit 0 if that commit is deployed
     python scripts/registry.py claim --name NAME --repository ORG/REPO --repository-id ID   # before the stack
     python scripts/registry.py write --name NAME --repository ORG/REPO --repository-id ID \
-        --commit SHA --run-id RUN [--answer-put first|stood]                  # after the agent answered
+        --commit SHA --run-id RUN [--answer-put first|stood] [--guardrail ID:VERSION --rules-digest SHA256]  # after the agent answered
+    python scripts/registry.py guardrail --name NAME                         # the pin the row holds, or an empty line (M09 PR 2)
     python scripts/registry.py retiring --name NAME --repository-id ID --arn ARN   # before the runtime is removed
     python scripts/registry.py retire --name NAME --repository-id ID --commit SHA --run-id RUN   # after it is gone
 
@@ -38,6 +39,14 @@ From M07 PR 2 (SPEC/07 section 6):
   condition, so a later head that drops `rollout: retired` is not deployed
   and cannot replace the row (security-reviewer 8 on M07 PR 2: `write` puts
   a whole item, and would have dropped `retired_at`).
+
+From M09 PR 2 (SPEC/09 §2, §6; R3): for an agent with `rules/`, `write`
+also records the guardrail the agent's stack built, `guardrail_id`,
+`guardrail_version` and `rules_digest`, from the stack's outputs; `guardrail`
+prints the pin the row holds, which deploy.yml hands to the platform check
+so a manifest that pins anything but the built guardrail is refused once the
+row holds one (the placeholder's life). `scripts/observe_rules.py` reads the
+row's digest where the guardrail cannot be read back (SPEC/09 §9 cut 3).
 """
 
 from __future__ import annotations
@@ -93,12 +102,34 @@ def claim(dynamodb: Any, name: str, repository: str, repository_id: str) -> tupl
     return 0, f"{name}: already this repository's"
 
 
+def guardrail(dynamodb: Any, name: str) -> tuple[int, str]:
+    """The guardrail the row records for `name`, `<id>:<version>`, or nothing (M09 PR 2, R3).
+
+    Exit 0 and the pin when the row holds one; 0 and an empty line when the row holds none or there is no
+    row (a placeholder is admitted then); never raises for a missing row. deploy.yml hands the pin to the
+    platform check's `--held-guardrail`, which refuses a head whose manifest pins something else."""
+    item = dynamodb.get_item(TableName=TABLE, Key={"name": {"S": name}}, ConsistentRead=True).get("Item") or {}
+    held_id = (item.get("guardrail_id") or {}).get("S")
+    held_version = (item.get("guardrail_version") or {}).get("S")
+    return 0, f"{held_id}:{held_version}" if held_id and held_version else ""
+
+
 def write(dynamodb: Any, name: str, repository: str, repository_id: str, commit: str, run_id: str,
-          answer_put: str | None = None) -> tuple[int, str]:  # fmt: skip
+          answer_put: str | None = None, guardrail_pin: str | None = None, rules_digest: str | None = None) -> tuple[int, str]:  # fmt: skip
     from botocore.exceptions import ClientError
 
     now = datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
     said = {} if answer_put is None else {"answer_put": {"S": answer_put}}
+    # M09 PR 2 (SPEC/09 §6, the registry row): the guardrail the stack built for an agent with rules/, its
+    # version and the digest its description carries, as the deploy read them from the stack's outputs. Read
+    # by `guardrail` above and by scripts/observe_rules.py (SPEC/09 §9 cut 3). An agent without rules/ writes none.
+    if guardrail_pin:
+        pin_id, _, pin_version = guardrail_pin.partition(":")
+        if not pin_id or not pin_version:
+            return 3, f"{name}: --guardrail {guardrail_pin!r} is not <id>:<version>"
+        said |= {"guardrail_id": {"S": pin_id}, "guardrail_version": {"S": pin_version}}
+        if rules_digest:
+            said["rules_digest"] = {"S": rules_digest}
     try:
         dynamodb.put_item(
             TableName=TABLE,
@@ -112,7 +143,8 @@ def write(dynamodb: Any, name: str, repository: str, repository_id: str, commit:
         if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
             return 3, f"{name} was taken by another repository, or retired, between the claim and the write"
         raise
-    return 0, f"{name}: {repository}@{commit[:12]}, run {run_id}, {now}" + (f", answer record {answer_put}" if answer_put else "")
+    return 0, (f"{name}: {repository}@{commit[:12]}, run {run_id}, {now}" + (f", answer record {answer_put}" if answer_put else "")
+               + (f", guardrail {guardrail_pin}" if guardrail_pin else ""))  # fmt: skip
 
 
 PLATFORM_AGENT = "refagent"  # never retired by this path (SPEC/07 section 6)
@@ -182,6 +214,11 @@ def main(argv: list[str] | None = None) -> int:
     for flag in ("--name", "--repository", "--repository-id", "--commit", "--run-id"):
         two.add_argument(flag, required=True)
     two.add_argument("--answer-put", choices=("first", "stood"))
+    # M09 PR 2: the stack's guardrail outputs for an agent with rules/; empty for one without.
+    two.add_argument("--guardrail", default="")
+    two.add_argument("--rules-digest", default="")
+    five = sub.add_parser("guardrail")
+    five.add_argument("--name", required=True)
     three = sub.add_parser("retiring")
     for flag in ("--name", "--repository-id"):
         three.add_argument(flag, required=True)
@@ -202,11 +239,15 @@ def main(argv: list[str] | None = None) -> int:
         code, said = deployed(client(), args.name, args.commit)
         print(said)
         return code
+    if args.what == "guardrail":
+        code, said = guardrail(client(), args.name)
+        print(said)  # the pin, or an empty line: the row holds none
+        return code
     if args.what == "claim":
         code, said = claim(client(), args.name, args.repository, args.repository_id)
     else:
         code, said = write(client(), args.name, args.repository, args.repository_id, args.commit, args.run_id,
-                           args.answer_put)  # fmt: skip
+                           args.answer_put, args.guardrail or None, args.rules_digest or None)  # fmt: skip
     print(said, file=sys.stderr if code else sys.stdout)
     return code
 

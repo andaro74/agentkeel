@@ -205,7 +205,8 @@ def merge_errors(baseline: dict[str, Any], agent: Any, where: str = "rules/guard
         errors.append(f"{where}: pii is not a list")
     if "content_filters" in agent and agent["content_filters"] != baseline.get("content_filters"):
         errors.append(f"{where}: content_filters {agent['content_filters']!r}: the filters are the baseline's alone "
-                      f"({baseline.get('content_filters')!r}); an agent file may not turn one on or off (R1)")  # fmt: skip
+                      f"({baseline.get('content_filters')!r}), and the prompt-attack filter is off (the Rule Owner, M03 "
+                      f"PR 2; R1); an agent file may not turn one on or off")  # fmt: skip
     base_topics = {_name_key(t.get("name")): t.get("name") for t in _topics(baseline)}
     for topic in _topics(agent):
         key = _name_key(topic.get("name"))

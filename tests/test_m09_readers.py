@@ -213,3 +213,89 @@ def test_the_digest_ignores_line_endings_and_orders_the_baseline_first():
     """What the construct writes on the version and the observer computes again from `git show` (cold review N7 on PR 1)."""
     assert merge_module.digest(b"a: 1\r\n", b"b: 2\r\n") == merge_module.digest(b"a: 1\n", b"b: 2\n")
     assert merge_module.digest(b"a: 1\n", b"b: 2\n") != merge_module.digest(b"b: 2\n", b"a: 1\n")
+
+
+# --- the registry row's guardrail fields (scripts/registry.py) -------------------------------
+
+
+def test_the_registry_row_records_the_built_guardrail_and_prints_the_pin_it_holds():
+    """R3: the deploy writes id, version and digest from the stack's outputs; `guardrail` prints the pin, or nothing."""
+    from scripts import registry
+
+    from .test_m06_readers import FakeTable
+
+    table = FakeTable()
+    assert registry.guardrail(table, "festival-desk") == (0, "")  # no row: a placeholder is admitted
+    assert registry.claim(table, "festival-desk", "agentkeel-studio/festival-desk", "9")[0] == 0
+    assert registry.guardrail(table, "festival-desk") == (0, "")  # a row with no guardrail yet
+    code, said = registry.write(table, "festival-desk", "agentkeel-studio/festival-desk", "9", "1" * 40, "7",
+                                "first", f"{STACK['id']}:1", DIGEST)  # fmt: skip
+    assert code == 0 and f"guardrail {STACK['id']}:1" in said
+    row = table.items["festival-desk"]
+    assert (row["guardrail_id"]["S"], row["guardrail_version"]["S"], row["rules_digest"]["S"]) == (STACK["id"], "1", DIGEST)
+    assert registry.guardrail(table, "festival-desk") == (0, f"{STACK['id']}:1")
+    assert registry.write(table, "festival-desk", "agentkeel-studio/festival-desk", "9", "2" * 40, "8", None, "nocolon")[0] == 3
+
+
+# --- the observer writes raw records (scripts/observe_rules.py) -----------------------------
+
+
+def test_the_observer_writes_a_run_not_made_as_not_made_and_reads_nothing(tmp_path, monkeypatch):
+    from scripts import observe_rules as observer
+
+    def never(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("a run not made reads nothing")
+
+    monkeypatch.setattr(observer, "gh", never)
+    out = tmp_path / "rules.json"
+    assert observer.main(["--read", "github,bucket,registry,guardrail", "--out", str(out)]) == 0
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert written["made"] is False and written["answer"] is None and written["pulls"] is None
+    assert agent_rules.record(written)["F9_1"]["read"] is False
+
+
+def test_the_observer_computes_the_digest_from_the_merge_commit_and_main_and_reads_the_checks(tmp_path, monkeypatch):
+    """The digest is the observer's own, from bytes it fetched by the merge commit and `git show` of main, never
+    the builder's (SPEC/09 §4, note 9); the heads' check runs are GitHub's own."""
+    import base64
+
+    from scripts import observe_rules as observer
+
+    guardrail_bytes = (AGENT / "rules" / "guardrail.yaml").read_bytes()
+    summary = f"- **{RULES_CHECK}**: rules/guardrail.yaml: pii EMAIL: ANONYMIZE to NONE"
+    answers = {
+        "/repos/agentkeel-studio/festival-desk/pulls/1": {"merged": True, "merged_at": "t", "head": {"sha": "a" * 40}, "merge_commit_sha": "1" * 40},
+        "/repos/agentkeel-studio/festival-desk/pulls/2": {"merged": False, "merged_at": None, "head": {"sha": "b" * 40}, "merge_commit_sha": None},
+        "/repos/agentkeel-studio/festival-desk/pulls/3": {"merged": True, "merged_at": "t", "head": {"sha": "c" * 40}, "merge_commit_sha": "3" * 40},
+        f"/repos/agentkeel-studio/festival-desk/commits/{'a' * 40}/check-runs?per_page=100": {"check_runs": [
+            {"name": "platform-check", "app": {"id": 5144253}, "conclusion": "success", "output": {"summary": "Every check passed."}}]},
+        f"/repos/agentkeel-studio/festival-desk/commits/{'b' * 40}/check-runs?per_page=100": {"check_runs": [
+            {"name": "platform-check", "app": {"id": 5144253}, "conclusion": "failure", "output": {"summary": summary}}]},
+        f"/repos/agentkeel-studio/festival-desk/commits/{'c' * 40}/check-runs?per_page=100": {"check_runs": [
+            {"name": "platform-check", "app": {"id": 5144253}, "conclusion": "success", "output": {"summary": "Every check passed."}}]},
+        f"/repos/agentkeel-studio/festival-desk/contents/rules/guardrail.yaml?ref={'1' * 40}": {
+            "encoding": "base64", "content": base64.b64encode(guardrail_bytes).decode()},
+    }  # fmt: skip
+
+    def fake_gh(path: str, *, raw: bool = False) -> Any:
+        import urllib.error
+
+        if path not in answers:
+            raise urllib.error.HTTPError(path, 404, "not found", {}, None)  # type: ignore[arg-type]
+        return answers[path]
+
+    monkeypatch.setattr(observer, "gh", fake_gh)
+    run = tmp_path / "run.yaml"
+    run.write_text(yaml.safe_dump({"seed": "run", "repository": "agentkeel-studio/festival-desk", "agent": "festival-desk",
+                                   "observed": {"first": {"pull_request": 1}, "second": {"pull_request": 2},
+                                                "third": {"pull_request": 3}, "deploy": {"run_id": 1}}}), encoding="utf-8")  # fmt: skip
+    out = tmp_path / "rules.json"
+    assert observer.main(["--read", "github", "--run", str(run), "--out", str(out)]) == 0
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert written["made"] is True and written["pulls"]["second"]["check_runs"][0]["refused"] == [RULES_CHECK]
+    assert written["pulls"]["second"]["check_runs"][0]["summary"] == summary
+    assert written["rules"]["guardrail"]["blocks"] == RULES["blocks"] and written["rules"]["redteam"] is None
+    assert written["baseline"]["read_from"] in ("origin/main", "main", "HEAD") and written["tree_digest"] is not None
+    # build reads it as the observer handed it over: the heads held, the weakened file refused naming EMAIL
+    reading = agent_rules.record({**written, "answer": record(guardrail=STACK), "read_back": read_back(description=f"rules sha256 {written['tree_digest']}")})
+    assert reading["F9_4"]["held"] is True and reading["F9_2"]["held"] is True
