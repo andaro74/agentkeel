@@ -42,7 +42,7 @@ pr: 50
 
 # Ruling: M09 PR 2, Engineering
 
-Ruled by: pending
+Ruled by andaro74 as Engineering, 2026-10-11, as written.
 
 ## What this covers
 
