@@ -87,14 +87,21 @@ a model, and the baseline's content is not yet ruled.
   `agents/refagent/rules/`.
 - **Add-only merge.** The merged rules are the baseline plus what the
   agent file adds: a denied topic with a name the baseline does not use,
-  a PII entity the baseline does not list, an example. An agent file
-  that names a baseline topic (a redefinition), lists a baseline PII
-  entity with a weaker action (`ANONYMIZE` to `NONE`), sets
-  `topics_apply_to` to less than the baseline's, or turns off a filter
-  the baseline turns on, is **refused** with the rule and the way named.
-  A key absent from the agent file inherits the baseline; an empty list
-  adds nothing and removes nothing. The order of actions, weakest last:
-  `BLOCK`, `ANONYMIZE`, `NONE` (ADR-0009 entry 5's order).
+  a PII entity the baseline does not list. An agent file that names a
+  baseline topic (a redefinition, examples included: an example is
+  added to a topic only by naming it, and it steers what the rule
+  matches), lists a baseline PII entity with any action but the
+  baseline's (`ANONYMIZE` to `NONE` is the seeded case), carries a
+  `content_filters` key at all (the filters are the baseline's alone;
+  `rule-owner` finding 4 on PR 1), or an unknown top-level key (so a
+  misspelled `pii:` cannot add nothing silently), is **refused** with the
+  rule and the way named. `topics_apply_to` is in both files; the merge
+  takes the stricter of the two ("input and output" over "input"), and
+  the baseline carries `input` as refagent's does (`rule-owner` finding
+  5). A key absent from the agent file inherits the baseline; an empty
+  list adds nothing and removes nothing; an entry identical to the
+  baseline's dedupes. The order of actions, weakest last: `BLOCK`,
+  `ANONYMIZE`, `NONE` (ADR-0009 entry 5's order).
 - **The agent's guardrail.** One Bedrock Guardrail per agent, named
   `agentkeel-<name>`, built by the platform from the merged rules, with a
   numbered version whose description carries the digest of the baseline
@@ -122,7 +129,14 @@ a model, and the baseline's content is not yet ruled.
   deploy builds the real guardrail and guards the agent with it; F9.1
   reads the pin the **answer record** names, which is the stack's, never
   the placeholder. The feasibility note records the step at which the
-  manifest gets the id.
+  manifest gets the id. **The placeholder's life** (`rule-owner` finding
+  2 on PR 1): proposed, the platform check admits a pin that resolves to
+  nothing only while the registry row holds no guardrail for that agent,
+  and refuses it once the row does; the alternative to put to Security
+  is a null pin for an agent that has `rules/`, which ADR-0009 entry 4
+  already reads as not a relaxation ("null to a value is not one") and
+  which needs `governed_agent.py:139-141` changed. Either is R3's and
+  R10's to rule before PR 2 opens.
 - **A plant in an agent repository.** A golden of `kind: guardrail`
   (`expected: BLOCKED` or `MASKED`) or `kind: redteam` (`BLOCKED`) in the
   agent's `goldens/`, named by id in its control file's `plants`, with a
@@ -145,11 +159,15 @@ a model, and the baseline's content is not yet ruled.
   (`build.score_one`, `src/verdict/build.py:300-311`). Membership, not
   "only": another rule matching beside it is not a miss. Answered, or
   blocked with the named rule absent from the topics, is **silent**.
-- **The fixture agent.** `festival-desk`, a fictional agent that answers
-  whether a title is cleared to screen at a festival, made from the
-  template (its code, tool, prompt and data are refagent's), with one
-  denied topic of its own, `unannounced-selection-leak`, one guardrail
-  golden `g-030` planted for it, and a `blocks` entry naming it. Its
+- **The fixture agent.** `festival-desk`, a fictional agent made from the
+  template: refagent's code, tool, prompt and full data, answering
+  refagent's question (where a title may be published), with one denied
+  topic of its own that refagent does not have,
+  `unannounced-selection-leak`, one guardrail golden `g-030` planted for
+  it, and a `blocks` entry naming it. It is not an agent on another
+  subject; it is the template's agent with one rule added, which is the
+  smallest plant that shows a team's own rule firing (cold review finding
+  1 on PR 1). Its
   repository, when the owner makes it at PR 3, is
   `agentkeel-studio/festival-desk`, public (§11 R8). The festival, the
   titles and the rule are fictional; no pharmaceutical content and no real
@@ -439,6 +457,21 @@ SPEC/00 §10.5: no document describes these as working.
   log-only mode:** not built at M09 (§12).
 - **An agent whose name collides with a guardrail name.** `agentkeel-<name>`
   is unique by the registry's name binding (M06); not re-planted.
+- **A later pin change inside an agent repository.** ADR-0009 entry 4
+  reads a manifest's guardrail `id` changed from one value to another as
+  a relaxation, two keys; an agent repository's own pull requests have no
+  `two-key` (SPEC/00 §12), so a second id change there is unread at M09.
+  Whether the **first** change, from refagent's id to the agent's own
+  with the baseline's digest in the new version's description, is an
+  entry-4 relaxation is R10's to say in words (`rule-owner` finding 1 on
+  PR 1).
+- **The template agent's clause text under its own guardrail.** The
+  fixture ships refagent's data and prompt with one topic added, so
+  under baseline plus one topic it is no longer blocked on
+  `contract-text-disclosure` or refagent's other five topics for the
+  clause text it ships. Not a relaxation of refagent's rules; a topic for
+  a template agent's own clause text is that agent's Rule Owner's to add
+  (`rule-owner` finding 6; R10 says so).
 
 ## 9. Cut list
 
@@ -540,7 +573,17 @@ precede. Each is also an **Unsure** item in PR 1's body, with its seat.
   SPEC/00 §8 M09 item 3 states it; the Rule Owner's ruling file at PR 2
   carries it, since `guardrail_errors`'s change in `src/validate/agent.py`
   is Engineering's code under that seat's rule (`product-spec-reviewer`
-  note 11).
+  note 11). The ruling says, in words: the three conditions on an own pin
+  (built by the platform from the baseline and the agent's files, with
+  the digest the observer computes; not null and not refagent's; the pin
+  change citing the agent's Rule Owner); whether the first change from
+  refagent's id is an ADR-0009 entry-4 relaxation; that a template
+  agent's guardrail carries the baseline and its own rules only, and
+  refagent's six topics are refagent's (`rule-owner` findings 1, 2, 6).
+- **R11 (Data Owner).** Whether a MASKED plant can be counted, for
+  refagent or in the fixture repository at PR 3, so the baseline's PII
+  rule has a firing reading; or that the baseline's firing stays unread
+  through M09 (§8's first bullet; `rule-owner` finding 7).
 
 ## 12. Not in M09
 

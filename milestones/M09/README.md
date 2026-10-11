@@ -12,7 +12,7 @@ Written at M09 PR 1 open. The row in `milestones/README.md` is the one
 | Field | Row 9 |
 |---|---|
 | Claim | An agent made from the template is guarded by its own rules on top of a platform baseline, and each of its rules is shown to fire on a question planted for it |
-| Falsifiers | F9.1 the agent's rules are not in the guardrail its run carries. F9.2 an agent removes or weakens a baseline rule and is merged. F9.3 a planted rule is silent (answered, or blocked with its named rule absent from the trace). F9.4 the platform check refuses an agent's own pin or its guardrail golden, or admits a plant with no named rule. F9.5 the split relaxes refagent (a rule leaves its guardrail, or its plants read under 7 of 7). |
+| Falsifiers | F9.1 an agent repository's rules are not in the guardrail its run carries: the pin its answer record names is refagent's, or a version whose description does not carry the digest of the baseline and the agent's files as the observer computes it. F9.2 an agent removes or weakens a baseline rule and is merged, or the merged guardrail lacks a baseline rule. F9.3 a planted rule is silent: a plant in an agent repository is answered, or blocked with its named rule absent from the trace. F9.4 the platform check refuses an agent's own pin or its guardrail golden, or admits a plant with no named rule or one naming a rule the merge does not build. F9.5 the split relaxes refagent: a topic or PII entity leaves refagent's guardrail, or its plants read under 7 of 7. |
 | Seeded commit | `02db54e`: S1 the fixture agent `festival-desk` (the template's folder with `rules/guardrail.yaml`, one topic, `g-030` planted with its `blocks` entry, a pin of its own); S2 the weakened baseline; S3 the silent plant; S5 the unnamed plant; the run file `observed: null`; S4 a guard with no fixture. One commit, before any reader |
 | Expected gate output | PR 1: refagent's envelope as at M08; it says nothing about claim 9. `tests/test_m09_seeds.py` 2 passed, 7 xfailed. From PR 2's merge the gate requires `F9_1` to `F9_5`, test-only witnesses. The live reading is recorded in `agent_rules` and read by this row's cell, not gated (SPEC/09 §4); on PR 2's own envelope it reads unread, so the row reads RED there. Named P3 exception: the fixture agent's repository is made after PR 2 merges and read by PR 3's run (PR 4's if the deploy path needs a repair). **Stated at open: fired 1 of 1, F9.1 to F9.5 held, row 9 expected GREEN**, with SPEC/09 §7's risks named. |
 | Measured | — |
@@ -85,7 +85,12 @@ for a ruling file that reads "Ruled by".
 7. R7 (Data Owner): the blocked observation's shape, as `build` writes it
    today (pharmadelta M00 Unsure 10).
 8. R10 (Rule Owner): row 37 re-ruled, a template agent's pin may be its
-   own (SPEC/00 §8 M09 item 3).
+   own (SPEC/00 §8 M09 item 3), with the placeholder's life, the three
+   conditions, ADR-0009 entry 4 on the first pin change, and that a
+   template agent carries the baseline and its own rules only, each said
+   in words (`rule-owner` findings 1, 2, 6).
+8a. R11 (Data Owner): a MASKED plant counted, or the baseline's firing
+    unread through M09 (`rule-owner` finding 7).
 
 **Before PR 3's run** (after PR 2 merges; the owner, each stated in
 `runs/f9_3_plant_run.yaml` first):
@@ -113,7 +118,8 @@ uv run pytest tests/test_m09_seeds.py -q --runxfail   # 2 passed, 7 failed, each
 make plants     # S1 to S5 and the run; agent_rules.py, baseline.yaml, observe_rules.py "not in the tree yet"
 make validate   # twenty checks, ok
 make ledger     # exits 0; row 9 OPEN, Measured empty, 1 / 4
-git diff 0ba6d1d...HEAD -- src/validate src/verdict/build.py src/verdict/gate.py scripts infra rules thresholds.yaml evals agents   # empty but for SEEDS_M09 in plants.py
+git diff 0ba6d1d...HEAD -- src/validate src/verdict/build.py src/verdict/gate.py scripts infra rules thresholds.yaml evals agents .github   # empty
+git diff 0ba6d1d...HEAD -- src/verdict/plants.py   # SEEDS_M09 and its SEEDS_BY_MILESTONE line, nothing else
 ```
 
 Any seed test that passes for a reason other than its reader, or any

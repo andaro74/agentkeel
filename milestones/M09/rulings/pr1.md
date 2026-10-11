@@ -76,6 +76,11 @@ no grant and no attempt.
    (11), the cap risk recorded (12), where `rules/` goes (15).
 6. **The public caller is M10**, proposed and not opened (SPEC/09 §11
    R6).
+7. **The two seat reads of PR 1 applied as drafts** (`feasibility.md`
+   §2.5, §2.6): `rule-owner` 0 BLOCK, 7 FINDING, 5 NOTE, no relaxation;
+   `engineering-cold-reviewer` 0 BLOCK, 3 FINDING, 7 NOTE. The three
+   cold findings are prose and were applied in this PR's last commit;
+   the Rule Owner's are proposals in SPEC/09 for its own PR 2 ruling.
 
 ## Unsure, each with its seat and when
 
@@ -93,7 +98,9 @@ The PR body's Unsure list, repeated here so the ruling carries it.
 | H | The observer's read-back of a built guardrail (`bedrock:GetGuardrail`); if not granted, SPEC/09 §9 cut 3 | Security | before PR 2 opens (R4) |
 | I | The fixture repository's name and visibility: `agentkeel-studio/festival-desk`, public | Product | before PR 3's run (R8) |
 | J | The fixture's three goldens and that `g-030`'s wording is not changed to make the rule fire; the Rule Owner rewords the rule if the first probe does not block | Data Owner; Rule Owner | before PR 3's run (R9) |
-| K | Row 37 re-ruled: a template agent's pin may be its own (SPEC/00 §8 M09 item 3) | Rule Owner | PR 2 (R10) |
+| K | Row 37 re-ruled: a template agent's pin may be its own (SPEC/00 §8 M09 item 3), with the three conditions and the placeholder's life stated in words (`rule-owner` findings 2, 6) | Rule Owner | PR 2 (R10) |
+| L | Whether the first pin change in a template agent, from refagent's id to its own, is an ADR-0009 entry-4 relaxation (two keys); a later id change inside an agent repository is unread at M09 (`rule-owner` finding 1) | Rule Owner; Threshold Owner | before PR 2 opens (R10) |
+| M | Whether a MASKED plant can be counted so the baseline's PII rule has a firing reading, or the baseline's firing stays unread through M09 (`rule-owner` finding 7; SPEC/09 §8) | Data Owner | PR 2 (R11) |
 
 ## What a reader can run
 

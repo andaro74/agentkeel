@@ -737,9 +737,10 @@ run carries. F9.2 an agent removes or weakens a baseline rule and is
 merged. F9.3 a planted rule is silent: a plant in an agent repository is
 answered, or blocked with its named rule absent from the trace.
 F9.4 the platform check refuses an agent's own pin or its guardrail
-golden, or admits a guardrail golden with no named rule. F9.5 the split
-relaxes refagent: a topic or entity leaves refagent's guardrail, or its
-plants stop firing. The measured value is the fixture agent's planted
+golden, or admits a plant with no named rule or one naming a rule the
+merge does not build. F9.5 the split relaxes refagent: a topic or PII
+entity leaves refagent's guardrail, or its plants read under 7 of 7. The
+measured value is the fixture agent's planted
 rules fired, n of m, read from its answer record after the merge; row 9
 is GREEN only at m of m with F9.1 to F9.5 held.
 PRs: (1) SPEC/09; this entry; ADR-0014; the fixture agent with

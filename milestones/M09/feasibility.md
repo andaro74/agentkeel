@@ -82,6 +82,44 @@ three lines more (`2320218`).
 | 14 | Recorded. The explainer's first section says what "the platform's" rules are on day one and that their firing is not read. | Product | nothing |
 | 15 | **Where `rules/` goes, stated** (SPEC/09 §2, a new bullet): into the signed bundle (`pack.py` packs the tree, no change), not into the image (the Dockerfile's list unchanged); F9.1's digest is the guardrail version description's, as `guardrail_spec` computes it, not the bundle's. | Engineering | nothing |
 
+## 2.5 The `rule-owner` report (0 BLOCK, 7 FINDING, 5 NOTE)
+
+Run on the committed diff at `106df54`, on the fixture's rules file and
+SPEC/09's proposals. No relaxation: the diff touches no `rules/` path and
+refagent's pin is unchanged. The report is in the PR body verbatim. Each
+finding taken on the session's recommendation:
+
+| # | Disposition | Seat |
+|---|---|---|
+| 1 | ADR-0009 entry 4 on the first pin change (refagent's id to the agent's own): **R10 says in words** whether it is a relaxation; a later id change inside an agent repository is unread at M09 (SPEC/09 §8, new bullet; §11 R10). Unsure L | Rule Owner; Threshold Owner |
+| 2 | The placeholder's life: **stated as a proposal** in SPEC/09 §2 (admitted only while the registry row holds no guardrail for the agent; refused once it does), with the null-pin alternative for Security. Unsure C and K | Rule Owner (R10); Security (R3) |
+| 3 | "an example" **struck** from the add list; a baseline topic's name in an agent file is refused, examples included (SPEC/09 §2) | Product (the line); Rule Owner (R1) |
+| 4 | A `content_filters` key in an agent file is **refused** by the merge; the filters are the baseline's alone (SPEC/09 §2) | Rule Owner (R1) |
+| 5 | The baseline carries `topics_apply_to: input`; the merge **takes the stricter** of the two values (SPEC/09 §2) | Rule Owner (R1) |
+| 6 | A template agent's guardrail carries the baseline and its own rules only; refagent's six topics are refagent's; a topic for the template's shipped clause text is the agent's Rule Owner's to add: **R10 says so** (SPEC/09 §8, §11) | Rule Owner (R10) |
+| 7 | The baseline's PII rule has no firing reading: **R11 added** for the Data Owner (a MASKED plant counted, or the firing unread through M09). Unsure M | Data Owner |
+| N5 | `record_held.json` pins the placeholder; PR 2's test for `guardrail(record, read_back, tree_digest)` must not use it as F9.1's held case. Recorded for PR 2 | Engineering |
+
+The report's drafts for R1, R2 and R10 and its list of what the merge
+must refuse are carried into PR 2's Rule Owner ruling file as its
+starting text; they are a report, never a ruling.
+
+## 2.6 The `engineering-cold-reviewer` report (0 BLOCK, 3 FINDING, 7 NOTE)
+
+Run on `origin/main...106df54` without the PR body. Shape, plant, P5 and
+owned paths held; each seed fails for its planted reason and no other.
+The report is in the PR body verbatim. The three findings are Product
+prose and were applied in the last commit of this PR:
+
+| # | Disposition | Seat |
+|---|---|---|
+| 1 | The explainer and SPEC/09 §2 now say the fixture is the template's agent (refagent's subject and data) with one festival rule added, not an agent on another subject | Product |
+| 2 | The explainer's two present-tense sentences about a builder that does not exist ("checks the only way that counts", "cannot drift") reworded as what M09 is meant to build and what PR 3 reads | Product |
+| 3 | F9.4 and F9.5 one wording: SPEC/00 §8 M09's falsifier line carries the unbuilt-rule arm and "read under 7 of 7"; `milestones/M09/README.md`'s Falsifiers cell is the ledger row's, verbatim | Product |
+| N2 | `README.md`'s "What a reader can run" diff command lists `src/verdict/plants.py` on its own line | Product |
+| N3 | `F9_5` is a guard's witness and cannot go RED at PR 2; the row's RED at PR 2 rests on `agent_rules` unread, as the row says. PR 2's review reads it as a guard | Engineering, PR 2 |
+| N7 | The fixture's working-tree line endings are mixed (LF in the index); any digest the observer computes reads `git show`, never the working tree | Engineering, PR 2 |
+
 ## 3. The false state
 
 SPEC/09 §3 names five things on `main` at `0ba6d1d` that make claim 9
@@ -178,10 +216,14 @@ is the false state and is corrected at PR 2, after the reader exists.
 **`product-spec-reviewer`**, on SPEC/09 at `d848ea9`: 0 BLOCK, 8
 FINDING, 7 NOTE (§1). Dispositions in §2.
 
-The `engineering-cold-reviewer` report on the diff (the seeds,
-`SEEDS_M09`, the tests, the ledger test's count) and the `rule-owner`
-report on the fixture's rules file are in the PR body verbatim; their
-counts are recorded in `rulings/pr1-engineering.md` and `rulings/pr1.md`.
-No `security-reviewer`, `data-owner` or `threshold-owner` report: PR 1
-touches no `infra/`, no workflow, no `evals/goldens/`, no `data/` and no
-bar. The `cold-review` skill runs from PR 2 (R9).
+**`rule-owner`**, on the fixture's rules file and SPEC/09's proposals at
+`106df54`: 0 BLOCK, 7 FINDING, 5 NOTE. No relaxation. Dispositions in
+§2.5.
+
+**`engineering-cold-reviewer`**, on `origin/main...106df54`: 0 BLOCK, 3
+FINDING, 7 NOTE. Dispositions in §2.6.
+
+Both reports are in the PR body verbatim. No `security-reviewer`,
+`data-owner` or `threshold-owner` report: PR 1 touches no `infra/`, no
+workflow, no `evals/goldens/`, no `data/` and no bar. The `cold-review`
+skill runs from PR 2 (R9).
