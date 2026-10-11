@@ -30,6 +30,7 @@ authorises:
   - tests/test_p5_disagree.py
   - tests/test_gate.py
   - tests/test_m07_readers.py
+  - tests/test_bootstrap.py
   - tests/fixtures/README.md
 evidence:
   - SPEC/09-per-agent-rules.md#6-the-code-that-reads-the-answer-pr-2
