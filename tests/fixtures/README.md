@@ -364,9 +364,17 @@ planted for its one rule, and a manifest pinning a guardrail of its own.
 S2 and S5 are **agent rule files** the merge must refuse or merge as
 named; S3 is **answer records**; S4 is a guard with no fixture. Their
 readers are `src/validate/agent_rules.py` and `src/verdict/agent_rules.py`,
-which PR 2 adds; today neither is there, and the platform check refuses S1
+which PR 2 adds; at PR 1 neither was there, and the platform check refused S1
 on its pin and its golden's kind, which is the false state. None is copied
 to `evals/history/`. The festival, the titles and the rule are fictional.
+
+**Six markers are off as of M09 PR 2**, each in the commit that landed its
+reader: S1's two and S2's two and S5's with `rules/baseline.yaml`,
+`src/validate/agent_rules.py` and the platform check's three changed
+readings (`e2c04ab`); S3's with `src/verdict/agent_rules.py` (`9d2f3a7`).
+The run file's stays on: `observed` is null until the owner makes the run
+after PR 2 merges (SPEC/09 §5.1), and a strict marker taken off early would
+fail every run until then. S1's format guard and S4's guard pass as before.
 
 | Seed | File | What is wrong with it (or, for the guard, why it passes) |
 |---|---|---|

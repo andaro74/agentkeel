@@ -39,4 +39,11 @@ reads:
   - the built guardrail's version description, read back (or the registry row's digest, SPEC/09 §9 cut 3)
   - the platform check's result on each of the three heads
   - the digest of rules/baseline.yaml on agentkeel's main and the agent's rules at the merge commit, computed by the observer
+# What the owner fills after the run (M09 PR 2; scripts/observe_rules.py reads these keys and nothing else
+# from this file): the three pull request numbers, the deploy run and the answer record's key. Never a result.
+#   observed:
+#     first:  {pull_request: 1}
+#     deploy: {run_id: 123456789, answer_key: envelopes/agents/festival-desk/<merge commit>.json}
+#     second: {pull_request: 2}
+#     third:  {pull_request: 3}
 observed: null

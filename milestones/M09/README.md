@@ -109,18 +109,72 @@ for a ruling file that reads "Ruled by".
 12. If the platform's own deploy path needs a repair, PR 3 is that repair
     and the run is read by PR 4's run (M08's second exception).
 
+### Measure detail (PR 2, 2026-10-11)
+
+- **PR 2 of 4, the measure.** Every reader SPEC/09 §6 names landed, each
+  in the commit that took its seed's marker off: `rules/baseline.yaml` and
+  `src/validate/agent_rules.py` with the platform check's three changed
+  readings (`e2c04ab`; S1, S2, S5 read); `src/verdict/agent_rules.py`,
+  `agent_rules` on the envelope, `CLAIM_9_CHECKS` wired and row 9's
+  reading (`9d2f3a7`; S3 read), named as `M09_READERS` in the commit after
+  it (`2608711`); the guardrail builder, the narrowed grants, the registry
+  row, the observer and the two workflow steps (`353a8c4`). The run file's
+  marker stays on: `observed` is null until the owner makes the run.
+- **The plant goes RED here.** On PR 2's own envelope `agent_rules` reads
+  not made: no agent repository with rules exists, so row 9's reading of it
+  is RED ("the plant run has not been made", four falsifiers unread,
+  planted rules none named) whatever refagent's own verdict. `F9_1` to
+  `F9_5` are test-only witnesses on every envelope from the merge; `F9_5`
+  is joined by build's own count of refagent's plants, 7 of 7 across the
+  split, and the gate holds it again.
+- **The rulings decided before PR 2 opened** (2026-10-11, each as proposed
+  in PR 1's Unsure table): R1, R2, R3, R4, R6, R10, written as the four
+  ruling files of this PR, each a draft until it reads "Ruled by". R5 is
+  built (the merge refuses at 31 naming the file). R7 and R11 are put to
+  the Data Owner in the PR body. The split is one key (R2): refagent's
+  file is unchanged, its identical entries dedupe, its guardrail keeps its
+  id and gains a version with the new digest at the next bootstrap deploy.
+- **What this PR does not do.** No agent repository is made; no golden
+  under `evals/goldens/`, no bar, nothing under `src/baseline/`; no
+  gateway, no policy engine, no public caller (R6: M10). refagent's
+  manifest still pins version 5: the version bump follows the bootstrap
+  deploy, by hand, under the Rule Owner's key.
+
+### By-hand steps before PR 3's run, each with what it must precede
+
+1. **Security deploys the bootstrap stack** (`infra/bootstrap/`, by hand,
+   as at every stop): the deploy boundary's narrowed deny, the execution
+   role's guardrail grants (R3), the eval role's read-back (R4), and
+   refagent's guardrail version 6 with the digest over the baseline. Before
+   the fixture repository's first merge: without it the first deploy of an
+   agent with `rules/` is refused on `CreateGuardrail`, which is a PR 3
+   repair, not a finding of the claim.
+2. **The Rule Owner moves refagent's manifest to the new version** once
+   the stack's `GuardrailVersionForTheManifest` output reads it (R2: one
+   key; the id is unchanged). Before PR 3's run, so refagent's envelope at
+   that run carries the baseline's digest. `plants_fired` must stay 7 of 7.
+3. **The owner makes `agentkeel-studio/festival-desk`** (R8, public) and
+   opens the three pull requests in the order the run file states (R9: the
+   golden is never edited), filling `observed` with the numbers and the
+   answer record's key; the observer reads the rest.
+4. If R4's grant is not deployed when PR 3's run reads, F9.1 reads the
+   registry row's digest and the envelope says so (`source: registry`).
+
 ### What a reader can run
 
 ```
-git show 02db54e --stat   # the seeds, the tests, SEEDS_M09, the README rows, the run file; no reader
-uv run pytest tests/test_m09_seeds.py -q              # 2 passed, 7 xfailed
-uv run pytest tests/test_m09_seeds.py -q --runxfail   # 2 passed, 7 failed, each with its planted message
-make plants     # S1 to S5 and the run; agent_rules.py, baseline.yaml, observe_rules.py "not in the tree yet"
-make validate   # twenty checks, ok
-make ledger     # exits 0; row 9 OPEN, Measured empty, 1 / 4
-git diff 0ba6d1d...HEAD -- src/validate src/verdict/build.py src/verdict/gate.py scripts infra rules thresholds.yaml evals agents .github   # empty
-git diff 0ba6d1d...HEAD -- src/verdict/plants.py   # SEEDS_M09 and its SEEDS_BY_MILESTONE line, nothing else
+git log 460990b..HEAD --format=%h   # PR 2's commits: e2c04ab, 9d2f3a7, 2608711, 353a8c4, then the documents and the rulings
+uv run pytest tests/test_m09_seeds.py -q              # 8 passed, 1 xfailed (the run, not made)
+uv run pytest tests/test_m09_seeds.py -q --runxfail   # 8 passed, 1 failed: seed run: the run has not been made
+uv run pytest tests/test_m09_readers.py tests/test_m09_platform.py tests/test_p5_disagree.py -q   # the readers, the builder, P5
+make plants     # S1 to S5 and the run, every reader "in the tree"
+make validate   # twenty-one checks, ok
+make ledger     # exits 0; row 9 OPEN, Measured empty; "as row M09 reads it" ends RED on agent_rules not read
+git diff 460990b...HEAD --stat -- evals/goldens thresholds.yaml src/baseline agents/refagent/rules agents/refagent/manifest.yaml   # empty
+AGENTKEEL_BUNDLE=tests/fixtures/m09/s1-festival-desk CDK_OUTDIR=/tmp/fd PYTHONPATH=. uv run python infra/construct/app.py && grep -c AWS::Bedrock::Guardrail /tmp/fd/AgentkeelAgent.template.json   # 2: the guardrail and its version
 ```
 
-Any seed test that passes for a reason other than its reader, or any
-reader that appears in this PR, makes the plant wrong.
+Any reader that reads an agent repository's rules before the merge from
+the working tree, any envelope field written by a runner or the observer,
+or a row 9 reading that is not RED on this PR's own envelope, makes the
+measure wrong.

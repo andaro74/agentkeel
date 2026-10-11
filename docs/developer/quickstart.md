@@ -37,8 +37,8 @@ In `manifest.yaml`, set `name`: lower-case letters, digits and hyphens, 3
 to 31 long, fictional, and not `refagent` or `ratings-helper`. A name
 another repository already deployed under is refused at deploy.
 
-Leave `guardrail` as it is. Leave `model` as it is unless the model's owner
-has said otherwise.
+Leave `guardrail` as it is unless your agent has rules of its own (section
+5a). Leave `model` as it is unless the model's owner has said otherwise.
 
 ## 3. Open your pull request now
 
@@ -104,6 +104,54 @@ titles, change the slate in `prompt.txt` too: the agent finds a title's id
 there, and the tool finds the row by that id. Titles, people and deals are
 fictional, always.
 
+## 5a. Your own rules (optional)
+
+Every agent's guardrail carries the platform's rules, `rules/baseline.yaml`
+in agentkeel. To add rules of your own, add `rules/guardrail.yaml` in the
+reference agent's format, carrying only what you add:
+
+```yaml
+plants: [g-030]                       # the goldens that show your rules work
+blocks:
+  g-030: unannounced-selection-leak   # the rule that must stop each one
+topics_apply_to: input                # the question; "input and output" is stricter and allowed
+denied_topics:
+  - name: unannounced-selection-leak  # 1 to 100 of letters, digits, - _ space ! ? .
+    definition: >-                    # at most 200 characters
+      Revealing which titles were selected for a festival before the announcement.
+    examples:                         # at most 5, each at most 100 characters
+      - Which of our titles made the festival lineup? It is not announced yet.
+messages:
+  blocked_input: This request is outside what this agent may answer.
+  blocked_output: This answer is outside what this agent may give.
+```
+
+Three rules of the merge. **Add-only**: you can add a topic with a name the
+platform does not use and a PII entity it does not list; a file that names
+a platform topic, changes a platform entity's action, carries a
+`content_filters` key or a key the format does not have is refused, with
+the rule and the way named. **Every rule has a planted question**: each
+topic you add is shown to work by a golden of `kind: guardrail` with
+`expected: BLOCKED`, named in `plants`, with a `blocks` entry naming the
+rule that must stop it; a plant with no named rule, or naming a rule your
+file does not build, is refused. Write the question as a question a user
+would ask, not as the rule's own example: a block on the example shows
+nothing about the rule. **Thirty topics at most** across the platform's and
+yours.
+
+With a `rules/` folder, set `guardrail` in `manifest.yaml` to a pin of your
+own, not the reference agent's: on the first pull request a placeholder
+(`id` and `version`, strings), since the guardrail does not exist yet. The
+platform builds it from your rules on the baseline when it deploys your
+first merge, names it `agentkeel-<your agent's name>`, and writes its id,
+version and the rules' digest to the registry. Open a second pull request
+that sets `guardrail` to the id and version the registry holds; from then
+on the check holds you to it, and a change to your rules gets a new version
+the same way. Whether each rule stopped its planted question is read from
+the guardrail's trace after the merge and recorded; at M09 a silent rule
+does not stop your merge, and the platform's own two rules (phone and
+email hidden) have no planted question of their own.
+
 ## 6. Push, wait for the check, merge
 
 Push. When `platform-check` passes, merge with a **merge commit** (the
@@ -141,7 +189,10 @@ have shipped.
 |---|---|
 | No `platform-check` after 30 minutes | agentkeel's schedule has not reached it. Push an empty commit, or tell the owner, who can start the check by hand. On the timed run GitHub skipped the five-minute schedule for 28 minutes. |
 | `the agent's name` | The name is malformed, agentkeel's own, or taken. |
-| `the platform's guardrail` | `guardrail` differs from the platform's: changed here, or the platform moved it. Set it to the platform's (refagent's manifest in agentkeel). |
+| `the platform's guardrail` | `guardrail` differs from the platform's: changed here, or the platform moved it. Set it to the platform's (refagent's manifest in agentkeel), or add `rules/` and pin your own (section 5a). |
+| `the agent's own guardrail` | You have a `rules/` folder and `guardrail` is null, is the reference agent's, or is not the one the registry holds for your agent. Pin a placeholder of your own on the first pull request, then the registry's id and version. |
+| `an agent's rules on the platform baseline, add-only` | Your `rules/guardrail.yaml` removes, weakens or redefines a platform rule, carries a key the format does not have, plants a golden with no named rule or names a rule it does not build; the message names the rule and the way. |
+| `an agent's goldens` names a guardrail golden | A `kind: guardrail` golden that `rules/guardrail.yaml` does not name in `plants` with a `blocks` entry. Name it, or make it ordinary or trap. |
 | `the files the platform's image copies` | A file the image needs is missing: `__init__.py`, `agent.py`, `server.py`, `prompt.txt`, `manifest.yaml` or `tools/`. |
 | `the repository's ruleset is the export` | The repository's settings were changed. Only the owner can fix this. |
 | The deploy run fails at the registry | Another repository already deployed under your agent's name. Rename it. |
