@@ -25,7 +25,7 @@ pr: 50
 
 # Ruling: M09 PR 2, Product
 
-Ruled by: pending
+Ruled by andaro74 as Product, 2026-10-11, as written.
 
 ## What this PR is
 

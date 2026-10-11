@@ -29,7 +29,7 @@ pr: 50
 
 # Ruling: M09 PR 2, Security
 
-Ruled by: pending
+Ruled by andaro74 as Security, 2026-10-11, as written.
 
 ## R3. The construct builds an agent's guardrail in the agent's own stack
 

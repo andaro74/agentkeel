@@ -22,7 +22,7 @@ pr: 50
 
 # Ruling: M09 PR 2, Rule Owner
 
-Ruled by: pending
+Ruled by andaro74 as Rule Owner, 2026-10-11, as written.
 
 ## R1. The baseline on day one (ADR-0014 decision 2)
 
