@@ -73,7 +73,7 @@ def test_the_repo_has_a_cap_the_code_can_read():
 
 def test_ledger_reads_every_row():
     rows = ledger.rows()
-    assert [row["M"] for row in rows] == [f"M{n:02d}" for n in range(9)]
+    assert [row["M"] for row in rows] == [f"M{n:02d}" for n in range(10)]  # row 9 from M09 PR 1
     assert set(ledger._sentences()) == {row["M"] for row in rows}
 
 
