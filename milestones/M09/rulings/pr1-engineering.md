@@ -21,9 +21,6 @@ pr: 49
 
 # Ruling: M09 PR 1, Engineering
 
-Drafted by the session on 2026-10-11 and ruled by andaro74 as
-Engineering. It reads "Ruled by" only when the human says so.
-
 Ruled by andaro74 as Engineering, 2026-10-11, as written.
 
 ## What this covers

@@ -29,11 +29,6 @@ pr: 49
 
 # Ruling: M09 PR 1, Product
 
-Drafted by the session on 2026-10-11 and ruled by andaro74 as
-Product. This file reads "Ruled by" only when the human has read it and
-says so; until then nothing in this PR is ruled, and the PR does not
-merge (`cold-review-ruling`; `milestones/M05/open.md` row 44).
-
 Ruled by andaro74 as Product, 2026-10-11, as written.
 
 ## What this PR is
