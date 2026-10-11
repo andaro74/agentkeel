@@ -1,0 +1,51 @@
+# The platform baseline (SPEC/09 §2; ADR-0014 decision 2). Rule Owner.
+# Ruled at M09 PR 2 (milestones/M09/rulings/pr2-rule-owner.md, R1): the
+# rules every agent's guardrail carries, in refagent's format
+# (agents/refagent/rules/guardrail.yaml), with no `plants` and no `blocks`.
+# A baseline plants nothing by itself: its rules are planted by refagent's
+# goldens if at all, and at M09 the baseline's own firing is not read
+# (SPEC/09 §8; g-014, MASKED, reads never_passed in every cell from row 3
+# to row 8). Its presence in an agent's guardrail is read by F9.1's digest
+# and the read-back.
+#
+# Merged onto by every agent's rules/guardrail.yaml, add-only
+# (src/validate/agent_rules.py): an agent file may add a denied topic with a
+# name not used here and a PII entity not listed here; it may not name a
+# topic here, lower or change a listed entity's action, carry a
+# `content_filters` key that differs from this one, or carry a key this
+# format does not have. An identical entry dedupes. `topics_apply_to` takes
+# the stricter of the two values. The two messages are defaults an agent
+# file may replace.
+#
+# The prompt-attack content filter stays off (the human as Rule Owner at
+# M03 PR 2, guardrail.yaml:33-36; the bootstrap refuses to build otherwise):
+# each plant is read as blocked by the rule named for it, and a generic
+# filter matching beside it would make that reading ambiguous.
+#
+# Dropping an entity, weakening an action or adding a filter here is a
+# change to every agent's guardrail; a drop or a weakening is a relaxation
+# (ADR-0009, entry 5): two keys.
+
+# Where the denied topics are assessed, for every agent: the user's words,
+# as refagent's since version 4. An agent file may say "input and output",
+# which is stricter and wins; it may not say less.
+topics_apply_to: input
+
+# No topic on day one. refagent's six topics are refagent's own
+# (agents/refagent/rules/guardrail.yaml), not the platform's (R10).
+denied_topics: []
+
+# SPEC/00 §9: talent contact details present in the license (ML-12.3).
+# ANONYMIZE is Bedrock's word for MASK.
+pii:
+  - entity: PHONE
+    action: ANONYMIZE
+  - entity: EMAIL
+    action: ANONYMIZE
+
+content_filters:
+  prompt_attack: off
+
+messages:
+  blocked_input: This request is outside what this agent may answer.
+  blocked_output: This answer is outside what this agent may give.

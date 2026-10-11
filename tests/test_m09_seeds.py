@@ -106,7 +106,6 @@ def test_s1_guard_the_fixture_is_in_refagents_format():
     assert kinds == ["guardrail", "ordinary", "trap"], kinds
 
 
-@expected_failure
 def test_s1_the_platform_check_admits_an_agent_with_its_own_rules():
     """The platform check must admit an agent repository that pins a guardrail of its own and plants a
     guardrail golden for its own rule (F9.1, F9.4). Today `evaluate()` refuses it twice: on the pin
@@ -119,7 +118,6 @@ def test_s1_the_platform_check_admits_an_agent_with_its_own_rules():
     assert not refused, f"seed S1: the platform check refuses an agent's own pin and its guardrail golden: {refused}"
 
 
-@expected_failure
 def test_s1_an_agent_repositorys_rules_are_read():
     """`src.validate.agent_rules.rules_errors(agent_dir)` must read the fixture's rules/guardrail.yaml and
     find nothing wrong with it (F9.1). Today nothing reads an agent repository's rules/ (SPEC/09 §3.1)."""
@@ -133,7 +131,6 @@ def test_s1_an_agent_repositorys_rules_are_read():
 MERGE_WHAT = "no platform baseline exists and nothing merges an agent's rules onto one"
 
 
-@expected_failure
 def test_s2_a_weakened_baseline_rule_is_refused():
     """`weakened.yaml` lists EMAIL with action NONE. The merge must refuse it, naming EMAIL and the way
     (F9.2). Today rules/baseline.yaml does not exist and no merge reads two files (SPEC/09 §3.3)."""
@@ -145,7 +142,6 @@ def test_s2_a_weakened_baseline_rule_is_refused():
     assert errors and all("EMAIL" in e for e in errors), errors
 
 
-@expected_failure
 def test_s2_an_empty_list_removes_nothing():
     """`empty_pii.yaml` lists `pii: []`. Add-only: the merged rules must still hold the baseline's PHONE and
     EMAIL as ANONYMIZE, and the agent's own topic beside them (F9.2). Today there is no baseline and no
@@ -207,7 +203,6 @@ def test_s4_refagents_rules_are_whole():
 # --- S5: an unnamed plant, read by agent_rules.rules_errors -------------------------
 
 
-@expected_failure
 def test_s5_a_plant_with_no_named_rule_is_refused():
     """`no_blocks.yaml` plants g-030 and names no rule for it; `unbuilt_rule.yaml` names a rule its topics
     do not build. `rules_errors` must refuse both, naming the golden and the rule (F9.4). Today nothing
