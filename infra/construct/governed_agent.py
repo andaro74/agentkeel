@@ -20,8 +20,12 @@ from aws_cdk import aws_ssm as ssm
 from constructs import Construct, IValidation
 
 from src import manifest as manifest_module
+from src.validate import agent_rules
 
 ROOT = manifest_module.ROOT
+# M09 PR 2 (SPEC/09 §2, §6; R3): the platform baseline every agent's guardrail carries, and the agent's own
+# rules it is merged with. Read at synth from the tree the deploy runs from, which is `main`.
+BASELINE = ROOT / "rules" / "baseline.yaml"
 RUNTIME_TYPE = agentcore.CfnRuntime.CFN_RESOURCE_TYPE_NAME
 AGENT_ROLE_PATH = "/agentkeel/agents/"  # the key policy matches agent roles by path (ruling b)
 PORT = 443
@@ -139,6 +143,15 @@ class GovernedAgent(Construct):
         if self.agent_name != PLATFORM_AGENT and not self.manifest.get("guardrail"):
             rules.refuse(f"{self.node.path}: an agent from the template pins the platform's guardrail "
                          "(SPEC/06 section 6, item 6); this one pins none.")
+        # M09 PR 2 (SPEC/09 §2 "The placeholder pin"; R3, R10): an agent with rules/ of its own is guarded by
+        # the guardrail this stack builds from them on the baseline, and the manifest's pin is read only to
+        # refuse null (above) and refagent's. refagent's own guardrail stays the bootstrap stack's.
+        self.own_rules = self.agent_name != PLATFORM_AGENT and (ROOT / bundle / "rules" / "guardrail.yaml").is_file()
+        if self.own_rules:
+            platform_pin = manifest_module.load(ROOT / "agents" / PLATFORM_AGENT / "manifest.yaml").get("guardrail") or {}
+            if (self.manifest.get("guardrail") or {}).get("id") == platform_pin.get("id"):
+                rules.refuse(f"{self.node.path}: an agent with rules/ pins a guardrail of its own, built here from them "
+                             f"on the baseline; this one pins refagent's {platform_pin.get('id')} (SPEC/09 section 2; R10).")
         if missing := [n for n in IMAGE_PULL_ENDPOINTS if n not in self.manifest["endpoint_allowlist"]]:
             rules.refuse(f"{self.node.path}: endpoint_allowlist lacks {', '.join(missing)}. The runtime pulls its "
                          f"image through them and the VPC has no other way out (ruling d, amended at M01 PR 3).")
@@ -150,6 +163,23 @@ class GovernedAgent(Construct):
         # An agent from the template brings its own key (SPEC/06 section 6, item 5); refagent's is the bootstrap's.
         # Made before the role, whose grant names it.
         self.key = None if self.agent_name == PLATFORM_AGENT else self._agent_key()
+        # M09 PR 2: the guardrail on the call. For an agent with rules/, the one this stack builds (its ARN and
+        # version are tokens the role's condition and the runtime's environment carry); otherwise the manifest's
+        # pin, as since M03 PR 2. Made before the role, whose invoke is conditioned on it.
+        self.built_guardrail: bedrock.CfnGuardrail | None = None
+        self.built_version: bedrock.CfnGuardrailVersion | None = None
+        self.rules_digest: str | None = None
+        if self.own_rules:
+            self._agent_guardrail(rules)
+        if self.built_guardrail is not None and self.built_version is not None:
+            self.guardrail_arn: str | None = self.built_guardrail.attr_guardrail_arn
+            self.guardrail_version: str | None = self.built_version.attr_version
+        elif self.guardrail:
+            stack_ = cdk.Stack.of(self)
+            self.guardrail_arn = f"arn:aws:bedrock:{stack_.region}:{stack_.account}:guardrail/{self.guardrail['id']}"
+            self.guardrail_version = str(self.guardrail["version"])
+        else:
+            self.guardrail_arn = self.guardrail_version = None
         self.role = self._role(role, rules)
         # M07 PR 2 (SPEC/07 section 6; milestones/M07/rulings/pr2-security.md item 11): a retirement is
         # this stack without its runtime. Read from the manifest, as everything else about the agent is:
@@ -254,7 +284,8 @@ class GovernedAgent(Construct):
         # M03 PR 2 (security-reviewer F2 at M03 PR 1): with a guardrail pinned,
         # an invoke that does not carry it, at its pinned version, is refused.
         # Code cannot drop the guardrail; it can only fail to answer.
-        guarded = {"bedrock:GuardrailIdentifier": self._guardrail_arn(versioned=True)} if self.guardrail else {}
+        # M09 PR 2: for an agent with rules/, the guardrail this stack built, so no other could be on the call.
+        guarded = {"bedrock:GuardrailIdentifier": self._guardrail_arn(versioned=True)} if self.guardrail_arn else {}
         role.add_to_policy(iam.PolicyStatement(
             sid="InvokeItsOwnProfileOnly",
             actions=INVOKE,
@@ -268,9 +299,9 @@ class GovernedAgent(Construct):
                        for region in PROFILE_REGIONS],
             conditions={"StringEquals": {"bedrock:InferenceProfileArn": profile_arn, **guarded}},
         ))  # fmt: skip
-        if self.guardrail:
-            # Its own guardrail, the one the manifest pins, and its numbered
-            # versions; the agent boundary allows ApplyGuardrail as a ceiling.
+        if self.guardrail_arn:
+            # Its own guardrail, the one the manifest pins (or, with rules/, the one this stack built), and its
+            # numbered versions; the agent boundary allows ApplyGuardrail as a ceiling.
             role.add_to_policy(iam.PolicyStatement(
                 sid="ApplyItsOwnGuardrailOnly",
                 actions=["bedrock:ApplyGuardrail"],
@@ -404,10 +435,66 @@ class GovernedAgent(Construct):
         return self.manifest.get("guardrail")
 
     def _guardrail_arn(self, *, versioned: bool) -> str:
-        """The pinned guardrail's ARN; with `versioned`, the form bedrock:GuardrailIdentifier carries."""
-        stack = cdk.Stack.of(self)
-        arn = f"arn:aws:bedrock:{stack.region}:{stack.account}:guardrail/{self.guardrail['id']}"
-        return f"{arn}:{self.guardrail['version']}" if versioned else arn
+        """The guardrail on the call, by ARN; with `versioned`, the form bedrock:GuardrailIdentifier carries."""
+        assert self.guardrail_arn is not None and self.guardrail_version is not None
+        return f"{self.guardrail_arn}:{self.guardrail_version}" if versioned else self.guardrail_arn
+
+    def _agent_guardrail(self, rules: _StackRules) -> None:
+        """An agent's own guardrail, built here from its rules merged onto the baseline (M09 PR 2; SPEC/09 §2, §6; R3).
+
+        One Bedrock Guardrail named `agentkeel-<name>`, tagged with the agent's name so the execution role may
+        make it and nothing untagged (the bootstrap's deploy boundary and execution role, narrowed at M09
+        PR 2), and a numbered version whose description carries the digest of the baseline and the agent's
+        rule files, which `scripts/observe_rules.py` computes again from the merge commit (F9.1). The merge
+        is the platform check's (`src/validate/agent_rules.py`): a file the check would refuse is refused
+        here too, before anything is deployed. The prompt-attack filter is the baseline's and is off, so no
+        content policy; a merged spec that turned it on is refused. Retained, as refagent's versions are."""
+        bundle = ROOT / self.bundle
+        errors = agent_rules.rules_errors(bundle, root=ROOT)
+        for error in errors:
+            rules.refuse(f"{self.node.path}: {error}")
+        if errors:
+            return
+        baseline = agent_rules.load(BASELINE)
+        files = [bundle / "rules" / "guardrail.yaml"]
+        if (bundle / "rules" / "redteam.yaml").is_file():
+            files.append(bundle / "rules" / "redteam.yaml")
+        merged = agent_rules.merge(baseline, agent_rules.load(files[0]))
+        if (merged.get("content_filters") or {}).get("prompt_attack") is not False:
+            rules.refuse(f"{self.node.path}: the prompt-attack filter is off (the Rule Owner, M03 PR 2; R1); the merged rules say otherwise.")
+            return
+        self.rules_digest = agent_rules.digest(BASELINE.read_bytes(), *(f.read_bytes() for f in files))
+        on_output = merged["topics_apply_to"] == "input and output"
+        topics = merged["denied_topics"]
+        guardrail = bedrock.CfnGuardrail(
+            self, "Guardrail",
+            name=f"agentkeel-{self.agent_name}",
+            description=f"agentkeel {self.agent_name}: built from rules/baseline.yaml (Rule Owner) and the agent's "
+                        f"rules/ at its merge commit, add-only (SPEC/09). Security builds, never scopes.",
+            blocked_input_messaging=merged["messages"]["blocked_input"],
+            blocked_outputs_messaging=merged["messages"]["blocked_output"],
+            topic_policy_config=bedrock.CfnGuardrail.TopicPolicyConfigProperty(topics_config=[
+                bedrock.CfnGuardrail.TopicConfigProperty(
+                    name=t["name"], definition=t["definition"], type="DENY", examples=t.get("examples"),
+                    input_enabled=True, input_action="BLOCK",
+                    output_enabled=on_output, output_action="BLOCK" if on_output else "NONE")
+                for t in topics]) if topics else None,
+            sensitive_information_policy_config=bedrock.CfnGuardrail.SensitiveInformationPolicyConfigProperty(
+                pii_entities_config=[bedrock.CfnGuardrail.PiiEntityConfigProperty(type=e["entity"], action=e["action"])
+                                     for e in merged["pii"]]) if merged["pii"] else None,
+            tags=[cdk.CfnTag(key=AGENT_TAG, value=self.agent_name)],
+        )  # fmt: skip
+        version = bedrock.CfnGuardrailVersion(
+            self, "GuardrailVersion",
+            guardrail_identifier=guardrail.attr_guardrail_id,
+            description=f"rules sha256 {self.rules_digest}",
+        )  # fmt: skip
+        # A rules change replaces the version; the one the record names, and old envelopes name, outlives it.
+        # Both retained: a stack delete would otherwise take the guardrail and its versions with it
+        # (security-reviewer on M09 PR 2). Old guardrails and versions are removed by hand, as refagent's.
+        guardrail.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+        version.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+        self.built_guardrail, self.built_version = guardrail, version
 
     def _foundation_model(self) -> str:
         """`us.anthropic.claude-sonnet-4-6` -> `anthropic.claude-sonnet-4-6`: the model the profile routes to."""
@@ -459,8 +546,9 @@ class GovernedAgent(Construct):
                 # The manifest's guardrail pin, which the server passes to converse (M03 PR 2), as
                 # the ARN, not the bare id: the invoke grants' GuardrailIdentifier condition names the
                 # ARN, and the request then carries the same string (security-reviewer on PR 2, F1).
+                # M09 PR 2: for an agent with rules/, the guardrail this stack built, never the manifest's pin.
                 **({"AGENTKEEL_GUARDRAIL_ARN": self._guardrail_arn(versioned=False),
-                    "AGENTKEEL_GUARDRAIL_VERSION": self.guardrail["version"]} if self.guardrail else {}),
+                    "AGENTKEEL_GUARDRAIL_VERSION": self.guardrail_version} if self.guardrail_arn else {}),
                 # M05 PR 2 (SPEC/05 §2, §6; seed S4's reader): the manifest's depth ceiling, since the
                 # image has no YAML reader, and where the agent writes a refusal event.
                 "AGENTKEEL_CEILING_DEPTH": str(self.manifest["ceilings"]["depth"]),

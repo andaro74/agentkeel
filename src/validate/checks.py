@@ -30,6 +30,7 @@ from src.gates import pattern_regex, two_key
 from src.gates import pr_number as two_key_pr
 from src.validate import (
     agent_goldens,
+    agent_rules,
     codeowners,
     controls,
     corpus,
@@ -431,4 +432,7 @@ CHECKS = {
     "panel 1 queries the registry and nothing else": panel.check,
     # M07 PR 2 (SPEC/07 section 6): S4's query reader. A check of its own, not panel 1's extended.
     "panel 2 selects the verdict as stored, from the envelopes' table and nothing else": panel.check_panel_2,
+    # M09 PR 2 (SPEC/09 section 2, section 6; R1): the platform baseline in its format, no plants and no blocks,
+    # the prompt-attack filter off, and every agents/*/rules/guardrail.yaml in the tree merging onto it add-only.
+    "the platform baseline, and every agent's rules merging onto it add-only": agent_rules.check,
 }

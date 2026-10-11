@@ -62,9 +62,9 @@ statement that lets that put out to the security account (SPEC/05 §5.1,
 
 from __future__ import annotations
 
-import hashlib
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +81,12 @@ from aws_cdk import aws_kms as kms
 from aws_cdk import aws_ssm as ssm
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from constructs import Construct
+
+# M09 PR 2 (SPEC/09 §2, §6; R2): refagent's guardrail is built from its rule files merged onto the platform
+# baseline by the same add-only merge the platform check and the construct use. The cdk CLI runs this file from
+# infra/bootstrap/, so the repository root goes on the path, as infra/construct/app.py puts it.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.validate import agent_rules  # noqa: E402
 
 REPO = "andaro74/agentkeel"
 SUBJECT = "repo:andaro74@3157440/agentkeel@1376369685"  # the immutable subject, as at M00 (milestones/M00/feasibility.md, milestones/M01/rulings/pr1.md)
@@ -133,6 +139,15 @@ INVOKE = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
 # ADR-0009's list).
 GUARDRAIL_DENIED = ["bedrock:Create*Guardrail*", "bedrock:Update*Guardrail*", "bedrock:Delete*Guardrail*",
                     "bedrock:Put*Guardrail*", "bedrock:GetGuardrail", "bedrock:ListGuardrails"]
+# M09 PR 2 (SPEC/09 §6, §11 R3; milestones/M09/rulings/pr2-security.md): the deploy plane's deny on these is
+# narrowed to a guardrail that carries the agent tag, so the execution role may build an agent's own guardrail
+# in the agent's stack and no other. ListGuardrails stays denied outright. The agent plane's deny is unchanged:
+# no agent role may touch any guardrail but Apply.
+GUARDRAIL_ADMIN = [a for a in GUARDRAIL_DENIED if a != "bedrock:ListGuardrails"]
+AGENT_TAG = "agentkeel:agent"  # the construct tags an agent's key, role and guardrail with its name
+# Deny unless the request tags the guardrail with the agent tag (CreateGuardrail, which has no resource yet) or the
+# guardrail already carries it (everything on an existing guardrail): both keys null is the untagged case.
+UNTAGGED_GUARDRAIL = {"Null": {f"aws:RequestTag/{AGENT_TAG}": "true", f"aws:ResourceTag/{AGENT_TAG}": "true"}}
 DENY = ["iam:*", "sts:AssumeRole", "logs:Delete*", *GUARDRAIL_DENIED, "s3:PutBucketPolicy"]
 # The rights table marker (SPEC/03 §6, S1's reader; security-reviewer F6 at
 # M03 PR 1): the digest of the table the last load put in the runtime's
@@ -151,44 +166,62 @@ REGISTRY_TABLE = "agentkeel-registry"
 # The Rule Owner's files the guardrail is built from (SPEC/03 §6). Read at
 # synth; a change to either is a change to this stack, and a new version.
 RULES_DIR = Path(__file__).resolve().parents[2] / "agents" / "refagent" / "rules"
+# M09 PR 2 (R1, R2): the platform baseline, merged under refagent's files; the digest covers it first.
+BASELINE = Path(__file__).resolve().parents[2] / "rules" / "baseline.yaml"
 GUARDRAIL_PARAM = "/agentkeel/security/guardrail/refagent"
 # Bedrock's own limits on a denied topic. Refused at synth, not at deploy.
 TOPIC_NAME = re.compile(r"^[0-9a-zA-Z\-_ !?.]{1,100}$")
 TOPIC_DEFINITION_MAX, TOPIC_EXAMPLE_MAX, TOPIC_EXAMPLES_MAX, TOPICS_MAX = 200, 100, 5, 30
 
 
-def guardrail_spec(rules_dir: Path = RULES_DIR) -> dict[str, Any]:
-    """What the Bedrock Guardrail is, from `guardrail.yaml`, and the digest of both rule files.
+def guardrail_spec(rules_dir: Path = RULES_DIR, baseline_path: Path = BASELINE) -> dict[str, Any]:
+    """What the Bedrock Guardrail is, from `guardrail.yaml` merged onto the baseline, and the digest of the three files.
 
     Every rule either control names in `blocks` must be a topic here: a
     plant whose block is not built is a plant nobody could see fire. From
     M03 PR 3 guardrail.yaml names its own plants' rules as redteam.yaml does
-    (rule-owner F1 on PR 2).
+    (rule-owner F1 on PR 2). From M09 PR 2 (SPEC/09 §2; R1, R2) the spec is
+    the add-only merge of `rules/baseline.yaml` and refagent's file: the
+    baseline's two PII entities dedupe with refagent's identical ones, so the
+    rules are what they were and the digest, now over the baseline first,
+    is new. A file the merge refuses is refused here, at synth.
     """
     guardrail = yaml.safe_load((rules_dir / "guardrail.yaml").read_text(encoding="utf-8"))
     redteam = yaml.safe_load((rules_dir / "redteam.yaml").read_text(encoding="utf-8"))
-    topics = guardrail["denied_topics"]
-    names = [t["name"] for t in topics]
-    if len(topics) > TOPICS_MAX or len(set(names)) != len(names):
-        raise ValueError(f"guardrail.yaml: {len(topics)} topics, names {names}: at most {TOPICS_MAX}, each once")
-    for topic in topics:
+    # refagent's own topics against Bedrock's limits first, in the words the M03 tests read; then the merge.
+    own = guardrail["denied_topics"]
+    names = [t["name"] for t in own]
+    if len(own) > TOPICS_MAX or len(set(names)) != len(names):
+        raise ValueError(f"guardrail.yaml: {len(own)} topics, names {names}: at most {TOPICS_MAX}, each once")
+    for topic in own:
         examples = topic.get("examples", [])
         fits = (TOPIC_NAME.match(topic["name"]) and len(topic["definition"]) <= TOPIC_DEFINITION_MAX
                 and len(examples) <= TOPIC_EXAMPLES_MAX and all(len(e) <= TOPIC_EXAMPLE_MAX for e in examples))
         if not fits:
             raise ValueError(f"guardrail.yaml: topic {topic['name']!r} is outside Bedrock's limits")
+    # refagent's file says where its topics apply (the Rule Owner, M03 PR 2): the merge would let the key
+    # inherit the baseline's, which is right for a template agent's file and not for the platform's own.
+    if guardrail.get("topics_apply_to") not in ("input", "input and output"):
+        raise ValueError(f"guardrail.yaml: topics_apply_to is {guardrail.get('topics_apply_to')!r}, not 'input' or 'input and output'")
+    baseline = agent_rules.load(baseline_path)
+    if problems := agent_rules.baseline_errors(baseline) + agent_rules.merge_errors(baseline, guardrail, "guardrail.yaml"):
+        raise ValueError("; ".join(problems))
+    merged = agent_rules.merge(baseline, guardrail)
+    topics = merged["denied_topics"]
+    names = [t["name"] for t in topics]
     for name, control in (("guardrail.yaml", guardrail), ("redteam.yaml", redteam)):
         if unbuilt := sorted(set((control.get("blocks") or {}).values()) - set(names)):
             raise ValueError(f"{name} names blocks guardrail.yaml does not build: {unbuilt}")
-    if guardrail.get("content_filters", {}).get("prompt_attack") is not False:
+    if merged.get("content_filters", {}).get("prompt_attack") is not False:
         raise ValueError("guardrail.yaml: the prompt-attack filter is off (the Rule Owner, M03 PR 2); say so")
-    # Line endings do not change it: the files are checked out CRLF on Windows and LF in CI.
-    digest = hashlib.sha256(b"".join((rules_dir / name).read_bytes().replace(b"\r\n", b"\n")
-                                     for name in ("guardrail.yaml", "redteam.yaml"))).hexdigest()  # fmt: skip
-    applies_to = guardrail.get("topics_apply_to")
+    # Line endings do not change it: the files are checked out CRLF on Windows and LF in CI. The baseline
+    # first, then refagent's two files (M09 PR 2), as the construct digests an agent's.
+    digest = agent_rules.digest(baseline_path.read_bytes(),
+                                *((rules_dir / name).read_bytes() for name in ("guardrail.yaml", "redteam.yaml")))  # fmt: skip
+    applies_to = merged.get("topics_apply_to")
     if applies_to not in ("input", "input and output"):
         raise ValueError(f"guardrail.yaml: topics_apply_to is {applies_to!r}, not 'input' or 'input and output'")
-    return {"topics": topics, "pii": guardrail["pii"], "messages": guardrail["messages"], "digest": digest,
+    return {"topics": topics, "pii": merged["pii"], "messages": merged["messages"], "digest": digest,
             "on_output": applies_to == "input and output"}
 EVAL_WORKFLOWS = [
     f"{REPO}/.github/workflows/evals.yml@refs/pull/*/merge",
@@ -403,10 +436,32 @@ class BootstrapStack(cdk.Stack):
                     sid="NeverTouchAKeyPolicyNeverEraseEvidenceNeverOpenTheNetwork",
                     effect=iam.Effect.DENY,
                     actions=["kms:PutKeyPolicy", "kms:CreateGrant", "kms:ScheduleKeyDeletion", "kms:DisableKey",
-                             "logs:Delete*", *GUARDRAIL_DENIED, "s3:PutBucketPolicy",
+                             "logs:Delete*", "bedrock:ListGuardrails", "s3:PutBucketPolicy",
                              "ec2:CreateInternetGateway", "ec2:AttachInternetGateway",
                              "ec2:CreateNatGateway", "ec2:CreateVpcPeeringConnection"],
                     resources=["*"],
+                ),
+                # M09 PR 2 (SPEC/09 §11 R3, ruled in milestones/M09/rulings/pr2-security.md): every guardrail
+                # action but Apply and List was denied outright since M03 PR 2 (Security builds, never scopes).
+                # Narrowed: denied on any guardrail that is not tagged as an agent's own, so the execution role
+                # may build an agent's guardrail in that agent's stack and may not touch refagent's, which the
+                # bootstrap builds untagged, or any other in this shared account. The verbs stay patterns.
+                iam.PolicyStatement(
+                    sid="NeverTouchAGuardrailThatIsNotATaggedAgentsOwn",
+                    effect=iam.Effect.DENY,
+                    actions=GUARDRAIL_ADMIN,
+                    resources=["*"],
+                    conditions=UNTAGGED_GUARDRAIL,
+                ),
+                # And never tag or untag one: a tag put on refagent's untagged guardrail would bring it under
+                # every grant above (security-reviewer on M09 PR 2). On guardrails alone, so the inference
+                # profiles' and runtimes' tags are untouched.
+                iam.PolicyStatement(
+                    sid="NeverTagAGuardrailThatIsNotATaggedAgentsOwn",
+                    effect=iam.Effect.DENY,
+                    actions=["bedrock:TagResource", "bedrock:UntagResource"],
+                    resources=[f"arn:aws:bedrock:{REGION}:{self.account}:guardrail/*"],
+                    conditions=UNTAGGED_GUARDRAIL,
                 ),
             ]),
         )  # fmt: skip
@@ -709,6 +764,31 @@ class BootstrapStack(cdk.Stack):
             resources=[f"arn:aws:kms:{REGION}:{self.account}:alias/agentkeel-refagent"],
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(sid="ListAliases", actions=["kms:ListAliases"], resources=["*"]))
+        # M09 PR 2 (SPEC/09 §2, §6; R3): an agent with rules/ gets its own guardrail, built in its stack from
+        # the merged rules and tagged with the agent's name. The create is held to a request that carries the
+        # tag (CreateGuardrail takes no resource); everything on an existing guardrail (the read handler's Get
+        # and ListTagsForResource, Update, Delete, a numbered version, the tags) to one that carries it.
+        # refagent's guardrail is the bootstrap's, untagged, and this role may not reach it (the deploy
+        # boundary's narrowed deny above says the same).
+        guardrails = f"arn:aws:bedrock:{REGION}:{self.account}:guardrail/*"
+        # CreateGuardrail alone: CloudFormation passes the tags in the create request, and TagResource on an
+        # existing guardrail is in the statement below, held to one already tagged. With TagResource here a
+        # request carrying the tag could tag refagent's untagged guardrail and bring it under the statement
+        # below (security-reviewer and cold review F3 on M09 PR 2); the deploy boundary denies that too.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="MakeAnAgentsGuardrailOnlyWithItsTag",
+            actions=["bedrock:CreateGuardrail"],
+            resources=[guardrails],
+            conditions={"Null": {f"aws:RequestTag/{AGENT_TAG}": "false"}},
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadUpdateVersionAndRemoveATaggedAgentsGuardrailOnly",
+            actions=["bedrock:GetGuardrail", "bedrock:UpdateGuardrail", "bedrock:DeleteGuardrail",
+                     "bedrock:CreateGuardrailVersion", "bedrock:TagResource", "bedrock:UntagResource",
+                     "bedrock:ListTagsForResource"],
+            resources=[guardrails],
+            conditions={"Null": {f"aws:ResourceTag/{AGENT_TAG}": "false"}},
+        ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="NeverTouchTheBoundaryOrAKeyPolicy",
             effect=iam.Effect.DENY,
@@ -969,9 +1049,25 @@ class BootstrapStack(cdk.Stack):
             sid="ReadCloudTrailForTheSeedAttempts",
             actions=["cloudtrail:LookupEvents"], resources=["*"],
         ))  # fmt: skip
+        # M09 PR 2 (SPEC/09 §4 F9.1, §11 R4; milestones/M09/rulings/pr2-security.md): `scripts/observe_rules.py`
+        # reads a template agent's built guardrail back, so F9.1 holds its version description to the digest the
+        # observer computes itself. Read only, on a guardrail tagged as an agent's own; refagent's, untagged,
+        # stays denied, as does every other guardrail action. Until this is deployed the read is refused and
+        # F9.1 reads the registry row's digest instead (SPEC/09 §9 cut 3), named as such on the envelope.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadATaggedAgentsGuardrailBack",
+            actions=["bedrock:GetGuardrail"],
+            resources=[f"arn:aws:bedrock:{REGION}:{self.account}:guardrail/*"],
+            conditions={"Null": {f"aws:ResourceTag/{AGENT_TAG}": "false"}},
+        ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="DenyEscalationAndEvidenceDeletion", effect=iam.Effect.DENY,
-            actions=DENY, resources=["*"],
+            actions=[a for a in DENY if a != "bedrock:GetGuardrail"], resources=["*"],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="DenyReadingAGuardrailThatIsNotATaggedAgentsOwn", effect=iam.Effect.DENY,
+            actions=["bedrock:GetGuardrail"], resources=["*"],
+            conditions={"Null": {f"aws:ResourceTag/{AGENT_TAG}": "true"}},
         ))  # fmt: skip
         cdk.CfnOutput(self, "EvalRoleArn", value=role.role_arn)
         return role
@@ -1437,7 +1533,12 @@ SUPPRESSIONS = {
         f"takes no resource. M07 PR 4: runtime/* carries two actions and no other, CreateAgentRuntimeEndpoint and "
         f"TagResource, which CreateAgentRuntime checks before the runtime has an id (deploy runs 37066321605 and "
         f"37074759767 were refused without them); that one statement is wider than the platform's runtimes: it "
-        f"reaches every runtime in this shared account. {CEILING}"
+        f"reaches every runtime in this shared account. M09 PR 2 (SPEC/01 §6's execution role, as SPEC/09 §6's "
+        f"guardrail builder extends it, R3): guardrail/* is an agent's own guardrail, whose id AWS assigns at "
+        f"create; CreateGuardrail is held to a request tagged agentkeel:agent, and every action on an existing "
+        f"guardrail, tagging included, to one carrying that tag, so refagent's, untagged, and any other in this "
+        f"shared account are out of reach; the deploy boundary denies the same, and denies tagging an untagged "
+        f"guardrail. {CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "
@@ -1469,7 +1570,10 @@ SUPPRESSIONS = {
         "the versioned name; DescribeStacks, GetAgentRuntime and ecr:DescribeImages are reads on refagent alone. "
         "M07 PR 2 (SPEC/01 §6's eval role, as SPEC/07 §6's rollback reading extends it): the same three reads on "
         "stack/agentkeel-*/*, runtime/agentkeel_* and repository/agentkeel/*, an agent from the template's, whose "
-        "names exist only once it is deployed; reads only, and no invoke. "
+        "names exist only once it is deployed; reads only, and no invoke. M09 PR 2 (SPEC/01 §6's eval role, as "
+        "SPEC/09 §4's read-back extends it, R4): bedrock:GetGuardrail on guardrail/*, held to a guardrail tagged "
+        "agentkeel:agent, an agent's own, whose id AWS assigns at create; read only, and refagent's, untagged, "
+        "stays denied. "
         f"{CEILING}"
     ),
     "ModelWatchRole/DefaultPolicy/Resource": (
@@ -1490,7 +1594,9 @@ APPLIES_TO = {
         ("bedrock-agentcore", "runtime/agentkeel_*"), ("bedrock-agentcore", "runtime/refagent*"),
         ("bedrock-agentcore", "runtime/*"),  # M07: what CreateAgentRuntime checks before the runtime has an id
         ("bedrock-agentcore", "workload-identity-directory/default/workload-identity/*"),
-        ("bedrock", "application-inference-profile/*"), ("dynamodb", "table/agentkeel-*-rights"),
+        ("bedrock", "application-inference-profile/*"),
+        ("bedrock", "guardrail/*"),  # M09 PR 2: an agent's own guardrail, held to the agent tag on every action
+        ("dynamodb", "table/agentkeel-*-rights"),
         ("ec2", "network-interface/*"), ("ec2", "security-group-rule/*"), ("ec2", "security-group/*"),
         ("ec2", "subnet/*"), ("kms", "alias/agentkeel-*"), ("kms", "key/*"),
         ("ssm", "parameter/agentkeel/security/*"))] + [
@@ -1507,6 +1613,7 @@ APPLIES_TO = {
     "EvalRole/DefaultPolicy/Resource": ["Resource::*", "Resource::<RefagentGuardrail.GuardrailArn>:*"] + [
         f"Resource::{_ARN.format(service, rest)}" for service, rest in (
             ("bedrock-agentcore", "runtime/agentkeel_*"), ("bedrock-agentcore", "runtime/refagent*"),
+            ("bedrock", "guardrail/*"),  # M09 PR 2 (R4): GetGuardrail, read only, on a tagged agent's own
             ("cloudformation", "stack/agentkeel-*/*"), ("cloudformation", "stack/agentkeel-refagent/*"),
             ("ecr", "repository/agentkeel/*"))],
     "ModelWatchRole/DefaultPolicy/Resource": [f"Resource::arn:aws:bedrock:{REGION}::foundation-model/*"],

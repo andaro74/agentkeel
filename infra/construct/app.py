@@ -58,6 +58,12 @@ class RefagentStack(cdk.Stack):
         if self.agent.runtime is not None:
             cdk.CfnOutput(self, "RuntimeArn", value=self.agent.runtime.attr_agent_runtime_arn)
         cdk.CfnOutput(self, "AgentRoleArn", value=self.agent.role.role_arn)
+        # M09 PR 2 (SPEC/09 §2, §6; R3): the guardrail this stack built for an agent with rules/, which deploy.yml
+        # writes to the registry row and to the answer record, and the owner copies into the manifest.
+        if self.agent.built_guardrail is not None and self.agent.built_version is not None:
+            cdk.CfnOutput(self, "GuardrailId", value=self.agent.built_guardrail.attr_guardrail_id)
+            cdk.CfnOutput(self, "GuardrailVersion", value=self.agent.built_version.attr_version)
+            cdk.CfnOutput(self, "GuardrailDigest", value=self.agent.rules_digest or "")
 
 
 # A fixed output directory, so `make validate` reads the NagReport of the
@@ -77,7 +83,11 @@ stack = RefagentStack(
 ACCOUNT = "<AWS::AccountId>"  # how cdk-nag names the account in a finding: it comes from the deployer
 # Its own runtime's log group, by the runtime's name (platform-architect F3 on M06 PR 2).
 RUNTIMES = f"arn:aws:logs:{REGION}:{ACCOUNT}:log-group:/aws/bedrock-agentcore/runtimes/{stack.agent.runtime_name}-*"
-GUARDRAIL = stack.agent.manifest["guardrail"]["id"]
+# The guardrail on the call, as cdk-nag names it in the finding: the manifest's pin by id, or, for an agent with
+# rules/ (M09 PR 2), the guardrail this stack built, by its logical id's attribute.
+GUARDRAIL_FINDING = (f"Resource::<{stack.get_logical_id(stack.agent.built_guardrail)}.GuardrailArn>:*"
+                     if stack.agent.built_guardrail is not None else
+                     f"Resource::arn:aws:bedrock:{REGION}:{ACCOUNT}:guardrail/{stack.agent.manifest['guardrail']['id']}:*")
 WILDCARDS = {
     "Resource::*": (
         "SPEC/01 §6, B1 (M01 PR 3): ecr:GetAuthorizationToken and logs:DescribeLogGroups take no resource-level "
@@ -98,10 +108,11 @@ WILDCARDS = {
         "being refagent's alias, because refagent's key is the bootstrap stack's and the construct does not read "
         "its id (PR 3 security-reviewer F6). The key policy denies this role its own key policy (seed S6)."
     )} if REFAGENT else {}),
-    f"Resource::arn:aws:bedrock:{REGION}:{ACCOUNT}:guardrail/{GUARDRAIL}:*": (
-        "SPEC/01 §6 as built on at M03 PR 2: ApplyGuardrail on the guardrail the manifest pins and <arn>:*, its "
-        "numbered versions, and every model invoke is conditioned on bedrock:GuardrailIdentifier at the pinned "
-        "version. The boundary (seed S5) caps it."
+    GUARDRAIL_FINDING: (
+        "SPEC/01 §6 as built on at M03 PR 2: ApplyGuardrail on the guardrail the manifest pins (or, for an agent "
+        "with rules/, the one this stack builds from them on the baseline, M09 PR 2) and <arn>:*, its numbered "
+        "versions, and every model invoke is conditioned on bedrock:GuardrailIdentifier at that version. The "
+        "boundary (seed S5) caps it."
     ),
     f"Resource::arn:aws:s3:::agentkeel-audit-897698239547/agents/{stack.agent.agent_name}/*": (
         "SPEC/01 §6's boundary (seed S5) as widened at M05 PR 2: PutObject under this agent's own prefix in the "

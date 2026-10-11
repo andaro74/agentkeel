@@ -207,6 +207,11 @@ M07_READERS = "eed43f5"
 # it, as M05's, M06's and M07's were. On PR 2's branch, and main keeps it because pull requests land as
 # merge commits (ADR-0004 amendment 1). Named here, in the commit after it, so no later PR has to set it.
 M08_READERS = "91be2c298ba0"
+# The commit that wired claim 9's five checks, F9_1 to F9_5 from the seed tests of S1, S2, S3, S5 and S4's
+# guard, into the Makefile (M09 PR 2; SPEC/09 section 4). The gate requires them from here. Named in the
+# commit after it, as M05's to M08's were. On PR 2's branch, and main keeps it because pull requests land as
+# merge commits (ADR-0004 amendment 1).
+M09_READERS = "9d2f3a7356d5"
 
 
 def descends_from(commit: str, anchor: str, root: Path = ROOT) -> bool:

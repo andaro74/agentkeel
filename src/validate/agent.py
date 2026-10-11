@@ -15,10 +15,19 @@ and these run over it:
   or `ratings-helper` (whose exemptions are agentkeel's), not a name another
   agent in `agentkeel` holds. A name the registry holds for another
   repository is refused at deploy (SPEC/06 §6, item 9);
-- the guardrail: at M06 every agent from the template pins the platform's,
-  refagent's, by id and version (SPEC/06 section 6, item 6), and a null pin
-  on either side is refused, so one key on refagent's pin cannot relax every
-  agent at once (rule-owner on M06 PR 2);
+- the guardrail: an agent without `rules/` pins the platform's, refagent's,
+  by id and version (SPEC/06 section 6, item 6, M06), and a null pin on
+  either side is refused, so one key on refagent's pin cannot relax every
+  agent at once (rule-owner on M06 PR 2). From M09 PR 2 an agent with
+  `rules/guardrail.yaml` pins a guardrail of its own, not null and not
+  refagent's, which the platform builds from its rules on the baseline in
+  the agent's own stack (SPEC/09 section 2, section 6; R3, R10); given the
+  registry row's pin (`--held-guardrail`, the deploy job), a pin that is not
+  the held one is refused;
+- an agent's rules (M09 PR 2, `agent_rules.py`): `rules/guardrail.yaml`
+  merged onto `rules/baseline.yaml` add-only, every refusal named; each
+  guardrail or red-team plant named for a rule the merged guardrail builds
+  and a live golden of its kind;
 - the files `infra/construct/agent.Dockerfile` copies are there, so a merged
   repository cannot stop the deploy of every other agent
   (security-reviewer F3 on M06 PR 2);
@@ -52,7 +61,7 @@ from typing import Any
 
 import yaml
 
-from src.validate import agent_goldens, edges, lifecycle, ruleset, seats
+from src.validate import agent_goldens, agent_rules, edges, lifecycle, ruleset, seats
 from src.validate.checks import check_manifests
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -106,19 +115,51 @@ def image_file_errors(agent: Path) -> list[str]:
     return [f"{name}: missing; the platform's image copies it (infra/construct/agent.Dockerfile)" for name in missing]
 
 
-def guardrail_errors(doc: dict[str, Any], root: Path = ROOT) -> list[str]:
+def has_own_rules(agent: Path) -> bool:
+    """An agent repository with `rules/guardrail.yaml` is guarded by its own rules on the baseline (SPEC/09 §2)."""
+    return (agent / "rules" / "guardrail.yaml").is_file()
+
+
+def guardrail_errors(doc: dict[str, Any], root: Path = ROOT, *, own_rules: bool = False,
+                     held: dict[str, Any] | None = None) -> list[str]:  # fmt: skip
+    """The pin. Without `rules/`, the platform's (M06); with it, the agent's own (M09 PR 2, SPEC/09 §6; R10).
+
+    `own_rules`: the folder carries `rules/guardrail.yaml`. Its pin must then be not null and not
+    refagent's: the platform builds the guardrail from the merged rules in the agent's own stack
+    and conditions the call on that resource, reading the pin only to refuse those two (R3). `held`
+    is the registry row's guardrail for this agent, when the caller can read it (the deploy can,
+    the check's job cannot): a pin that is not the held one is refused, so a placeholder is admitted
+    only while the row holds no guardrail for the agent and refused once it does (R3, R10)."""
     platform = yaml.safe_load((root / "agents" / PLATFORM_AGENT / "manifest.yaml").read_text(encoding="utf-8"))
-    if not platform.get("guardrail") or not doc.get("guardrail"):
+    pin = doc.get("guardrail")
+    if not platform.get("guardrail") or not pin:
         return ["manifest.yaml: no guardrail pinned; an agent from the template pins the platform's "
-                "(SPEC/06 section 6, item 6), and the platform's must be a pin"]  # fmt: skip
-    if doc.get("guardrail") != platform.get("guardrail"):
-        return [f"manifest.yaml: guardrail {doc.get('guardrail')!r} is not the platform's {platform.get('guardrail')!r} "
-                "(SPEC/06 section 6, item 6: one guardrail for every agent at M06)"]  # fmt: skip
+                "(SPEC/06 section 6, item 6), and the platform's must be a pin" if not own_rules else
+                "manifest.yaml: no guardrail pinned; an agent with rules/ pins a guardrail of its own, built by the "
+                "platform from its rules on the baseline (SPEC/09 section 2; ADR-0014 decision 4)"]  # fmt: skip
+    if not own_rules:
+        if pin != platform.get("guardrail"):
+            return [f"manifest.yaml: guardrail {pin!r} is not the platform's {platform.get('guardrail')!r} "
+                    "(SPEC/06 section 6, item 6: one guardrail for every agent at M06; an agent with rules/ pins its own)"]  # fmt: skip
+        return []
+    if not isinstance(pin, dict) or not isinstance(pin.get("id"), str) or not isinstance(pin.get("version"), str) \
+            or not pin["id"] or not pin["version"]:  # fmt: skip
+        return [f"manifest.yaml: guardrail {pin!r} is not an id and a version, each a string"]
+    if pin == platform.get("guardrail") or pin.get("id") == (platform.get("guardrail") or {}).get("id"):
+        return [f"manifest.yaml: guardrail {pin!r} is refagent's; an agent with rules/ is guarded by its own, built from "
+                "them on the baseline, not by refagent's six topics (SPEC/09 section 2; R10)"]  # fmt: skip
+    if held and pin != held:
+        return [f"manifest.yaml: guardrail {pin!r} is not the {held!r} the registry holds for this agent: a pin the "
+                "registry does not hold is admitted only while the row holds no guardrail for the agent (R3)"]  # fmt: skip
     return []
 
 
-def evaluate(agent: Path, repository: str, root: Path = ROOT, *, lookup=None) -> dict[str, list[str]]:
-    """Each check's errors over the agent folder, by check name; every list empty means passed."""
+def evaluate(agent: Path, repository: str, root: Path = ROOT, *, lookup=None,
+             held_guardrail: dict[str, Any] | None = None) -> dict[str, list[str]]:  # fmt: skip
+    """Each check's errors over the agent folder, by check name; every list empty means passed.
+
+    `held_guardrail` is the registry row's pin for this agent, given by a caller that can read the
+    registry (deploy.yml's deploy job); the check's own job holds no AWS credential and gives none."""
     if bad := links(agent):
         return {"no symbolic links": [f"{p}: a symbolic link; refused before anything is read" for p in bad]}
     path = agent / "manifest.yaml"
@@ -134,7 +175,9 @@ def evaluate(agent: Path, repository: str, root: Path = ROOT, *, lookup=None) ->
     if errors["the agent's name"]:
         return errors
     name = doc["name"]
-    errors["the platform's guardrail"] = guardrail_errors(doc, root)
+    own_rules = has_own_rules(agent)
+    errors["the platform's guardrail" if not own_rules else "the agent's own guardrail"] = guardrail_errors(
+        doc, root, own_rules=own_rules, held=held_guardrail)
     errors["the files the platform's image copies"] = image_file_errors(agent)
     tree = scratch_tree(agent, name, root)
     previous = os.environ.get("AGENTKEEL_SEAT_REPOSITORY")
@@ -149,6 +192,11 @@ def evaluate(agent: Path, repository: str, root: Path = ROOT, *, lookup=None) ->
         errors["seats assigned, each a login that administers the repository"] = [e for e in seat_errors if e.startswith(mine)]
         errors["an agent's goldens: one ordinary and one trap at least, citing its own data"] = [
             e for e in agent_goldens.check(tree) if e.startswith(mine)]
+        # M09 PR 2 (SPEC/09 §2, §6; seeds S1, S2, S5): an agent's rules/guardrail.yaml merged onto the
+        # baseline add-only, each plant named for a rule the merged guardrail builds. Read only for an agent
+        # that carries rules/; one without is guarded by the platform's as at M06.
+        errors["an agent's rules on the platform baseline, add-only, each plant naming a rule it builds"] = (
+            agent_rules.rules_errors(tree / "agents" / name, root=root) if own_rules else [])
     finally:
         seats.login_holds_seat.cache_clear()
         if previous is None:
@@ -205,6 +253,9 @@ def main(argv: list[str] | None = None) -> int:
     # The evaluating job holds no token that may ask an organisation repository about its collaborators:
     # a seat that names a login passes here, and the posting job checks each login's access with the App's.
     one.add_argument("--defer-seat-access", action="store_true")
+    # M09 PR 2 (R3): the registry row's guardrail for this agent, `<id>:<version>`, given by deploy.yml's deploy
+    # job, which can read the registry; empty when the row holds none. The check's own job gives none.
+    one.add_argument("--held-guardrail", default="")
     two = sub.add_parser("ruleset")
     two.add_argument("--live", required=True, type=Path)
     two.add_argument("--out", required=True, type=Path)
@@ -217,7 +268,12 @@ def main(argv: list[str] | None = None) -> int:
             logins.append(login)
             return True, "deferred to the posting job"
 
-        errors = evaluate(args.agent, args.repository, lookup=deferred if args.defer_seat_access else None)
+        held = None
+        if args.held_guardrail:
+            held_id, _, held_version = args.held_guardrail.partition(":")
+            held = {"id": held_id, "version": held_version}
+        errors = evaluate(args.agent, args.repository, lookup=deferred if args.defer_seat_access else None,
+                          held_guardrail=held)  # fmt: skip
         result = {"repository": args.repository, "head": args.head, "errors": errors,
                   "seat_logins": sorted(set(logins)), "passed": not any(errors.values())}  # fmt: skip
     else:
