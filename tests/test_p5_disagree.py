@@ -321,3 +321,8 @@ def test_build_holds_a_plant_run_and_row_9_reads_it_again():
     misses = gate.rules_misses({"agent_rules": forged})
     assert any("the envelope says 1 of 1, F9_3 counts 0 of 1" in m for m in misses)
     assert "planted rules fired 0 of 1" in misses
+
+
+def test_the_gate_requires_f9_checks_from_m09s_readers_and_not_before():
+    assert {"F9_1", "F9_2", "F9_3", "F9_4", "F9_5"} <= set(gate.required_checks("HEAD"))
+    assert "F9_1" not in gate.required_checks("460990b")  # M09 PR 1's merge, before the readers
