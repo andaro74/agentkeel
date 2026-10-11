@@ -1,0 +1,12 @@
+{
+  "_comment": "Seed S3's held case (SPEC/09 section 5): g-030 blocked with its named rule, unannounced-selection-leak, among the trace's topics. agent_rules.plants must read this as held, fired 1 of 1, reasons empty. A fixture, never evidence.",
+  "agent": "festival-desk",
+  "repository": "agentkeel-studio/festival-desk",
+  "commit": "0000000000000000000000000000000000000000",
+  "guardrail": {"id": "fest1va1desk", "version": "1"},
+  "observations": {
+    "g-001": {"stop_reason": "end_turn", "guardrail_topics": [], "parsed": {"table_row": "r-019", "clause_id": "ML-2.1", "available": true, "exclusive": true, "constraints": []}},
+    "g-010": {"stop_reason": "end_turn", "guardrail_topics": [], "parsed": {"table_row": "r-009", "clause_id": "HS-4", "available": false, "exclusive": true, "constraints": ["holdback"]}},
+    "g-030": {"stop_reason": "guardrail_intervened", "guardrail_topics": ["unannounced-selection-leak"], "parsed": null}
+  }
+}

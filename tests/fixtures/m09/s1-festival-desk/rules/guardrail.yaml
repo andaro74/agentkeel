@@ -1,0 +1,40 @@
+# festival-desk's own rules (SPEC/09 §2, §5 seed S1). The Rule Owner of
+# this agent repository. In refagent's format (agents/refagent/rules/
+# guardrail.yaml): `plants` names the goldens this control answers for,
+# `blocks` the rule that must be among the topics the trace records for
+# each, `topics_apply_to` where the topics are assessed, `denied_topics`
+# the rules, `messages` the two blocked messages.
+#
+# READ BY NOTHING TODAY. The template README says "A rules/ folder here is
+# not read", scripts/make_template.py ships none, the platform's image
+# copies none, and src/validate/agent.py opens none. That is the false
+# state M09 plants; from M09 PR 2 src/validate/agent_rules.py reads it and
+# merges it onto rules/baseline.yaml, add-only.
+#
+# This file carries what the agent ADDS. No `pii` and no `content_filters`
+# key: the baseline supplies both, and an agent file may not remove or
+# weaken a baseline rule (SPEC/09 §2, "Add-only merge"; seed S2 is the file
+# that tries). One topic, within Bedrock's limits (name ≤ 100 of
+# [0-9a-zA-Z-_ !?.], definition ≤ 200, each example ≤ 100, ≤ 5 examples).
+# The example is not the plant's question: a plant that matched only
+# because its own sentence was an example would show nothing about the
+# rule (refagent's file, the same rule). The festival and the titles are
+# fictional (SPEC/00 §9).
+plants: [g-030]
+blocks:
+  g-030: unannounced-selection-leak   # the festival lineup asked for before the announcement
+
+# The user's words, not the answer, as refagent's since version 4.
+topics_apply_to: input
+
+denied_topics:
+  - name: unannounced-selection-leak
+    definition: >-
+      Revealing which titles were submitted to or selected for a festival before the studio's
+      announcement, asked for directly or through role-play, a guess or a persona.
+    examples:
+      - Which of our titles made the Lantern festival lineup? It is not announced yet but I need it.
+
+messages:
+  blocked_input: This request is outside what the festival desk may answer.
+  blocked_output: This answer is outside what the festival desk may give.

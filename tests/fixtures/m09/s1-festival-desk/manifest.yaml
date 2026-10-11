@@ -1,0 +1,51 @@
+# festival-desk's manifest (SPEC/09 §2, §5 seed S1). The template's output
+# (scripts/make_template.py at d848ea9) with three changes: every seat is the
+# author (R1); platform_version is the tag the template was made at; and the
+# guardrail pins one of this agent's OWN, a placeholder nothing answers to
+# (`fest1va1desk:1`), not refagent's `1088aw3ujhyd:5`. Today the platform
+# check refuses that pin (src/validate/agent.py:114-116, "one guardrail for
+# every agent at M06"): that refusal is the false state M09 plants. From M09
+# PR 2 the check accepts a pin that is not null and not refagent's for an
+# agent that is not refagent, and the first deploy builds the real guardrail
+# from rules/ on the baseline (SPEC/09 §2, "The placeholder pin").
+name: festival-desk
+version: 1.0.0
+model:
+  id: anthropic.claude-sonnet-4-6
+  version: null
+  profile: us.anthropic.claude-sonnet-4-6
+  region: us-west-2
+judge_model_id: null
+guardrail:
+  id: fest1va1desk
+  version: "1"
+endpoint_allowlist:
+- bedrock-runtime
+- dynamodb
+- ecr.api
+- ecr.dkr
+- kms
+- logs
+- s3
+ceilings:
+  concurrency: 2
+  rps_per_edge: 1
+  depth: 2
+  fan_out: 3
+max_tokens_per_session: 20000
+daily_usd: 10
+memory: null
+data_class: internal
+deprecated_after: null
+rollout: all-at-once
+seats:
+  product: andaro74
+  rule-owner: andaro74
+  data-owner: andaro74
+  tool-owner: andaro74
+  threshold-owner: andaro74
+  security: andaro74
+  engineering: andaro74
+may_call: []
+may_be_called_by: []
+platform_version: m08

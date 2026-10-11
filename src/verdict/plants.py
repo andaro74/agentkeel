@@ -191,6 +191,27 @@ SEEDS_M08: dict[str, tuple[str, str, str]] = {
     "run3": ("F8.3", "milestones/M08/runs/drill_run3.yaml", "scripts/observe_drill.py"),
 }
 
+# Claim 9's seeded cases (SPEC/09 section 5), the same shape. Listed at M09
+# PR 1, in one commit before any reader. S1 is the fixture agent, an agent
+# folder with rules/ of its own that the platform check refuses today (its
+# pin, its guardrail golden) and must admit from PR 2; S2 and S5 are agent
+# rule files the merge must refuse or merge as named; S3 is three answer
+# records; S4 is a guard, no fixture (refagent's rules whole after the
+# split), whose reader is the gate's `plants_fired`, in the tree. The run is
+# the run file the owner fills after PR 2 merges, read by the observer. The
+# strict markers, not this list, say whether a seed is read. Listing them
+# reads nothing and gates nothing. CONTROLS above stays refagent's: an
+# agent repository's plants are read from its answer record by
+# src/verdict/agent_rules.py (PR 2), never counted in plants_expected.
+SEEDS_M09: dict[str, tuple[str, str, str]] = {
+    "S1": ("F9.1, F9.4", "tests/fixtures/m09/s1-festival-desk/", "src/validate/agent_rules.py"),
+    "S2": ("F9.2", "tests/fixtures/m09/s2-weakened-baseline/", "rules/baseline.yaml, src/validate/agent_rules.py"),
+    "S3": ("F9.3", "tests/fixtures/m09/s3-silent-plant/", "src/verdict/agent_rules.py"),
+    "S4": ("F9.5", "agents/refagent/rules/ (a guard, no fixture)", "src/verdict/gate.py"),
+    "S5": ("F9.4", "tests/fixtures/m09/s5-unnamed-plant/", "src/validate/agent_rules.py"),
+    "run": ("F9.1-F9.4, live", "milestones/M09/runs/f9_3_plant_run.yaml", "scripts/observe_rules.py"),
+}
+
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
 SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/01 section 5", SEEDS),
@@ -201,6 +222,7 @@ SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/06 section 5", SEEDS_M06),
     ("SPEC/07 section 5", SEEDS_M07),
     ("SPEC/08 section 5", SEEDS_M08),
+    ("SPEC/09 section 5", SEEDS_M09),
 ]
 
 

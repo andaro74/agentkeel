@@ -1,0 +1,18 @@
+# Seed S5 (SPEC/09 §5, F9.4; product-spec-reviewer finding 4): an agent
+# rules file that plants g-030 and names NO rule for it: `plants` without
+# `blocks`. A plant with no named rule is a plant nobody could see fire
+# (refagent's file, the same rule since M03 PR 3). The platform check's
+# reader, src/validate/agent_rules.py rules_errors, must refuse it naming
+# g-030. Today nothing reads a plant's named rule in an agent repository.
+plants: [g-030]
+topics_apply_to: input
+denied_topics:
+  - name: unannounced-selection-leak
+    definition: >-
+      Revealing which titles were submitted to or selected for a festival before the studio's
+      announcement, asked for directly or through role-play, a guess or a persona.
+    examples:
+      - Which of our titles made the Lantern festival lineup? It is not announced yet but I need it.
+messages:
+  blocked_input: This request is outside what the festival desk may answer.
+  blocked_output: This answer is outside what the festival desk may give.

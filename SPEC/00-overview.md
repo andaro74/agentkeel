@@ -22,7 +22,10 @@ M05, §10.3 row 05; `milestones/M05/rulings/pr1.md`) · Amended at M06 PR 1
 quickstart is timed after PR 3's merge and read by PR 4's run;
 `milestones/M06/rulings/pr3.md`) · Amended at M06 PR 4 (§8 M06, §10.1
 cut 3, §10.2 Acts 1 to 3, §10.5: row 6 closed RED and S3 moves to M07;
-`milestones/M06/rulings/pr4.md`)
+`milestones/M06/rulings/pr4.md`) · Amended at M09 PR 1 (§3, §7 row 9,
+§8's count and its M09 entry, §10.3 row 09, §10.5, §15: a tenth
+milestone, opened after M08 closed and tagged; ADR-0014;
+`milestones/M09/rulings/pr1.md`, put to Product)
 
 ## 1. What this is
 
@@ -56,7 +59,7 @@ seat that owns it, and that a model swap cannot relax it unnoticed.*
 
 | Threat | Looks like | Answered by |
 |---|---|---|
-| Negligent developer | forgets a seat, ships no goldens, loosens a bar to go green | M02, M06 |
+| Negligent developer | forgets a seat, ships no goldens, loosens a bar to go green; ships an agent on a new subject guarded by another agent's rules | M02, M06, M09 |
 | Malicious developer | edits a workflow, bypasses a check, deploys from a laptop | M01, M02, M06 |
 | Compromised or leaky tool | returns a credential, calls an undeclared endpoint | M05, M08 |
 | Poisoned corpus | an unsigned "amendment" reaches the documents the agent will read; a golden mirrors its own source | M03 (the bucket), M06 (the answer) |
@@ -290,6 +293,7 @@ by hand; M00 itself opens and closes without them.
 | 6 | A developer ships a governed agent from the template in under one day | M06 | OPEN |
 | 7 | An agent takes a platform, model or retirement upgrade without a workflow edit | M07 | OPEN |
 | 8 | The platform detects, contains and recovers from a hostile agent end to end; the evidence is complete without anyone editing it | M08 | OPEN |
+| 9 | An agent made from the template is guarded by its own rules on top of a platform baseline, and each of its rules is shown to fire on a question planted for it | M09 | OPEN |
 
 States: OPEN → GREEN | RED | UNMEASURED | UNSCHEDULED (two-key) | RETIRED.
 A milestone that closes without a measurement is RED, never GREEN, never
@@ -305,7 +309,12 @@ the milestone's build paths cites `SPEC/00-overview.md#8-MNN`.
 Measurement lands by PR 2. The close PR carries the explainer's "What
 happened" and the milestone video; if the cold review of PR 2 finds
 nothing, PR 3 is the close PR. Nine milestones, at most 36 PRs, about
-twelve weeks at one milestone per ten days.
+twelve weeks at one milestone per ten days. Amended at M09 PR 1
+(`milestones/M09/rulings/pr1.md`; ADR-0014): a tenth, M09, opened after
+M08 closed RED and was tagged; at most 40 PRs. M08's "then building
+stops" held from its close on 2026-10-06 until M09 opened; M09 is opened
+by a Product ruling, not by a finding of M08, and reopens none of M08's
+rows.
 
 ### M00 — Baseline and ledger
 Build: `src/baseline/` (Converse on the pinned baseline model, one
@@ -682,6 +691,78 @@ and nothing but a person attaches the quarantine. The sixth attempt is
 (SPEC/05 §8); the injection aimed at the judge is **not measured in this
 project**.
 
+### M09 — Per-agent rules on a platform baseline
+Claim 9 above. Added at M09 PR 1 (`milestones/M09/rulings/pr1.md`;
+ADR-0014), after M08 closed RED and was tagged. It takes the gap
+SPEC/06 §8 named as "One guardrail for every agent" and
+`milestones/M08/open.md` row 37 left as a named gap to re-rule: an agent
+from the template pins refagent's guardrail, whose denied topics are
+about title availability; its own `rules/` folder is not read; and an
+agent repository may hold no guardrail or red-team golden, so nothing
+checks a guardrail on a template agent's runtime. **M09 builds one
+control and the reading of it.** The control is the add-only merge of an
+agent's rules onto a platform baseline and the guardrail built from it;
+the reading is each planted rule's firing, read from the trace. It is not
+described as working until it has fired on the seeded case (§10.5).
+1. **A platform baseline**, `rules/baseline.yaml` (Rule Owner), separate
+   from refagent's film topics. refagent keeps its six topics as its own
+   agent rules in `agents/refagent/rules/`. What the baseline holds on
+   day one is the Rule Owner's ruling (SPEC/09 §2 proposes the two PII
+   entities and the prompt-attack filter as ruled at M03).
+2. **An agent repository's `rules/guardrail.yaml` is read**, in
+   refagent's format, and merged on top of the baseline **add-only**: an
+   agent can add rules and can never remove or weaken a baseline rule. A
+   file that tries is refused by the platform check, not ignored.
+3. **One Bedrock Guardrail per agent**, built by the platform from the
+   merged rules, a numbered version whose description carries the digest
+   of the baseline and the agent's files, as refagent's does. The agent's
+   manifest pins the resulting id and version, and the platform check
+   accepts that pin in place of refagent's. Which role builds it, and
+   whether a new agent needs a bootstrap deploy, is Security's ruling
+   (SPEC/09 §11).
+4. **Guardrail and red-team goldens in an agent repository**, with
+   `plants` and `blocks` as refagent's control files carry them. Each
+   plant must be blocked by its named rule, read from the trace
+   (`guardrail_topics`), as `build` reads refagent's plants since M03
+   PR 3.
+5. **Plant results are run and recorded after the merge**, by the
+   existing deploy path (the step that asks a deployed agent its own
+   goldens, M06), and read into the envelope's `agent_rules` field by
+   the observer; they do not stop the merge at M09.
+6. **The guardrail stays on the model call**, where it is today: the
+   construct's condition on the agent role's invoke and the server's
+   converse (M03 PR 2). Nothing moves to a gateway.
+Falsifiers: F9.1 an agent repository's rules are not in the guardrail its
+run carries. F9.2 an agent removes or weakens a baseline rule and is
+merged. F9.3 a planted rule is silent: a plant in an agent repository is
+answered, or blocked with its named rule absent from the trace.
+F9.4 the platform check refuses an agent's own pin or its guardrail
+golden, or admits a plant with no named rule or one naming a rule the
+merge does not build. F9.5 the split relaxes refagent: a topic or PII
+entity leaves refagent's guardrail, or its plants read under 7 of 7. The
+measured value is the fixture agent's planted
+rules fired, n of m, read from its answer record after the merge; row 9
+is GREEN only at m of m with F9.1 to F9.5 held.
+PRs: (1) SPEC/09; this entry; ADR-0014; the fixture agent with
+`rules/guardrail.yaml`, one guardrail golden beside the template's
+minimum of one ordinary and one trap, and one `blocks` entry, the other
+seeds, and the run file with `observed: null`, each before any reader;
+ledger row; explainer draft. (2) The baseline; the merge and its
+refusals; the per-agent guardrail; the platform check's three changed
+readings; `agent_rules` on the envelope and row 9's reading; the
+observer; the template README and quickstart corrected. The plant must go
+RED here. (3) The fixture agent made into an agent repository by the
+owner, merged, deployed, its guardrail built and its plant run and
+recorded (a named P3 exception, as M07's and M08's); the cold review's
+repairs. (4) Close.
+Not built at M09 (SPEC/09 §9 and §12): the AgentCore Gateway, a policy
+engine, Cedar, per-tool limits, log-only mode, two-key on an agent
+repository's own pull requests, a merge stop on a silent plant in an
+agent repository, and the public caller, proposed as M10 with a claim of
+its own.
+Produces: the baseline, the merge, one guardrail per agent, and the first
+guardrail plant fired for an agent that is not refagent.
+
 ## 9. refagent — the reference agent (title availability)
 
 Built in M01 as the construct's first tenant, shipped in the M06
@@ -896,6 +977,7 @@ finding on camera is the point.
 | 06 | A team can do this in a day | One developer creates an agent from the template and ships it in a day, without touching the safety pipeline. |
 | 07 | Upgrades come to you | A new platform version, a new model, or a retirement arrives as a PR; the team never edits the pipeline. |
 | 08 | We rehearsed the bad day | A hostile agent tried six things; all six were stopped, recorded, and recovered from. |
+| 09 | Every agent gets its own rules | A team writes the rules for its own agent on top of the platform's, each rule is shown to stop the question it was written for, and a team can add rules but cannot take the platform's away. |
 
 Plus two framing pages:
 - `docs/milestones/README.md` — the plain-language index: milestone,
@@ -936,7 +1018,12 @@ not check recordings.
   of its own milestone; M00 PR 4 was the one exception and spent M00's
   cap (ADR-0005 amendment 1). M08, which has no next milestone, rules its
   own at M08 open. A milestone is not finished until its video is
-  committed.
+  committed. Amended at M09 PR 1: M08's video was committed at M08's own
+  close under that ruling (ADR-0005 amendment 2), so M09 PR 1 carries no
+  recording; M09's own video is committed at M09's close as M08's was,
+  under the same amendment, since SPEC/00 plans no M10 (M10 is proposed,
+  not opened, SPEC/09 §11 R6). §15's ten videos are then met at M09's
+  close, not at M10's open.
 
 ## 11. Rulings recorded in this SPEC
 
@@ -1052,20 +1139,28 @@ alarm and a quarantine input. Target under $250 total.
 
 ## 15. Done when
 
-Rows 0–8 in `milestones/README.md` have a measured value, at least seven
+Rows 0–9 in `milestones/README.md` have a measured value (0–8 at M08's
+close; row 9 added at M09 PR 1), at least seven
 are GREEN, every RED and UNSCHEDULED row carries a ruling file under
 `milestones/MNN/rulings/`, every PR since M00 PR 1 has one, the
 compliance page links to evidence for every control it names,
 `docs-current` is green, `docs/milestones/README.md` matches
 `make ledger-plain`, Acts 1–6 are committed with their tags,
 `quickstart.md` carries a measured time under one day,
-`docs/milestones/` holds nine explainers and nine videos, `docs/story.md`
-exists, and `git tag m08` exists on `main`.
+`docs/milestones/` holds nine explainers and nine videos (ten of each
+from M09 PR 1), `docs/story.md`
+exists, and `git tag m08` exists on `main` (and `m09`, from M09 PR 1).
 
 Amended at M08 PR 1 (`milestones/M08/rulings/pr1.md`;
 `product-spec-reviewer` finding 8 on SPEC/08). M08 is the last
 milestone, so this is the last place this section can be made true.
 Three of its clauses are not met and are not moved to fit:
+
+Amended at M09 PR 1 (`milestones/M09/rulings/pr1.md`; ADR-0014): M09 is
+opened after M08's close. The three clauses below stay as M08's close
+read them; M09's close re-reads each over rows 0–9 the same way, and
+moves none to fit. "At least seven are GREEN" is unreachable at M09 too
+(three GREEN of nine; one row cannot make seven).
 
 - **"At least seven are GREEN" is not met and was unreachable from
   M06's close.** Rows 0, 2 and 3 are GREEN; rows 1, 4, 5, 6 and 7 are

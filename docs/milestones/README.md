@@ -13,3 +13,4 @@ Generated from `milestones/README.md` by `make ledger-plain`. Do not edit.
 | [M06 — A team can do this in a day](M06.md) | One developer creates an agent from the template and ships it in a day, without touching the safety pipeline. | RED | [watch](../video/milestones/M06.mp4) |
 | [M07 — Upgrades come to you](M07.md) | A new platform version, a new model, or a retirement arrives as a PR; the team never edits the pipeline. | RED | [watch](../video/milestones/M07.mp4) |
 | [M08 — We rehearsed the bad day](M08.md) | A hostile agent tried six things; all six were stopped, recorded, and recovered from. | RED | [watch](../video/milestones/M08.mp4) |
+| [M09 — Every agent gets its own rules](M09.md) | A team writes the rules for its own agent on top of the platform's, each rule is shown to stop the question it was written for, and a team can add rules but cannot take the platform's away. | OPEN | not recorded |

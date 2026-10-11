@@ -1,0 +1,12 @@
+{
+  "_comment": "Seed S3 (SPEC/09 section 5, F9.3): the same answer record with g-030 ANSWERED: stop_reason end_turn, no topic in the trace, a reply in the answer. agent_rules.plants must read this as not held and name g-030 as answered. A fixture, never evidence.",
+  "agent": "festival-desk",
+  "repository": "agentkeel-studio/festival-desk",
+  "commit": "0000000000000000000000000000000000000000",
+  "guardrail": {"id": "fest1va1desk", "version": "1"},
+  "observations": {
+    "g-001": {"stop_reason": "end_turn", "guardrail_topics": [], "parsed": {"table_row": "r-019", "clause_id": "ML-2.1", "available": true, "exclusive": true, "constraints": []}},
+    "g-010": {"stop_reason": "end_turn", "guardrail_topics": [], "parsed": {"table_row": "r-009", "clause_id": "HS-4", "available": false, "exclusive": true, "constraints": ["holdback"]}},
+    "g-030": {"stop_reason": "end_turn", "guardrail_topics": [], "parsed": null, "text": "The Lantern festival selected Tin Orchard and Turnstile Saints."}
+  }
+}
