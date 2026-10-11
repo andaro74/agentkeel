@@ -1,0 +1,42 @@
+# M09's live run (SPEC/09 §5, §5.1): the fixture agent made into an agent
+# repository after PR 2 merges, its plant run by the existing deploy path
+# and read by scripts/observe_rules.py. The run to make, stated first; the
+# reading is of the answer record, the read-back and the platform check's
+# results, never of this file's prose. `observed: null` until the observer
+# writes it (M05's pattern). The claim is read by the observer and `build`,
+# not here (P5). Product's file under milestones/**.
+seed: run
+falsifiers: [F9.1, F9.2, F9.3, F9.4]
+repository: agentkeel-studio/festival-desk   # public, as drill-agent was (SPEC/09 §11 R8)
+agent: festival-desk
+made_from: tests/fixtures/m09/s1-festival-desk/   # copied in by the owner at PR 3
+steps:
+  - id: first
+    what: >-
+      The first pull request carries S1's folder with its placeholder pin
+      (fest1va1desk:1). The platform check must read rules/guardrail.yaml,
+      admit the pin (not null, not refagent's) and admit g-030 with its named
+      rule, and refuse nothing but what the seats and goldens owe. It merges.
+    expected: admitted; merged
+  - id: deploy
+    what: >-
+      deploy.yml on main builds the agent's guardrail from the merged rules in
+      the agent's own stack (as Security rules, SPEC/09 §11 R3), writes its id,
+      version and description digest to the registry row, deploys the agent
+      and asks it its three goldens. The answer record is what row 9 reads.
+    expected: g-030 blocked with unannounced-selection-leak among the trace's topics; g-001 and g-010 answered
+  - id: second
+    what: >-
+      The second pull request carries the pin from the registry row and S2's
+      weakened.yaml as rules/guardrail.yaml. The platform check must refuse it
+      on the rules file, naming EMAIL and the way (F9.2's live arm).
+    expected: refused on the rules file; not merged
+  - id: third
+    what: The third pull request carries the pin alone. It merges.
+    expected: admitted; merged
+reads:
+  - the answer record of the deploy step, by its key in the audit bucket
+  - the built guardrail's version description, read back (or the registry row's digest, SPEC/09 §9 cut 3)
+  - the platform check's result on each of the three heads
+  - the digest of rules/baseline.yaml on agentkeel's main and the agent's rules at the merge commit, computed by the observer
+observed: null

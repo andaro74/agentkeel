@@ -1,0 +1,12 @@
+{
+  "_comment": "Seed S3 (SPEC/09 section 5, F9.3): festival-desk's answer record after the merge, as the deploy's step that asks an agent its goldens would leave it, with g-030 BLOCKED by some other rule: the trace names a topic that is not the one blocks names for it. Membership, not only: the named rule must be among guardrail_topics, and here it is absent. agent_rules.plants must read this as not held and name g-030 and what the trace recorded. A fixture, never evidence.",
+  "agent": "festival-desk",
+  "repository": "agentkeel-studio/festival-desk",
+  "commit": "0000000000000000000000000000000000000000",
+  "guardrail": {"id": "fest1va1desk", "version": "1"},
+  "observations": {
+    "g-001": {"stop_reason": "end_turn", "guardrail_topics": [], "parsed": {"table_row": "r-019", "clause_id": "ML-2.1", "available": true, "exclusive": true, "constraints": []}},
+    "g-010": {"stop_reason": "end_turn", "guardrail_topics": [], "parsed": {"table_row": "r-009", "clause_id": "HS-4", "available": false, "exclusive": true, "constraints": ["holdback"]}},
+    "g-030": {"stop_reason": "guardrail_intervened", "guardrail_topics": ["some-other-rule"], "parsed": null}
+  }
+}

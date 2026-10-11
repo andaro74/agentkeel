@@ -353,3 +353,26 @@ instrument, never a refusal. None is copied to `evals/history/`.
 | S6 | `m08/s6-evidence/` | a run's records and a held set: one doubled (two versions), one written after the close plus N, one with no retention, one missing, and an unnamed refusal by the role in the window; `drill.evidence` must name each of the five and pass the held set (F8.4) |
 | S7 | `m08/s7-quarantine/` | two observations and a held one: a call by the role answered after the attach, and a window with no refused call by the role (M05's S7); `drill.quarantine` takes the role and must refuse both (F8.5) |
 | run1–3 | `milestones/M08/runs/drill_run{1,2,3}.yaml` | `observed: null`: the three runs to make, read by `scripts/observe_drill.py` after PR 2 merges (PR 3 for runs 2 and 3) |
+
+## M09 (SPEC/09 §5)
+
+Committed at M09 PR 1, in one commit before any reader. S1 is the **fixture
+agent**, `festival-desk`: the template's agent folder (made by
+`scripts/make_template.py`, so its code, tool, prompt and full data are
+refagent's) with `rules/guardrail.yaml` of its own, one guardrail golden
+planted for its one rule, and a manifest pinning a guardrail of its own.
+S2 and S5 are **agent rule files** the merge must refuse or merge as
+named; S3 is **answer records**; S4 is a guard with no fixture. Their
+readers are `src/validate/agent_rules.py` and `src/verdict/agent_rules.py`,
+which PR 2 adds; today neither is there, and the platform check refuses S1
+on its pin and its golden's kind, which is the false state. None is copied
+to `evals/history/`. The festival, the titles and the rule are fictional.
+
+| Seed | File | What is wrong with it (or, for the guard, why it passes) |
+|---|---|---|
+| S1 | `m09/s1-festival-desk/` | the template's folder with `rules/guardrail.yaml` (one topic, `unannounced-selection-leak`; `plants: [g-030]`; `blocks` naming it; no `pii` or `content_filters`, which the baseline supplies), `goldens/g-030.yaml` (`kind: guardrail`, `BLOCKED`) beside `g-001` and `g-010`, and a placeholder pin `fest1va1desk:1`. `src/validate/agent.evaluate()` **refuses it** twice today: the pin is not refagent's (`agent.py:114-116`) and g-030 is not ordinary or trap (`agent_goldens.py:88-90`). From PR 2 it must admit it, and `agent_rules.rules_errors` must read its rules and find nothing |
+| S2 | `m09/s2-weakened-baseline/` | `weakened.yaml` lists EMAIL with action NONE: the merge must refuse it naming EMAIL and the way. `empty_pii.yaml` lists `pii: []`: the merge must still hold PHONE and EMAIL as ANONYMIZE. Today `rules/baseline.yaml` does not exist and nothing merges |
+| S3 | `m09/s3-silent-plant/` | three answer records: g-030 blocked by `some-other-rule` (its named rule absent from the trace), g-030 answered, and a held one blocked by its named rule. `agent_rules.plants` must refuse the first two naming g-030 and hold the third (fired 1 of 1) |
+| S4 | none (`agents/refagent/rules/`) | a guard: refagent's six topics, two PII entities and seven plants as they stand. Passes today; a split that moves a rule out fails it (F9.5) |
+| S5 | `m09/s5-unnamed-plant/` | `no_blocks.yaml` plants g-030 with no `blocks` entry; `unbuilt_rule.yaml` names `festival-embargo`, a rule its topics do not build. `rules_errors` must refuse both |
+| run | `milestones/M09/runs/f9_3_plant_run.yaml` | `observed: null`: the fixture agent made into `agentkeel-studio/festival-desk` after PR 2 merges, its four steps stated first, read by `scripts/observe_rules.py` |
