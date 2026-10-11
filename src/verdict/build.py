@@ -61,6 +61,16 @@ From M08 PR 2, with `--drill`, `drill`: the game-day drill's three runs, ruled
 here (src/verdict/drill.py) on what `scripts/observe_drill.py` read, against N
 (`detection.max_seconds`). Recorded, never gated (SPEC/08 §4); row 8 reads it.
 
+From M09 PR 2, with `--rules`, `agent_rules`: the plant run in an agent
+repository, ruled here (src/verdict/agent_rules.py) on what
+`scripts/observe_rules.py` read: the pin and the digest (F9.1), the weakened
+file refused (F9.2), each plant from the trace (F9.3), the three heads (F9.4),
+and planted rules fired n of m. Recorded, never gated (SPEC/09 §4); row 9
+reads it. F9_5, the split not relaxing refagent, is joined here with this
+run's own plant count. And `build answer` writes each golden's observation
+and the stack's guardrail pin (`--guardrail`) on the answer record, so the
+plant run can be read from it.
+
 From M04 PR 3, with `--swaps`, `swaps`: what `scripts/rule_swaps.py` wrote,
 the gate's verdict on each swap PR's own envelope beside GitHub's record of
 the pull. Copied, not read: build rules on no envelope (P5), and nothing
@@ -95,7 +105,7 @@ from typing import Any
 
 import yaml
 
-from src.verdict import containment, drill, template, upgrade
+from src.verdict import agent_rules, containment, drill, template, upgrade
 # M06 PR 2 (SPEC/06 §4, BLOCK 3): build is the comparer of panel 1's rows with the registry's.
 from src.verdict.template import panel_not_in_registry  # noqa: F401  (S4's reader, by this name)
 # M07 PR 2 (SPEC/07 §4): build is the reader of a retirement's records, of a rollback's digests, of panel
@@ -716,6 +726,37 @@ def drill_record(path: Path, thresholds: dict[str, Any]) -> dict[str, Any]:
         raise Refused(f"{path}: {exc}") from exc
 
 
+def rules_record(path: Path) -> dict[str, Any]:
+    """scripts/observe_rules.py's observation, ruled into `agent_rules` (SPEC/09 §4). No bar: n of m is the value."""
+    try:
+        return agent_rules.record(load_json(path))
+    except agent_rules.Unreadable as exc:
+        raise Refused(f"{path}: {exc}") from exc
+
+
+def agent_blocks(agent_dir: Path) -> dict[str, str]:
+    """An agent repository's plants, each with its named rule, from its two control files (M09 PR 2).
+
+    The platform check held each to a rule the merged guardrail builds before the merge
+    (`src/validate/agent_rules.rules_errors`); here they are read as refagent's are by `blocks_at`, so an
+    agent's guardrail golden is scored fired only by its named rule (SPEC/09 §2, "Fired")."""
+    blocks: dict[str, str] = {}
+    for name in ("guardrail.yaml", "redteam.yaml"):
+        path = agent_dir / "rules" / name
+        if not path.is_file():
+            continue
+        control = yaml.safe_load(path.read_text(encoding="utf-8"))
+        named = (control.get("blocks") or {}) if isinstance(control, dict) else {}
+        if not isinstance(named, dict):
+            raise Refused(f"rules/{name}: blocks is not a mapping of plant id to rule")
+        for golden_id, rule in named.items():
+            if not isinstance(rule, str) or not rule:
+                raise Refused(f"rules/{name}: blocks names no rule for {golden_id}")
+            if blocks.setdefault(golden_id, rule) != rule:
+                raise Refused(f"{golden_id} is named for {blocks[golden_id]!r} and {rule!r} by two controls")
+    return blocks
+
+
 def quickstart_bar(thresholds: dict[str, Any]) -> float:
     """`quickstart.max_seconds` (SPEC/06 section 1): refused when it is absent, as N is."""
     bar = (thresholds.get("quickstart") or {}).get("max_seconds")
@@ -784,10 +825,13 @@ def compose_envelope(
     template_reading: dict[str, Any] | None = None,
     upgrade_reading: dict[str, Any] | None = None,
     drill_reading: dict[str, Any] | None = None,
+    rules_reading: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """`bars` and `incumbent` (its runs, and where the pin was read) give F4_4; `second`, the
     agent's second raw and its scores, gives A-vs-A and F4_3; `control_second`, the control's
-    second raw and the ids whose pass differ from its card, is recorded only (M04 PR 2)."""
+    second raw and the ids whose pass differ from its card, is recorded only (M04 PR 2).
+    `rules_reading` is claim 9's (M09 PR 2), recorded only; F9_5's second source is this run's own
+    plant count, joined below."""
     observations = raw["observations"]
     usage = [o.get("usage", {}) for o in observations]
     agent_usage = sum(u.get("inputTokens", 0) + u.get("outputTokens", 0) for u in usage)
@@ -838,6 +882,12 @@ def compose_envelope(
     regressed = [g for g in failing if gated and g in passed_before]
     never_passed = [g for g in failing if g not in passed_before]
     plants_fired = sum(results[g]["pass"] for g in plant_ids)
+    # SPEC/09 §4 (F9.5, M09 PR 2): the split must not relax refagent. Its second source is this run's own
+    # count of refagent's plants, joined to S4's guard; a count short of the controls' is a fail here, and
+    # the gate holds F9_5 to its own count again (P5). Joined only where the Makefile passed the guard.
+    if gated and "F9_5" in checks:
+        whole = bool(plant_ids) and plants_fired == len(plant_ids)
+        checks = both(checks, "F9_5", {"status": "pass" if whole else "fail", "url": checks["F9_5"]["url"]})
     results = {
         g: {"kind": r["kind"], "scope": scope, "score": r["score"], "cites": r["cites"], "pass": r["pass"]}
         for g, r in results.items()
@@ -880,6 +930,10 @@ def compose_envelope(
     # M08 PR 2 (SPEC/08 section 4): the game-day drill, recorded and gated by nothing; row 8 reads it.
     if gated and drill_reading is not None:
         one_subject["drill"] = drill_reading
+    # M09 PR 2 (SPEC/09 section 4): the plant run in an agent repository, recorded and gated by nothing; row 9
+    # reads it. On PR 2's own envelope it reads unread: no agent repository with rules exists (SPEC/09 §7).
+    if gated and rules_reading is not None:
+        one_subject["agent_rules"] = rules_reading
     return {
         "commit": raw["commit"],
         "tag": tag,
@@ -913,12 +967,20 @@ ANSWER_SCHEMA = Path(__file__).with_name("answer.schema.json")
 
 
 def compose_answer(raw: dict[str, Any], agent_dir: Path, repository: str, platform_commit: str,
-                   run_url: str | None) -> dict[str, Any]:  # fmt: skip
+                   run_url: str | None, guardrail: dict[str, str] | None = None) -> dict[str, Any]:  # fmt: skip
     """Item 4's record (SPEC/06 §1, R7): an agent from the template, in its deployed runtime, on its own goldens.
 
     Scored as an agent is (grounded, citing, no credential), against the agent's own data: its rows
     in `data/table.json`, its clauses in `data/clauses.json`. GREEN when every call answered and at
-    least one golden passed; RED when none did; UNMEASURED when a call failed. Gated by nothing."""
+    least one golden passed; RED when none did; UNMEASURED when a call failed. Gated by nothing.
+
+    From M09 PR 2 (SPEC/09 §2, §4; R7) the record also carries each golden's observation as `build`
+    writes refagent's: `stop_reason`, `guardrail_topics` (the rule names the trace recorded) and
+    `parsed`, so a plant in the agent repository is read from the trace by `src/verdict/agent_rules.py`;
+    a guardrail or red-team golden is scored by the membership rule against the agent's own controls'
+    `blocks` (`agent_blocks`). `guardrail` is the pin the stack built and the call carried, which
+    `deploy.yml` reads from the stack's outputs; the manifest's pin is not written here (SPEC/09 §2,
+    "The placeholder pin")."""
     if not run_url:
         raise Refused("an answer record needs the CI run URL (--run-url)")
     if raw.get("mode") != "runtime" or not raw.get("runtime_arn"):
@@ -931,11 +993,15 @@ def compose_answer(raw: dict[str, Any], agent_dir: Path, repository: str, platfo
     table = load_json(agent_dir / "data" / "table.json")
     rows = {r["table_row"] for r in table}
     clauses = set(load_json(agent_dir / "data" / "clauses.json"))
-    results = as_the_agent_is_scored(score_all(raw, goldens, rows, clauses))
+    results = as_the_agent_is_scored(score_all(raw, goldens, rows, clauses, blocks=agent_blocks(agent_dir)))
     errors = sum("error" in o for o in raw["observations"])
     usage = [o.get("usage", {}) for o in raw["observations"]]
     passed = any(r["pass"] for r in results.values())
     manifest = yaml.safe_load((agent_dir / "manifest.yaml").read_text(encoding="utf-8"))
+    observations = {o["id"]: {"stop_reason": o.get("stop_reason"),
+                              "guardrail_topics": sorted(t for t in (o.get("guardrail_topics") or []) if isinstance(t, str)),
+                              "parsed": o.get("parsed") if isinstance(o.get("parsed"), dict) else None}
+                    for o in raw["observations"] if o["id"] in goldens}  # fmt: skip
     return {
         "what": "agent answer",
         "repository": repository,
@@ -945,7 +1011,9 @@ def compose_answer(raw: dict[str, Any], agent_dir: Path, repository: str, platfo
         "runtime_arn": raw["runtime_arn"],
         "model_id": raw["model_id"],
         "region": raw["region"],
+        **({"guardrail": {"id": guardrail["id"], "version": guardrail["version"], "source": "stack"}} if guardrail else {}),
         "goldens": {g: {k: r[k] for k in ("kind", "score", "cites", "pass")} for g, r in results.items()},
+        "observations": observations,
         "errors": errors,
         "tokens_in": sum(u.get("inputTokens", 0) for u in usage),
         "tokens_out": sum(u.get("outputTokens", 0) for u in usage),
@@ -1034,6 +1102,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--upgrade", type=Path, metavar="OBSERVATION")
     # M08 PR 2 (SPEC/08 §4): the game-day drill, as scripts/observe_drill.py read it. Recorded only.
     parser.add_argument("--drill", type=Path, metavar="OBSERVATION")
+    # M09 PR 2 (SPEC/09 §4): the plant run in an agent repository, as scripts/observe_rules.py read it. Recorded only.
+    parser.add_argument("--rules", type=Path, metavar="OBSERVATION")
     parser.add_argument("--app-observation", type=Path, metavar="STORED")
     parser.add_argument("--surfaces", type=Path, metavar="JUNIT_XML")
     parser.add_argument("--run-url")
@@ -1041,15 +1111,24 @@ def main(argv: list[str] | None = None) -> int:
     # M06 PR 2 (R7): `answer` reads an agent from the template, placed at --agent-dir, from --repository.
     parser.add_argument("--agent-dir", type=Path)
     parser.add_argument("--repository")
+    # M09 PR 2 (SPEC/09 §2): the guardrail the stack built and the call carried, `<id>:<version>`, from the
+    # stack's outputs; empty for an agent without rules/, whose record then names none.
+    parser.add_argument("--guardrail", default="")
     args = parser.parse_args(argv)
 
     if args.what == "answer":
         try:
             if not args.agent_dir or not args.repository:
                 raise Refused("answer needs --agent-dir and --repository")
+            pin = None
+            if args.guardrail:
+                pin_id, _, pin_version = args.guardrail.partition(":")
+                if not pin_id or not pin_version:
+                    raise Refused(f"--guardrail {args.guardrail!r} is not <id>:<version>")
+                pin = {"id": pin_id, "version": pin_version}
             document = compose_answer(load_json(args.raw), args.agent_dir, args.repository,
                                       subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,
-                                                     text=True, check=True).stdout.strip(), args.run_url)  # fmt: skip
+                                                     text=True, check=True).stdout.strip(), args.run_url, pin)  # fmt: skip
             if errors := answer_errors(document):
                 raise Refused("the answer record does not validate: " + "; ".join(errors))
             if HISTORY in args.out.resolve().parents:
@@ -1163,6 +1242,7 @@ def main(argv: list[str] | None = None) -> int:
                     upgrade_reading=upgrade_record(args.upgrade, thresholds, args.history_dir, template_reading=shipped,
                                                    app=stored, surfaces=args.surfaces) if args.upgrade else None,
                     drill_reading=drill_record(args.drill, thresholds) if args.drill else None,
+                    rules_reading=rules_record(args.rules) if args.rules else None,
                 )  # fmt: skip
             emit(envelope, args.out, envelope=True)
     except Refused as refusal:

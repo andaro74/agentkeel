@@ -261,3 +261,63 @@ def test_build_holds_a_drill_and_row_8_reads_it_again_at_the_commits_n():
 def test_the_gate_requires_f8_checks_from_m08s_readers_and_not_before():
     assert {"F8_1", "F8_2", "F8_3", "F8_4", "F8_5"} <= set(gate.required_checks("HEAD"))
     assert "F8_1" not in gate.required_checks("1083722")  # M08 PR 1's merge, before the readers
+
+
+# --- M09 PR 2 (SPEC/09 §4, P5): a case for each new check ---------------------
+
+
+def test_the_observer_claims_fired_and_build_reads_the_trace():
+    """observe_rules writes raw records; agent_rules rules. A plant the observer wrote as fired, whose observation
+    shows another rule in the trace, is read as silent by build, and the reason names it (F9.3)."""
+    from src.verdict import agent_rules
+
+    record = {"guardrail": {"id": "fd7k2m9q1x0b", "version": "1"}, "fired": 1, "held": True,  # the observer's own claims
+              "observations": {"g-030": {"stop_reason": "guardrail_intervened", "guardrail_topics": ["some-other-rule"],
+                                         "parsed": None, "fired": True}}}  # fmt: skip
+    reading = agent_rules.plants(record, {"g-030": "unannounced-selection-leak"})
+    assert reading["fired"] == 0 and reading["held"] is False
+    assert any("g-030" in r and "some-other-rule" in r for r in reading["reasons"])
+
+
+def test_build_writes_no_claim_9_checks_and_the_gate_requires_them(chain):
+    """F9_1 to F9_5 from M09's readers: build says GREEN without them, the gate does not (SPEC/09 §4)."""
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    assert envelope["verdict"] == "GREEN"
+    required = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_9_CHECKS
+    verdict, reasons = gate.judge(envelope, load_golden_kinds(GOLDENS_DIR), {}, [], required=required)
+    assert verdict == "RED"
+    for name in ("F9_1", "F9_2", "F9_3", "F9_4", "F9_5"):
+        assert f"checks.{name} is missing from an agent envelope" in reasons
+
+
+def test_build_says_f9_5_pass_and_the_gate_reads_its_own_plant_count(chain):
+    """F9.5's second source is build's own count of refagent's plants; the gate counts again (P5): a pass beside
+    a silent plant, or beside no plant, is read as a fail."""
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    url = envelope["checks"]["F1_4"]["url"]
+    said = {**envelope, "checks": {**envelope["checks"], "F9_5": {"status": "pass", "url": url}}}
+    kinds = load_golden_kinds(GOLDENS_DIR)
+    verdict, reasons = gate.judge(said, kinds, {}, ["g-013"])  # g-013 fails in this fixture: a silent plant
+    assert verdict == "RED" and "envelope says F9_5 is pass, the gate reads plants 0/1" in reasons
+    verdict, reasons = gate.judge(said, kinds, {}, [])
+    assert "envelope says F9_5 is pass, the gate reads plants 0/0" in reasons
+    # and build's own join: a run whose plants are whole passes, one short of the controls' does not
+    whole = build.both({"F9_5": {"status": "pass", "url": url}}, "F9_5", {"status": "pass", "url": url})
+    assert whole["F9_5"]["status"] == "pass"
+    assert build.both({"F9_5": {"status": "pass", "url": url}}, "F9_5", {"status": "fail", "url": url})["F9_5"]["status"] == "fail"
+
+
+def test_build_holds_a_plant_run_and_row_9_reads_it_again():
+    """build ruled the run; row 9's reading holds the top-level count to F9_3's own and n to m (P5)."""
+    from src.verdict import agent_rules
+
+    from .test_m09_readers import observation
+
+    reading = agent_rules.record(observation())
+    assert gate.rules_misses({"agent_rules": reading}) == []
+    forged = {**reading, "F9_3": {**reading["F9_3"], "fired": 0}}
+    misses = gate.rules_misses({"agent_rules": forged})
+    assert any("the envelope says 1 of 1, F9_3 counts 0 of 1" in m for m in misses)
+    assert "planted rules fired 0 of 1" in misses

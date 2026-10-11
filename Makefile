@@ -134,6 +134,21 @@ F8_3_CASES := test_s5_run_3_is_refused_on_a_refusal_or_a_red_verdict
 F8_4_CASES := test_s6_incomplete_evidence_is_found_by_drill_evidence
 F8_5_CASES := test_s7_the_quarantine_is_read_against_the_role
 DRILL_OBS ?=
+# M09 PR 2 (SPEC/09 section 4). F9_1 to F9_5: each seed of S1, S2, S3 and S5 read or refused by its reader
+# (src/validate/agent_rules.py, src/validate/agent.py, src/verdict/agent_rules.py), and S4's guard, read
+# from the seed tests; test-only witnesses, the only claim 9 checks on an envelope. F9_1 is joined by the
+# F9.1 reader's own test; F9_5 is joined by build's own count of refagent's plants in this run, which must
+# stay 7 of 7 across the split. The run-file test is in no list: it reads what the owner fills, and stays
+# an expected failure until the run is made (PR 3). The live reading is RULES_OBS,
+# scripts/observe_rules.py's reading of the answer record, the built guardrail, the registry and GitHub:
+# build rules it into `agent_rules`, and only the ledger's row 9 reading reads it. Empty, the envelope has
+# no agent_rules, and row 9 reads it as not read.
+F9_1_CASES := test_s1_the_platform_check_admits_an_agent_with_its_own_rules,test_s1_an_agent_repositorys_rules_are_read,test_f9_1_the_record_pin_and_the_read_back_digest_are_held_to_the_tree
+F9_2_CASES := test_s2_a_weakened_baseline_rule_is_refused,test_s2_an_empty_list_removes_nothing
+F9_3_CASES := test_s3_a_silent_plant_is_read_from_the_answer_record
+F9_4_CASES := test_s1_the_platform_check_admits_an_agent_with_its_own_rules,test_s5_a_plant_with_no_named_rule_is_refused
+F9_5_CASES := test_s4_refagents_rules_are_whole
+RULES_OBS ?=
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \
           $(if $(F0_3_OBS),--check-pr F0_3 "$(F0_3_OBS)") \
           $(if $(JUNIT),--check-cases F1_1 "$(F1_1_CASES)" "$(JUNIT)") \
@@ -167,6 +182,11 @@ CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)")
           $(if $(JUNIT),--check-cases F8_3 "$(F8_3_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F8_4 "$(F8_4_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F8_5 "$(F8_5_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F9_1 "$(F9_1_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F9_2 "$(F9_2_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F9_3 "$(F9_3_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F9_4 "$(F9_4_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F9_5 "$(F9_5_CASES)" "$(JUNIT)") \
           $(if $(RUN_URL),--run-url "$(RUN_URL)")
 # CI passes a file path; the gate's exit code is written there, so a REJECTED
 # envelope (exit 2) is told from a RED one and is not recorded (M01 item 9).
@@ -199,7 +219,7 @@ define chain
 	$(if $(A_VS_A),-uv run python -m src.agent.run --out $(1)/$(2).agent-raw-b.json --recheck-runtime)
 	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json $(A_VS_A_RUNS)
 	$(if $(SWAPS_OBS),uv run python scripts/rule_swaps.py "$(SWAPS_OBS)" --out "$(SWAPS_RULED)")
-	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)") $(if $(TEMPLATE_OBS),--template "$(TEMPLATE_OBS)") $(if $(UPGRADE_OBS),--upgrade "$(UPGRADE_OBS)" $(if $(JUNIT),--surfaces "$(JUNIT)")) $(if $(APP_OBS),--app-observation "$(APP_OBS)") $(if $(DRILL_OBS),--drill "$(DRILL_OBS)")
+	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)") $(if $(TEMPLATE_OBS),--template "$(TEMPLATE_OBS)") $(if $(UPGRADE_OBS),--upgrade "$(UPGRADE_OBS)" $(if $(JUNIT),--surfaces "$(JUNIT)")) $(if $(APP_OBS),--app-observation "$(APP_OBS)") $(if $(DRILL_OBS),--drill "$(DRILL_OBS)") $(if $(RULES_OBS),--rules "$(RULES_OBS)")
 	uv run python -m src.verdict.gate $(1)/$(2).json; code=$$?; $(if $(GATE_EXIT),echo $$code > "$(GATE_EXIT)";) exit $$code
 endef
 else

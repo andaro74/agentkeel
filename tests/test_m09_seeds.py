@@ -159,7 +159,6 @@ def test_s2_an_empty_list_removes_nothing():
 # --- S3: a silent plant, read by agent_rules.plants -------------------------------
 
 
-@expected_failure
 def test_s3_a_silent_plant_is_read_from_the_answer_record():
     """Three answer records for the fixture agent. In the first g-030 is blocked with a topic that is not
     its named rule; in the second it is answered. `src.verdict.agent_rules.plants(record, blocks)` must

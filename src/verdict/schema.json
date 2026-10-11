@@ -760,6 +760,71 @@
         }
       }
     },
+    "agent_rules": {
+      "description": "From M09 PR 2 (SPEC/09 §4, §6). The plant run in an agent repository as scripts/observe_rules.py read the answer record, the built guardrail (read back, or the registry row's record of it), the platform check's results on the three heads and the rule files at the merge commit, and verdict.build (src/verdict/agent_rules.py) ruled on them: F9.1 the pin and the digest, F9.2 the weakened file refused and the baseline present, F9.3 each plant from the trace by its named rule, F9.4 the three heads; and the measured value, planted rules fired n of m. The gate rules nothing on it; the ledger's row 9 reading (gate.rules_misses) is the measurement. Not made reads every falsifier unread. Optional, so no envelope before it becomes invalid.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["looked_up_at", "made", "repository", "agent", "commit", "pin", "expected", "fired", "F9_1", "F9_2", "F9_3", "F9_4"],
+      "properties": {
+        "looked_up_at": {"type": ["string", "null"]},
+        "made": {"type": "boolean"},
+        "repository": {"type": ["string", "null"]},
+        "agent": {"type": ["string", "null"]},
+        "commit": {"type": ["string", "null"]},
+        "pin": {"description": "The guardrail the answer record names, <id>:<version>, the stack's; null when unread.", "type": ["string", "null"]},
+        "expected": {"type": "integer", "minimum": 0},
+        "fired": {"type": "integer", "minimum": 0},
+        "F9_1": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "pin", "digest_expected", "digest_read", "source"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "pin": {"type": ["string", "null"]},
+            "digest_expected": {"type": ["string", "null"]},
+            "digest_read": {"type": ["string", "null"]},
+            "source": {"description": "read_back: GetGuardrail as the eval role (R4); registry: the row's record of the build (SPEC/09 §9 cut 3); null: neither.", "enum": ["read_back", "registry", null]}
+          }
+        },
+        "F9_2": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "refused_on"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "refused_on": {"type": ["array", "null"], "items": {"type": "string"}}
+          }
+        },
+        "F9_3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "expected", "fired", "fired_by"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "expected": {"type": "integer", "minimum": 0},
+            "fired": {"type": "integer", "minimum": 0},
+            "fired_by": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}}
+          }
+        },
+        "F9_4": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["read", "held", "reasons", "heads"],
+          "properties": {
+            "read": {"type": "boolean"},
+            "held": {"type": ["boolean", "null"]},
+            "reasons": {"type": "array", "items": {"type": "string"}},
+            "heads": {"type": "object", "additionalProperties": {"enum": ["admitted", "refused", "unread"]}}
+          }
+        }
+      }
+    },
     "swaps": {
       "description": "From M04 PR 3 (SPEC/04 §4). The M04 swap PRs as scripts/rule_swaps.py read them: GitHub's record of each pull and the gate's verdict on that pull's own envelope. Recorded, never gated (Product, M04 PR 3). Optional, so no envelope before it becomes invalid.",
       "type": "array",

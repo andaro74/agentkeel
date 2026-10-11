@@ -80,7 +80,7 @@ from typing import Any
 import yaml
 
 from src.verdict import M04_READERS as verdict_m04_readers
-from src.verdict import M05_READERS, M06_READERS, M07_READERS, M08_READERS
+from src.verdict import M05_READERS, M06_READERS, M07_READERS, M08_READERS, M09_READERS
 from src.verdict import (
     ROOT,
     canonical_sha256,
@@ -158,6 +158,12 @@ CLAIM_7_CHECKS = ("F7_0", "F7_1", "F7_2", "F7_3", "F7_4", "F7_5")
 # (READ_THE_DRILL), never required here: a missed attempt must not make every later pull request's `evals`
 # red. Held from M08_READERS, which wired them. M08 builds no control (ADR-0013): these are the instrument.
 CLAIM_8_CHECKS = ("F8_1", "F8_2", "F8_3", "F8_4", "F8_5")
+# What an agent envelope must carry from M09 PR 2 (SPEC/09 section 4): F9_1 to F9_5, from the seed tests of
+# S1, S2, S3 and S5 and S4's guard (F9_5 joined by build's own count of refagent's plants, which `judge` holds
+# again below). Test-only witnesses: each says a reader refused its fixture, not that an agent's rule fired.
+# The live reading is in `agent_rules`, read by row 9 (READ_THE_RULES), never required here: a silent plant
+# in an agent repository stops no merge at M09 (ADR-0014 decision 5). Held from M09_READERS, which wired them.
+CLAIM_9_CHECKS = ("F9_1", "F9_2", "F9_3", "F9_4", "F9_5")
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -209,6 +215,13 @@ UPGRADE_BARS = ("arrive_max_seconds", "deploy_max_seconds", "retire_max_seconds"
 # reading is refused 4 of 6 and recorded 5 of 6, so row 8 is expected RED (SPEC/08 §7).
 READ_THE_DRILL = {"M08"}
 DRILL_RUNS = ("run1", "run2", "run3", "evidence", "quarantine")
+# Rows whose claim is read from the plant run an envelope keeps in `agent_rules` (SPEC/09 §4, §7). Gated by
+# nothing, but a run not made, a falsifier unread or not held, or planted rules fired under m of m makes the
+# row's reading RED whatever the run's own verdict, as READ_THE_DRILL does for row 8. On PR 2's own envelope
+# it reads unread (no agent repository with rules exists), so row 9 reads RED there: the plant going RED under
+# the measurement. Expected at PR 3's run: fired 1 of 1, F9.1 to F9.5 held (SPEC/09 §7).
+READ_THE_RULES = {"M09"}
+RULES_READINGS = ("F9_1", "F9_2", "F9_3", "F9_4")
 
 
 class Rejected(Exception):
@@ -362,7 +375,8 @@ def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
     claim_6 = CLAIM_6_CHECKS if descends_from(commit, M06_READERS, root) else ()
     claim_7 = CLAIM_7_CHECKS if descends_from(commit, M07_READERS, root) else ()
     claim_8 = CLAIM_8_CHECKS if descends_from(commit, M08_READERS, root) else ()
-    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6 + claim_7 + claim_8
+    claim_9 = CLAIM_9_CHECKS if M09_READERS and descends_from(commit, M09_READERS, root) else ()
+    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6 + claim_7 + claim_8 + claim_9
 
 
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:
@@ -589,6 +603,12 @@ def judge(
             reasons.append(f"silent surface plant: expected {surfaces['plants_expected']}, fired {surfaces['plants_fired']}")
             if said_f7_5 is not None and said_f7_5["status"] == "pass":
                 reasons.append("envelope says F7_5 is pass, and upgrade.surfaces counts a silent plant")
+        # SPEC/09 §4 (F9.5, M09 PR 2): the split must not relax refagent. build joined its own plant count to
+        # S4's guard; the gate holds F9_5 to its own count again (P5): a pass beside a silent plant, or beside
+        # no plant at all, is read as a fail.
+        said_f9_5 = envelope["checks"].get("F9_5")
+        if said_f9_5 is not None and said_f9_5["status"] == "pass" and (not plant_ids or fired != len(plant_ids)):
+            reasons.append(f"envelope says F9_5 is pass, the gate reads plants {fired}/{len(plant_ids)}")
     reasons += [
         f"check {name} failed: {check['url']}"
         for name, check in sorted(envelope["checks"].items())
@@ -641,7 +661,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
              detection: tuple[float | None, str] | None = None,
              quickstart: tuple[float | None, str] | None = None,
              upgrade: tuple[dict[str, float] | None, str] | None = None,
-             drill: tuple[float | None, str] | None = None) -> str:
+             drill: tuple[float | None, str] | None = None,
+             rules: bool = False) -> str:
     """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's.
 
     An M00 envelope: its control tallies. From M01: the agent's tallies, then
@@ -676,6 +697,11 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     and each miss are named, and a GREEN run reads RED (M08 PR 2). The six
     attempts' expected reading is refused 4 of 6 and recorded 5 of 6, so row 8
     is expected RED (SPEC/08 §7).
+
+    `rules` is for a row whose claim is read from the plant run in an agent
+    repository (`READ_THE_RULES`): planted rules fired n of m, each
+    falsifier's reading and each miss are named, and a GREEN run reads RED
+    (M09 PR 2). No bar: the value is n of m, expected 1 of 1 (SPEC/09 §7).
     """
     results = envelope["goldens"]
     agent = {g: r for g, r in results.items() if r["scope"] == "agent"}
@@ -697,7 +723,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     shipped = template_misses(envelope, *quickstart) if quickstart is not None and agent else []
     upgraded = upgrade_misses(envelope, *upgrade) if upgrade is not None and agent else []
     drilled = drill_misses(envelope, *drill) if drill is not None and agent else []
-    if (misses or held or shipped or upgraded or drilled) and verdict == "GREEN":
+    ruled = rules_misses(envelope) if rules and agent else []
+    if (misses or held or shipped or upgraded or drilled or ruled) and verdict == "GREEN":
         verdict = "RED"
     parts = [
         *heads,
@@ -715,6 +742,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         *upgraded,
         *(drill_reading(envelope) if drill is not None and agent else []),
         *drilled,
+        *(rules_reading(envelope) if rules and agent else []),
+        *ruled,
         verdict,
         f"envelope `{envelope['commit']}`",
     ]
@@ -1057,6 +1086,52 @@ def drill_reading(envelope: dict[str, Any]) -> list[str]:
     return parts
 
 
+def rules_misses(envelope: dict[str, Any]) -> list[str]:
+    """What row 9 finds wrong with the plant run an envelope recorded; [] if nothing (SPEC/09 §4, §7).
+
+    build ruled each falsifier on the record, the read-back and GitHub's results. This holds the count
+    again: `fired` and `expected` to F9_3's own, m to at least one, and n to m. A run not made, a falsifier
+    unread or not held is a miss; unread reads as not read, never as held. On an envelope with no
+    `agent_rules`, or one whose run was not made, every falsifier is a miss, which is PR 2's RED."""
+    reading = envelope.get("agent_rules")
+    if reading is None:
+        return ["agent_rules not read: the envelope records no plant run"]
+    misses = []
+    if not reading.get("made"):
+        misses.append("the plant run has not been made: no agent repository with rules was read")
+    for name in RULES_READINGS:
+        one = reading[name]
+        if not one["read"]:
+            misses.append(f"{name} unread: {'; '.join(one['reasons'][:2]) or 'no reason recorded'}")
+        elif one["held"] is not True:
+            misses.append(f"{name} not held: {'; '.join(one['reasons'][:3]) or 'no reason recorded'}")
+    planted = reading["F9_3"]
+    if (reading["fired"], reading["expected"]) != (planted["fired"], planted["expected"]):
+        misses.append(f"planted rules: the envelope says {reading['fired']} of {reading['expected']}, F9_3 counts "
+                      f"{planted['fired']} of {planted['expected']}")  # fmt: skip
+    if planted["expected"] < 1:
+        misses.append("planted rules: none is named, so none can have fired")
+    elif planted["fired"] != planted["expected"]:
+        misses.append(f"planted rules fired {planted['fired']} of {planted['expected']}")
+    return misses
+
+
+def rules_reading(envelope: dict[str, Any]) -> list[str]:
+    """n of m and each falsifier in the Measured cell, as the envelope recorded them: printed; the misses decide."""
+    reading = envelope.get("agent_rules")
+    if reading is None:
+        return []
+    parts = [f"planted rules fired {reading['fired']} of {reading['expected']}"
+             + ("" if reading.get("made") else " (run not made)")]  # fmt: skip
+    for name in RULES_READINGS:
+        one = reading[name]
+        state = "unread" if not one["read"] else ("held" if one["held"] else "not held")
+        if name == "F9_1" and one.get("source"):
+            state += f" ({one['source']})"
+        parts.append(f"{name} {state}")
+    return parts
+
+
 def latest(history_dir: Path = HISTORY) -> Path | None:
     """The envelope for the nearest commit at or behind HEAD."""
     have = {p.stem: p for p in replay_history.envelope_paths(history_dir)}
@@ -1140,7 +1215,8 @@ def measured_at(path: Path, history_dir: Path = HISTORY, *, milestone: str | Non
                     detection=detection_at(envelope["commit"]) if milestone in READ_THE_CONTAINMENT else None,
                     quickstart=quickstart_at(envelope["commit"]) if milestone in READ_THE_TEMPLATE else None,
                     upgrade=upgrade_bars_at(envelope["commit"]) if milestone in READ_THE_UPGRADE else None,
-                    drill=detection_at(envelope["commit"]) if milestone in READ_THE_DRILL else None)  # fmt: skip
+                    drill=detection_at(envelope["commit"]) if milestone in READ_THE_DRILL else None,
+                    rules=milestone in READ_THE_RULES)  # fmt: skip
 
 
 def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> str | None:
