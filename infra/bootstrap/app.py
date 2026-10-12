@@ -275,6 +275,7 @@ class BootstrapStack(cdk.Stack):
         self.endpoint_groups: dict[str, ec2.ISecurityGroup] = {}
         boundary = self._boundary()
         deploy_boundary = self._deploy_boundary()
+        self.deploy_boundary = deploy_boundary  # `_guardrail` adds the deny on refagent's guardrail by ARN (M09 PR 3)
         # Stack-wide, and it is the DEPLOY boundary, not the agent one (ruling
         # s). This stack creates no role under /agentkeel/agents/: the roles
         # here deploy the platform, and capping them with the agent plane's
@@ -771,13 +772,32 @@ class BootstrapStack(cdk.Stack):
         # refagent's guardrail is the bootstrap's, untagged, and this role may not reach it (the deploy
         # boundary's narrowed deny above says the same).
         guardrails = f"arn:aws:bedrock:{REGION}:{self.account}:guardrail/*"
-        # CreateGuardrail alone: CloudFormation passes the tags in the create request, and TagResource on an
-        # existing guardrail is in the statement below, held to one already tagged. With TagResource here a
-        # request carrying the tag could tag refagent's untagged guardrail and bring it under the statement
-        # below (security-reviewer and cold review F3 on M09 PR 2); the deploy boundary denies that too.
+        # M09 PR 3 (SPEC/09 §11 R3, Unsure R3-a on #50, read on the Service Authorization Reference for Amazon
+        # Bedrock on 2026-10-11, before the by-hand deploy, not at the first deploy): CreateGuardrail lists no
+        # `guardrail` resource type (only the optional automated-reasoning-policy and guardrail-profile ones), and
+        # a statement naming a resource type the action does not take never applies. On guardrail/* this grant
+        # was dead and the first deploy of an agent with rules/ would have been refused on CreateGuardrail, as
+        # CreateAgentRuntime on runtime/* was (above). Resource `*`, held by the request tag, as the deploy
+        # boundary's deny already reads it.
         role.add_to_policy(iam.PolicyStatement(
             sid="MakeAnAgentsGuardrailOnlyWithItsTag",
             actions=["bedrock:CreateGuardrail"],
+            resources=["*"],
+            conditions={"Null": {f"aws:RequestTag/{AGENT_TAG}": "false"}},
+        ))  # fmt: skip
+        # The same page's operations table: the CreateGuardrail operation authorises bedrock:TagResource as well
+        # as bedrock:CreateGuardrail when the request carries tags, and CloudFormation's create handler calls
+        # TagResource (describe-type AWS::Bedrock::Guardrail, tagOnCreate, read 2026-10-11) on the new guardrail,
+        # which carries no tag yet, so the resource-tag statement below cannot admit it: the M07 lesson for
+        # runtime/* (deploy runs 37066321605 and 37074759767). Held to a request carrying the agent tag. What this
+        # reopens is security-reviewer and cold review F3 on M09 PR 2: a request carrying the tag could tag
+        # refagent's untagged guardrail and bring it under the statement below. The deploy boundary now denies
+        # TagResource and UntagResource on refagent's guardrail by its ARN (`_guardrail`), flat, so that one is
+        # out of reach whatever the request carries; any other untagged guardrail in this shared account is
+        # reachable only by a template GovernedAgent renders (stated under Unsure, Security).
+        role.add_to_policy(iam.PolicyStatement(
+            sid="TagAnAgentsGuardrailAtCreateOnly",
+            actions=["bedrock:TagResource"],
             resources=[guardrails],
             conditions={"Null": {f"aws:RequestTag/{AGENT_TAG}": "false"}},
         ))  # fmt: skip
@@ -1192,6 +1212,18 @@ class BootstrapStack(cdk.Stack):
             # converse, not assumed (security-reviewer on 0bb1d4a, F2).
             resources=[guardrail.attr_guardrail_arn, f"{guardrail.attr_guardrail_arn}:*"],
         ))  # fmt: skip
+        # M09 PR 3: the execution role may now tag a guardrail at create on a request carrying the agent tag
+        # (`_execution_role`, TagAnAgentsGuardrailAtCreateOnly), which is what F3 on M09 PR 2 named: such a
+        # request could tag this guardrail, untagged, and bring it under the execution role's resource-tag
+        # grants. Denied here by ARN, flat and unconditioned, on this one guardrail: no deploy-plane role tags
+        # or untags refagent's guardrail, whatever the request carries. The boundary is stack-wide, so the
+        # execution role carries it.
+        self.deploy_boundary.add_statements(iam.PolicyStatement(
+            sid="NeverTagRefagentsGuardrail",
+            effect=iam.Effect.DENY,
+            actions=["bedrock:TagResource", "bedrock:UntagResource"],
+            resources=[guardrail.attr_guardrail_arn],
+        ))  # fmt: skip
         # The guardrail's ARN, for the human's read-back (scripts/read_back_grants.py).
         # GovernedAgent and the ingest stack do not read it: both build the ARN
         # from the manifest's id and version, which the Rule Owner copies from
@@ -1538,7 +1570,11 @@ SUPPRESSIONS = {
         f"create; CreateGuardrail is held to a request tagged agentkeel:agent, and every action on an existing "
         f"guardrail, tagging included, to one carrying that tag, so refagent's, untagged, and any other in this "
         f"shared account are out of reach; the deploy boundary denies the same, and denies tagging an untagged "
-        f"guardrail. {CEILING}"
+        f"guardrail. M09 PR 3 (R3-a, the Service Authorization Reference read 2026-10-11): CreateGuardrail takes "
+        f"no guardrail resource type, so it is on Resource * and held by the request tag alone, as CreateAgentRuntime "
+        f"is by its subnets; TagResource at create is on guardrail/*, held to the request tag, because the create "
+        f"handler tags the new guardrail before it carries one; the deploy boundary denies tagging refagent's "
+        f"guardrail by its ARN. {CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "
