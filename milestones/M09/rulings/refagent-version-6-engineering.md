@@ -18,9 +18,7 @@ pr: 51
 
 # Ruling: two fixtures' premises after refagent pins version 6 (Engineering)
 
-DRAFT until it reads "Ruled by". Drafted by the session 2026-10-12; the
-first draft (the M07 test alone) was ruled at `a288e84` and is widened here
-by the second failure below, so it is ruled again.
+Ruled by andaro74 as Engineering, 2026-10-12, as written.
 
 ## What failed
 
