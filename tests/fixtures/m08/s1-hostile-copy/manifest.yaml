@@ -16,7 +16,7 @@ model:
 judge_model_id: null
 guardrail:
   id: 1088aw3ujhyd
-  version: "5"
+  version: "6"
 # kms is left out on purpose: the stand-in for a distribution-partner
 # endpoint the manifest does not declare (attempt a1). ecr.api and ecr.dkr
 # stay, or the construct refuses the manifest at synth.

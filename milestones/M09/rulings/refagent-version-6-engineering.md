@@ -1,11 +1,14 @@
 ---
-# Engineering's key over the one Engineering path pull request #51 touches:
+# Engineering's key over the two Engineering paths pull request #51 touches:
 # one test in tests/test_m07_readers.py, whose premise the Rule Owner's pin
-# move made false. The pin itself is refagent-version-6.md (Rule Owner).
+# move made false, and the M08 hostile-copy fixture's manifest, whose pin
+# was the platform's and is again. The pin itself is refagent-version-6.md
+# (Rule Owner).
 ruling: refagent-version-6-engineering
 seat: Engineering
 authorises:
   - tests/test_m07_readers.py
+  - tests/fixtures/m08/s1-hostile-copy/manifest.yaml
 evidence:
   - SPEC/00-overview.md#8-M09
   - milestones/M09/rulings/refagent-version-6.md
@@ -13,9 +16,11 @@ evidence:
 pr: 51
 ---
 
-# Ruling: the M07 upgrade test's premise, after refagent pins version 6 (Engineering)
+# Ruling: two fixtures' premises after refagent pins version 6 (Engineering)
 
-Ruled by andaro74 as Engineering, 2026-10-12, as written.
+DRAFT until it reads "Ruled by". Drafted by the session 2026-10-12; the
+first draft (the M07 test alone) was ruled at `a288e84` and is widened here
+by the second failure below, so it is ruled again.
 
 ## What failed
 
@@ -49,15 +54,46 @@ unchanged. No fixture file changes: `tests/fixtures/README.md` row S1 still
 reads as written, and "invented for the fixture" now describes a version
 that has since become real, which this file records.
 
+## The second failure, on the ruled head
+
+Run 38201479296 on `a288e84`, one test:
+`tests/test_m08_seeds.py::test_s1_the_platform_check_admits_the_hostile_copy`,
+a guard with no marker. M08's seed S1 (`tests/fixtures/m08/s1-hostile-copy/`,
+`tests/fixtures/README.md` row S1) is refagent's agent with six attempts in
+its code; its manifest pinned the platform's guardrail as it was at M08,
+version 5. The platform check requires an agent without `rules/` to pin
+the platform's guardrail exactly, id and version
+(`src/validate/agent.py`, "the platform's guardrail"), and from #51 that is
+version 6, so the hostile copy was refused on its pin:
+
+    manifest.yaml: guardrail {'id': '1088aw3ujhyd', 'version': '5'} is not the platform's {'id': '1088aw3ujhyd', 'version': '6'}
+
+The seed's false state is the six attempts in `agent.py`, never the pin;
+the pin has to be the platform's for the guard to read what it reads
+(SPEC/08 §1: the check reads the manifest and never the code). Changed:
+`version: "5"` to `version: "6"` in that manifest, one line, and nothing
+else under `tests/fixtures/m08/`. The README row names no version and
+stands. The M07 fixture agent's manifest also pins version 5
+(`m07/s1-platform-upgrade/agent/manifest.yaml`) and stays: it is an agent
+one platform version behind by design, and no test runs the platform check
+over it.
+
+The same reading applies outside the tree: `agentkeel-studio/drill-agent`,
+retired at M08's close, pins version 5 and would be refused by the platform
+check if it were ever checked again. Nothing deploys it. Recorded, not
+changed.
+
 ## What a reader can run
 
 ```
-git diff f5ecb25...HEAD -- tests/                       # one test's premise, nothing else under tests/
+git diff f5ecb25...HEAD -- tests/                       # one test's premise and one fixture pin, nothing else under tests/
+uv run pytest tests/test_m08_seeds.py -q                 # the hostile copy admitted again
 uv run pytest tests/test_m07_readers.py -q               # passes; the first assertion holds on version 5 vs 6
 uv run pytest tests/test_m07_readers.py -q -k held_to_mains_pin
 git diff f5ecb25...HEAD -- scripts/platform_upgrade.py   # empty: the reader is unchanged
 ```
 
 A change to `scripts/platform_upgrade.py`, to a file under
-`tests/fixtures/m07/`, or to any assertion of the test, in this pull
-request, makes this ruling wrong.
+`tests/fixtures/m07/`, to anything under `tests/fixtures/m08/` but that one
+line, or to any assertion of either test, in this pull request, makes this
+ruling wrong.
