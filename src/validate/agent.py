@@ -87,6 +87,12 @@ def scratch_tree(agent: Path, name: str, root: Path = ROOT) -> Path:
     tree = Path(tempfile.mkdtemp(prefix="agentkeel-agent-"))
     shutil.copy2(root / "thresholds.yaml", tree / "thresholds.yaml")
     for manifest in sorted((root / "agents").glob("*/manifest.yaml")):
+        # M09 PR 3 (security-reviewer F1 on #52): at deploy-agent the candidate itself sits at root/agents/<name>/,
+        # so its manifest is not a platform agent's to copy here; copytree below would find the folder made for it
+        # and raise. Skipped by identity, not by name: a platform agent that holds the name is still copied, and
+        # name_errors has refused the candidate before this runs.
+        if manifest.parent.resolve() == agent.resolve():
+            continue
         target = tree / "agents" / manifest.parent.name / "manifest.yaml"
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(manifest, target)

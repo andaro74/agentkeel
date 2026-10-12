@@ -298,8 +298,49 @@ def test_the_folder_being_checked_is_not_a_name_collision_with_itself(tmp_path):
     assert platform_check.name_errors("premiere-desk", root) == []
 
 
+def deploy_layout(tmp_path: Path) -> tuple[Path, Path]:
+    """agentkeel's root as deploy-agent's checkout holds it: the platform's manifests, thresholds.yaml, the
+    baseline, and the candidate's bundle already placed at agents/<name>/ (deploy.yml's rsync before the
+    held-pin check). Returns (root, bundle)."""
+    root = tmp_path / "agentkeel"
+    for name in ("refagent", "ratings-helper"):
+        (root / "agents" / name).mkdir(parents=True)
+        shutil.copy2(ROOT / "agents" / name / "manifest.yaml", root / "agents" / name / "manifest.yaml")
+    shutil.copy2(ROOT / "thresholds.yaml", root / "thresholds.yaml")
+    (root / "rules").mkdir()
+    shutil.copy2(BASELINE, root / "rules" / "baseline.yaml")
+    bundle = root / "agents" / "festival-desk"
+    shutil.copytree(FIXTURE, bundle)
+    return root, bundle
+
+
+def test_the_held_pin_check_admits_the_bundle_at_agents_name_in_the_deploys_own_checkout(tmp_path, monkeypatch):
+    """The deploy's case end to end (run 38259465892; security-reviewer F1 and the cold review's F3 on #52): the
+    candidate sits at <root>/agents/<name>/ and `evaluate` is run over it against that root. The name check
+    must not read it as a platform agent holding the name, and scratch_tree must not find the folder it is
+    about to make already made (it copies every root/agents/*/manifest.yaml first). Both the absolute form and
+    the relative `agents/<name>` deploy.yml passes, resolved against the checkout as cwd."""
+    from .test_m06_seeds import stand_in_lookup
+
+    root, bundle = deploy_layout(tmp_path)
+    errors = platform_check.evaluate(bundle, "agentkeel-studio/festival-desk", root=root, lookup=stand_in_lookup)
+    assert {name for name, errs in errors.items() if errs} == set(), errors
+    monkeypatch.chdir(root)
+    relative = platform_check.evaluate(Path("agents/festival-desk"), "agentkeel-studio/festival-desk", root=root,
+                                       lookup=stand_in_lookup)  # fmt: skip
+    assert {name for name, errs in relative.items() if errs} == set(), relative
+    # The same bundle checked from agent-src, as the pull-request check and sign-agent read it, while a platform
+    # folder holds the name: refused on the name and nothing else is read (the collision still fires).
+    elsewhere = tmp_path / "agent-src"
+    shutil.copytree(FIXTURE, elsewhere)
+    refused = platform_check.evaluate(elsewhere, "agentkeel-studio/festival-desk", root=root, lookup=stand_in_lookup)
+    assert refused == {"the agent's name": ["manifest.yaml: name festival-desk is held by agents/festival-desk/ in agentkeel"]}
+
+
 def test_evaluate_hands_the_name_check_the_folder_it_is_checking(monkeypatch, tmp_path):
-    """The call site, read: `evaluate` passes the agent folder, so the deploy's own copy is not a collision."""
+    """The call site, read on its own: `evaluate` passes the agent folder to `name_errors`. (The refusal's
+    absence here says nothing about the repair, since ROOT/agents/ holds no festival-desk; the test above reads
+    that against its own root.)"""
     from .test_m06_seeds import stand_in_lookup
 
     seen: list[Path | None] = []
@@ -312,7 +353,5 @@ def test_evaluate_hands_the_name_check_the_folder_it_is_checking(monkeypatch, tm
     monkeypatch.setattr(platform_check, "name_errors", recording)
     copy = tmp_path / "agents" / "festival-desk"
     shutil.copytree(FIXTURE, copy)
-    errors = platform_check.evaluate(copy, "agentkeel-studio/festival-desk", lookup=stand_in_lookup)
+    platform_check.evaluate(copy, "agentkeel-studio/festival-desk", lookup=stand_in_lookup)
     assert seen == [copy]
-    assert errors["the agent's name"] == []
-    assert {name for name, errs in errors.items() if errs} == set(), errors
