@@ -223,7 +223,9 @@ def test_the_execution_role_makes_a_guardrail_only_with_the_tag_and_touches_only
     refagent = by_boundary_sid["NeverTagRefagentsGuardrail"]
     assert "Condition" not in refagent
     guardrail_logical, _ = the_one(bootstrap_template, "AWS::Bedrock::Guardrail")
-    assert refagent["Resource"] == {"Fn::GetAtt": [guardrail_logical, "GuardrailArn"]}
+    # Both ARN forms the Apply grant names (security-reviewer F2 on PR 3): the guardrail's and its versions'.
+    arn = {"Fn::GetAtt": [guardrail_logical, "GuardrailArn"]}
+    assert refagent["Resource"] == [arn, {"Fn::Join": ["", [arn, ":*"]]}], refagent["Resource"]
     assert by_sid["ReadUpdateVersionAndRemoveATaggedAgentsGuardrailOnly"]["Condition"] == {"Null": {f"aws:ResourceTag/{TAG}": "false"}}
     assert "bedrock:ListGuardrails" not in {a for s in found for a in actions(s)}
 
