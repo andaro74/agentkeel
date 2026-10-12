@@ -15,7 +15,7 @@ pr: 51
 
 # Ruling: the M07 upgrade test's premise, after refagent pins version 6 (Engineering)
 
-DRAFT until it reads "Ruled by". Drafted by the session 2026-10-12.
+Ruled by andaro74 as Engineering, 2026-10-12, as written.
 
 ## What failed
 
