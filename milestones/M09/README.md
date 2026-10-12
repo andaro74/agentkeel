@@ -167,6 +167,82 @@ for a ruling file that reads "Ruled by".
    in the cell; neither is a miss. Step 1 before the run is what makes
    both read whole.
 
+### Repair detail (PR 3, 2026-10-12)
+
+- **PR 3 of 4, the repair; the run moves to PR 4** (SPEC/09 §5.1, M08's
+  second exception, stated at open). The platform's own deploy path needed
+  two repairs before an agent with `rules/` could deploy, one read from
+  the Service Authorization Reference before any deploy and one from the
+  first deploy's refusal. The plant run is read by PR 4's run, and the cell
+  cites that.
+- **By-hand steps 1 and 2 are done.** Step 1: the bootstrap stack deployed
+  2026-10-12 01:19 UTC from this branch after `pr3-security.md` was ruled;
+  refagent's guardrail `1088aw3ujhyd` has version 6, description `rules
+  sha256 41a0265a…cbd7`, the tree's digest over the baseline and refagent's
+  two files. Step 2: `#51` moved refagent's manifest to version 6
+  (`refagent-version-6.md`, Rule Owner, one key); it also had to move two
+  fixtures' premises that had pinned "a version main does not have" or "the
+  platform's version" (`refagent-version-6-engineering.md`). On the envelope
+  after its merge refagent reads `plants 7/7`, GREEN: F9.5 held on the first
+  envelope with the baseline's digest. Because `#51` took that number, PR 3
+  is `#52`.
+- **Step 3 began and stopped at the deploy.** `agentkeel-studio/festival-desk`
+  was made from the template, public, with the platform ruleset applied
+  from `infra/ruleset/agent.post.json` (R8). Its first pull request, S1's
+  folder with the placeholder pin, was admitted by the platform check and
+  merged (`cd0ad604`, 2026-10-12 13:28 UTC): F9.4's admitted arm. The
+  deploy found it once the platform check had passed the merge commit, signed
+  it, claimed the registry row, and was refused by its own held-pin check:
+  `name festival-desk is held by agents/festival-desk/ in agentkeel` (run
+  38259465892). No guardrail was attempted.
+- **Repair 1, Security** (`2bc9067`, `c7a8c36`): `CreateGuardrail` takes no
+  `guardrail` resource type, so the execution role's create grant on
+  `guardrail/*` never applied; it is on `Resource *` held by the request
+  tag. The `CreateGuardrail` operation also authorises `bedrock:TagResource`
+  and the create handler tags on create, so `TagResource` at create is
+  granted on `guardrail/*` held to the request tag, and the deploy boundary
+  denies tagging refagent's guardrail by its ARN, both forms. R3-d:
+  `ListTagsForResource` carries `aws:ResourceTag`; that condition stays.
+  Read on the page 2026-10-11 and deployed at step 1; `pr3-security.md`
+  carries the `cdk diff` table and the `security-reviewer` read.
+- **Repair 2, Engineering** (this PR's last code commit): the held-pin check
+  is PR 2's and ran for the first time at this deploy. `deploy-agent` places
+  the bundle at `agents/<name>/` in agentkeel's checkout and runs the check
+  over it there; `name_errors` found that folder and called it a platform
+  agent holding the name. It now takes the folder being checked and does not
+  count it; the pull-request check, which reads the head from `agent-src`
+  beside a clean `main`, is where a stolen name is refused, as before. Two
+  tests read it.
+- **Two readings stay open for PR 4's deploy.** Whether Bedrock puts
+  `aws:RequestTag` in the context of a plain `CreateGuardrail` (the page
+  lists the key on resource rows only); if not, the create and the
+  boundary's deny both refuse and the fallback in `pr3-security.md` is a PR 4
+  repair. And whether CloudFormation's create needs anything the narrowed
+  grants do not give. Neither is a finding of the claim.
+- **Noted for Security, not repaired here.** The `agentkeel-platform` App's
+  installation on the organisation is "selected repositories", not "all"
+  as SPEC/06 §6 describes; a new agent repository has to be added to it by
+  the owner in the browser before a ruleset can name its check (the
+  `required_status_checks` POST is refused with "Invalid integration ids"
+  until then). The other two Apps are on all repositories.
+- **The deploy keeps retrying.** Every scheduled run finds festival-desk's
+  merge commit, signs it and fails at the same step until this PR merges.
+  Harmless; each leaves a failed run.
+
+### By-hand steps before PR 4's run
+
+3. (continued) After this PR merges, the next scheduled deploy deploys
+   festival-desk: it builds the guardrail in `agentkeel-festival-desk`,
+   writes the registry row and asks the three goldens. Then the owner opens
+   the second pull request (the registry row's pin and S2's `weakened.yaml`;
+   refused on the rules file; not merged) and the third (the pin alone;
+   merged), as the run file states (R9: the golden is never edited).
+4. The owner fills `observed` in `runs/f9_3_plant_run.yaml` with the three
+   pull request numbers, the deploy run id and the answer record's key
+   (`envelopes/agents/festival-desk/cd0ad60490ad66a55e201eacda9e09b732a99a7c.json`
+   if the first deploy after the merge is the one that lands), and nothing
+   else. PR 4's run carries `agent_rules` made; the cell cites it.
+
 ### What a reader can run
 
 ```

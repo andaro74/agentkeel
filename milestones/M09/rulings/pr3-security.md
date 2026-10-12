@@ -1,5 +1,5 @@
 ---
-# M09 PR 3 (#51), the run. Security's key over the one Security path this PR
+# M09 PR 3 (#52), the repair (the run moves to PR 4, SPEC/09 §5.1). Security's key over the one Security path this PR
 # touches: the bootstrap stack and its cdk-nag report, repaired before the
 # by-hand deploy on a reading of the Service Authorization Reference, not at
 # the first deploy. Product's file is pr3.md (R8, the run file's observed
@@ -16,15 +16,18 @@ evidence:
   - SPEC/09-per-agent-rules.md
   - milestones/M09/rulings/pr2-security.md
   - https://docs.aws.amazon.com/service-authorization/latest/reference/list_bedrock.html
-pr: 51
+pr: 52
 ---
 
 # Ruling: M09 PR 3, Security
 
 DRAFT until it reads "Ruled by". Drafted by the session 2026-10-11 from
-the reading below; the by-hand bootstrap deploy (`milestones/M09/README.md`,
-"By-hand steps", step 1) waits for this file to read "Ruled by" and is made
-from this PR's branch, as M07 PR 3's second repair was.
+the reading below and widened 2026-10-12. The by-hand bootstrap deploy
+(`milestones/M09/README.md`, "By-hand steps", step 1) was made from this
+branch on 2026-10-12 at 01:19 UTC after the first draft was ruled; this
+second draft adds what the first deploy of the fixture agent read and is
+ruled again. This PR opened as #52 because the Rule Owner's version-6 pull
+request took #51.
 
 ## What this file rules
 
@@ -183,13 +186,37 @@ guardrail, the tag deny on refagent's guardrail by ARN) are in the
 tabulate. The stack's `GuardrailVersionForTheManifest` output after the
 deploy is what the Rule Owner's version-6 pull request copies (step 2).
 
+## What the first deploy read (2026-10-12)
+
+Deploy run 38259465892 on `agentkeel-studio/festival-desk` at `cd0ad604`
+was refused before any AWS resource was touched, by the deploy's own
+held-pin check: `name festival-desk is held by agents/festival-desk/ in
+agentkeel`. That is Engineering's path (`src/validate/agent.py`), repaired
+in this PR and ruled in `pr3-engineering.md`; nothing under `infra/` is
+touched by it. So the `CreateGuardrail` reading in item 4 is still unread:
+it lands on PR 4's deploy, the first one that reaches the stack.
+
+**Noted for this seat, not repaired here.** The `agentkeel-platform` App
+(5144253) is installed on the organisation with `repository_selection:
+selected`, not "all repositories" as SPEC/06 §6 and `pr2-security.md`'s
+grant reading describe; `agentkeel-upgrades` and `agentkeel-observer` are
+on all. A new agent repository has to be added to the platform App's
+installation by the owner in the browser before `infra/ruleset/agent.post.json`
+can be applied to it: GitHub refuses the ruleset's `required_status_checks`
+with "Invalid integration ids" until the App reaches the repository (read
+2026-10-12 at festival-desk's creation). Whether the installation should be
+moved to "all repositories", or SPEC/06 and the grant reading say
+"selected", is this seat's to rule; `scripts/platform_check.py grant`
+already reads and prints the selection. Recorded in the PR body under
+Unsure.
+
 ## What this PR does not do
 
-- No grant is deployed by it. The deploy is this seat's, by hand, from
-  this branch, after this file reads "Ruled by" and before the fixture
-  repository's first merge (step 1). Until then `main` describes a boundary
-  that is not deployed and nothing here has fired (`security-reviewer`
-  NOTE 1).
+- The grant was deployed by hand, from this branch, after the first draft
+  read "Ruled by" (step 1, 2026-10-12 01:19 UTC), before the fixture
+  repository's first merge. Nothing here has fired yet on a guardrail
+  create: the first deploy was refused before the stack (`security-reviewer`
+  NOTE 1 stands until PR 4's deploy).
 - No change to the agent plane's boundary, the deploy role's trust, the
   eval role beyond PR 2's, `verify`'s identity, any bucket or key policy,
   any security group or VPC. `deploy.yml` and the construct are unchanged;
