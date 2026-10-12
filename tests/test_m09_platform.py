@@ -23,6 +23,7 @@ from typing import Any
 import pytest
 import yaml
 
+from src.validate import agent as platform_check
 from src.validate import agent_rules
 
 from .test_bootstrap import (
@@ -269,3 +270,49 @@ def test_the_eval_role_reads_a_tagged_agents_guardrail_back_and_no_other(bootstr
     assert len(denying) == 1 and denying[0]["Condition"] == {"Null": {f"aws:ResourceTag/{TAG}": "true"}}
     flat = {a for s in eval_role_policy(bootstrap_template) if s["Effect"] == "Deny" and not s.get("Condition") for a in actions(s)}
     assert "bedrock:GetGuardrail" not in flat and denies_by_pattern(flat, "bedrock:CreateGuardrail")
+
+
+# --- the deploy's held-pin check over the bundle at agents/<name>/ (M09 PR 3) -----------------------------
+# deploy run 38259465892, the first deploy of an agent with rules/: deploy.yml's deploy-agent job places the
+# signed bundle at agents/<name>/ in agentkeel's checkout and runs the platform check over it with the pin the
+# registry holds (M09 PR 2). The name check found that folder and refused the agent's own name as a collision
+# ("name festival-desk is held by agents/festival-desk/ in agentkeel"). The pull-request check never reads
+# this: platform-check.yml checks the head out to agent-src beside a clean main.
+
+
+def test_the_folder_being_checked_is_not_a_name_collision_with_itself(tmp_path):
+    root = tmp_path / "agentkeel"
+    bundle = root / "agents" / "festival-desk"
+    bundle.mkdir(parents=True)
+    # The deploy's case: the folder at agents/<name>/ is the candidate itself.
+    assert platform_check.name_errors("festival-desk", root, agent=bundle) == []
+    # A caller that names no folder reads as before, and so does one checking another folder with that name:
+    # a platform agent holding the name is still refused.
+    elsewhere = tmp_path / "agent-src"
+    elsewhere.mkdir()
+    for agent in (None, elsewhere):
+        errors = platform_check.name_errors("festival-desk", root, agent=agent)
+        assert errors == ["manifest.yaml: name festival-desk is held by agents/festival-desk/ in agentkeel"], agent
+    # Nothing under agents/ with that name: admitted either way.
+    assert platform_check.name_errors("premiere-desk", root, agent=elsewhere) == []
+    assert platform_check.name_errors("premiere-desk", root) == []
+
+
+def test_evaluate_hands_the_name_check_the_folder_it_is_checking(monkeypatch, tmp_path):
+    """The call site, read: `evaluate` passes the agent folder, so the deploy's own copy is not a collision."""
+    from .test_m06_seeds import stand_in_lookup
+
+    seen: list[Path | None] = []
+    original = platform_check.name_errors
+
+    def recording(name, root=platform_check.ROOT, agent=None):
+        seen.append(agent)
+        return original(name, root, agent=agent)
+
+    monkeypatch.setattr(platform_check, "name_errors", recording)
+    copy = tmp_path / "agents" / "festival-desk"
+    shutil.copytree(FIXTURE, copy)
+    errors = platform_check.evaluate(copy, "agentkeel-studio/festival-desk", lookup=stand_in_lookup)
+    assert seen == [copy]
+    assert errors["the agent's name"] == []
+    assert {name for name, errs in errors.items() if errs} == set(), errors

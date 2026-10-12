@@ -94,12 +94,21 @@ def scratch_tree(agent: Path, name: str, root: Path = ROOT) -> Path:
     return tree
 
 
-def name_errors(name: Any, root: Path = ROOT) -> list[str]:
+def name_errors(name: Any, root: Path = ROOT, agent: Path | None = None) -> list[str]:
+    """The name is well formed, not agentkeel's own, and not a folder agentkeel holds under agents/.
+
+    `agent` is the folder being checked. M09 PR 3 (deploy run 38259465892, the first deploy of an agent
+    with rules/): deploy.yml's held-pin check runs this over the bundle it has placed at agents/<name>/ in
+    its own checkout, so the folder it finds there is the candidate itself, not a platform agent holding
+    the name. That folder is not a collision. The pull-request check reads the head from `agent-src`
+    beside a clean checkout of main (platform-check.yml), and that is where a name agentkeel holds is
+    refused; a caller that gives no `agent` reads as before."""
     if not isinstance(name, str) or not NAME.match(name):
         return [f"manifest.yaml: name {name!r} is not lower-case letters, digits and hyphens, 3 to 31 long"]
     if name in agent_goldens.EXEMPT:
         return [f"manifest.yaml: name {name} is agentkeel's own agent; an agent repository may not take it"]
-    if (root / "agents" / name).is_dir():
+    held = root / "agents" / name
+    if held.is_dir() and not (agent is not None and held.resolve() == agent.resolve()):
         return [f"manifest.yaml: name {name} is held by agents/{name}/ in agentkeel"]
     return []
 
@@ -171,7 +180,7 @@ def evaluate(agent: Path, repository: str, root: Path = ROOT, *, lookup=None,
         return {"the agent's name": [f"manifest.yaml: not YAML ({exc.__class__.__name__})"]}
     if not isinstance(doc, dict):
         return {"the agent's name": ["manifest.yaml: not a mapping"]}
-    errors: dict[str, list[str]] = {"the agent's name": name_errors(doc.get("name"), root)}
+    errors: dict[str, list[str]] = {"the agent's name": name_errors(doc.get("name"), root, agent=agent)}
     if errors["the agent's name"]:
         return errors
     name = doc["name"]
