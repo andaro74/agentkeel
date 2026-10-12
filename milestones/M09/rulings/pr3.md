@@ -1,7 +1,7 @@
 ---
 # M09 PR 3 (#52), the repair. Product's key over the Product paths this PR
 # touches: this milestone's README (the repair detail and the by-hand steps
-# for PR 4's run) and the four ruling files. The Security file is
+# for PR 4's run) and the three ruling files. The Security file is
 # pr3-security.md (the bootstrap), the Engineering file pr3-engineering.md
 # (the platform check's name reading, the tests, the cold review).
 ruling: pr3
@@ -50,7 +50,13 @@ PR 4 records the run and closes.
 4. **The README's repair detail and the by-hand steps for PR 4's run** are
    written as this file's companion; the run file is unchanged, `observed:
    null`, until the owner fills it after the deploy.
-5. **PR numbering.** The Rule Owner's version-6 pull request, a by-hand
+5. **The by-hand deploy's record.** The bootstrap was deployed from this
+   branch on a draft of `pr3-security.md` Security had read but not
+   committed as ruled (cold review F2). The README and that file say so,
+   and the deployed policies are read back from the account in that file;
+   the deploy stands on the "Ruled by" the file receives before this PR
+   merges. Product records the sequence; it changes no reading.
+6. **PR numbering.** The Rule Owner's version-6 pull request, a by-hand
    step outside the milestone's count, took `#51`, so this PR is `#52`; the
    first draft of `pr3-security.md` said 51 and was corrected before this
    PR opened. The milestone's PR count is still 3 of 4.

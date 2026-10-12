@@ -176,7 +176,10 @@ for a ruling file that reads "Ruled by".
   first deploy's refusal. The plant run is read by PR 4's run, and the cell
   cites that.
 - **By-hand steps 1 and 2 are done.** Step 1: the bootstrap stack deployed
-  2026-10-12 01:19 UTC from this branch after `pr3-security.md` was ruled;
+  2026-10-12 01:19 UTC from this branch, on a draft of `pr3-security.md`
+  Security had read but not committed as ruled (the file says so, and reads
+  the deployed policies back from the account; it is ruled before this PR
+  merges);
   refagent's guardrail `1088aw3ujhyd` has version 6, description `rules
   sha256 41a0265a…cbd7`, the tree's digest over the baseline and refagent's
   two files. Step 2: `#51` moved refagent's manifest to version 6
@@ -210,9 +213,12 @@ for a ruling file that reads "Ruled by".
   the bundle at `agents/<name>/` in agentkeel's checkout and runs the check
   over it there; `name_errors` found that folder and called it a platform
   agent holding the name. It now takes the folder being checked and does not
-  count it; the pull-request check, which reads the head from `agent-src`
-  beside a clean `main`, is where a stolen name is refused, as before. Two
-  tests read it.
+  count it, and `scratch_tree` skips the candidate's own manifest when
+  copying the platform's (the second refusal the first would have uncovered,
+  `security-reviewer` F1 on this PR); the pull-request check and
+  `sign-agent`, which read the head from `agent-src` beside a clean `main`,
+  are where a stolen name is refused, as before. Three tests read it, one
+  over the deploy's exact layout against its own root.
 - **Two readings stay open for PR 4's deploy.** Whether Bedrock puts
   `aws:RequestTag` in the context of a plain `CreateGuardrail` (the page
   lists the key on resource rows only); if not, the create and the

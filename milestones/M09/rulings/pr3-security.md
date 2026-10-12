@@ -22,12 +22,21 @@ pr: 52
 # Ruling: M09 PR 3, Security
 
 DRAFT until it reads "Ruled by". Drafted by the session 2026-10-11 from
-the reading below and widened 2026-10-12. The by-hand bootstrap deploy
-(`milestones/M09/README.md`, "By-hand steps", step 1) was made from this
-branch on 2026-10-12 at 01:19 UTC after the first draft was ruled; this
-second draft adds what the first deploy of the fixture agent read and is
-ruled again. This PR opened as #52 because the Rule Owner's version-6 pull
-request took #51.
+the reading below and widened 2026-10-12. **How the by-hand deploy stands
+to this file** (cold review F2 and `security-reviewer` F3 on #52): Security
+read the first draft (`a132c08`, then `0214789` with the four findings
+taken) and deployed the bootstrap from this branch on 2026-10-12 at 01:19
+UTC without committing a "Ruled by" line, so no ruled form of that draft is
+in the history. The deploy is recorded here as made on a draft read by
+Security, uncommitted, and stands on the "Ruled by" this file receives
+before #52 merges. What was deployed is read back from the account, not
+from a commit: the live `agentkeel-deploy-boundary` (version v3) carries
+`NeverTagRefagentsGuardrail` on both ARN forms, and `agentkeel-cfn-exec`'s
+policy carries `MakeAnAgentsGuardrailOnlyWithItsTag` on `Resource *` and
+`TagAnAgentsGuardrailAtCreateOnly` on `guardrail/*`, each held to the
+request tag (read 2026-10-12, pasted below), which is `infra/bootstrap/`
+as `c7a8c36` and every later commit hold it. This PR opened as #52
+because the Rule Owner's version-6 pull request took #51.
 
 ## What this file rules
 
@@ -186,6 +195,21 @@ guardrail, the tag deny on refagent's guardrail by ARN) are in the
 tabulate. The stack's `GuardrailVersionForTheManifest` output after the
 deploy is what the Rule Owner's version-6 pull request copies (step 2).
 
+## What the account holds (read 2026-10-12, after step 1)
+
+```
+$ aws iam get-policy-version --policy-arn arn:aws:iam::581208540944:policy/agentkeel-deploy-boundary --version-id v3     --query 'PolicyVersion.Document.Statement[?Sid==`NeverTagRefagentsGuardrail`]'
+[{"Action": ["bedrock:TagResource", "bedrock:UntagResource"], "Effect": "Deny", "Sid": "NeverTagRefagentsGuardrail",
+  "Resource": ["arn:aws:bedrock:us-west-2:581208540944:guardrail/1088aw3ujhyd",
+               "arn:aws:bedrock:us-west-2:581208540944:guardrail/1088aw3ujhyd:*"]}]
+$ aws iam get-role-policy --role-name agentkeel-cfn-exec --policy-name ExecutionRoleDefaultPolicyA5B92313     --query 'PolicyDocument.Statement[?Sid==`MakeAnAgentsGuardrailOnlyWithItsTag` || Sid==`TagAnAgentsGuardrailAtCreateOnly`]'
+[{"Sid": "MakeAnAgentsGuardrailOnlyWithItsTag", "Effect": "Allow", "Action": "bedrock:CreateGuardrail", "Resource": "*",
+  "Condition": {"Null": {"aws:RequestTag/agentkeel:agent": "false"}}},
+ {"Sid": "TagAnAgentsGuardrailAtCreateOnly", "Effect": "Allow", "Action": "bedrock:TagResource",
+  "Resource": "arn:aws:bedrock:us-west-2:581208540944:guardrail/*",
+  "Condition": {"Null": {"aws:RequestTag/agentkeel:agent": "false"}}}]
+```
+
 ## What the first deploy read (2026-10-12)
 
 Deploy run 38259465892 on `agentkeel-studio/festival-desk` at `cd0ad604`
@@ -226,7 +250,20 @@ Unsure.
   construct's report unchanged. The deploy boundary's 6,144-character limit
   is not read at synth; the deploy reads it (`security-reviewer` NOTE 5).
 
-## The `security-reviewer` read
+## The `security-reviewer`'s second read (the full diff, before #52 opened)
+
+On the diff `f5ecb25...51695bc` (9 files): **0 BLOCK, 3 FINDING, 7 NOTE**,
+pasted verbatim in `pr3-engineering.md` under "Cold review" with the
+`engineering-cold-reviewer`'s. For this seat: F1 (the name check passing
+would have let `scratch_tree` raise on the deploy's layout) is repaired in
+Engineering's commit after it and read by a test over that layout; F2 (the
+Data Owner file this file named and the PR does not carry) is struck above;
+F3 (the deploy's provenance) is the paragraph at the top and the read-back
+above. NOTE 5 (the App's installation on "selected repositories") is the
+note above. NOTE 7 (a laptop path in the pasted report) is left as pasted:
+the paste is verbatim by the skill's rule.
+
+## The `security-reviewer`'s first read
 
 On the diff `f5ecb25...a132c08` (5 files): **0 BLOCK, 4 FINDING, 5 NOTE**.
 Every finding taken in the commit after it (F1 the cell quoted and the
