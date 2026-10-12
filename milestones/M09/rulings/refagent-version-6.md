@@ -19,8 +19,7 @@ pr: 51
 
 # Ruling: refagent's guardrail pin moves to version 6 (Rule Owner)
 
-DRAFT until it reads "Ruled by". Drafted by the session 2026-10-12 from the
-readings below.
+Ruled by andaro74 as Rule Owner, 2026-10-12, as written.
 
 ## What moves
 
