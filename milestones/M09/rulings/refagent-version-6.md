@@ -14,7 +14,7 @@ evidence:
   - milestones/M09/rulings/pr2-rule-owner.md
   - milestones/M09/rulings/pr3-security.md
   - docs/adr/ADR-0009-the-closed-list-of-relaxations-amended.md
-pr: 0
+pr: 51
 ---
 
 # Ruling: refagent's guardrail pin moves to version 6 (Rule Owner)
