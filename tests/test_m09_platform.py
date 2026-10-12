@@ -192,20 +192,70 @@ def test_the_execution_role_makes_a_guardrail_only_with_the_tag_and_touches_only
     found = [s for policy in of_type(bootstrap_template, "AWS::IAM::Policy").values()
              if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
              for s in policy["Properties"]["PolicyDocument"]["Statement"]
-             if s["Effect"] == "Allow" and any("Guardrail" in a for a in actions(s))]  # fmt: skip
+             if s["Effect"] == "Allow" and (any("Guardrail" in a for a in actions(s)) or "Guardrail" in s.get("Sid", ""))]  # fmt: skip
     by_sid = {s["Sid"]: s for s in found}
-    assert set(by_sid) == {"MakeAnAgentsGuardrailOnlyWithItsTag", "ReadUpdateVersionAndRemoveATaggedAgentsGuardrailOnly"}
-    assert by_sid["MakeAnAgentsGuardrailOnlyWithItsTag"]["Condition"] == {"Null": {f"aws:RequestTag/{TAG}": "false"}}
-    # CreateGuardrail alone on the request-tag side: TagResource there could tag refagent's untagged guardrail and
-    # bring it under the resource-tag statement (security-reviewer and cold review F3 on PR 2).
-    assert actions(by_sid["MakeAnAgentsGuardrailOnlyWithItsTag"]) == {"bedrock:CreateGuardrail"}
+    assert set(by_sid) == {"MakeAnAgentsGuardrailOnlyWithItsTag", "TagAnAgentsGuardrailAtCreateOnly",
+                           "ReadUpdateVersionAndRemoveATaggedAgentsGuardrailOnly"}  # fmt: skip
+    # M09 PR 3 (R3-a, the Service Authorization Reference for Amazon Bedrock read 2026-10-11): CreateGuardrail
+    # takes no `guardrail` resource type, so a statement on guardrail/* never applied to it and the first deploy
+    # of an agent with rules/ would have been refused on CreateGuardrail. Resource *, held by the request tag.
+    make = by_sid["MakeAnAgentsGuardrailOnlyWithItsTag"]
+    assert actions(make) == {"bedrock:CreateGuardrail"} and make["Resource"] == "*"
+    assert make["Condition"] == {"Null": {f"aws:RequestTag/{TAG}": "false"}}
+    # The CreateGuardrail operation authorises bedrock:TagResource too when the request carries tags, and the
+    # create handler tags the new guardrail before it carries one (describe-type, tagOnCreate): TagResource on
+    # guardrail/*, held to the request tag, and nothing else in that statement. (At PR 2 CreateGuardrail stood
+    # alone on the request-tag side so a tagged request could not tag refagent's untagged guardrail, F3; the
+    # boundary now denies that by ARN, below.)
+    tag_at_create = by_sid["TagAnAgentsGuardrailAtCreateOnly"]
+    assert actions(tag_at_create) == {"bedrock:TagResource"}
+    assert "guardrail/*" in json.dumps(tag_at_create["Resource"]) and "profile" not in json.dumps(tag_at_create["Resource"])
+    assert tag_at_create["Condition"] == {"Null": {f"aws:RequestTag/{TAG}": "false"}}
     tagging = [s for s in statements(named(bootstrap_template, "agentkeel-deploy-boundary"), "Deny")
                if "bedrock:TagResource" in actions(s)]  # fmt: skip
-    assert len(tagging) == 1 and actions(tagging[0]) == {"bedrock:TagResource", "bedrock:UntagResource"}
-    assert tagging[0]["Condition"] == {"Null": {f"aws:RequestTag/{TAG}": "true", f"aws:ResourceTag/{TAG}": "true"}}
-    assert "guardrail/*" in json.dumps(tagging[0]["Resource"]) and "profile" not in json.dumps(tagging[0]["Resource"])
+    assert len(tagging) == 2 and all(actions(s) == {"bedrock:TagResource", "bedrock:UntagResource"} for s in tagging)
+    by_boundary_sid = {s["Sid"]: s for s in tagging}
+    untagged = by_boundary_sid["NeverTagAGuardrailThatIsNotATaggedAgentsOwn"]
+    assert untagged["Condition"] == {"Null": {f"aws:RequestTag/{TAG}": "true", f"aws:ResourceTag/{TAG}": "true"}}
+    assert "guardrail/*" in json.dumps(untagged["Resource"]) and "profile" not in json.dumps(untagged["Resource"])
+    # F3 closed by name: refagent's guardrail, the bootstrap's own, may not be tagged or untagged by any role the
+    # deploy boundary caps, whatever the request carries. Flat: no condition.
+    refagent = by_boundary_sid["NeverTagRefagentsGuardrail"]
+    assert "Condition" not in refagent
+    guardrail_logical, _ = the_one(bootstrap_template, "AWS::Bedrock::Guardrail")
+    assert refagent["Resource"] == {"Fn::GetAtt": [guardrail_logical, "GuardrailArn"]}
     assert by_sid["ReadUpdateVersionAndRemoveATaggedAgentsGuardrailOnly"]["Condition"] == {"Null": {f"aws:ResourceTag/{TAG}": "false"}}
     assert "bedrock:ListGuardrails" not in {a for s in found for a in actions(s)}
+
+
+# What CloudFormation's handlers call for the two resource types the fixture's stack adds, as `describe-type`
+# gave them on 2026-10-11 (AWS::Bedrock::Guardrail create: CreateGuardrail, GetGuardrail, TagResource,
+# ListTagsForResource and four kms calls the construct's guardrail, built with no customer key, does not make;
+# AWS::Bedrock::GuardrailVersion create: CreateGuardrailVersion, GetGuardrail and two kms calls likewise). The
+# bootstrap tests' NEEDED_BY_TYPE is refagent's stack's and does not list these (refagent's guardrail is the
+# bootstrap's). By action: a grant's resource and condition are read by the test above, not here.
+GUARDRAIL_HANDLERS_NEED = {
+    "AWS::Bedrock::Guardrail": {"bedrock:CreateGuardrail", "bedrock:GetGuardrail", "bedrock:TagResource",
+                                "bedrock:ListTagsForResource", "bedrock:UpdateGuardrail", "bedrock:UntagResource",
+                                "bedrock:DeleteGuardrail"},
+    "AWS::Bedrock::GuardrailVersion": {"bedrock:CreateGuardrailVersion", "bedrock:GetGuardrail", "bedrock:DeleteGuardrail"},
+}  # fmt: skip
+
+
+def test_the_execution_role_may_make_the_fixture_stacks_guardrail_and_its_version(bootstrap_template, fixture_template):
+    """Every action the two handlers call is granted to the execution role, and the boundary's flat denies on
+    Resource * deny none of them (the conditioned and the named-resource denies fire on a guardrail that is
+    not the agent's own, which the agent's new one is not)."""
+    granted = {a for policy in of_type(bootstrap_template, "AWS::IAM::Policy").values()
+               if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
+               for s in policy["Properties"]["PolicyDocument"]["Statement"] if s["Effect"] == "Allow" for a in actions(s)}  # fmt: skip
+    flat = {a for s in statements(named(bootstrap_template, "agentkeel-deploy-boundary"), "Deny")
+            if not s.get("Condition") and s["Resource"] == "*" for a in actions(s)}  # fmt: skip
+    rendered = {r["Type"] for r in fixture_template["Resources"].values()}
+    assert set(GUARDRAIL_HANDLERS_NEED) <= rendered
+    for kind, needs in GUARDRAIL_HANDLERS_NEED.items():
+        assert needs <= granted, (kind, sorted(needs - granted))
+        assert not [a for a in needs if denies_by_pattern(flat, a)], kind
 
 
 def test_the_eval_role_reads_a_tagged_agents_guardrail_back_and_no_other(bootstrap_template):

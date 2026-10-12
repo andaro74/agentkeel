@@ -426,8 +426,10 @@ def test_no_construct_resource_needs_an_action_the_deploy_boundary_denies(templa
     # The flat denies. A conditioned deny (M09 PR 2: a guardrail action, or a tag change, on a guardrail that is
     # not tagged as an agent's own) fires on its condition, not on the action; what it fires on is read by
     # tests/test_m09_platform.py, and a handler's call on a tagged guardrail or an inference profile is not it.
-    deny = {a for s in statements(named(template, "agentkeel-deploy-boundary"), "Deny") if not s.get("Condition")
-            for a in actions(s)}  # fmt: skip
+    # A deny on one named resource (M09 PR 3: tagging refagent's guardrail, by its ARN) fires on that resource,
+    # not on the action; the handler's TagResource on the agent's own new guardrail is not it. Read there too.
+    deny = {a for s in statements(named(template, "agentkeel-deploy-boundary"), "Deny")
+            if not s.get("Condition") and s["Resource"] == "*" for a in actions(s)}  # fmt: skip
     collisions: dict[str, list[str]] = {}
     for logical, resource in construct_template["Resources"].items():
         hit = sorted(a for a in handler_needs(resource) if any(fnmatch.fnmatch(a, d) for d in deny))
