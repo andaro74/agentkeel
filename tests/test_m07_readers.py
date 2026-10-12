@@ -543,9 +543,15 @@ def test_each_proposed_file_is_held_to_the_template_and_the_guardrail_to_mains(t
 
 def test_the_guardrail_is_held_to_mains_pin_not_to_the_templates(tmp_path, versions):
     """A template made from an older `main`, or one somebody pushed a pin into, proposes a guardrail `main`
-    does not pin. Held against this tree's own refagent manifest, the fixture's version 6 is refused."""
+    does not pin. Held against refagent's manifest in this tree's format with the pin `main` held when the
+    fixture was planted (version 5, the fixture agent's own), the fixture's version 6 is refused.
+
+    Until M09's version-6 pull request (#51) this read the live manifest's pin; from that merge `main` pins
+    the fixture's invented version 6 itself, so the live pin is no longer one the fixture does not have and
+    the premise is taken from the fixture's agent instead. The reader under test is unchanged."""
     entry = plan_entry(tmp_path)
     mains = yaml.safe_load((ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
+    mains["guardrail"] = yaml.safe_load((S1 / "agent" / "manifest.yaml").read_text(encoding="utf-8"))["guardrail"]
     assert mains["guardrail"] != S1_PIN["guardrail"]
     assert any("is not the one main pins" in e for e in platform_upgrade.content_errors(entry, S1 / "platform", mains))
     assert any("is not the one main pins" in e for e in platform_upgrade.content_errors(entry, S1 / "platform", {}))

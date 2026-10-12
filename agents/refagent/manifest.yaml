@@ -60,7 +60,7 @@ judge_model_id: null
 # then the deployed runtime and promoter keep the version they were built with.
 guardrail:
   id: 1088aw3ujhyd
-  version: "5"
+  version: "6"
 
 # Security (ruling d): AWS service names only at M01, one VPC endpoint each.
 # The agent's security group egress allows these and nothing else; anything
