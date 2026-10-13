@@ -38,7 +38,7 @@ pr: 53
 
 # Ruling: M09 PR 4, the close, Product
 
-DRAFT until it reads "Ruled by". Drafted by the session 2026-10-13.
+Ruled by andaro74 as Product, 2026-10-13, as written.
 
 ## What this PR is
 

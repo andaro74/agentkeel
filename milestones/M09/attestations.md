@@ -35,7 +35,7 @@ code change in this PR is the run test's marker (`c503324`); no reader
 changed in PR 4, and the run file was not changed after the owner's
 `observed` block (`bfa4c19`).
 
-_Signed: _
+_Signed: andaro74, 2026-10-13_
 
 **2. Security — the grants fired as ruled, and the records are from the separate account.**
 
@@ -50,7 +50,7 @@ cannot write outside its own prefix. The bootstrap deploy of 2026-10-12
 recorded as such and stands on the "Ruled by" that file carries. No live
 control was left relaxed.
 
-_Signed: _
+_Signed: andaro74, 2026-10-13_
 
 **3. Rule Owner — the split did not relax refagent.**
 
@@ -61,7 +61,7 @@ tag `m08`; refagent's manifest moved from guardrail version 5 to 6 under
 plants read 7 of 7 on every envelope since `#51` merged, this PR's among
 them (F9.5).
 
-_Signed: _
+_Signed: andaro74, 2026-10-13_
 
 **4. Data Owner — the golden was never edited to make the rule fire.**
 
@@ -72,7 +72,7 @@ was needed (R9). `g-001` and `g-010` cite rows and clauses that exist in the
 full table the template ships. No golden under `evals/goldens/` changed in
 M09.
 
-_Signed: _
+_Signed: andaro74, 2026-10-13_
 
 **5. Product — the row is GREEN and the prose says what GREEN does not mean.**
 
@@ -84,7 +84,7 @@ firing; a silent rule stops no merge at M09; one rule fired once. No
 fired on its seeded case. Every finding and every Unsure item of this
 milestone has a named home in the close detail.
 
-_Signed: _
+_Signed: andaro74, 2026-10-13_
 
 **6. Product — the recording's rule.**
 
@@ -95,4 +95,4 @@ was (`rulings/pr4.md` ruling 3), where its duration, size and sha256 are
 written in `docs/video/README.md`, the Shows cell confirmed, and this line
 signed again with the hash.
 
-_Signed: _
+_Signed: andaro74, 2026-10-13_

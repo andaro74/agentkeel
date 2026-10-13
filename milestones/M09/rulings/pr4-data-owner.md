@@ -21,7 +21,7 @@ pr: 53
 
 # Ruling: M09 PR 4, Data Owner
 
-DRAFT until it reads "Ruled by". Drafted by the session 2026-10-13.
+Ruled by andaro74 as Data Owner, 2026-10-13, as written.
 
 ## R7. The blocked observation's shape
 
