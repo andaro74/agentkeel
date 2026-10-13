@@ -57,7 +57,11 @@ names was written by this PR's own CI run on that commit, from the owner's
    copied, not retyped: planted rules fired 1 of 1; F9_1 held (read_back);
    F9_2 held; F9_3 held; F9_4 held; refagent `plants 7/7`; GREEN. `make
    ledger` exits 0. The reading matches what SPEC/09 §7 stated at open:
-   fired 1 of 1, F9.1 to F9.5 held, row 9 GREEN. No number in the explainer differs from the envelope's or, for the
+   fired 1 of 1, F9.1 to F9.5 held, row 9 GREEN. The close's last commit
+   was measured again (finding 20): the envelope for `77f6d4b`
+   (`b459124`) reads the same to the field, and the cell stays on
+   `c503324`, the tree with nothing but the run file and the marker on
+   `main`, unless Product rules otherwise (Unsure 6). No number in the explainer differs from the envelope's or, for the
    cost paragraph, from the record's the close detail cites (cold review
    F2: the explainer says which is which); none was changed from a
    seat's wording, since none had been written.
@@ -145,6 +149,12 @@ bump, a by-hand step outside the count.
    installation"), at the next Product PR. Product.
 5. **`docs/compliance/map.md`** (finding 11) and **`docs/story.md`**
    (finding 12): standing; neither written at this close. Product.
+6. **Which envelope the cell names** (finding 20): `c503324`'s, the first
+   and the cleanest tree, as written; or `77f6d4b`'s, the latest at the
+   close's head, which reads the same and whose run URL is 38407825333.
+   Either keeps `make ledger` at exit 0; a change is the cell, the close
+   detail's references and the attestations, one commit, before the
+   rulings. Proposed: as written. Product.
 
 ## What a reader can run
 
