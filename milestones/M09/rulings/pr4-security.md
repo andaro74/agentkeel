@@ -90,9 +90,7 @@ reads "Ruled by" on the branch it is deployed from.
 ## The failed deploy runs and the schedules
 
 50 scheduled `deploy.yml` runs failed at the held-pin check between
-2026-10-12 13:58Z and 2026-10-13 03:09Z (finding 6): the workflow finds the
-same admitted head every ten minutes until the registry holds it, and a
-head the check refuses is retried, not parked. Harmless: nothing in AWS was
+2026-10-12 13:58Z and 2026-10-13 03:09Z (finding 6): the workflow finds the same admitted head on its ten-minute schedule until the registry holds it, and a head the check refuses is retried, not parked (50 runs in the window's 79 slots: GitHub's scheduler ran about two of every three). Harmless: nothing in AWS was
 touched by any of them (each returned before the stack), and each left a
 failed run with its artifacts. The latency finding 7 names (30 and 19
 minutes) is the two `*/10` schedules in series. Neither is changed here: a

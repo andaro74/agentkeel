@@ -57,9 +57,10 @@ names was written by this PR's own CI run on that commit, from the owner's
    copied, not retyped: planted rules fired 1 of 1; F9_1 held (read_back);
    F9_2 held; F9_3 held; F9_4 held; refagent `plants 7/7`; GREEN. `make
    ledger` exits 0. The reading matches what SPEC/09 §7 stated at open:
-   fired 1 of 1, F9.1 to F9.5 held, row 9 GREEN. No number in the
-   explainer differs from the envelope's; none was changed from a seat's
-   wording, since none had been written.
+   fired 1 of 1, F9.1 to F9.5 held, row 9 GREEN. No number in the explainer differs from the envelope's or, for the
+   cost paragraph, from the record's the close detail cites (cold review
+   F2: the explainer says which is which); none was changed from a
+   seat's wording, since none had been written.
 2. **The ledger's header rows** for M09 PR 3 and for the tag `m09`:
    twenty-one checks, none new and none changed at either. Written as the
    close detail reads them.
@@ -77,7 +78,14 @@ names was written by this PR's own CI run on that commit, from the owner's
    says the owner records after the tag. The alternative, recording on
    this branch at `1ebd907` and committing before the merge as M08 did,
    is open to Product under Unsure 1 below; the video README row and
-   attestation 6 are written for the first form.
+   attestation 6 are written for the first form. The cold review (F1)
+   names what the first form rests on: the two uncounted precedents, `#1`
+   and `#29`, neither edited a closed milestone's attestations or
+   explainer after its tag, and CLAUDE.md reads "never in five". So the
+   first form is a rule Product writes here, not a precedent it follows;
+   the second form needs no rule. Product chooses before this file reads
+   "Ruled by", and the two "fifth pull request" lines in the close read
+   "counted against the cap" so the close does not contradict itself.
 4. **Every finding and every Unsure item has a named home.** The two
    tables in `milestones/M09/README.md`, close detail: 19 findings, each
    with a file and a seat, standing where M09 leaves them; every Unsure
@@ -152,4 +160,5 @@ for f in milestones/M09/rulings/pr4*.md; do grep -l '^Ruled by ' "$f"; done   # 
 
 A Measured cell that is not the envelope's line, an explainer number that
 is not the envelope's, a finding with no file and seat, an Unsure item with
-no seat, or a fifth pull request, makes this ruling wrong.
+no seat, or a fifth pull request counted against the cap, makes this
+ruling wrong.

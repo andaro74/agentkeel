@@ -379,7 +379,7 @@ item to; each stands here, as M08's did.
 | 3 | The `agentkeel-platform` App (5144253) is installed on the organisation with "selected repositories", not "all" as SPEC/06 §6 reads; a new agent repository must be added by the owner before `infra/ruleset/agent.post.json` can be applied ("Invalid integration ids"). | `rulings/pr4-security.md` (Security: stays "selected", proposed); SPEC/06 §6 one sentence and the quickstart's first step, Product, at the next Product PR. Standing. |
 | 4 | The bootstrap was deployed on a draft of `pr3-security.md` Security had read and not signed. | `rulings/pr3-security.md` (top), `rulings/pr3.md` item 5; stands on the "Ruled by" of 2026-10-12. Security: no by-hand deploy before the file reads "Ruled by" on the branch. Standing lesson. |
 | 5 | A platform pin bump reaches seeds that hard-code "the platform's version": `#51` moved two fixtures' premises (M07 S1, M08 S1). | `rulings/refagent-version-6-engineering.md`; `tests/fixtures/README.md` rows M07 S1 and M08 S1 still read "invented for the fixture". Engineering. Standing. |
-| 6 | 50 scheduled deploy runs failed at the held-pin check between 2026-10-12 13:58Z and 2026-10-13 03:09Z: a refused head is retried every ten minutes until the registry holds it. Harmless; each leaves a failed run and its artifacts, deleted by no one (no Security ruling asks it). | This close; `deploy.yml` (Security) if the retry is ever changed. Standing. |
+| 6 | 50 scheduled deploy runs failed at the held-pin check between 2026-10-12 13:58Z and 2026-10-13 03:09Z: a refused head is retried on the ten-minute schedule until the registry holds it (50 runs in the 79 ten-minute slots of that window: the scheduler ran about two of every three). Harmless; each leaves a failed run and its artifacts, deleted by no one (no Security ruling asks it). | This close; `deploy.yml` (Security) if the retry is ever changed. Standing. |
 | 7 | The schedules' latency: 30 minutes from pull request 1's merge to the first deploy attempt, 19 minutes from `#52`'s merge to the deploy that landed (platform check, then deploy, `*/10` each). Under claim 6's bar; not a falsifier of claim 9. | This close; the two workflows (Security). Standing. |
 | 8 | R3-a′: `aws:RequestTag/agentkeel:agent` is in the context of a plain `CreateGuardrail`; the create succeeded under the request-tag condition at run 38342463397. The fallback in `pr3-security.md` item 4 is not needed. | `rulings/pr4-security.md`. Settled; closed. |
 | 9 | F3′: three other projects' untagged guardrails in the shared account can be tagged `agentkeel:agent` by the execution role on a tagged request from a template `GovernedAgent` renders, then fall under its resource-tag grants. | `rulings/pr4-security.md`: enough at M09 (proposed); a deny by ARN list is the alternative. Security. Standing. |
@@ -446,4 +446,6 @@ gh run view 38342463397 --json conclusion -q .conclusion   # success: the deploy
 
 A Measured cell that differs from the envelope, a reader or a golden
 changed in this PR, a run file changed after `bfa4c19`, or a fifth pull
-request, makes this close wrong.
+request counted against the cap (the video pull request is outside the
+count only if `rulings/pr4.md` ruling 3 is ruled so), makes this close
+wrong.

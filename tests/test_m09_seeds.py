@@ -218,7 +218,7 @@ def test_s5_a_plant_with_no_named_rule_is_refused():
     assert second and any("festival-embargo" in e for e in second), second
 
 
-# --- the run file (made at PR 3; observed: null today) ----------------------------
+# --- the run file (made before PR 4; observed filled at bfa4c19) -------------------
 
 
 def test_the_plant_run_was_made():
