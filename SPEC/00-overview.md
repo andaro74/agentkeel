@@ -1023,7 +1023,11 @@ not check recordings.
   recording; M09's own video is committed at M09's close as M08's was,
   under the same amendment, since SPEC/00 plans no M10 (M10 is proposed,
   not opened, SPEC/09 §11 R6). §15's ten videos are then met at M09's
-  close, not at M10's open.
+  close, not at M10's open. Amended at M09 PR 4 (`milestones/M09/rulings/pr4.md`
+  ruling 3; ADR-0005 amendment 2, written there): M09's video is ruled
+  **not recorded**; no gate or cell reads a recording, the envelope is the
+  evidence, and §15's ten videos reads nine, M09's ruled not recorded, not
+  moved to fit.
 
 ## 11. Rulings recorded in this SPEC
 
