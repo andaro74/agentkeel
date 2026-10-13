@@ -150,9 +150,11 @@ on the check holds you to it, and a change to your rules gets a new version
 the same way. Whether each rule stopped its planted question is read from
 the guardrail's trace after the merge and recorded; at M09 a silent rule
 does not stop your merge, and the platform's own two rules (phone and
-email hidden) have no planted question of their own. No agent with a
-`rules/` folder has been deployed yet: the first is M09's fixture agent,
-whose run is what shows this page's path works.
+email hidden) have no planted question of their own. The first agent with a
+`rules/` folder was deployed on 2026-10-13: M09's fixture agent,
+`agentkeel-studio/festival-desk`, whose run showed this page's path works
+after two repairs to the platform's own deploy path
+(`milestones/M09/README.md`, close detail).
 
 ## 6. Push, wait for the check, merge
 
