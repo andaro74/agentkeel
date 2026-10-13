@@ -20,7 +20,7 @@ pr: 52
 
 # Ruling: M09 PR 3, Product
 
-DRAFT until it reads "Ruled by". Drafted by the session 2026-10-12.
+Ruled by andaro74 as Product, 2026-10-12, as written.
 
 ## What this PR is
 

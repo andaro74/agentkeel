@@ -21,8 +21,7 @@ pr: 52
 
 # Ruling: M09 PR 3, Security
 
-DRAFT until it reads "Ruled by". Drafted by the session 2026-10-11 from
-the reading below and widened 2026-10-12. **How the by-hand deploy stands
+Ruled by andaro74 as Security, 2026-10-12, as written. **How the by-hand deploy stands
 to this file** (cold review F2 and `security-reviewer` F3 on #52): Security
 read the first draft (`a132c08`, then `0214789` with the four findings
 taken) and deployed the bootstrap from this branch on 2026-10-12 at 01:19
