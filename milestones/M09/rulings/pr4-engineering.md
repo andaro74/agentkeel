@@ -74,7 +74,7 @@ verbatim.
 
 | # | Finding | Status |
 |---|---|---|
-| F1 | The close plans a video pull request after the tag while two lines say "a fifth pull request makes this close wrong"; the uncounted precedents (`#1`, `#29`) did not edit a closed milestone's files | Product's, `pr4.md` ruling 3 and Unsure 1: the two lines now read "counted against the cap", and ruling 3 records that the after-the-tag form is a rule Product writes, not a precedent it follows, with M08's form as the alternative. Product chooses before ruling. |
+| F1 | The close planned a video pull request after the tag while two lines said "a fifth pull request makes this close wrong"; the uncounted precedents (`#1`, `#29`) did not edit a closed milestone's files | Settled: Product ruled M09's video not recorded (`pr4.md` ruling 3; ADR-0005 amendment 2, written in this PR). No video pull request; the two lines read "a fifth pull request" again. |
 | F2 | "The numbers below are the envelope's" covered the cost paragraph's numbers, which are the record's; "one every ten minutes" does not reconcile with 50 runs in 791 minutes | Repaired: the explainer says which paragraphs are the envelope's and which the record's; the rate reads "on a ten-minute schedule" (`54f84e6`), and the close detail and `pr4-security.md` say 50 runs in 79 slots. Product, Security. |
 | N1 | "The two ordinary questions" named the trap as ordinary | Repaired in `54f84e6` (the `docs-writer` read it too). Product. |
 | N2 | A stale comment in `tests/test_m09_seeds.py` ("made at PR 3; observed: null today") | Repaired: one comment line, no code. Engineering, this file's path. |

@@ -362,8 +362,7 @@ same way M08's close read it). "At least seven are GREEN": rows 0, 2, 3
 and 9 are GREEN, four of ten; not met, as stated unreachable. `docs-current`:
 not built; its four conditions read by hand at this close by `docs-writer`
 (report in the PR body). Acts 1 to 6: one act, unchanged since M08. Ten
-explainers: met. Ten videos: nine until M09's recording lands (ruling 3 in
-`rulings/pr4.md`). `git tag m09`: after this PR merges. `docs/story.md`:
+explainers: met. Ten videos: nine; M09's is **ruled not recorded** (`rulings/pr4.md` ruling 3, ADR-0005 amendment 2), not moved to fit. `git tag m09`: after this PR merges. `docs/story.md`:
 does not exist, and no close has read the clause (finding 12). Every RED
 row carries a ruling file; every PR since M00 PR 1 has one; the ledger page
 is generated.
@@ -383,7 +382,7 @@ item to; each stands here, as M08's did.
 | 7 | The schedules' latency: 30 minutes from pull request 1's merge to the first deploy attempt, 19 minutes from `#52`'s merge to the deploy that landed (platform check, then deploy, `*/10` each). Under claim 6's bar; not a falsifier of claim 9. | This close; the two workflows (Security). Standing. |
 | 8 | R3-a′: `aws:RequestTag/agentkeel:agent` is in the context of a plain `CreateGuardrail`; the create succeeded under the request-tag condition at run 38342463397. The fallback in `pr3-security.md` item 4 is not needed. | `rulings/pr4-security.md`. Settled; closed. |
 | 9 | F3′: three other projects' untagged guardrails in the shared account can be tagged `agentkeel:agent` by the execution role on a tagged request from a template `GovernedAgent` renders, then fall under its resource-tag grants. | `rulings/pr4-security.md`: enough at M09 (proposed); a deny by ARN list is the alternative. Security. Standing. |
-| 10 | Six files cite "ADR-0005 amendment 2" for a video committed at its own close (M08's close ruling, SPEC/00 §10.5, SPEC/09 §10, this milestone's README and explainer, the video README); the ADR carries one amendment and says "One is left". | `docs/adr/ADR-0005-video-follows-the-tag.md`, Product: the amendment is written in M09's video pull request (ruling 3, `rulings/pr4.md`); the text is proposed in the PR body. Standing until then. |
+| 10 | Six files cited "ADR-0005 amendment 2" for a video committed at its own close (M08's close ruling, SPEC/00 §10.5, SPEC/09 §10, this milestone's README and explainer, the video README); the ADR carried one amendment and said "One is left". | Written at this close: `docs/adr/ADR-0005-video-follows-the-tag.md` amendment 2, its last, under `rulings/pr4.md` ruling 3; it records M08's recording as it stands and rules M09's not recorded. Product. Closed. |
 | 11 | `docs/compliance/map.md` ends "Claim 8 (M08): not opened", stale since M08 PR 1, and names no row for M09's control (the add-only merge and the per-agent guardrail, fired on `g-030`). | `docs/compliance/map.md`, Product, at the next Product PR; the evidence path is this row's envelope. Standing. |
 | 12 | `docs/story.md` does not exist; SPEC/00 §15 lists it, and M08's close did not read the clause. | SPEC/00 §15, Product. Standing; not written at this close. |
 | 13 | A second answer record for festival-desk at `19864419` (deploy run 38401101435, 12:56Z) exists and is not read by row 9, which reads the record the run file names. | This close. Recorded; nothing to act. |
@@ -392,7 +391,7 @@ item to; each stands here, as M08's did.
 | 16 | The platform's own two rules (PHONE, EMAIL) have never fired on a planted question in this project; M09 read their presence in the built guardrail (F9.1's digest, F9.2's read-back), not their firing (SPEC/09 §8; R11). | `rulings/pr4-data-owner.md` (R11: unread through M09); a MASKED plant in an agent repository is where a firing reading would come from. Data Owner. Standing. |
 | 17 | `tests/test_m09_seeds.py` imports `SeedBroken` and does not use it (ruff F401, pre-existing; no workflow runs ruff). | Engineering. Standing note; not changed at the close (no code beyond the marker). |
 | 18 | The fixture repository's standing home: `agentkeel-studio/festival-desk` stays public and deployed (its stack, guardrail `at8e36cosq1r`, key and runtime), as `drill-agent` did after M08. A retirement goes through M07's path (a `rollout: retired` pull request by its seats), which deletes the runtime and leaves the record row 9 reads in the bucket. | `rulings/pr4-security.md`: nothing deleted without a Security ruling. Security, Product. Standing. |
-| 19 | The videos' ceilings: M01 and M02 over five minutes, M08 over 40 MiB, none re-recorded (SPEC/00 §10.2). M09's recording is held to both ceilings when made. | `docs/video/README.md`, Product. Standing. |
+| 19 | The videos' ceilings: M01 and M02 over five minutes, M08 over 40 MiB, none re-recorded (SPEC/00 §10.2). M09 has no recording, by ruling. | `docs/video/README.md`, Product. Standing. |
 | 20 | The close's last commit (`77f6d4b`, the cold review's repairs: documents and one comment line in `tests/test_m09_seeds.py`) was measured again, since `tests/` is a measured path: a second envelope, `77f6d4b5ffa7648fadb04fdd2ecff7409fe8bdd3` (run 38407825333, `b459124`, `github-actions[bot]`), reads the same `agent_rules` to the field (only `looked_up_at` differs, 13:53:53Z), GREEN, plants 7/7, F9_1 to F9_5 pass. The cell names `c503324`, the envelope of the tree whose only difference from `main` was the run file and the marker; `make ledger` exits 0 against it and prints the later one as the latest. Which the cell names is Product's (`rulings/pr4.md` Unsure 6). | `rulings/pr4.md`. Product. |
 
 **Unsure items, every PR body of this milestone, each ruled or with a
@@ -426,9 +425,8 @@ named seat.**
 
 **The by-hand steps of the close** (the owner): rule the four `pr4*.md`
 files and sign `attestations.md` on this branch; merge with a merge commit;
-`git tag m09` on the merge commit and push the tag; record M09's video on
-`main` at the tag and commit it as ruling 3 of `rulings/pr4.md` states.
-Delete nothing in AWS: festival-desk's stack, guardrail `at8e36cosq1r`,
+`git tag m09` on the merge commit and push the tag. No recording is made
+(ruling 3 of `rulings/pr4.md`). Delete nothing in AWS: festival-desk's stack, guardrail `at8e36cosq1r`,
 key and runtime, and the failed deploy runs' artifacts, stand as the
 envelope read them.
 
@@ -446,7 +444,4 @@ gh run view 38342463397 --json conclusion -q .conclusion   # success: the deploy
 ```
 
 A Measured cell that differs from the envelope, a reader or a golden
-changed in this PR, a run file changed after `bfa4c19`, or a fifth pull
-request counted against the cap (the video pull request is outside the
-count only if `rulings/pr4.md` ruling 3 is ruled so), makes this close
-wrong.
+changed in this PR, a run file changed after `bfa4c19`, or a fifth pull request, makes this close wrong.

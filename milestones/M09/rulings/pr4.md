@@ -4,8 +4,9 @@
 # header rows for PR 3 and the tag), this milestone's README (the row and
 # the close detail), the run file's observed block (bfa4c19, written by the
 # owner, carried here), the explainer, the generated ledger page, the video
-# README, the quickstart's one sentence, the attestations and the four
-# ruling files. Engineering's file is pr4-engineering.md (the run test's
+# README, the quickstart's one sentence, the attestations, the four
+# ruling files, and SPEC/00 §10.5 with ADR-0005's second amendment (the
+# video ruled not recorded, ruling 3). Engineering's file is pr4-engineering.md (the run test's
 # marker, the cold review), the Data Owner's pr4-data-owner.md (R7, R9, R11
 # in words), Security's pr4-security.md (its Unsure dispositions). The
 # three seat files own no path in this diff; their paths are listed here
@@ -25,9 +26,12 @@ authorises:
   - docs/milestones/README.md
   - docs/video/README.md
   - docs/developer/quickstart.md
+  - SPEC/00-overview.md
+  - docs/adr/ADR-0005-video-follows-the-tag.md
 evidence:
   - SPEC/00-overview.md#8-M09
   - SPEC/09-per-agent-rules.md
+  - docs/adr/ADR-0005-video-follows-the-tag.md
   - evals/history/c503324bac926e4a3295ee7e7f68a98cf254bc42.json
   - https://github.com/andaro74/agentkeel/actions/runs/38400685274
   - milestones/M09/rulings/pr1.md
@@ -68,7 +72,22 @@ names was written by this PR's own CI run on that commit, from the owner's
 2. **The ledger's header rows** for M09 PR 3 and for the tag `m09`:
    twenty-one checks, none new and none changed at either. Written as the
    close detail reads them.
-3. **M09's video.** Not recorded at this close's opening. It is recorded
+3. **M09's video is ruled not recorded.** Product, 2026-10-13, on the
+   session's recommendation. No gate, no `validate` check, no envelope and
+   no ledger cell reads a recording; the evidence for row 9 is the
+   CI-written envelope, and the close detail traces every number to it.
+   SPEC/00 §10.5's "not finished until its video is committed" is read
+   for M09 as met by this ruling, as M01's and M02's recordings stand over
+   the five-minute ceiling and M08's over the size ceiling by ruling; §15's
+   ten videos reads nine, M09's ruled not recorded, not moved to fit. The
+   rule is written as ADR-0005's second and last amendment, in this PR,
+   with SPEC/00 §10.5's one sentence; the amendment also records M08's
+   recording as it stands (finding 10). There is no video pull request:
+   the count is four, and the cold review's F1 (a fifth pull request on
+   this milestone's paths) is settled by this ruling. The first draft of
+   this ruling, which the cold review read, is kept below as what it
+   replaced.
+   *Replaced draft:* Not recorded at this close's opening. It is recorded
    on `main` at tag `m09` after this PR merges, as SPEC/00 §10.5 reads and
    as every video from M01 to M07 was, and committed in **M09's video
    pull request**, which carries the LFS object, the `docs/video/README.md`
@@ -122,12 +141,11 @@ bump, a by-hand step outside the count.
 
 ## Unsure, for Product
 
-1. **Where M09's video lands** (ruling 3). Proposed: after the tag, in an
-   uncounted video pull request. The alternative is M08's form: recorded
-   on this branch now and committed before the merge, with the README row
-   and attestation 6 rewritten to the hash. Product.
-2. **ADR-0005's second amendment** (finding 10). Proposed text, for the
-   video pull request:
+1. **Where M09's video lands** (ruling 3). Ruled: not recorded, by
+   Product, 2026-10-13; the two forms below were the proposals.
+2. **ADR-0005's second amendment** (finding 10). Ruled: written in this
+   PR, with the text below reworded to the ruling above (the draft text
+   named a video pull request):
    > ## Amendment 2 (M08 PR 4, 2026-10-05; written at M09's video pull request): the last milestone's video is committed at its own close
    > Product. A milestone with no next milestone has no PR 1 to carry its
    > video. M08's close committed `docs/video/milestones/M08.mp4` in M08
@@ -170,5 +188,5 @@ for f in milestones/M09/rulings/pr4*.md; do grep -l '^Ruled by ' "$f"; done   # 
 
 A Measured cell that is not the envelope's line, an explainer number that
 is not the envelope's, a finding with no file and seat, an Unsure item with
-no seat, or a fifth pull request counted against the cap, makes this
-ruling wrong.
+no seat, a recording presented as evidence, or a fifth pull request,
+makes this ruling wrong.

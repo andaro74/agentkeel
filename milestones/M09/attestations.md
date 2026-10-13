@@ -88,11 +88,11 @@ _Signed: andaro74, 2026-10-13_
 
 **6. Product — the recording's rule.**
 
-M09's video is not yet recorded at the time this close is signed. It is
-recorded on `main` at tag `m09` after the merge, as every video from M01
-to M07 was, and committed in M09's video pull request, uncounted as `#29`
-was (`rulings/pr4.md` ruling 3), where its duration, size and sha256 are
-written in `docs/video/README.md`, the Shows cell confirmed, and this line
-signed again with the hash.
+M09's video is ruled not recorded (`rulings/pr4.md` ruling 3; ADR-0005
+amendment 2, written in this PR). No gate, no `validate` check, no
+envelope and no ledger cell reads a recording; the evidence for row 9 is
+the CI-written envelope its Measured cell names. `docs/video/README.md`
+says so in M09's row, SPEC/00 §15's ten videos reads nine and is not moved
+to fit, and nothing filmed later is presented as this milestone's record.
 
 _Signed: andaro74, 2026-10-13_

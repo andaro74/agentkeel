@@ -5,8 +5,8 @@ status: Accepted
 date: 2026-09-18
 seat: Product
 authorises:
-  - Product  # SPEC/00 §10.5, fourth bullet; §10.3's delivery sentence; amendment 1: where the video is committed
-amendments: 1
+  - Product  # SPEC/00 §10.5, fourth bullet; §10.3's delivery sentence; amendment 1: where the video is committed; amendment 2: the last milestone's video
+amendments: 2
 ---
 
 # ADR-0005 — The milestone video is recorded at the tag
@@ -81,3 +81,29 @@ PR's contents. There is no next milestone after M08, so this rule cannot
 apply to it as written. M08 open rules how the last video lands.
 
 This is ADR-0005's first amendment. One is left.
+
+## Amendment 2 (M09 PR 4, 2026-10-13): the last milestone's video
+
+Product (`milestones/M09/rulings/pr4.md`, ruling 3).
+
+**A milestone with no next milestone has no PR 1 to carry its video, and
+its video is ruled at its own close.** M08's close committed
+`docs/video/milestones/M08.mp4` in M08 PR 4 (`milestones/M08/rulings/pr4.md`)
+and cited this amendment without writing it; that recording stands as
+committed, and this amendment records the rule it applied. SPEC/00 §10.5
+was amended at M09 PR 1 to say M09's video is committed at M09's close
+the same way.
+
+**M09's video is ruled not recorded.** No gate, no `validate` check, no
+envelope and no ledger cell reads a recording; the evidence for row 9 is
+the CI-written envelope its Measured cell names, and the close detail
+traces every number to it. The rule "a milestone is not finished until
+its video is committed" (SPEC/00 §10.5) is read for M09 as met by this
+ruling, the way M01's and M02's recordings stand over the five-minute
+ceiling and M08's over the size ceiling by ruling rather than by a
+retake; SPEC/00 §15's "ten videos" reads nine, M09's ruled not recorded,
+and is not moved to fit. `make ledger-plain` prints "not recorded" for
+M09's video, which is what the page already does when no file exists.
+
+SPEC/00 §10.5's fourth bullet is amended to say so. This is ADR-0005's
+second amendment; none is left.
