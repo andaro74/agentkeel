@@ -221,7 +221,6 @@ def test_s5_a_plant_with_no_named_rule_is_refused():
 # --- the run file (made at PR 3; observed: null today) ----------------------------
 
 
-@expected_failure
 def test_the_plant_run_was_made():
     run = load_yaml(RUNS / "f9_3_plant_run.yaml")
     holds(isinstance(run, dict) and run.get("seed") == "run", "f9_3_plant_run.yaml is the run file")
