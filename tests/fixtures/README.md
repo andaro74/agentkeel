@@ -384,3 +384,26 @@ fail every run until then. S1's format guard and S4's guard pass as before.
 | S4 | none (`agents/refagent/rules/`) | a guard: refagent's six topics, two PII entities and seven plants as they stand. Passes today; a split that moves a rule out fails it (F9.5) |
 | S5 | `m09/s5-unnamed-plant/` | `no_blocks.yaml` plants g-030 with no `blocks` entry; `unbuilt_rule.yaml` names `festival-embargo`, a rule its topics do not build. `rules_errors` must refuse both |
 | run | `milestones/M09/runs/f9_3_plant_run.yaml` | `observed: null`: the fixture agent made into `agentkeel-studio/festival-desk` after PR 2 merges, its four steps stated first, read by `scripts/observe_rules.py` |
+
+## M10 (SPEC/10 §5)
+
+Committed at M10 PR 1, in one commit before any reader. S1 is **call
+records**: today's answer record, which names no caller, and five records
+in the read shape SPEC/10 §2 fixes (`subject`, `issuer`, `agent`,
+`outcome`, `reason`, `request_id`, `time`, `delivered`). S2 is **a
+manifest with no `callers`**, festival-desk's as its repository holds it,
+beside the same manifest with the field. S3 is **two-key cases**: refagent's
+manifest gaining a `callers` entry with one key. S4 is two guards with no
+fixture. Their readers are `src/verdict/caller.py`, `src/validate/callers.py`,
+the manifest schema's `callers` key and `two_key.py`'s entry 7, which PR 2
+adds; at PR 1 none was there. None is copied to `evals/history/`. The
+subjects (`lantern-desk`, `box-office`, `stranger`), the pool ids, the role
+and the account are made up; no real person.
+
+| Seed | File | What is wrong with it (or, for the guards, why they pass) |
+|---|---|---|
+| S1 | `m10/s1-call-records/` | `record_no_caller.json`: today's answer record for festival-desk, every field `compose_answer` writes and no caller: `caller.calls` must read it as not held, "names no caller". `call_stranger_answered.json`: subject `stranger`, not in `callers`, `outcome: admitted`: not held. `call_bypass.json`: `outcome: admitted`, `reason: not the door`, no issuer: not held. `call_wrong_subject.json`: `box-office`, in `callers` but not the stated caller of the `admitted` step: not held. `call_refused_late.json`: the stranger refused, `delivered` 601 s after `time`: not held, later than N (600 s). `calls_held.json`: the four calls as the run file states them, each refusal within N: held, admitted 1 of 1, refused 3 of 3 |
+| S2 | `m10/s2-manifest-no-callers/` | `manifest.yaml`: festival-desk's manifest at `19864419`, no `callers` field: `callers_errors` must refuse it naming the field. `with_callers.yaml`: the same with one subject: the manifest schema must admit it; today `additionalProperties: false` refuses the key |
+| S3 | `m10/s3-caller-added/cases.json` | refagent's manifest with `callers: []` as the base; a subject added, or the key removed, with the Tool Owner's ruling alone: `two-key` must refuse each naming ADR-0009 amendment 2 and pass with Security's key. One guard case: left alone, one key passes |
+| S4 | none (the construct, the latest envelope) | two guards: the fixture agent's synthesised stack conditions the invoke on its own guardrail and its runtime has no authoriser yet; refagent's latest CI-written envelope reads plants 7 of 7, GREEN. Pass today; the door's construct change must leave both whole (F10.2) |
+| run | `milestones/M10/runs/f10_x_caller_run.yaml` | `observed: null`: the four calls on festival-desk after PR 2 merges and the door is deployed, each stated first, read by `scripts/observe_caller.py` |

@@ -1,0 +1,9 @@
+{
+  "_comment": "Seed S1's held case (SPEC/10 section 5): the four calls of the run file, each as stated. lantern-desk, a subject in callers, admitted; no identity refused; the stranger refused; the bypass refused; each refusal delivered within 600 s of its event time. caller.calls must read this as held: admitted 1 of 1, refused 3 of 3, reasons empty. The issuer of the pool is a placeholder until the construct makes it. A fixture, never evidence.",
+  "records": [
+    {"subject": "lantern-desk", "issuer": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_fest1va1d", "agent": "festival-desk", "outcome": "admitted", "reason": null, "request_id": "a1a1a1a1-0000-4000-8000-000000000011", "time": "2026-10-20T10:00:00Z", "delivered": "2026-10-20T10:03:00Z"},
+    {"subject": null, "issuer": null, "agent": "festival-desk", "outcome": "refused", "reason": "no identity", "request_id": "a1a1a1a1-0000-4000-8000-000000000012", "time": "2026-10-20T10:01:00Z", "delivered": "2026-10-20T10:04:20Z"},
+    {"subject": "stranger", "issuer": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_n0tth3p00l", "agent": "festival-desk", "outcome": "refused", "reason": "not admitted", "request_id": "a1a1a1a1-0000-4000-8000-000000000013", "time": "2026-10-20T10:02:00Z", "delivered": "2026-10-20T10:05:10Z"},
+    {"subject": "arn:aws:sts::000000000000:assumed-role/agentkeel-fixture-laptop/owner", "issuer": null, "agent": "festival-desk", "outcome": "refused", "reason": "not the door", "request_id": "a1a1a1a1-0000-4000-8000-000000000014", "time": "2026-10-20T10:03:00Z", "delivered": "2026-10-20T10:06:05Z"}
+  ]
+}

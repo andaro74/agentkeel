@@ -1,0 +1,11 @@
+{
+  "_comment": "Seed S1 (SPEC/10 section 2 'The call record', section 5; F10.4): a read record of a call by a subject the manifest's callers does not list, with outcome admitted. caller.calls must read it as not held, naming the subject: 'a caller the manifest does not admit was answered'. A fixture, never evidence.",
+  "subject": "stranger",
+  "issuer": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_n0tth3p00l",
+  "agent": "festival-desk",
+  "outcome": "admitted",
+  "reason": null,
+  "request_id": "a1a1a1a1-0000-4000-8000-000000000001",
+  "time": "2026-10-20T10:00:00Z",
+  "delivered": "2026-10-20T10:03:30Z"
+}
