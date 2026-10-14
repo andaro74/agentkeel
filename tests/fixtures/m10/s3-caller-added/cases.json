@@ -1,0 +1,18 @@
+{
+  "_comment": "Seed S3 (SPEC/10 section 3.4, section 5; F10.5). Each case is a change to refagent's manifest, as this tree holds it with `callers: []` appended as its base, made with the Tool Owner's ruling alone in a copy of the tree (tests/test_m07_two_key_seed.py's pattern). From M10 PR 2 `two-key` must refuse each naming the path and ADR-0016 (entry 7 of the closed list), and pass the same diff with Security's second key. Today two_key.relaxations has no entry for `callers`, so every case passes with one key: the false state. `not_a_relaxation` cases are guards with a base of their own: a diff that narrows or first writes the field passes with one key today and must still pass after the reader (cold review F2 on PR 1: a byte-identical manifest is no guard, since two-key never sees it). The subject and issuer are made up.",
+  "base": "callers: []\n",
+  "relaxed_with_one_key": {
+    "a subject added": "callers:\n  - subject: lantern-desk\n    issuer: self\n",
+    "the key removed": "<the line deleted>"
+  },
+  "not_a_relaxation": {
+    "a subject removed": {
+      "base": "callers:\n  - subject: lantern-desk\n    issuer: self\n  - subject: box-office\n    issuer: self\n",
+      "change": "callers:\n  - subject: lantern-desk\n    issuer: self\n"
+    },
+    "absent to an empty list": {
+      "base": "<the line deleted>",
+      "change": "callers: []\n"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 ---
 adr: ADR-0014
 title: Per-agent guardrail rules on a platform baseline; a tenth milestone after the last
-status: Proposed
+status: Accepted  # 2026-10-11, when milestones/M09/rulings/pr1.md read "Ruled by"; this line read Proposed until M10 PR 1 (row 9's close, finding 14; milestones/M10/rulings/pr1.md R7)
 date: 2026-10-11
 seat: Product
 authorises:

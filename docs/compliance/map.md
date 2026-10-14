@@ -66,6 +66,7 @@ Envelopes cited, all under `evals/history/`:
 | E4 | `05bd718feb0cc72ab78df13fccf47c3efb8a9314.json` | 4 | GREEN, runtime |
 | E5 | `28634e9a1405b034a3efbe898cc7675ebfab3587.json` | 5 | GREEN, runtime |
 | E6 | `245eb9baf796cd9ceed652abe3805825208358c9.json` | 6 | GREEN, runtime |
+| E9 | `c503324bac926e4a3295ee7e7f68a98cf254bc42.json` | 9 | GREEN, runtime (added at M10 PR 1, row 9's close finding 11; rows 7 and 8 are not drafted here, standing) |
 
 A stored GREEN is the run's own verdict. Rows 1, 4, 5 and 6 are RED by
 the ledger's reading of what the envelope recorded beside it.
@@ -108,6 +109,7 @@ the ledger's reading of what the envelope recorded beside it.
 | 32 | An agent's first pull request is refused while a seat is empty or it has no tests. | M06, F6.1 | `tests/fixtures/m06/s1a-unassigned-seat/`, `s1b-no-goldens/` | E6 `checks.F6_1`, `template.F6_1` | Check pass: test-only witness. The live reading is unread. | RMF GOVERN 2.1; 42001 A.3.2; SOC 2 CC1.3 | Check pass; live half unread. **Row 6 RED** |
 | 33 | A check posted by the agent repository's own workflow does not stand in for the platform's check. | M06, F6.2 | `milestones/M06/runs/f6_2_standin.yaml` | E6 `template.F6_2` | Read, held. At that time the platform's check was refusing every head for a fault of its own. | SOC 2 CC8.1; RMF, 42001: no line claimed | Held. Row 6 RED |
 | 34 | The registry panel shows no agent the registry does not hold. | M06, F6.4 | `tests/fixtures/m06/s4-panel1/` | E6 `checks.F6_4`, `template.F6_4` | Check pass. Read, held; `not_in_registry` empty. | RMF GOVERN 1.6; 42001, SOC 2: no line claimed | Held. Row 6 RED |
+| 35 | An agent's own rules are merged add-only onto a platform baseline into a guardrail of its own, and each planted rule is shown to fire; a file that weakens a baseline rule is refused. | M09, F9.1 to F9.5 | `tests/fixtures/m09/s1-festival-desk/`, `s2-weakened-baseline/`, `s3-silent-plant/`, `s5-unnamed-plant/`; `milestones/M09/runs/f9_3_plant_run.yaml` | E9 `agent_rules`; `checks.F9_1` to `F9_5` (test-only witnesses) | Planted rules fired 1 of 1 (`g-030`, `unannounced-selection-leak`); F9.1 held, the guardrail read back with the digest the observer computed; F9.2 held, the weakened file refused on `agentkeel-studio/festival-desk#2`; F9.3, F9.4 held; refagent plants 7/7. The baseline's own two rules have never fired on a planted question (row 9's finding 16). | RMF GOVERN 1.2, MEASURE 2.7; 42001 A.6.2.4; SOC 2 CC6.1 (each unverified) | Row 9 GREEN. Added at M10 PR 1 |
 
 ## Not evidenced
 
@@ -223,4 +225,5 @@ request, and the lock would refuse it for a day.
   and people are fictional.
 - Privacy law, export control, sector rules, contracts with a model
   provider. None was read.
-- Claim 8 (M08): not opened.
+- Claims 7 and 8 (M07, M08) closed RED and this map was not drafted again for them (row 9's close, finding 11; standing). Claim 9's row 35 was added at M10 PR 1.
+- Claim 10 (M10): opened at M10 PR 1 (`SPEC/10-public-caller.md`); its door and call record are not built, and nothing is measured. This line said "Claim 8 (M08): not opened" from M08 PR 1 until M10 PR 1.

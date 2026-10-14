@@ -1,0 +1,70 @@
+# M10's live run (SPEC/10 §5, §5.1): the four calls to make after PR 2
+# merges and the door is deployed on festival-desk, each stated first with
+# the outcome and the record it must leave. The reading is of the call
+# records in the security account's audit bucket, the answer record of the
+# deploy that put the door on, and refagent's envelope, never of this file's
+# prose; scripts/observe_caller.py reads the keys under `observed` and
+# nothing else here. `observed: null` until the owner fills it (M05's
+# pattern). The claim is read by the observer and `build`, not here (P5).
+# Product's file under milestones/**. The subjects are made up; no real
+# person. The laptop's IAM principal is the bypass arm only and is never
+# presented as the outside caller (SPEC/10 §2 "The public caller").
+seed: run
+falsifiers: [F10.1, F10.2, F10.3, F10.4]
+repository: agentkeel-studio/festival-desk   # M09's fixture agent, public, deployed at 19864419
+agent: festival-desk
+door: as Security rules at SPEC/10 §11 R2   # proposed: the runtime's JWT authoriser on the agent's own pool
+before_the_calls:
+  - id: callers
+    what: >-
+      The owner opens a pull request in festival-desk adding `callers` with
+      one subject, lantern-desk, issued by the agent's own pool. The platform
+      check must admit it. It merges.
+    expected: admitted; merged
+  - id: deploy
+    what: >-
+      deploy.yml on main redeploys festival-desk with the pool, the two
+      clients and the authoriser, and asks its three goldens through the
+      door as the `platform` client. The answer record is F10.2's reading.
+    expected: g-030 blocked with unannounced-selection-leak among the trace's topics, 1 of 1; the record names at8e36cosq1r:1 (or the pin the redeploy carries, read from the registry row)
+  - id: credential
+    what: The owner sets lantern-desk's first credential by hand, outside the repository.
+    expected: nothing recorded
+steps:
+  - id: admitted
+    caller: {subject: lantern-desk, issuer: self}   # self: the agent's own pool, as the manifest says it
+    what: The owner calls festival-desk through the door with lantern-desk's token and g-001's question.
+    expected: admitted; one record, subject lantern-desk, delivered within 600 s of its event time
+  - id: none
+    caller: null
+    what: The owner calls festival-desk through the door with no token.
+    expected: refused, no identity; one record, no subject, delivered within 600 s
+  - id: stranger
+    caller: {subject: stranger, issuer: other}   # other: a throwaway pool the owner makes for the run and deletes after
+    what: The owner calls festival-desk through the door with a token the agent's pool did not issue.
+    expected: refused, not admitted; one record, subject stranger, delivered within 600 s
+  - id: bypass
+    caller: {subject: observed.bypass.principal, issuer: null}   # the laptop's IAM principal, as the owner writes it under observed
+    what: >-
+      The owner calls festival-desk's runtime directly with InvokeAgentRuntime,
+      signed as the laptop's IAM principal, which holds the grant today: a
+      platform principal the construct does not name, standing in for anyone
+      who tries to go around the door.
+    expected: refused, not the door; one record, the principal named, delivered within 600 s
+reads:
+  - each call record under calls/agents/festival-desk/ in the audit bucket, raw, with its LastModified
+  - the answer record of the deploy step, by its key in the audit bucket
+  - refagent's latest CI-written envelope's plants_fired and plants_expected
+# What the owner fills after the run (M10 PR 2; scripts/observe_caller.py reads these keys and nothing else
+# from this file): the callers pull request number, the deploy run and the answer record's key, each
+# call's request id as the owner's client returned it, and the bypass call's principal ARN. The observer
+# derives `stated` for build's `calls` from `steps[].caller` and that ARN (cold review F3 on PR 1), so the
+# stated caller has one seat-owned source, this file. Never a result.
+#   observed:
+#     callers: {pull_request: 4}
+#     deploy:  {run_id: 123456789, answer_key: envelopes/agents/festival-desk/<merge commit>.json}
+#     admitted: {request_id: ...}
+#     none:     {request_id: ...}
+#     stranger: {request_id: ...}
+#     bypass:   {request_id: ..., principal: arn:aws:sts::<account>:assumed-role/<role>/<session>}
+observed: null

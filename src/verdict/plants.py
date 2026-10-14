@@ -212,6 +212,23 @@ SEEDS_M09: dict[str, tuple[str, str, str]] = {
     "run": ("F9.1-F9.4, live", "milestones/M09/runs/f9_3_plant_run.yaml", "scripts/observe_rules.py"),
 }
 
+# M10 PR 1 (SPEC/10 section 5): the public caller's seeded cases, listed by
+# `make plants`. Not plants: nothing counts them in plants_expected. S4's two
+# guards name files already in the tree (the construct, which PR 2 changes,
+# and the gate), so `make plants` says "in the tree" beside S4: the guards
+# pass today and must pass after the door; the strict markers, not this list,
+# say which seeds are read. S3's reader is the gate file that exists and
+# gains entry 7 at PR 2, so it too reads "in the tree" here; its xfail
+# marker is what says the reader is not there yet.
+SEEDS_M10: dict[str, tuple[str, str, str]] = {
+    "S1": ("F10.1, F10.3, F10.4", "tests/fixtures/m10/s1-call-records/", "src/verdict/caller.py"),
+    "S2": ("F10.4", "tests/fixtures/m10/s2-manifest-no-callers/", "src/validate/callers.py"),
+    "S3": ("F10.5", "tests/fixtures/m10/s3-caller-added/", "src/gates/two_key.py"),
+    "S4": ("F10.2", "the construct and the latest envelope (two guards, no fixture)",
+           "infra/construct/governed_agent.py, src/verdict/gate.py"),
+    "run": ("F10.1-F10.4, live", "milestones/M10/runs/f10_x_caller_run.yaml", "scripts/observe_caller.py"),
+}
+
 # Every milestone's seeded cases, in order, with the SPEC section that lists them.
 SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/01 section 5", SEEDS),
@@ -223,6 +240,7 @@ SEEDS_BY_MILESTONE: list[tuple[str, dict[str, tuple[str, str, str]]]] = [
     ("SPEC/07 section 5", SEEDS_M07),
     ("SPEC/08 section 5", SEEDS_M08),
     ("SPEC/09 section 5", SEEDS_M09),
+    ("SPEC/10 section 5", SEEDS_M10),
 ]
 
 

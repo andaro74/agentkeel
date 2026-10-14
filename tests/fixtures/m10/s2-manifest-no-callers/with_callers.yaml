@@ -1,0 +1,53 @@
+# The same manifest with the field M10 proposes (SPEC/10 section 2
+# `callers`; Tool Owner, section 11 R4): one outside subject, lantern-desk,
+# a made-up member of a made-up festival's staff, with the agent's own pool
+# as its issuer. The issuer is the symbol `self`: the agent's own pool, which the construct
+# makes, so its URL cannot be in the manifest before it exists (tool-owner
+# F1). S2's second planted test: this file must pass src/manifest/schema.json
+# from M10 PR 2. Today the schema's `additionalProperties: false` refuses
+# `callers` (SPEC/10 section 3.3), which is the false state: no manifest can
+# say who may call it. A fixture, never evidence.
+name: festival-desk
+version: 1.0.0
+model:
+  id: anthropic.claude-sonnet-4-6
+  version: null
+  profile: us.anthropic.claude-sonnet-4-6
+  region: us-west-2
+judge_model_id: null
+guardrail:
+  id: at8e36cosq1r
+  version: "1"
+endpoint_allowlist:
+- bedrock-runtime
+- dynamodb
+- ecr.api
+- ecr.dkr
+- kms
+- logs
+- s3
+ceilings:
+  concurrency: 2
+  rps_per_edge: 1
+  depth: 2
+  fan_out: 3
+max_tokens_per_session: 20000
+daily_usd: 10
+memory: null
+data_class: internal
+deprecated_after: null
+rollout: all-at-once
+seats:
+  product: andaro74
+  rule-owner: andaro74
+  data-owner: andaro74
+  tool-owner: andaro74
+  threshold-owner: andaro74
+  security: andaro74
+  engineering: andaro74
+may_call: []
+may_be_called_by: []
+callers:
+- subject: lantern-desk
+  issuer: self
+platform_version: m08

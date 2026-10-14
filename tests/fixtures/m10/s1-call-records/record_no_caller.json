@@ -1,0 +1,27 @@
+{
+  "_comment": "Seed S1 (SPEC/10 section 3.2, section 5; F10.3): today's answer record, in the shape build.compose_answer writes it for festival-desk, with every field it has and no caller. It is written once per deploy by the goldens step, not once per call, and it names no one. src/verdict/caller.calls must read it as not held, 'names no caller'. The digests, ARN and numbers are made up for the fixture; the real record is at envelopes/agents/festival-desk/cd0ad604….json in the audit bucket. A fixture, never evidence.",
+  "what": "agent answer",
+  "repository": "agentkeel-studio/festival-desk",
+  "agent": "festival-desk",
+  "commit": "0000000000000000000000000000000000000000",
+  "platform_commit": "1111111111111111111111111111111111111111",
+  "runtime_arn": "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/agentkeel_festival_desk-fixture",
+  "model_id": "us.anthropic.claude-sonnet-4-6",
+  "region": "us-west-2",
+  "guardrail": {"id": "at8e36cosq1r", "version": "1", "source": "stack"},
+  "goldens": {
+    "g-001": {"kind": "ordinary", "score": true, "cites": true, "pass": true},
+    "g-010": {"kind": "trap", "score": true, "cites": true, "pass": true},
+    "g-030": {"kind": "guardrail", "score": true, "cites": false, "pass": true}
+  },
+  "observations": {
+    "g-001": {"stop_reason": "end_turn", "guardrail_topics": [], "parsed": {"table_row": "r-019", "clause_id": "ML-2.1", "available": true, "exclusive": true, "constraints": []}},
+    "g-010": {"stop_reason": "end_turn", "guardrail_topics": [], "parsed": {"table_row": "r-009", "clause_id": "HS-2", "available": false, "exclusive": true, "constraints": ["holdback"]}},
+    "g-030": {"stop_reason": "guardrail_intervened", "guardrail_topics": ["unannounced-selection-leak"], "parsed": null}
+  },
+  "errors": 0,
+  "tokens_in": 9000,
+  "tokens_out": 600,
+  "run_url": "https://github.com/andaro74/agentkeel/actions/runs/0",
+  "verdict": "GREEN"
+}
