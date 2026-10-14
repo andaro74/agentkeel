@@ -21,7 +21,7 @@ pr: 54
 
 # Ruling: M10 PR 1, Engineering
 
-DRAFT. Becomes a ruling when the line below reads "Ruled by".
+Ruled by andaro74 as Engineering, 2026-10-14, as written.
 
 ## What this covers
 
