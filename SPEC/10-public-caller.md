@@ -374,10 +374,13 @@ rules.
 **PR 1.** refagent's envelope as at M09: `plants 7/7`, the M01 to M09
 checks as row 9's cell has them; it says nothing about claim 10.
 `make plants` lists S1 to S4 and the run (seeded cases, not golden
-plants); `tests/test_m10_seeds.py` shows **2 passed** (S4's two guards)
-and **5 xfailed** (S1, S2 refused, S2 admitted by the schema, S3, the
-run); `--runxfail` shows 2 passed, 5 failed, each with its planted
-message. `make validate`'s twenty-one checks pass: none reads a fixture,
+plants); `tests/test_m10_seeds.py` shows **3 passed** (S3's guard case,
+S4's two guards) and **6 xfailed** (S1, S2 refused, S2 admitted by the
+schema, S3's two cases, the run); `--runxfail` shows 3 passed, 6 failed,
+each with its planted message. (This paragraph said 2 and 5 at `053ee19`,
+before the tests were written; the two-key seed has two cases and a guard,
+as M07's has. Corrected at the documents commit, recorded in
+`feasibility.md` §3.) `make validate`'s twenty-one checks pass: none reads a fixture,
 a run file or a call.
 
 **PR 2, on the PR.** S1, S2 and S3 refused or read by their readers, each

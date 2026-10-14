@@ -18,7 +18,10 @@ calls between agents, no FRAGILE marking. None is built in this project
 
 ## 0. Before you start (the owner, not you)
 
-The organisation's owner creates your repository from the template, applies
+The organisation's owner creates your repository from the template, adds
+it to the platform App's installation (the `agentkeel-platform` App is on
+"selected repositories", so a new repository is not covered until the owner
+adds it; the ruleset cannot name the App's check before that), applies
 the platform's ruleset to it, and gives you write. That moment is the
 repository's `created_at`, and the clock starts there. You cannot create
 the repository yourself: member repository creation is off.
