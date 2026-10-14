@@ -25,7 +25,11 @@ cut 3, §10.2 Acts 1 to 3, §10.5: row 6 closed RED and S3 moves to M07;
 `milestones/M06/rulings/pr4.md`) · Amended at M09 PR 1 (§3, §7 row 9,
 §8's count and its M09 entry, §10.3 row 09, §10.5, §15: a tenth
 milestone, opened after M08 closed and tagged; ADR-0014;
-`milestones/M09/rulings/pr1.md`, put to Product)
+`milestones/M09/rulings/pr1.md`, put to Product) · Amended at M10 PR 1
+(§3, §7 row 10, §8's count and its M10 entry, §10.3 row 10, §10.5, §15:
+an eleventh milestone, the public caller, opened after M09 closed GREEN
+and was tagged; ADR-0015; `milestones/M10/rulings/pr1.md`, put to
+Product)
 
 ## 1. What this is
 
@@ -67,6 +71,7 @@ seat that owns it, and that a model swap cannot relax it unnoticed.*
 | Model regression or deprecation | a new version breaks a tool format or slows past the bar | M04 |
 | Rogue agent / swarm | agents reach each other or the internet, delete their tracks | M05, M08 |
 | Insider on the platform team | silently changes what is checked, or edits evidence | M02 (bypass empty), M05 (write-once audit), R4 |
+| An outside caller | reaches an agent around the platform's door, or under an identity the agent's manifest does not admit, or leaves no name on the call's record | M10 |
 | The one-human problem | the owner approves their own change | R1 — no gate depends on a human |
 
 ## 4. Principles (each is a rule the repo enforces on itself)
@@ -294,6 +299,7 @@ by hand; M00 itself opens and closes without them.
 | 7 | An agent takes a platform, model or retirement upgrade without a workflow edit | M07 | OPEN |
 | 8 | The platform detects, contains and recovers from a hostile agent end to end; the evidence is complete without anyone editing it | M08 | OPEN |
 | 9 | An agent made from the template is guarded by its own rules on top of a platform baseline, and each of its rules is shown to fire on a question planted for it | M09 | OPEN |
+| 10 | A caller outside the platform reaches an agent only through a door the platform controls, under an identity the agent's manifest admits, with the agent's pinned guardrail on every answer and the caller named in each call's record in the security account; a caller with no identity, or one the manifest does not admit, is refused and the refusal is in the security account within N | M10 | OPEN |
 
 States: OPEN → GREEN | RED | UNMEASURED | UNSCHEDULED (two-key) | RETIRED.
 A milestone that closes without a measurement is RED, never GREEN, never
@@ -314,7 +320,12 @@ twelve weeks at one milestone per ten days. Amended at M09 PR 1
 M08 closed RED and was tagged; at most 40 PRs. M08's "then building
 stops" held from its close on 2026-10-06 until M09 opened; M09 is opened
 by a Product ruling, not by a finding of M08, and reopens none of M08's
-rows.
+rows. Amended at M10 PR 1 (`milestones/M10/rulings/pr1.md`; ADR-0015):
+an eleventh, M10, opened after M09 closed GREEN and was tagged (`m09` on
+`833ab2b`, 2026-10-13); at most 44 PRs. M10 is opened by a Product
+ruling, as M09 was (SPEC/09 §11 R6, ruled at M09 PR 2: "the public caller
+is M10, its own claim"); it reopens none of M09's rows and repairs
+nothing M09 found.
 
 ### M00 — Baseline and ledger
 Build: `src/baseline/` (Converse on the pinned baseline model, one
@@ -763,6 +774,84 @@ its own.
 Produces: the baseline, the merge, one guardrail per agent, and the first
 guardrail plant fired for an agent that is not refagent.
 
+### M10 — The public caller
+Claim 10 above. Added at M10 PR 1 (`milestones/M10/rulings/pr1.md`;
+ADR-0015), after M09 closed GREEN and was tagged. It takes the one item
+every milestone since M05 named and none defined: "the public caller"
+(SPEC/05 S4 "a caller lying about its depth: Identity, M07"; §12's
+"credentials only via Identity"; SPEC/09 §11 R6, ruled at M09 PR 2 as
+M10's own claim). Today an agent's runtime is reached by any IAM principal
+in the platform account that holds `bedrock-agentcore:InvokeAgentRuntime`
+on it (the eval role, the deploy role, the owner by hand), by no one
+outside the account, and no record of a call names who called
+(`src/agent/run.py` `invoke_deployed`; the answer record `build` writes
+has no caller field; the manifest has no field that says who may call).
+**M10 builds one control and the reading of it.** The control is a door
+in front of the agent that admits a caller by an identity the agent's
+manifest names and refuses every other; the reading is each call's record
+in the security account, naming the caller and the outcome. It is not
+described as working until it has refused its seeded case (§10.5).
+1. **A `callers` field in the manifest** (Tool Owner): the outside
+   subjects, each with its issuer, that may call this agent. `callers: []`
+   admits no outside caller; a manifest with no `callers` field is refused
+   by the platform check from PR 2 (every agent says who may call it, even
+   if nobody). The platform's own goldens caller is admitted by the
+   construct, named `platform` on the record, and is not an outside caller.
+2. **A door the platform controls**, which Security rules (SPEC/10 §11
+   R2): proposed, the runtime's own JWT authoriser on an identity pool the
+   bootstrap stack deploys, so that a call signed as an IAM principal no
+   longer reaches the runtime at all and the only way in is a token the
+   pool issued to a subject the manifest admits. The alternatives, with
+   their costs, are in SPEC/10 §2. Either way the guardrail stays where
+   it is, on the agent role's model call inside the runtime (M03 PR 2,
+   M09 PR 2); the door is in front of the runtime and cannot take it off.
+3. **A call record per call**, in the audit bucket of the security
+   account, written by the door's log delivery, never by the agent:
+   subject, issuer, agent, outcome (admitted, refused, and why), the
+   guardrail on the trace, the request id and the time. The observer reads
+   them; `build` rules on them into the envelope's `caller` field; row
+   10's cell reads that field and the gate rules nothing on it (SPEC/10
+   §4).
+4. **Two keys on a caller admitted.** A subject added to `callers`, the
+   field removed, or the door's authoriser widened in the construct is a
+   relaxation: ADR-0009 amendment 2, its last, at PR 2 (Tool Owner's key
+   and Security's).
+5. **The refusal's record within N.** N is `detection.max_seconds`, 600 s,
+   as M05's attempts were read (SPEC/10 §11 R6): a refused call with no
+   record in the security account within N is a miss.
+Falsifiers: F10.1 a call that does not pass the door reaches the agent:
+from the outside caller directly on `InvokeAgentRuntime`, or from a
+platform principal the construct does not name. F10.2 a call through the
+door loses the guardrail: the admitted call's trace lacks the agent's
+pinned guardrail, or festival-desk's plant reads other than 1 of 1
+through the door, or refagent's plants read under 7 of 7 on the first
+envelope after the door's construct change. F10.3 a call's record names
+no caller, or a caller other than the one that called. F10.4 a caller with
+no identity, or one the manifest does not admit, is answered; or is
+refused with no record in the security account within N. F10.5 a caller
+is admitted, the field removed or the door widened with one key. The
+measured value is the live run's calls, **admitted n of n and refused m of
+m, each on the record within N**; row 10 is GREEN only at n of n and m of
+m with F10.1 to F10.5 held.
+PRs: (1) SPEC/10; this entry; ADR-0015; the seeds, each before any reader:
+the caller-less call records (today's shape), the manifest with no
+`callers` field, the relaxation with one key, the guards, and the run file
+with `observed: null`; ledger row; explainer draft. (2) The `callers`
+field and its platform-check reading; the door as Security rules it, with
+the identity pool, the construct change and the deploy step's token; the
+call record's delivery; `caller` on the envelope and row 10's reading; the
+observer; ADR-0009 amendment 2 and `two-key`'s entry; the quickstart's
+section on callers. The plant must go RED here. (3) The live run by the
+owner after PR 2 merges, each call stated in the run file first (a named
+P3 exception, as M07's to M09's); the cold review's repairs. (4) Close.
+Not built at M10 (SPEC/10 §9 and §12): the AgentCore Gateway, AgentCore
+Identity's credential vault, a policy engine, Cedar, per-tool or per-caller
+limits, a rate limit, a budget per caller, refagent behind the door, a
+second person as the caller, an account-per-team landing zone, and a
+recording (§10.5).
+Produces: one door on one agent, one identity pool, the first call record
+that names a caller, and the first outside caller refused on the record.
+
 ## 9. refagent — the reference agent (title availability)
 
 Built in M01 as the construct's first tenant, shipped in the M06
@@ -978,6 +1067,7 @@ finding on camera is the point.
 | 07 | Upgrades come to you | A new platform version, a new model, or a retirement arrives as a PR; the team never edits the pipeline. |
 | 08 | We rehearsed the bad day | A hostile agent tried six things; all six were stopped, recorded, and recovered from. |
 | 09 | Every agent gets its own rules | A team writes the rules for its own agent on top of the platform's, each rule is shown to stop the question it was written for, and a team can add rules but cannot take the platform's away. |
+| 10 | Strangers come in by the front door | Someone outside the team can only ask an agent a question through the platform's front door, under a name the agent's owners agreed to; every answer still carries the agent's rules, every question is recorded with who asked, and a stranger is turned away and the attempt written down. |
 
 Plus two framing pages:
 - `docs/milestones/README.md` — the plain-language index: milestone,
@@ -1027,7 +1117,12 @@ not check recordings.
   ruling 3; ADR-0005 amendment 2, written there): M09's video is ruled
   **not recorded**; no gate or cell reads a recording, the envelope is the
   evidence, and §15's ten videos reads nine, M09's ruled not recorded, not
-  moved to fit.
+  moved to fit. Amended at M10 PR 1 (`milestones/M10/rulings/pr1.md`;
+  ADR-0015, which carries the rule since ADR-0005 has no amendment left):
+  M10 has no recording, by Product's ruling at M10 PR 1, for the same
+  reason; §15's video clause reads nine videos, M09's and M10's ruled not
+  recorded, not moved to fit. M10's explainer's Watch line reads "No
+  recording" from its draft. SPEC/00 plans no M11.
 
 ## 11. Rulings recorded in this SPEC
 
@@ -1143,8 +1238,8 @@ alarm and a quarantine input. Target under $250 total.
 
 ## 15. Done when
 
-Rows 0–9 in `milestones/README.md` have a measured value (0–8 at M08's
-close; row 9 added at M09 PR 1), at least seven
+Rows 0–10 in `milestones/README.md` have a measured value (0–8 at M08's
+close; row 9 added at M09 PR 1; row 10 at M10 PR 1), at least seven
 are GREEN, every RED and UNSCHEDULED row carries a ruling file under
 `milestones/MNN/rulings/`, every PR since M00 PR 1 has one, the
 compliance page links to evidence for every control it names,
@@ -1152,8 +1247,10 @@ compliance page links to evidence for every control it names,
 `make ledger-plain`, Acts 1–6 are committed with their tags,
 `quickstart.md` carries a measured time under one day,
 `docs/milestones/` holds nine explainers and nine videos (ten of each
-from M09 PR 1), `docs/story.md`
-exists, and `git tag m08` exists on `main` (and `m09`, from M09 PR 1).
+from M09 PR 1; eleven explainers from M10 PR 1, and nine videos: M09's
+and M10's ruled not recorded, not moved to fit), `docs/story.md`
+exists, and `git tag m08` exists on `main` (and `m09`, from M09 PR 1;
+and `m10`, from M10 PR 1).
 
 Amended at M08 PR 1 (`milestones/M08/rulings/pr1.md`;
 `product-spec-reviewer` finding 8 on SPEC/08). M08 is the last
@@ -1165,6 +1262,16 @@ opened after M08's close. The three clauses below stay as M08's close
 read them; M09's close re-reads each over rows 0–9 the same way, and
 moves none to fit. "At least seven are GREEN" is unreachable at M09 too
 (three GREEN of nine; one row cannot make seven).
+
+Amended at M10 PR 1 (`milestones/M10/rulings/pr1.md`; ADR-0015): M10 is
+opened after M09's close. M09's close read the clauses over rows 0–9:
+four GREEN of ten (rows 0, 2, 3 and 9), `docs-current` by hand, one act,
+ten explainers, nine videos (M09's ruled not recorded), `docs/story.md`
+absent. M10's close re-reads each over rows 0–10 the same way and moves
+none to fit. "At least seven are GREEN" is unreachable at M10 too (four
+GREEN of ten; one row cannot make seven). The video clause reads nine of
+eleven, M09's and M10's ruled not recorded (§10.5). `docs/story.md` stays
+absent unless Product writes it; M10 PR 1 does not.
 
 - **"At least seven are GREEN" is not met and was unreachable from
   M06's close.** Rows 0, 2 and 3 are GREEN; rows 1, 4, 5, 6 and 7 are
