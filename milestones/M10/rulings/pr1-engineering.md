@@ -46,7 +46,10 @@ The seeds and their tests, planted in one commit before any reader
   `callers: []` as a base, a subject added or the key removed with the
   Tool Owner's ruling alone, in a repository built as
   `tests/test_m07_two_key_seed.py` builds its. Reader: `two_key.py`'s
-  entry 7, not there. Two planted cases and one guard case.
+  entry 7 (ADR-0016), not there. Two planted cases and two guard cases,
+  each a real diff with a base of its own (a subject removed; absent to
+  `[]`), after the cold review's F2 found the first draft's guard
+  byte-identical to its base.
 - **S4**: two guards, no fixture: the fixture agent's stack (M09's
   `s1-festival-desk/`, through `tests/test_m09_platform.synth`) conditions
   both `InvokeModel` allows on its own guardrail at its version and its
@@ -56,7 +59,10 @@ The seeds and their tests, planted in one commit before any reader
   not deleted: it then asserts the authoriser is the pool's.
 - **The run file** (`milestones/M10/runs/f10_x_caller_run.yaml`, Product's
   under `milestones/**`): `observed: null`, three preconditions and four
-  calls named, read by `scripts/observe_caller.py` after PR 2 merges.
+  calls named, each call's `caller` machine-readable (`issuer: self`,
+  `other`, `null`; the bypass's subject the ARN the owner writes under
+  `observed`), so the observer derives `stated` from one seat-owned source
+  (cold review F3); read by `scripts/observe_caller.py` after PR 2 merges.
 - **`SEEDS_M10`** in `src/verdict/plants.py`: five entries, listed by
   `make plants`; `CONTROLS` unchanged. S3 and S4 read "in the tree" there
   because their readers are files that exist and change at PR 2; the
@@ -64,7 +70,7 @@ The seeds and their tests, planted in one commit before any reader
 - **`tests/test_cost_cap_and_ledger.py`**: the ledger's row count, ten to
   eleven, for row 10.
 
-`tests/test_m10_seeds.py` shows 3 passed, 6 xfailed; `--runxfail` 3
+`tests/test_m10_seeds.py` shows 4 passed, 6 xfailed; `--runxfail` 3
 passed, 6 failed, each with its planted message (`feasibility.md` §3).
 The full suite passes with the row count bumped. `git show fba41ad
 --stat` shows the seeds, the tests, the README rows and `SEEDS_M10`, and
@@ -79,7 +85,7 @@ expected_admitted, expected_refused, reasons}`, the reasons carrying
 one that called" and "later than"; `src/validate/callers.py` with
 `callers_errors(manifest)` naming `callers`; `callers` in
 `src/manifest/schema.json`; `two_key.py`'s entry 7 whose refusal names
-`<path>: callers` and "ADR-0009 amendment 2"; `scripts/observe_caller.py`
+`<path>: callers` and "ADR-0016"; `scripts/observe_caller.py`
 (matched by CODEOWNERS' `observe_*.py` line); `caller` in
 `src/verdict/schema.json`; `CLAIM_10_CHECKS` and `READ_THE_CALLER` in
 `gate.py`; row 10's reading in `src/ledger.py`; the raw record fixture
@@ -89,9 +95,10 @@ on this PR's diff is in the PR body.
 
 ## Unsure
 
-- Whether `calls` takes the run file's `stated` steps directly or a
-  dict the observer derives from them; proposed: the dict, so the reader
-  never opens a Product file. Engineering, PR 2.
+- `calls` takes a dict the observer derives from the run file's
+  `steps[].caller` and `observed.bypass.principal` (cold review F3), so the
+  reader never opens a Product file; the test's `STATED` stands for that
+  derivation. Engineering, PR 2.
 - Whether the S4 synth guard, which runs the construct's app in a
   subprocess (about 20 s), should share `test_m09_platform.py`'s
   module-scoped template rather than synthesise again; proposed: share it

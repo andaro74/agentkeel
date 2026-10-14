@@ -10,7 +10,7 @@ the field, and the same manifest with `callers`, which the manifest schema must
 admit; today the module is absent and the schema refuses the key. **S3, a caller
 admitted with one key** (`s3-caller-added/cases.json`): refagent's manifest gaining a
 `callers` entry with the Tool Owner's ruling alone, which `two-key` must refuse under
-ADR-0009 amendment 2; today it passes. **S4** is two guards, no fixture: the fixture
+ADR-0016 (entry 7 of the closed list); today it passes. **S4** is two guards, no fixture: the fixture
 agent's stack conditions the agent role's invoke on its own guardrail, and refagent's
 latest envelope reads its plants whole; both pass today and must pass after the door
 is added to the construct. **The run** is `milestones/M10/runs/f10_x_caller_run.yaml`,
@@ -56,7 +56,9 @@ MAX_SECONDS = 600  # detection.max_seconds, reused (SPEC/10 §11 R6)
 
 expected_failure = pytest.mark.xfail(strict=True, raises=AssertionError, reason="planted at M10 PR 1 (SPEC/10 §5)")
 
-# The run file's four steps and the caller each states (SPEC/10 §5): what `calls` compares each record with.
+# The run file's four steps and the caller each states (SPEC/10 §5): what `calls` compares each record with. At
+# PR 2 the observer derives it from the run file's `steps[].caller` and `observed.bypass.principal` (cold review
+# F3 on PR 1); this dict stands for that derivation, the bypass principal being what the owner would write.
 STATED = {
     "admitted": {"subject": "lantern-desk", "outcome": "admitted"},
     "none": {"subject": None, "outcome": "refused", "reason": "no identity"},
@@ -64,8 +66,9 @@ STATED = {
     "bypass": {"subject": "arn:aws:sts::000000000000:assumed-role/agentkeel-fixture-laptop/owner", "outcome": "refused",
                "reason": "not the door"},
 }  # fmt: skip
-CALLERS = [{"subject": "lantern-desk", "issuer": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_fest1va1d"},
-           {"subject": "box-office", "issuer": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_fest1va1d"}]  # fmt: skip
+# The manifest's issuer is the symbol `self` at M10 (the agent's own pool; tool-owner F1): the pool's URL is known
+# only after the construct makes it, and the reader learns it from the observer, not from the manifest.
+CALLERS = [{"subject": "lantern-desk", "issuer": "self"}, {"subject": "box-office", "issuer": "self"}]
 
 
 def load_yaml(path: Path) -> Any:
@@ -145,9 +148,7 @@ def test_s2_a_manifest_with_callers_passes_the_schema():
     from src import manifest as manifest_module
 
     with_callers = load_yaml(MANIFESTS / "with_callers.yaml")
-    holds(with_callers.get("callers") == [{"subject": "lantern-desk",
-                                          "issuer": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_fest1va1d"}],
-          "with_callers.yaml names one subject")  # fmt: skip
+    holds(with_callers.get("callers") == [{"subject": "lantern-desk", "issuer": "self"}], "with_callers.yaml names one subject")
     errors = manifest_module.schema_errors(with_callers)
     assert errors == [], f"seed S2: the manifest schema refuses `callers`: {errors}"
 
@@ -165,45 +166,61 @@ def manifest_with(callers: str) -> str:
     return text.replace(LINE, LINE + block)
 
 
-@pytest.fixture
-def with_empty_callers(tmp_path: Path):
-    """A repository whose base ref holds refagent's manifest with `callers: []`, and this tree's CODEOWNERS."""
+def manifest_repo(tmp_path: Path, base: str) -> Repo:
+    """A repository whose base ref holds refagent's manifest with `base` as its callers block, and this tree's
+    CODEOWNERS. The caller removes the worktree."""
     root = tmp_path / "repo"
     root.mkdir()
     git(root, "init", "-q")
     git(root, "config", "core.autocrlf", "false")
     repo = Repo(root)
     repo.write(".github/CODEOWNERS", (ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8"))
-    repo.write(REFAGENT_MANIFEST, manifest_with(CASES["base"]))
+    repo.write(REFAGENT_MANIFEST, manifest_with(base))
     (root / "evals" / "history").mkdir(parents=True)
     (root / "evals" / "history" / ".keep").write_text("", encoding="utf-8")
     repo.commit_base()
+    return repo
+
+
+@pytest.fixture
+def with_empty_callers(tmp_path: Path):
+    """The planted cases' base: refagent's manifest with `callers: []`."""
+    repo = manifest_repo(tmp_path, CASES["base"])
     yield repo
-    git(root, "worktree", "remove", "--force", str(repo.base))
+    git(repo.root, "worktree", "remove", "--force", str(repo.base))
 
 
 @expected_failure
 @pytest.mark.parametrize("case", sorted(CASES["relaxed_with_one_key"]))
 def test_s3_a_caller_admitted_with_one_key_is_refused(with_empty_callers, case):
     """A subject added to `callers`, or the key removed, with the Tool Owner's ruling alone: `two-key` must refuse it
-    naming the path and ADR-0009 amendment 2 (F10.5), and pass the same diff with Security's key. Today the
+    naming the path and ADR-0016 (F10.5), and pass the same diff with Security's key. Today the
     closed list has no entry for `callers` and the gate passes it (SPEC/10 §3.4)."""
     with_empty_callers.write(REFAGENT_MANIFEST, manifest_with(CASES["relaxed_with_one_key"][case]))
     with_empty_callers.write("milestones/M10/rulings/a.md", ruling("Tool Owner", [REFAGENT_MANIFEST]))
     refused = with_empty_callers.keys() or ""
     assert f"{REFAGENT_MANIFEST}: callers" in refused and "one seat holds a key" in refused, \
         f"seed S3 ({case}): two-key passes a caller admitted with one key"  # fmt: skip
-    assert "ADR-0009 amendment 2" in refused
+    assert "ADR-0016" in refused
     with_empty_callers.write("milestones/M10/rulings/b.md", ruling("Security", ["infra/**"], keys=[REFAGENT_MANIFEST]))
     assert with_empty_callers.keys() is None
 
 
 @pytest.mark.parametrize("case", sorted(CASES["not_a_relaxation"]))
-def test_s3_guard_callers_left_alone_needs_no_second_key(with_empty_callers, case):
-    """A guard, not a seed: `callers: []` unchanged with one ruling passes before the reader and must after it."""
-    with_empty_callers.write(REFAGENT_MANIFEST, manifest_with(CASES["not_a_relaxation"][case]))
-    with_empty_callers.write("milestones/M10/rulings/a.md", ruling("Tool Owner", [REFAGENT_MANIFEST]))
-    assert with_empty_callers.keys() is None
+def test_s3_guard_a_narrowing_or_a_first_empty_list_needs_no_second_key(tmp_path, case):
+    """Guards, not seeds, each a real diff to the manifest with one ruling: a subject removed from two (a
+    narrowing), and the key first written as `[]` (what PR 2 does to refagent's and ratings-helper's). Each
+    passes before the reader and must still pass after entry 7 (SPEC/10 §2: absent to `[]` is not a
+    relaxation). A byte-identical manifest would be no guard: two-key never sees an unchanged path (cold
+    review F2 on PR 1)."""
+    guard = CASES["not_a_relaxation"][case]
+    repo = manifest_repo(tmp_path, guard["base"])
+    try:
+        repo.write(REFAGENT_MANIFEST, manifest_with(guard["change"]))
+        repo.write("milestones/M10/rulings/a.md", ruling("Tool Owner", [REFAGENT_MANIFEST]))
+        assert repo.keys() is None, f"guard ({case}): two-key read a narrowing or a first empty list as a relaxation"
+    finally:
+        git(repo.root, "worktree", "remove", "--force", str(repo.base))
 
 
 # --- S4: the guardrail stays on the call (two guards, not seeds; they pass) -------------------------------
@@ -237,12 +254,12 @@ def test_s4_guard_the_invoke_is_conditioned_on_the_agents_own_guardrail(fixture_
 
 def test_s4_guard_refagents_plants_are_whole_on_the_latest_envelope():
     """F10.2's second guard: the latest CI-written envelope reads refagent's plants fired equal to expected, 7 of
-    7, and GREEN. Passes today and must pass on the first envelope after the construct change. No marker."""
+    7. Passes today and must pass on the first envelope after the construct change. The verdict is not read
+    here: a main envelope RED for a reason that is not the door's is not F10.2's (cold review N4). No marker."""
     path = gate.latest()
     holds(path is not None, "a CI-written envelope is under evals/history/")
     envelope = json.loads(path.read_text(encoding="utf-8"))
     assert envelope["plants_expected"] == envelope["plants_fired"] == 7, (envelope["plants_expected"], envelope["plants_fired"])
-    assert envelope["verdict"] == "GREEN"
 
 
 # --- the run file (made after PR 2 merges; observed filled by the owner) -----------------------------------

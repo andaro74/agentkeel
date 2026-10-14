@@ -116,7 +116,7 @@ P11. **Only CI-written envelopes are evidence.** A local run
 | Product | what to build, when it's acceptable | `SPEC/**`, `milestones/**`, `CLAUDE.md`, `.claude/skills/**`, `docs/**`, `README.md`, `LICENSE` | define correctness; merge code |
 | Rule Owner | what the agent may say and do | `rules/**` and `agents/*/rules/**`, guardrail id/version in manifest | edit goldens; write product code |
 | Data Owner | what CORRECT means | `evals/goldens/**`, `data/**` (slate, rights table, clause index, corpus), rulings on FRAGILE, corpus admission | weaken a golden to green a build |
-| Tool Owner | tool and edge contracts; who may call an agent | `tools/**` and `agents/*/tools/**` schemas, `may_call`, `may_be_called_by`, `callers` (a manifest's outside callers, M10 PR 1; a subject added is two keys with Security's, SPEC/10 §6) | change a schema without a major bump; admit a caller with one key |
+| Tool Owner | tool and edge contracts; who may call an agent | `tools/**` and `agents/*/tools/**` schemas, `may_call`, `may_be_called_by`, `callers` (a manifest's outside callers, M10 PR 1; a subject added is two keys, SPEC/10 §6) | change a schema without a major bump; admit a caller with one key |
 | Threshold Owner | the bars, and which models are measured | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region (A-vs-A compares the pair) | move a bar in its `relaxes:` direction, or a pin's `deprecated_after` later, to null or removed with the model unchanged (ADR-0009 amendment 1), without two keys |
 | Security | what tooling and infra MAY DO | platform repo: workflows, `.github/CODEOWNERS` (ADR-0003 amendment 2), construct (`infra/construct/**`), bootstrap stack (`infra/bootstrap/**`), the rest of `infra/**` (with `infra/platform_grant.yaml`, the Apps' grant), `scripts/platform_check.py` (the reader of that grant; ADR-0012, M07 PR 3), KMS key policy, cosign identity, security account; seats → groups in a manifest | define scope |
 | Engineering | that it works | `src/**`, `scripts/**` but for `scripts/platform_check.py` (ADR-0012), `Makefile`, root config (`pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`, `.gitattributes`), `tests/**`, `agents/<name>/**` but for the fields and folders other seats own (ADR-0003 amendment 1), `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | self-approve any of the above |
@@ -240,7 +240,7 @@ by hand; M00 itself opens and closes without them.
 - **Manifest** (`manifest.yaml`): model id + version, guardrail id +
   version, judge model id, seats → GitHub logins (amended at M06 PR 1
   from IdP groups; SPEC/06 §2), `may_call`,
-  `may_be_called_by`, endpoint allowlist, ceilings (concurrency, per-edge
+  `may_be_called_by`, `callers` (the outside subjects an agent admits, Tool Owner; `[]` the default; M10 PR 1, SPEC/10 §2), endpoint allowlist, ceilings (concurrency, per-edge
   rps, depth 2, fan-out 3), `max_tokens_per_session`, `daily_usd`,
   memory (retention, ttl, per_user), `data_class` (informational in the
   PoC; enforcement deferred, §12), region set, `deprecated_after`,
@@ -810,28 +810,38 @@ described as working until it has refused its seeded case (§10.5).
 3. **A call record per call**, in the audit bucket of the security
    account, written by the door's log delivery, never by the agent:
    subject, issuer, agent, outcome (admitted, refused, and why), the
-   guardrail on the trace, the request id and the time. The observer reads
+   request id, the time of the call and the time the record arrived. No
+   guardrail: the delivery cannot see the agent role's model call, so
+   F10.2 reads the answer record and refagent's envelope (SPEC/10 §2). The
+   raw record as AWS wrote it stays beside `build`'s reading of it, and
+   carries no credential. The observer reads
    them; `build` rules on them into the envelope's `caller` field; row
    10's cell reads that field and the gate rules nothing on it (SPEC/10
    §4).
-4. **Two keys on a caller admitted.** A subject added to `callers`, the
-   field removed, or the door's authoriser widened in the construct is a
-   relaxation: ADR-0009 amendment 2, its last, at PR 2 (Tool Owner's key
-   and Security's).
+4. **Two keys on a caller admitted.** A subject added to `callers`, or
+   the field removed from a value, is a relaxation read by `two-key`:
+   entry 7 of the closed list, written as **ADR-0016** at PR 2 (ADR-0009's
+   last amendment is reserved for the Rule Owner, `tool-owner` note 4),
+   keyed by the Tool Owner and any second seat, as every entry is; absent
+   to `[]` is not one. The door's authoriser widened in the construct is
+   Python no entry reads: it stays under Security's `ruling-cited` and
+   `security-reviewer`, and SPEC/10 §8 names it unread by `two-key`.
 5. **The refusal's record within N.** N is `detection.max_seconds`, 600 s,
    as M05's attempts were read (SPEC/10 §11 R6): a refused call with no
    record in the security account within N is a miss.
 Falsifiers: F10.1 a call that does not pass the door reaches the agent:
 from the outside caller directly on `InvokeAgentRuntime`, or from a
 platform principal the construct does not name. F10.2 a call through the
-door loses the guardrail: the admitted call's trace lacks the agent's
-pinned guardrail, or festival-desk's plant reads other than 1 of 1
-through the door, or refagent's plants read under 7 of 7 on the first
-envelope after the door's construct change. F10.3 a call's record names
+door loses the guardrail: festival-desk's answer record through the door
+names a guardrail other than its pin or reads `g-030` other than 1 of 1,
+or refagent's plants read under 7 of 7 on the first envelope after the
+door's construct change. F10.3 a call's record names
 no caller, or a caller other than the one that called. F10.4 a caller with
 no identity, or one the manifest does not admit, is answered; or is
 refused with no record in the security account within N. F10.5 a caller
-is admitted, the field removed or the door widened with one key. The
+is admitted, or the field removed from a value, with one key (measured in
+agentkeel; an agent repository has no `two-key`, and the construct's
+authoriser is unread by it, SPEC/10 §8). The
 measured value is the live run's calls, **admitted n of n and refused m of
 m, each on the record within N**; row 10 is GREEN only at n of n and m of
 m with F10.1 to F10.5 held.
@@ -842,7 +852,7 @@ with `observed: null`; ledger row; explainer draft. (2) The `callers`
 field and its platform-check reading; the door as Security rules it, with
 the identity pool, the construct change and the deploy step's token; the
 call record's delivery; `caller` on the envelope and row 10's reading; the
-observer; ADR-0009 amendment 2 and `two-key`'s entry; the quickstart's
+observer; ADR-0016 and `two-key`'s entry 7; the quickstart's
 section on callers. The plant must go RED here. (3) The live run by the
 owner after PR 2 merges, each call stated in the run file first (a named
 P3 exception, as M07's to M09's); the cold review's repairs. (4) Close.

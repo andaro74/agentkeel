@@ -122,17 +122,33 @@ threaten the cap, and §11 R2's probe answers it before PR 2 opens.
   (the manifest field). A user's first credential is set by the owner by
   hand, outside the repository, before the run (§5.1).
 - **`callers`.** A manifest field (Tool Owner; `src/manifest/schema.json`
-  grows it at PR 2): a list of `{subject, issuer}` entries, `issuer` the
-  agent's own pool at M10. `callers: []` means no outside caller and no
+  grows it at PR 2): a list of `{subject, issuer}` entries. **Its shape,
+  written here so PR 2 copies it** (`tool-owner` findings 1, 2, 3, 6 on
+  this PR; the Tool Owner's ruling at R4): `required: [subject, issuer]`,
+  `additionalProperties: false`, `uniqueItems: true`, and no two entries
+  with one `subject`; `subject` matches `^[a-z][a-z0-9-]{2,30}$` and is
+  never `platform`, which `callers_errors` refuses by name; `issuer` is the
+  symbol `self` at M10, an enum of one meaning the agent's own pool, since
+  the pool is made by the construct from this very list and its URL cannot
+  be in the manifest before it exists; a second issuer is a later
+  milestone's. The key is **optional in the schema and required by
+  `callers_errors`**, so S2's manifest fails for its named reader and not
+  for the schema (`tool-owner` note 2). `callers` is not an edge, so
+  `semver.py` computes no bump for it and `version` stays (`tool-owner`
+  finding 6). `callers: []` means no outside caller and no
   pool. A manifest with no `callers` key is refused by the platform check
   from PR 2 ("an agent's manifest says who may call it, even if nobody"),
   so refagent's and `ratings-helper`'s gain `callers: []` at PR 2 (Tool
-  Owner, one key: an empty list admits no one and relaxes nothing).
-  Not an edge: a caller is not an agent, so `may_be_called_by`'s
-  two-sided check does not apply. Not a rule: it says who, not what may
-  be said. The platform's own goldens caller is admitted by the construct
-  as the `platform` client and is named `platform` on the record; it is
-  not in `callers` and is not an outside caller.
+  Owner, one key, a Tool Owner ruling file naming both paths: an empty
+  list admits no one, and absent to `[]` is not a relaxation, said so in
+  entry 7). Not an edge: a caller is not an agent, so `may_be_called_by`'s
+  two-sided check does not apply; the only second side a caller has is
+  "the issuer is this agent's own pool", which `self` says. Not a rule: it
+  says who, not what may be said. The platform's own goldens caller is
+  admitted by the construct as the `platform` client and is named
+  `platform` on the record; it is not in `callers`, cannot be listed
+  there, and is not an outside caller. `ceilings` binds no caller
+  (`tool-owner` note 7; §8).
 - **The call record.** One object per call in the audit bucket of the
   security account (897698239547), under a prefix the bucket policy
   gives the delivery and no agent role (`calls/agents/<name>/`,
@@ -140,7 +156,12 @@ threaten the cap, and §11 R2's probe answers it before PR 2 opens.
   finding 1). The *raw* record is what AWS delivered, byte for byte
   (CloudTrail's data event for `InvokeAgentRuntime`, or the runtime's log
   line, as the probe's question (b) and R2 decide); it is written by the
-  delivery and by nothing the platform runs. The observer
+  delivery and by nothing the platform runs. **A raw record carries no
+  credential**: a CloudTrail event has none, a log line might carry a
+  request header, and the envelope is public evidence under
+  `evals/history/`, so `from_raw` refuses a record that carries a bearer
+  token or a key, and the observer copies none (`tool-owner` note 6; R5,
+  Security). The observer
   (`scripts/observe_caller.py`) copies each raw record with the object's
   `LastModified` (its arrival) and the time it was read, and writes
   nothing else. The *read* record is `build`'s reading of a raw one
@@ -260,7 +281,7 @@ reader can open. **Live today, at `833ab2b` (tag `m09`).**
 | F10.2 | a call through the door loses the guardrail: festival-desk's answer record from the deploy that put the door on (its goldens asked through the door as `platform`) names a guardrail other than its pin or reads `g-030` other than 1 of 1, or refagent's plants read under 7 of 7 on the first envelope after the construct change. A call record carries no guardrail (finding 2); the live reading is the answer record's and refagent's envelope's only | `checks.F10_2: fail` from S4's guards (the construct's invoke condition on the fixture agent's synthesised stack; refagent's latest envelope `plants 7/7`); live, `caller.F10_2` on festival-desk's answer record after the deploy, and `plants_fired` on refagent's envelope |
 | F10.3 | a call's record names no caller, or a caller other than the one that called: the admitted call's read record carries no `subject`, or a `subject` that is not the user the owner called as; a refused call's record names a subject other than the stranger's (or other than none, for the no-identity call) | `checks.F10_3: fail` from S1's fixture test (today's answer record, with no caller, read as not held; a record whose `subject` is not the stated caller read as not held); live, `caller.records` on the envelope, each record's `subject` against the run file's stated caller |
 | F10.4 | a caller with no identity, or one the manifest does not admit, is answered; or is refused with no record in the security account within N: `delivered` (the object's `LastModified`) minus `time` (AWS's `eventTime` of the call) over 600 s, or no record at all | `checks.F10_4: fail` from S1's fixture test (a record of a stranger answered; a refusal delivered later than N) and S2's (a manifest with no `callers` admitted by the platform check); live, the run file's `none` and `stranger` steps, each `outcome: refused` on a record with `delivered` within 600 s of its `time` |
-| F10.5 | a caller is admitted with one key: a subject added to a manifest's `callers`, the key removed, or the construct's authoriser widened (a second issuer or client admitted) merges without two seats' rulings | `checks.F10_5: fail` from S3's seed (refagent's manifest gaining a `callers` entry with the Tool Owner's ruling alone, in a copy of the tree, which `two-key` must refuse under ADR-0009 amendment 2); live, `two-key` on PR 2's own diff and on the fixture's. **The agent repository's half is unread** (§8): an agent repository has no `two-key`, so festival-desk's `callers` pull request is admitted on the platform check alone; named, not measured |
+| F10.5 | a caller is admitted with one key: a subject added to a manifest's `callers`, or the key removed from a value, merges without two seats' rulings (entry 7 of the closed list, ADR-0016; absent to `[]` is not one) | `checks.F10_5: fail` from S3's seed (refagent's manifest gaining a `callers` entry with the Tool Owner's ruling alone, in a copy of the tree, which `two-key` must refuse under ADR-0016); live, `two-key` on PR 2's own diff and on the fixture's. **Two halves are unread** (§8): an agent repository has no `two-key`, so festival-desk's `callers` pull request is admitted on the platform check alone; and the construct's authoriser widened is Python no entry of the closed list reads (`tool-owner` finding 5), so it stays under Security's `ruling-cited` and `security-reviewer`. Both named, not measured |
 
 **Where each reading comes from** (M04's to M09's lesson, planned at
 open).
@@ -304,7 +325,7 @@ read; preconditions raise `SeedBroken`. Each is named in
 |---|---|---|---|---|
 | S1 the call records | F10.1, F10.3, F10.4 | `tests/fixtures/m10/s1-call-records/`: six files for festival-desk, each in the **read** shape of §2 but the first. `record_no_caller.json` is **today's answer record shape**, as `build.compose_answer` writes it (the fields §3.2 lists, no `subject`, no `outcome`): the reader must read it as not held, "names no caller". `call_stranger_answered.json` has `subject: stranger`, not in `callers`, and `outcome: admitted`: not held, "a caller the manifest does not admit was answered". `call_bypass.json` has `outcome: admitted` with `reason: not the door` and no `issuer`: not held, "reached the agent without the door". `call_wrong_subject.json` has `outcome: admitted` with a `subject` that is in `callers` but is not the caller the run stated: not held, "names a caller other than the one that called" (finding 5). `call_refused_late.json` is the stranger's refusal with `delivered` 601 s after `time`: not held, "recorded later than N" (finding 5). `calls_held.json` is the admitted user's call, `outcome: admitted`, beside three refused records (`none`, `stranger`, `bypass`) each with `delivered` within N: held, admitted 1 of 1, refused 3 of 3 | nothing reads a call record (§3.5) | `src/verdict/caller.py`: `calls(records, stated, callers, max_seconds)` returning `{read, held, admitted, refused, expected_admitted, expected_refused, reasons}`, `stated` the run file's callers per step; and `from_raw(event)`, whose raw fixture is PR 2's first commit (§2) |
 | S2 a manifest with no `callers` | F10.4 | `tests/fixtures/m10/s2-manifest-no-callers/manifest.yaml`: festival-desk's manifest as its repository holds it at `19864419` (pin `at8e36cosq1r:1`, every seat the author, `may_be_called_by: []`, no `callers`). Two planted tests: `src.validate.callers.callers_errors(manifest)` must refuse it naming the field; and `with_callers.yaml`, the same manifest with `callers: [{subject: lantern-desk, issuer: <the pool>}]`, must pass the manifest schema | `src/validate/callers.py` is not in the tree; the schema's `additionalProperties: false` refuses `callers` (§3.3) | `src/validate/callers.py`: `callers_errors(manifest)`; `src/manifest/schema.json`; `src/validate/agent.py` `evaluate()` calling it |
-| S3 a caller admitted with one key | F10.5 | `tests/fixtures/m10/s3-caller-added/cases.json`: refagent's manifest, as this tree holds it, gaining `callers: [{subject: …, issuer: …}]` with the Tool Owner's ruling alone, in a repository whose base holds `callers: []`; and the key removed the same way. `two-key` must refuse each naming the path and ADR-0009 amendment 2; with Security's second key the same diff passes (M07's two-key seed pattern, `tests/test_m07_two_key_seed.py`) | `two_key.relaxations` has no entry for `callers` (§3.4) | `src/gates/two_key.py` (entry 7, ADR-0009 amendment 2) |
+| S3 a caller admitted with one key | F10.5 | `tests/fixtures/m10/s3-caller-added/cases.json`: refagent's manifest, as this tree holds it, gaining `callers: [{subject: …, issuer: …}]` with the Tool Owner's ruling alone, in a repository whose base holds `callers: []`; and the key removed the same way. `two-key` must refuse each naming the path and ADR-0016; with a second seat's key (Security's in the test) the same diff passes (M07's two-key seed pattern, `tests/test_m07_two_key_seed.py`) | `two_key.relaxations` has no entry for `callers` (§3.4) | `src/gates/two_key.py` (entry 7, ADR-0016) |
 | S4 the guardrail stays on the call | F10.2 | two **guards**, no fixture: the fixture agent's stack as the construct synthesises it today (`tests/fixtures/m09/s1-festival-desk/`, through `tests/test_m09_platform.synth`) conditions the agent role's invoke on the stack's own guardrail at its version; and the latest CI-written envelope under `evals/history/` reads refagent's `plants_fired` equal to `plants_expected`, 7 of 7. Both pass today and must pass after the door is added to the construct | nothing: they pass, and that is the point | `infra/construct/governed_agent.py` (changed at PR 2) and `src/verdict/gate.py` (in the tree) |
 | The run | F10.1 to F10.4, live | `milestones/M10/runs/f10_x_caller_run.yaml`: the agent, the four calls (`admitted` as the pool user named in `callers`; `none` with no token; `stranger` with a token from a pool the construct did not make; `bypass` as an IAM principal directly on the runtime) with each stated outcome, the record each must leave, and `observed: null` | the run is not made: no door exists, and nothing would read it | `scripts/observe_caller.py`, after PR 2 merges and the door is deployed |
 
@@ -353,12 +374,12 @@ not choose them.
 
 | What | Path | Seat |
 |---|---|---|
-| The manifest field | `src/manifest/schema.json` grows `callers` (a list of `{subject, issuer}`, `additionalProperties: false`); `agents/refagent/manifest.yaml` and `agents/ratings-helper/manifest.yaml` gain `callers: []` | Engineering (the schema); Tool Owner (the field and its two empty lists) |
+| The manifest field | `src/manifest/schema.json` grows `callers` in the shape §2 fixes (optional in the schema; `subject` pattern, never `platform`; `issuer` enum `self`; unique), and its `version` description says `callers` computes no bump; `agents/refagent/manifest.yaml` and `agents/ratings-helper/manifest.yaml` gain `callers: []` under a Tool Owner ruling file naming both paths; refagent's bundle digest moves with it, so the first deploy after PR 2 redeploys refagent, which S4's second guard then reads (`tool-owner` note 8) | Engineering (the schema); Tool Owner (the field, the ruling, the two empty lists) |
 | The platform check's reading | `src/validate/callers.py`: `callers_errors(manifest)`; `src/validate/agent.py` `evaluate()` calls it | Engineering |
 | The door | the construct (`infra/construct/governed_agent.py`): for an agent with `callers`, a Cognito user pool, one user per subject, a callers client and a `platform` client, and the runtime's `authorizerConfiguration` set to the pool's issuer and the two clients; the deploy boundary and the eval role as Security rules (R2) | Security |
 | The platform's own call through the door | `.github/workflows/deploy.yml`, "The agent answers its own goldens": a token for the `platform` client fetched from the pool, passed to `src/agent/run.py`, which sends it on the invoke; `run.py` gains the header | Security (the step); Engineering (`run.py`) |
 | The call record's delivery | `infra/security/` and `infra/bootstrap/`: the records reach `calls/agents/<name>/` in the audit bucket, by CloudTrail's data event or the runtime's log subscription as the probe decides, under a bucket statement no agent role can use | Security |
-| The relaxation | `src/gates/two_key.py`: entry 7, a subject added to `callers`, the key removed, or the construct's authoriser widened; `docs/adr/ADR-0009-…` amendment 2, its last | Engineering (the gate); Product (the ADR, naming the Tool Owner's and Security's keys) |
+| The relaxation | `src/gates/two_key.py`: entry 7, a subject added to `callers` or the key removed from a value; absent to `[]` not one; refused as "<path>: callers … (ADR-0016)"; two distinct seats as every entry, the Tool Owner's covering; `docs/adr/ADR-0016-…`, a new ADR, since ADR-0009's last amendment is reserved for the Rule Owner (`tool-owner` note 4) | Engineering (the gate); Product (the ADR) |
 | The reading | `src/verdict/caller.py`: `from_raw(event)` (the raw record to the read shape, §2) and `calls(records, stated, callers, max_seconds)` | Engineering (the module); Data Owner (the read shape, §11 R5) |
 | The observer | `scripts/observe_caller.py`, in `evals.yml` on `main` (as `observe_rules.py`); `.github/CODEOWNERS` already takes `scripts/observe_*.py` as Engineering's with no edit (M09 feasibility §2 item 8) | Engineering (the script); Security (the workflow step and the read grant on `calls/`) |
 | The envelope | `caller` in `src/verdict/schema.json`; `build` composes it; `CLAIM_10_CHECKS` and `READ_THE_CALLER` in `gate.py`; row 10's reading in `src/ledger.py` | Engineering |
@@ -374,13 +395,13 @@ rules.
 **PR 1.** refagent's envelope as at M09: `plants 7/7`, the M01 to M09
 checks as row 9's cell has them; it says nothing about claim 10.
 `make plants` lists S1 to S4 and the run (seeded cases, not golden
-plants); `tests/test_m10_seeds.py` shows **3 passed** (S3's guard case,
+plants); `tests/test_m10_seeds.py` shows **4 passed** (S3's two guard cases,
 S4's two guards) and **6 xfailed** (S1, S2 refused, S2 admitted by the
-schema, S3's two cases, the run); `--runxfail` shows 3 passed, 6 failed,
+schema, S3's two cases, the run); `--runxfail` shows 4 passed, 6 failed,
 each with its planted message. (This paragraph said 2 and 5 at `053ee19`,
-before the tests were written; the two-key seed has two cases and a guard,
-as M07's has. Corrected at the documents commit, recorded in
-`feasibility.md` §3.) `make validate`'s twenty-one checks pass: none reads a fixture,
+before the tests were written, and 3 and 6 at `e5be79e`; the two-key seed
+has two planted cases and, after the cold review's F2, two guard cases with
+bases of their own. Corrected twice, recorded in `feasibility.md` §3.) `make validate`'s twenty-one checks pass: none reads a fixture,
 a run file or a call.
 
 **PR 2, on the PR.** S1, S2 and S3 refused or read by their readers, each
@@ -440,6 +461,11 @@ rows 0 to 9.
 
 SPEC/00 §10.5: no document describes these as working.
 
+- **The construct's authoriser widened.** A second issuer or client
+  admitted in `infra/construct/governed_agent.py` is a diff to Python
+  that no entry of the closed list reads; it is Security's under
+  `ruling-cited` and `security-reviewer`, unread by `two-key`
+  (`tool-owner` finding 5). Not planted.
 - **Two keys on an agent repository's `callers`.** An agent repository
   has no `two-key` (SPEC/00 §12); festival-desk's `callers` pull request
   is admitted on the platform check alone, and a second subject added
@@ -557,18 +583,22 @@ the same stop and go in as proposals until each seat's ruling file reads
   name, and never presented as outside. A principal in the security
   account (897698239547) is the fallback for the stranger arm if door 2
   is ruled, since door 2 takes IAM.
-- **R4 (Tool Owner).** The manifest field. Proposed: `callers`, a list of
-  `{subject, issuer}`, `additionalProperties: false`, beside
+- **R4 (Tool Owner).** The manifest field. Proposed: `callers`, in the
+  shape §2 fixes (`subject` a name, never `platform`, unique; `issuer`
+  the symbol `self` at M10; required both; optional in the schema,
+  required by `callers_errors`; no semver bump), beside
   `may_be_called_by`; not an edge (a caller is not an agent) and not a
-  rule (it says who, not what may be said); `callers: []` the default and
-  not a relaxation; the `platform` client admitted by the construct and
-  not listed. refagent's and `ratings-helper`'s manifests gain `callers:
-  []` at PR 2 under the Tool Owner's key.
+  rule (it says who, not what may be said); `callers: []` the default,
+  and absent to `[]` not a relaxation; the `platform` client admitted by
+  the construct and not listable. refagent's and `ratings-helper`'s
+  manifests gain `callers: []` at PR 2 under a Tool Owner ruling file
+  naming both paths (`tool-owner` findings 1, 2, 3, 6; notes 2, 3).
 - **R5 (Data Owner).** The call record's read shape. Proposed (§2):
   `subject`, `issuer`, `agent`, `outcome`, `reason`, `request_id`,
   `time`, `delivered`; no guardrail (finding 2); `build`'s `from_raw`
   maps the raw record AWS delivered onto it (finding 1), and the raw
-  record stays beside it on the envelope. One raw object per call under
+  record stays beside it on the envelope and carries no credential
+  (`from_raw` refuses one that does, `tool-owner` note 6). One raw object per call under
   `calls/agents/<name>/`, written by the door's delivery and never by
   the agent; pharmadelta's scorer reads the answer record, which is
   unchanged but for the `platform` caller the deploy's goldens run now
@@ -586,6 +616,12 @@ the same stop and go in as proposals until each seat's ruling file reads
   stale "Claim 8 (M08): not opened" line (finding 11). `docs/story.md`
   and the M08 header rows stay standing. **Ruled 2026-10-13, yes to all
   four**, at the same stop as R1.
+- **ADR-0016 (Product; the Tool Owner's and any second seat's keys at
+  PR 2).** Entry 7 of the closed list, a caller admitted or the field
+  removed from a value; absent to `[]` not one; any second seat, as the
+  gate reads every entry (`tool-owner` note 5). A new ADR, not ADR-0009's
+  second amendment, which that ADR reserves for the Rule Owner
+  (`tool-owner` note 4).
 - **No recording (Product, ruled 2026-10-13).** M10 records no video
   (SPEC/00 §10.5 as amended; ADR-0015). Not an Unsure item.
 

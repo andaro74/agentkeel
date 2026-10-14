@@ -1,8 +1,9 @@
 # The same manifest with the field M10 proposes (SPEC/10 section 2
 # `callers`; Tool Owner, section 11 R4): one outside subject, lantern-desk,
 # a made-up member of a made-up festival's staff, with the agent's own pool
-# as its issuer (a placeholder id until the construct makes the pool). Seed
-# S2's second planted test: this file must pass src/manifest/schema.json
+# as its issuer. The issuer is the symbol `self`: the agent's own pool, which the construct
+# makes, so its URL cannot be in the manifest before it exists (tool-owner
+# F1). S2's second planted test: this file must pass src/manifest/schema.json
 # from M10 PR 2. Today the schema's `additionalProperties: false` refuses
 # `callers` (SPEC/10 section 3.3), which is the false state: no manifest can
 # say who may call it. A fixture, never evidence.
@@ -48,5 +49,5 @@ may_call: []
 may_be_called_by: []
 callers:
 - subject: lantern-desk
-  issuer: https://cognito-idp.us-west-2.amazonaws.com/us-west-2_fest1va1d
+  issuer: self
 platform_version: m08

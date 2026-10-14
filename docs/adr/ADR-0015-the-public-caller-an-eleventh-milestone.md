@@ -6,7 +6,7 @@ date: 2026-10-13
 seat: Product
 authorises:
   - Product  # SPEC/00 §3 a threat row, §7 row 10, §8's count and its M10 entry, §10.3 row 10, §10.5 (no recording), §15: a milestone after "the last", again
-  - Tool Owner  # `callers`, a manifest field that says who may call an agent (SPEC/00 §5's Tool Owner row); a subject added is two keys with Security's (ADR-0009 amendment 2, at PR 2)
+  - Tool Owner  # `callers`, a manifest field that says who may call an agent (SPEC/00 §5's Tool Owner row); a subject added is two keys (ADR-0016, at PR 2)
   - Security  # the door and the identity pool in the construct, the deploy step's token, the call record's delivery (SPEC/10 §11 R2, R3), ruled at PR 2
 amendments: 0
 ---
@@ -63,9 +63,18 @@ Four things stand in the tree at `833ab2b` (tag `m09`):
 3. **A manifest says who may call its agent**, in a field a seat owns:
    `callers` (Tool Owner), a list of `{subject, issuer}`; `callers: []`
    admits no outside caller and is the default; a manifest with no
-   `callers` key is refused by the platform check from PR 2. A subject
-   added, the key removed or the door widened is a relaxation: ADR-0009
-   amendment 2, its last, at PR 2, keyed by the Tool Owner and Security.
+   `callers` key is refused by the platform check from PR 2 (optional in
+   the schema, required by `callers_errors`, so the seed fails for its
+   named reader and no other). A subject added or the key removed from a
+   value is a relaxation: entry 7 of the closed list, ADR-0016 at PR 2
+   (ADR-0009's last amendment is the Rule Owner's), keyed by the Tool Owner
+   and any second seat; absent to `[]` is not one. The construct's
+   authoriser widened is Security's under `ruling-cited`, unread by
+   `two-key`. The field's shape at M10: `subject` a name
+   (`^[a-z][a-z0-9-]{2,30}$`, never `platform`, unique in the list),
+   `issuer` the symbol `self` (the agent's own pool, which the construct
+   makes and whose URL is known only after it does); `callers` computes no
+   semver bump.
    SPEC/00 §5's Tool Owner row carries the field from this PR.
 4. **One door per agent, which the platform controls, and which Security
    rules** (SPEC/10 §11 R2). Proposed: the runtime's own JWT authoriser
@@ -114,9 +123,10 @@ Four things stand in the tree at `833ab2b` (tag `m09`):
   AgentCore Identity's credential vault. §12 is not amended at PR 1. If
   Security rules door 3 (the Gateway) at R2, §12's gateway line is
   amended at PR 2 under that ruling and the cost is named there.
-- **ADR-0009** gains its second and last amendment at PR 2, not here: the
-  entry is read by `two_key.py` from PR 2, and its seeded case (S3) is
-  planted at PR 1 before the reader.
+- **ADR-0009** is not amended: its last amendment is reserved for the
+  Rule Owner (its own closing words). Entry 7 is a new ADR, ADR-0016, at
+  PR 2; the entry is read by `two_key.py` from PR 2, and its seeded case
+  (S3) is planted at PR 1 before the reader.
 
 ## Consequences
 

@@ -98,12 +98,17 @@ probe and no attempt.
    its "Claim 8 (M08): not opened" line is replaced by two that say where
    claims 7 to 10 stand (finding 11). `docs/story.md` and the M08 header
    rows stay standing.
-8. **The seed test count corrected** in SPEC/10 §7 (3 passed, 6 xfailed;
-   it said 2 and 5 before the tests were written), with the first count
-   kept in brackets and the correction recorded in `feasibility.md` §3.
+8. **The seed test count corrected** in SPEC/10 §7 (4 passed, 6 xfailed;
+   it said 2 and 5 before the tests were written and 3 and 6 before the
+   cold review's F2 gave S3 two real guard cases), the earlier counts
+   named there and the corrections recorded in `feasibility.md` §3.
 9. **The two seat reads of PR 1 applied as drafts** (`feasibility.md`
-   §2.5, §2.6), with their counts and dispositions written there once the
-   reports are in; the reports are in the PR body verbatim.
+   §2.5, §2.6): `tool-owner` 0 BLOCK, 6 FINDING, 9 NOTE, no schema or
+   manifest change to rule on, the field's shape and ADR-0016 as its
+   findings proposed; `engineering-cold-reviewer` 0 BLOCK, 3 FINDING, 8
+   NOTE, applied in this PR's last commit. The reports are in the PR body
+   verbatim. SPEC/00 §6's manifest list gains `callers` under this ruling
+   (`tool-owner` F4).
 
 ## Unsure, each with its seat and when
 
@@ -113,10 +118,10 @@ The PR body's Unsure list, repeated here so the ruling carries it.
 |---|---|---|---|
 | A | The door (SPEC/10 §11 R2). Proposed: door 1, the runtime's own JWT authoriser on a Cognito user pool per agent in the agent's stack; the three unknowns probed with throwaway names before PR 2 opens, outputs in `runs/door_probe.md` at PR 2; door 2 if (c) is no; the bootstrap's grants narrowed by a runtime tag if (a) is no, failing which door 2 | Security | before PR 2 opens (R2) |
 | B | Who the outside caller is (R3). Proposed: a user in the agent's pool for the admitted arm; a user of a throwaway pool for the stranger; no token; the laptop's IAM principal for the bypass arm only, standing for a platform principal the construct does not name, never presented as outside; a security-account principal as the stranger if door 2 is ruled | Security; Product | before PR 2 opens (R3) |
-| C | The manifest field (R4). Proposed: `callers`, a list of `{subject, issuer}`, `additionalProperties: false`; not an edge, not a rule; `[]` the default and not a relaxation; the `platform` client admitted by the construct and not listed; refagent's and `ratings-helper`'s gain `callers: []` at PR 2 | Tool Owner | before PR 2 opens (R4) |
-| D | The call record's read shape (R5): `subject`, `issuer`, `agent`, `outcome`, `reason`, `request_id`, `time`, `delivered`; no guardrail; `build`'s `from_raw` maps the raw record onto it; the raw record stays beside it | Data Owner | PR 2 (R5) |
+| C | The manifest field (R4). Proposed: `callers`, in the shape SPEC/10 §2 fixes (`subject` a name, never `platform`, unique; `issuer` the symbol `self` at M10; both required; optional in the schema, required by `callers_errors`; no semver bump); not an edge, not a rule; `[]` the default and absent to `[]` not a relaxation; the `platform` client admitted by the construct and not listable; refagent's and `ratings-helper`'s gain `callers: []` at PR 2 under a Tool Owner ruling file | Tool Owner | before PR 2 opens (R4) |
+| D | The call record's read shape (R5): `subject`, `issuer`, `agent`, `outcome`, `reason`, `request_id`, `time`, `delivered`; no guardrail; `build`'s `from_raw` maps the raw record onto it and refuses one that carries a credential; the raw record stays beside it | Data Owner | PR 2 (R5) |
 | E | N (R6): `detection.max_seconds`, 600 s, reused and read as M05 read it (`LastModified` against `eventTime`); no bar added or moved | Threshold Owner | before PR 2 opens (R6) |
-| F | ADR-0009 amendment 2 (its last): entry 7, a subject added to `callers`, the key removed or the door's authoriser widened; keyed by the Tool Owner and Security | Product (the ADR); Tool Owner; Security | PR 2 |
+| F | ADR-0016, a new ADR (ADR-0009's last amendment is the Rule Owner's, `tool-owner` note 4): entry 7, a subject added to `callers` or the key removed from a value; absent to `[]` not one; keyed by the Tool Owner and any second seat. The construct's authoriser widened is Security's under `ruling-cited`, unread by `two-key` | Product (the ADR); Tool Owner | PR 2 |
 | G | Where the raw record comes from (CloudTrail's data event for `InvokeAgentRuntime`, or the runtime's log by a subscription the bootstrap deploys) and under which bucket statement it lands (`calls/agents/<name>/`, proposed) | Security | before PR 2 opens (R2's probe, question (b)) |
 | H | Whether setting `authorizerConfiguration` on a deployed runtime updates it in place or replaces it (a new ARN and registry row). Not a falsifier; the registry row says which | Security; Engineering | PR 2 (read at the first deploy after it) |
 | I | The `platform` client's credential for `deploy.yml`'s goldens step: where it is held (Secrets Manager or SSM, proposed) and which role reads it | Security | before PR 2 opens (R2) |

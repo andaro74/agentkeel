@@ -12,9 +12,9 @@ Written at M10 PR 1 open. The row in `milestones/README.md` is the one
 | Field | Row 10 |
 |---|---|
 | Claim | A caller outside the platform reaches an agent only through a door the platform controls, under an identity the agent's manifest admits, with the agent's pinned guardrail on every answer and the caller named in each call's record in the security account; a caller with no identity, or one the manifest does not admit, is refused and the refusal is in the security account within N |
-| Falsifiers | F10.1 a call that does not pass the door reaches the agent: from the outside caller directly on `InvokeAgentRuntime`, or from a platform principal the construct does not name. F10.2 a call through the door loses the guardrail: festival-desk's answer record through the door names a guardrail other than its pin or reads `g-030` other than 1 of 1, or refagent's plants read under 7 of 7 on the first envelope after the door's construct change. F10.3 a call's record names no caller, or a caller other than the one that called. F10.4 a caller with no identity, or one the manifest does not admit, is answered; or is refused with no record in the security account within N (`detection.max_seconds`, 600 s: the object's `LastModified` against AWS's `eventTime`). F10.5 a caller is admitted, the field removed or the door widened with one key (measured in agentkeel; an agent repository has no `two-key`, SPEC/10 §8). |
+| Falsifiers | F10.1 a call that does not pass the door reaches the agent: from the outside caller directly on `InvokeAgentRuntime`, or from a platform principal the construct does not name. F10.2 a call through the door loses the guardrail: festival-desk's answer record through the door names a guardrail other than its pin or reads `g-030` other than 1 of 1, or refagent's plants read under 7 of 7 on the first envelope after the door's construct change. F10.3 a call's record names no caller, or a caller other than the one that called. F10.4 a caller with no identity, or one the manifest does not admit, is answered; or is refused with no record in the security account within N (`detection.max_seconds`, 600 s: the object's `LastModified` against AWS's `eventTime`). F10.5 a caller is admitted, or the field removed from a value, with one key (ADR-0016, entry 7; measured in agentkeel: an agent repository has no `two-key`, and the construct's authoriser widened is unread by it, SPEC/10 §8). |
 | Seeded commit | `fba41ad`: S1 the call records (today's answer record naming no caller; a stranger answered; a bypass; a wrong subject; a late refusal; the held four); S2 festival-desk's manifest with no `callers`, and the same with it; S3 refagent's manifest gaining a caller with one key; S4 two guards, no fixture; the run file `f10_x_caller_run.yaml` with `observed: null`. One commit, before any reader |
-| Expected gate output | PR 1: refagent's envelope as at M09; it says nothing about claim 10. `tests/test_m10_seeds.py` 3 passed, 6 xfailed. From PR 2's merge the gate requires `F10_1` to `F10_5`, test-only witnesses. The live reading is recorded in `caller` and read by this row's cell, not gated (SPEC/10 §4); on PR 2's own envelope it reads unread, so the row reads RED there. Named P3 exception: the door is deployed and the four calls made after PR 2 merges, read by PR 3's run (PR 4's if the deploy path needs a repair). Security probes door 1's three unknowns before PR 2 opens. **Stated at open: admitted 1 of 1, refused 3 of 3, F10.1 to F10.5 held, row 10 expected GREEN**, with SPEC/10 §7's risks named, the refusal's record first. |
+| Expected gate output | PR 1: refagent's envelope as at M09; it says nothing about claim 10. `tests/test_m10_seeds.py` 4 passed, 6 xfailed. From PR 2's merge the gate requires `F10_1` to `F10_5`, test-only witnesses. The live reading is recorded in `caller` and read by this row's cell, not gated (SPEC/10 §4); on PR 2's own envelope it reads unread, so the row reads RED there. Named P3 exception: the door is deployed and the four calls made after PR 2 merges, read by PR 3's run (PR 4's if the deploy path needs a repair). Security probes door 1's three unknowns before PR 2 opens. **Stated at open: admitted 1 of 1, refused 3 of 3, F10.1 to F10.5 held, row 10 expected GREEN**, with SPEC/10 §7's risks named, the refusal's record first. |
 | Measured | — |
 | PRs used / cap | 1 / 4 |
 | State | OPEN |
@@ -97,16 +97,22 @@ for a ruling file that reads "Ruled by" (M09 finding 4).
    stranger; no token; the laptop's IAM principal for the bypass arm only,
    never presented as outside.
 3. R4 (Tool Owner): `callers`, a list of `{subject, issuer}`; not an edge,
-   not a rule; `[]` the default; refagent's and `ratings-helper`'s gain
-   `callers: []` at PR 2 under the Tool Owner's key.
+   not a rule; `[]` the default; `subject` a name, never `platform`;
+   `issuer` the symbol `self` at M10; optional in the schema, required by
+   `callers_errors`; no semver bump; refagent's and `ratings-helper`'s gain
+   `callers: []` at PR 2 under a Tool Owner ruling file (`tool-owner`
+   findings 1, 2, 3, 6).
 4. R5 (Data Owner): the read record's shape (`subject`, `issuer`, `agent`,
    `outcome`, `reason`, `request_id`, `time`, `delivered`), mapped by
    `build` from the raw record AWS delivered; no guardrail on a call
-   record.
+   record; the raw record carries no credential.
 5. R6 (Threshold Owner): N is `detection.max_seconds`, 600 s, reused and
    read as M05 read it.
-6. ADR-0009 amendment 2 (Product, keyed by the Tool Owner and Security):
-   entry 7, a caller admitted, written at PR 2 after S3 is planted here.
+6. ADR-0016 (Product; keyed at PR 2 by the Tool Owner and any second
+   seat): entry 7 of the closed list, a caller admitted or the field
+   removed from a value; absent to `[]` not one; a new ADR, since
+   ADR-0009's last amendment is the Rule Owner's (`tool-owner` note 4).
+   Written at PR 2 after S3 is planted here.
 
 **After PR 2 merges, before PR 3's run** (the owner, each stated in
 `runs/f10_x_caller_run.yaml` first):
@@ -126,8 +132,8 @@ for a ruling file that reads "Ruled by" (M09 finding 4).
 
 ```
 git log 833ab2b..HEAD --format=%h     # PR 1's commits: 053ee19, 841178f, fba41ad, then the documents and the rulings
-uv run pytest tests/test_m10_seeds.py -q              # 3 passed, 6 xfailed
-uv run pytest tests/test_m10_seeds.py -q --runxfail   # 3 passed, 6 failed, each with its planted message
+uv run pytest tests/test_m10_seeds.py -q              # 4 passed, 6 xfailed
+uv run pytest tests/test_m10_seeds.py -q --runxfail   # 4 passed, 6 failed, each with its planted message
 make plants     # S1 to S4 and the run; S1, S2 and the run "not in the tree yet"
 make validate   # twenty-one checks, ok
 make ledger     # exits 0; row 10 OPEN, Measured empty

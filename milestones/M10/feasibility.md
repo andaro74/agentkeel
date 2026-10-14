@@ -102,17 +102,56 @@ The four changes:
 | "named in the answer's record" | "named in each call's record" | the answer record is written once per deploy, not per call; the claim needs a per-call record, which PR 2 defines |
 | "F10.1 a call that bypasses the door reaches the agent" | "a principal other than the door's reaches the agent, from outside or from a platform principal the construct does not name" | an outsider is refused today by IAM's default, so the outsider's bypass has no plantable false state; the platform's own principals are the live bypass |
 
-### 2.5 The `tool-owner` report
+### 2.5 The `tool-owner` report (0 BLOCK, 6 FINDING, 9 NOTE)
 
-Written into this section when the report arrives (§8); the report itself
-is in the PR body verbatim. PR 1 proposes a manifest field (`callers`) and
-changes no schema, so the read is of SPEC/10 §2 and §11 R4 and of seed S2's
-`with_callers.yaml`.
+Run on the committed diff at `e5be79e`, on the proposed field and the seeds
+that carry it. No schema, manifest or edge changes in the diff, so no bump
+and nothing refused; the read is of SPEC/10 §2 and §11 R4 against the code
+that will read them at PR 2. The report is in the PR body verbatim. Each
+finding taken on the session's recommendation:
 
-### 2.6 The `engineering-cold-reviewer` report
+| # | Disposition | Seat |
+|---|---|---|
+| F1 | **`issuer` is the symbol `self` at M10**, an enum of one meaning the agent's own pool: the pool is made by the construct from the list, so its URL cannot be in the manifest before it exists. SPEC/10 §2, §11 R4; `with_callers.yaml`, `cases.json` and the test's `CALLERS` carry `self`. Whether the construct reads the field is R2's (it must: users are made from it) | Tool Owner (shape); Security (construct) |
+| F2 | **`platform` is reserved**: the `subject` pattern excludes it and `callers_errors` refuses it by name. SPEC/10 §2 | Tool Owner, PR 2's schema |
+| F3 | **The full shape written** in SPEC/10 §2 so PR 2 copies it: `required: [subject, issuer]`, `additionalProperties: false`, `uniqueItems`, no two entries with one `subject`, `subject` `^[a-z][a-z0-9-]{2,30}$` | Tool Owner (R4) |
+| F4 | **SPEC/00 §6's manifest list gains `callers`** under `rulings/pr1.md` | Product |
+| F5 | **Entry 7 names the two manifest arms only**; the construct's authoriser widened is Python no entry reads and stays under Security's `ruling-cited` and `security-reviewer`, named unread by `two-key` in SPEC/10 §4 F10.5 and §8, SPEC/00 §8 M10 item 4, the ledger row | Product (ADR wording); Security |
+| F6 | **`callers` computes no semver bump**, said in SPEC/10 §2 and §6; `schema.json`'s `version` description says it at PR 2 | Tool Owner |
+| N1 | Not an edge: agreed, as proposed | Tool Owner (R4) |
+| N2 | **`callers` optional in the schema, required by `callers_errors`**, so S2 fails for its named reader and not the schema. SPEC/10 §2, §6 | Engineering (schema); Tool Owner |
+| N3 | **Absent to `[]` is not a relaxation**, said in entry 7's draft (SPEC/00 §8 M10 item 4; SPEC/10 §2); PR 2 carries a Tool Owner ruling file naming both manifest paths; S3's second guard case plants the exact diff | Product (ADR); Tool Owner (ruling) |
+| N4 | **Entry 7 is ADR-0016, a new ADR**, not ADR-0009's second amendment, which that ADR reserves for the Rule Owner. SPEC/00 §8 M10 item 4 and PR (2) line, SPEC/10 §4, §5, §6, §11, ADR-0015, the test's expected string, `cases.json`, the README row | Product |
+| N5 | **Any second seat**, as the gate reads every entry; SPEC/00 §5's row and CLAUDE.md's no longer say "with Security's" | Product; Engineering |
+| N6 | **A raw record carries no credential**; `from_raw` refuses one that does, the observer copies none. SPEC/10 §2, §11 R5; SPEC/00 §8 M10 item 3 | Data Owner; Security |
+| N7 | `ceilings` binds no caller; recorded in SPEC/10 §2 and §8 | Tool Owner |
+| N8 | refagent's bundle digest moves with `callers: []` at PR 2, so the first deploy after it redeploys refagent, which S4's second guard then reads; SPEC/10 §6 | Engineering, PR 2 |
+| N9 | The agent repository's `callers` is one-keyed by design; recorded (Unsure K) | Product |
 
-Written into this section when the report arrives (§8); the report itself
-is in the PR body verbatim.
+### 2.6 The `engineering-cold-reviewer` report (0 BLOCK, 3 FINDING, 8 NOTE)
+
+Run on `833ab2b...e5be79e` without the PR body. Shape, plant, P5 and owned
+paths held; each seed fails for its planted reason and no other; `validate`
+twenty-one ok; `ledger` exit 0; the counts matched the row. The report is
+in the PR body verbatim, as the reviewer drafted it (a ruling-file draft
+named `pr1-cold-review.md`, which is not written to the tree: the cold
+review runs from PR 2, R9, and this PR's Engineering key is
+`pr1-engineering.md`). Each finding taken on the session's recommendation,
+applied in this PR's last commit:
+
+| # | Disposition | Seat |
+|---|---|---|
+| F1 | **SPEC/00 §8 M10 item 3 and its F10.2 sentence corrected**: no guardrail on a call record; F10.2 reads the answer record and refagent's envelope, as SPEC/10 §4 and the ledger row do; the F10.5 sentence drops "the door widened" (with `tool-owner` F5) | Product |
+| F2 | **S3's guard is two real diffs**, each with a base of its own: a subject removed from two (a narrowing) and absent to `[]` (what PR 2 does to the two manifests); the byte-identical case is gone. `cases.json`, the test, the README row; the count is 4 passed, 6 xfailed | Engineering (test); Product (count) |
+| F3 | **`stated` has one seat-owned source**: the run file's `steps[].caller` is machine-readable (`issuer: self`, `other`, `null`; the bypass's subject is `observed.bypass.principal`, the ARN the owner writes), and the observer derives `stated` from it; the test's dict stands for that derivation and says so | Product (the run file); Engineering, PR 2 |
+| N1 | Four commits in the range at the time of the read; five with the last | Engineering |
+| N2 | R7's four Product edits are outside the PR 1 shape; each is cited to `rulings/pr1.md` ruling 7 and none makes a seed pass. Recorded | Product |
+| N3 | SPEC/00 §5 lists `two-key` on `callers` "from M10 PR 2", a gate that does not fire until then; the row says so. Recorded | Product |
+| N4 | **S4's second guard reads the plants only**, not the envelope's verdict: a `main` envelope RED for a reason that is not the door's is not F10.2's | Engineering |
+| N5 | `pr: 54` is a prediction until the PR opens; checked at open (M09 did the same with #49) | Engineering |
+| N6 | `make ledger-plain` re-run before the last commit; `git diff --quiet docs/milestones/README.md` | Product |
+| N7 | **The explainer's N sentence** reads "proposed to be reused from M05, which that seat rules before PR 2" | Product |
+| N8 | Counts verified; `feasibility.md` §1's verbatim report keeps the reviewer's "2 passed, 5 xfailed", and §3 records the corrections | Product |
 
 ## 3. The false state
 
@@ -133,17 +172,20 @@ its message read:
 | S2 admitted by the schema | `seed S2: the manifest schema refuses `callers`: ["<manifest>: Additional properties are not allowed ('callers' was unexpected)"]` |
 | S3 a subject added | `seed S3 (a subject added): two-key passes a caller admitted with one key` |
 | S3 the key removed | `seed S3 (the key removed): two-key passes a caller admitted with one key` |
-| S3 left alone | **passes** (a guard): `callers: []` unchanged with one key passes before and after the reader |
+| S3 a subject removed | **passes** (a guard): two subjects to one, a narrowing, with one key passes before and after the reader |
+| S3 absent to an empty list | **passes** (a guard): no `callers` to `callers: []`, what PR 2 does to refagent's and `ratings-helper`'s manifests, with one key passes before and after the reader |
 | S4 the invoke condition | **passes** (a guard): the fixture agent's stack conditions both `InvokeModel` allows on its own guardrail at its version, and its runtime carries no authoriser yet |
 | S4 refagent's plants | **passes** (a guard): the latest CI-written envelope reads `plants_expected` 7, `plants_fired` 7, GREEN |
 | run | `seed run: the run has not been made` |
 
-`tests/test_m10_seeds.py` shows **3 passed, 6 xfailed**; `--runxfail`
-shows 3 passed, 6 failed, each with the message above. SPEC/10 §7 said "2
-passed, 5 xfailed" at `053ee19`, written before the tests: the two-key
-seed has two cases and a guard, as M07's has, so the count is 3 and 6.
-Corrected in SPEC/10 §7 at the documents commit, with the first count left
-in brackets there; the ledger row carries 3 and 6. `make plants` lists S1
+`tests/test_m10_seeds.py` shows **4 passed, 6 xfailed**; `--runxfail`
+shows 4 passed, 6 failed, each with the message above. SPEC/10 §7 said "2
+passed, 5 xfailed" at `053ee19`, written before the tests, and "3 passed,
+6 xfailed" at `e5be79e`: the two-key seed has two planted cases, and the
+cold review's F2 replaced its byte-identical guard with two guard cases of
+their own (a subject removed; absent to `[]`), so the count is 4 and 6.
+Corrected twice in SPEC/10 §7, the earlier counts named there; the ledger
+row carries 4 and 6. `make plants` lists S1
 to S4 and the run, the readers "not in the tree yet" beside S1, S2 and the
 run, and "in the tree" beside S3 (`two_key.py`, which gains entry 7 at PR
 2) and S4 (the construct and the gate). `make validate`'s twenty-one checks
@@ -164,7 +206,7 @@ expected_refused, reasons}`, whose reasons carry the strings the S1 test
 reads ("names no caller", "does not admit", "without the door", "other
 than the one that called", "later than"); `src/validate/callers.py` with
 `callers_errors(manifest)`; `src/manifest/schema.json`'s `callers` key;
-`two_key.py`'s entry 7 naming "ADR-0009 amendment 2"; `scripts/observe_caller.py`;
+`two_key.py`'s entry 7 naming "ADR-0016"; `scripts/observe_caller.py`;
 `caller` on the envelope; `CLAIM_10_CHECKS` and `READ_THE_CALLER` in
 `gate.py`; row 10's reading in `src/ledger.py`; `SEEDS_M10` in `plants.py`
 (this PR); the door, the pool and the deploy step's token as Security
@@ -214,9 +256,13 @@ named. `make validate`'s twenty-one checks pass.
 **`product-spec-reviewer`**, on SPEC/10 at `053ee19`: 0 BLOCK, 9 FINDING,
 3 NOTE (§1). Dispositions in §2.
 
-**`tool-owner`** and **`engineering-cold-reviewer`**: run on the committed
-diff before the PR opens; counts and dispositions in §2.5 and §2.6, the
-reports in the PR body verbatim. No `security-reviewer`, `data-owner`,
+**`tool-owner`**, on `e5be79e`: 0 BLOCK, 6 FINDING, 9 NOTE. Dispositions in
+§2.5.
+
+**`engineering-cold-reviewer`**, on `833ab2b...e5be79e`: 0 BLOCK, 3
+FINDING, 8 NOTE. Dispositions in §2.6.
+
+Both reports are in the PR body verbatim. No `security-reviewer`, `data-owner`,
 `rule-owner` or `threshold-owner` report: PR 1 touches no `infra/`, no
 workflow, no `evals/goldens/`, no `data/`, no rule file and no bar. The
 `cold-review` skill runs from PR 2 (R9).
