@@ -3,7 +3,10 @@
 Status: DRAFT · Owner: Product seat · Written at M10 PR 1, the plant,
 from SPEC/00 §8 M10 (added at this PR; ADR-0015) · Reviewed by
 `product-spec-reviewer` before anything else of PR 1 was written
-(`milestones/M10/feasibility.md` §1).
+(`milestones/M10/feasibility.md` §1: 0 BLOCK, 9 FINDING, 3 NOTE) and
+revised once on its findings (§2 the record's mapper and its two
+timestamps, no `guardrail` on a call record; §4 F10.2 and F10.4; §5 S1's
+two more records; §9 cut 4 struck; §11 R2's fallback for (a)).
 
 M10 opens after M09 closed GREEN and was tagged (`m09` on `833ab2b`,
 2026-10-13). It is opened by a Product ruling
@@ -52,8 +55,11 @@ does not admit, or leaves no name on the call's record.
   `infra/construct/governed_agent.py`, the `bedrock:GuardrailIdentifier`
   condition on `InvokeItsOwnProfileOnly`). The door is in front of the
   runtime and cannot take it off. This part is a guard, read on the
-  admitted call's trace and on refagent's envelope, as M09's F9.5 was a
-  guard that the split relaxed nothing.
+  answer record of the deploy that put the door on (the goldens asked
+  through the door as `platform`, `g-030` still blocked by its rule) and
+  on refagent's envelope, as M09's F9.5 was a guard that the split
+  relaxed nothing. A call record cannot see the model call, so it does
+  not carry the guardrail (reviewer finding 2).
 - *The caller named in each call's record, and the refusal recorded
   within N.* Each call, admitted or refused, leaves one record in the
   security account's audit bucket that names the subject, the issuer,
@@ -97,7 +103,7 @@ threaten the cap, and §11 R2's probe answers it before PR 2 opens.
 
   | # | Door | What admits a caller | Record of a refusal | Cost | Unknowns |
   |---|---|---|---|---|---|
-  | 1 | **The runtime's own JWT authoriser** (AgentCore Runtime `authorizerConfiguration`, `customJWTAuthorizer`): the construct sets the agent's identity pool as the issuer and the agent's app client as the allowed client; a Cognito user pool per agent in the agent's own stack, its users made from `callers`. **Proposed.** | the pool's issuer and client at the service edge; a token for another pool or client is refused before the container; no token is refused the same way. A call signed as an IAM principal is refused once the runtime is in JWT mode, so the platform's own goldens caller (`deploy.yml`, "The agent answers its own goldens") presents a token too, as a `platform` client the construct makes | the service's own record of the refused `InvokeAgentRuntime`, delivered to the audit bucket as M05's attempts were (CloudTrail), or the runtime's log delivered by a subscription the bootstrap deploys | smallest diff: one construct property, one pool and two clients per agent, one deploy step changed to fetch a token; no new code path the platform must defend | (a) JWT mode refuses SigV4 outright; (b) the admitted call's subject is readable where the record is written; (c) a refusal at the edge leaves a record the security account can hold within N. Each is a yes-or-no the probe answers (§11 R2) |
+  | 1 | **The runtime's own JWT authoriser** (AgentCore Runtime `authorizerConfiguration`, `customJWTAuthorizer`): the construct sets the agent's identity pool as the issuer and the agent's app client as the allowed client; a Cognito user pool per agent in the agent's own stack, its users made from `callers`. **Proposed.** | the pool's issuer and client at the service edge; a token for another pool or client is refused before the container; no token is refused the same way. A call signed as an IAM principal is refused once the runtime is in JWT mode, so the platform's own goldens caller (`deploy.yml`, "The agent answers its own goldens") presents a token too, as a `platform` client the construct makes | the service's own record of the refused `InvokeAgentRuntime`, delivered to the audit bucket as M05's attempts were (CloudTrail), or the runtime's log delivered by a subscription the bootstrap deploys | smallest diff: one construct property, one pool and two clients per agent, one deploy step changed to fetch a token; no new code path the platform must defend | (a) JWT mode refuses SigV4 outright; (b) the admitted call's subject is readable where the record is written; (c) a refusal at the edge leaves a record the security account can hold within N. Each is a yes-or-no the probe answers (§11 R2). If (a) answers no, the bootstrap's `InvokeAgentRuntime` grants are narrowed by a condition on a runtime tag the construct sets for an agent with `callers` (`agentkeel:door=jwt`, proposed), so no platform principal holds the grant on a doored runtime; failing that, door 2 (finding 4) |
   | 2 | **API Gateway with a Lambda authoriser** in front of `InvokeAgentRuntime`: the authoriser reads the token and the registry row's `callers`, a second Lambda holds `InvokeAgentRuntime` on the agent's runtime; the runtime's own grant narrows to that Lambda's role | the authoriser, by subject against `callers` | the API's access log, with the authoriser's `principalId`, delivered to the audit bucket | two Lambdas and a role holding `InvokeAgentRuntime`, all code Engineering and Security own and must defend; the runtime still answers any IAM principal with the grant, so F10.1's bypass arm needs the runtime's grants narrowed too | none in AWS; the record is certain. **The fallback** if door 1's probe answers no on (c) |
   | 3 | **The AgentCore Gateway** with an HTTP passthrough target to the runtime and admission by policy | the gateway's inbound authoriser and its policy | the gateway's own log | the gateway, a target per agent, a gateway role holding `InvokeAgentRuntime`; SPEC/00 §12 names the gateway as not built and would need amending | whether a target can be the runtime's invocations endpoint; whether policy admits by subject; whether the record names the caller. The most unknowns. Not proposed |
 
@@ -130,22 +136,34 @@ threaten the cap, and §11 R2's probe answers it before PR 2 opens.
 - **The call record.** One object per call in the audit bucket of the
   security account (897698239547), under a prefix the bucket policy
   gives the delivery and no agent role (`calls/agents/<name>/`,
-  proposed; Security): `subject`, `issuer`, `agent`, `outcome` (`admitted`
-  or `refused`), `reason` for a refusal (`no identity`, `not admitted`,
-  `not the door`), `guardrail` as the trace carried it for an admitted
-  call, `request_id`, `time`. Written by the door's log delivery as AWS
-  records it; never by the agent, the observer or a person. The exact
-  source (CloudTrail's data event, or the runtime's log) is the probe's
-  question (b) and Security's ruling under R2; the field names are fixed
-  here so the seeds and PR 2 agree (§5).
-- **Admitted.** A call whose record reads `outcome: admitted`, whose
-  `subject` is in the agent's `callers` (or is `platform`), and whose
-  `guardrail` is the agent's pin as the answer record names it.
-- **Refused.** A call whose record reads `outcome: refused` with its
-  reason, within N of the call's time. A call that was refused and has
-  no record within N is **unrecorded**, which is F10.4's second arm, and
-  a call that reached the agent without passing the door is **a bypass**,
-  F10.1.
+  proposed; Security). **Two shapes, and who writes each** (reviewer
+  finding 1). The *raw* record is what AWS delivered, byte for byte
+  (CloudTrail's data event for `InvokeAgentRuntime`, or the runtime's log
+  line, as the probe's question (b) and R2 decide); it is written by the
+  delivery and by nothing the platform runs. The observer
+  (`scripts/observe_caller.py`) copies each raw record with the object's
+  `LastModified` (its arrival) and the time it was read, and writes
+  nothing else. The *read* record is `build`'s reading of a raw one
+  (`src/verdict/caller.py` `from_raw(event)`): `subject`, `issuer`,
+  `agent`, `outcome` (`admitted` or `refused`), `reason` for a refusal
+  (`no identity`, `not admitted`, `not the door`), `request_id`, `time`
+  (AWS's `eventTime` of the call) and `delivered` (the object's
+  `LastModified`). The read shape is fixed here so the seeds and PR 2
+  agree (§5); the raw shape is known only after the probe, so S1's
+  fixtures are read records and PR 2 plants one raw record from the
+  probe's output as its own first commit, before `from_raw` exists
+  (`/open-milestone` step 4's allowance). A call record carries no
+  guardrail: the delivery cannot see the agent role's model call
+  (finding 2).
+- **Admitted.** A call whose read record has `outcome: admitted` and
+  whose `subject` is in the agent's `callers` (or is `platform`).
+- **Refused.** A call whose read record has `outcome: refused` with its
+  reason, and `delivered` minus `time` at most N (the same two
+  timestamps M05's `alarm_latency_s` read: AWS's event time against the
+  object's arrival, never the observer's read time; finding 3). A call
+  that was refused and has no record with `delivered` within N of its
+  `time` is **unrecorded**, which is F10.4's second arm, and a call that
+  reached the agent without passing the door is **a bypass**, F10.1.
 - **N.** `detection.max_seconds` in `thresholds.yaml`, 600 s (Threshold
   Owner, M05 PR 2). Reused, not added (§11 R6); no bar moves at M10.
 - **The fixture agent.** `festival-desk`, M09's agent, public at
@@ -197,7 +215,8 @@ reader can open. **Live today, at `833ab2b` (tag `m09`).**
    `build.compose_answer` writes (`src/verdict/build.py:1005-1020`) has
    `repository`, `agent`, `commit`, `platform_commit`, `runtime_arn`,
    `model_id`, `region`, `guardrail`, `goldens`, `observations`,
-   `errors`, `tokens_in`, `tokens_out` and no caller; it is written once
+   `errors`, `tokens_in`, `tokens_out`, `run_url`, `verdict` and `what`,
+   and no caller; it is written once
    per deploy by the goldens step, not once per call. M05's attempt
    records in the audit bucket are CloudTrail's events for IAM
    principals; a call by an identity that is not an IAM principal has no
@@ -238,9 +257,9 @@ reader can open. **Live today, at `833ab2b` (tag `m09`).**
 | Id | Fires when | What it looks like in the repo |
 |---|---|---|
 | F10.1 | a call that does not pass the door reaches the agent: the outside caller directly on `InvokeAgentRuntime` with an IAM credential, or a platform principal the construct does not name (the eval role, the deploy role or the owner's role signing a call, where the runtime is in JWT mode and only the `platform` client is admitted) | `checks.F10_1: fail` from S1's fixture test (a record of a call that reached the agent with `reason: not the door` read as not held); live, the run file's `bypass` step: the owner's laptop principal, holding the grant, calls the runtime directly after the door is deployed and must be refused, the refusal on the record |
-| F10.2 | a call through the door loses the guardrail: the admitted call's record carries a `guardrail` other than the agent's pin, or festival-desk's plant `g-030` reads other than 1 of 1 on the answer record of the deploy that put the door on, or refagent's plants read under 7 of 7 on the first envelope after the construct change | `checks.F10_2: fail` from S4's guards (the construct's invoke condition on the fixture agent's synthesised stack; refagent's latest envelope `plants 7/7`); live, `caller.F10_2` on the admitted call's record and on festival-desk's answer record after the deploy, and `plants_fired` on refagent's envelope |
-| F10.3 | a call's record names no caller, or a caller other than the one that called: the admitted call's record carries no `subject`, or a `subject` that is not the user the owner called as; a refused call's record names a subject other than the stranger's (or other than none, for the no-identity call) | `checks.F10_3: fail` from S1's fixture test (today's answer record, with no caller, read as not held); live, `caller.records` on the envelope, each record's `subject` against the run file's stated caller |
-| F10.4 | a caller with no identity, or one the manifest does not admit, is answered; or is refused with no record in the security account within N of the call | `checks.F10_4: fail` from S1's fixture test (a record of a stranger answered) and S2's (a manifest with no `callers` admitted by the platform check); live, the run file's `none` and `stranger` steps, each `outcome: refused` on a record whose `time` is within 600 s of the call's |
+| F10.2 | a call through the door loses the guardrail: festival-desk's answer record from the deploy that put the door on (its goldens asked through the door as `platform`) names a guardrail other than its pin or reads `g-030` other than 1 of 1, or refagent's plants read under 7 of 7 on the first envelope after the construct change. A call record carries no guardrail (finding 2); the live reading is the answer record's and refagent's envelope's only | `checks.F10_2: fail` from S4's guards (the construct's invoke condition on the fixture agent's synthesised stack; refagent's latest envelope `plants 7/7`); live, `caller.F10_2` on festival-desk's answer record after the deploy, and `plants_fired` on refagent's envelope |
+| F10.3 | a call's record names no caller, or a caller other than the one that called: the admitted call's read record carries no `subject`, or a `subject` that is not the user the owner called as; a refused call's record names a subject other than the stranger's (or other than none, for the no-identity call) | `checks.F10_3: fail` from S1's fixture test (today's answer record, with no caller, read as not held; a record whose `subject` is not the stated caller read as not held); live, `caller.records` on the envelope, each record's `subject` against the run file's stated caller |
+| F10.4 | a caller with no identity, or one the manifest does not admit, is answered; or is refused with no record in the security account within N: `delivered` (the object's `LastModified`) minus `time` (AWS's `eventTime` of the call) over 600 s, or no record at all | `checks.F10_4: fail` from S1's fixture test (a record of a stranger answered; a refusal delivered later than N) and S2's (a manifest with no `callers` admitted by the platform check); live, the run file's `none` and `stranger` steps, each `outcome: refused` on a record with `delivered` within 600 s of its `time` |
 | F10.5 | a caller is admitted with one key: a subject added to a manifest's `callers`, the key removed, or the construct's authoriser widened (a second issuer or client admitted) merges without two seats' rulings | `checks.F10_5: fail` from S3's seed (refagent's manifest gaining a `callers` entry with the Tool Owner's ruling alone, in a copy of the tree, which `two-key` must refuse under ADR-0009 amendment 2); live, `two-key` on PR 2's own diff and on the fixture's. **The agent repository's half is unread** (§8): an agent repository has no `two-key`, so festival-desk's `callers` pull request is admitted on the platform check alone; named, not measured |
 
 **Where each reading comes from** (M04's to M09's lesson, planned at
@@ -283,7 +302,7 @@ read; preconditions raise `SeedBroken`. Each is named in
 
 | Seed | Falsifier | Planted as | Fails today because | Read by (PR 2) |
 |---|---|---|---|---|
-| S1 the call records | F10.1, F10.3, F10.4 | `tests/fixtures/m10/s1-call-records/`: three records for festival-desk. `record_no_caller.json` is **today's answer record shape**, as `build.compose_answer` writes it (the fields §3.2 lists, no `subject`, no `outcome`): the reader must read it as not held, "names no caller". `call_stranger_answered.json` is a call record in §2's shape with `subject: stranger`, not in `callers`, and `outcome: admitted`: not held, "a caller the manifest does not admit was answered". `call_bypass.json` has `outcome: admitted` with `reason: not the door` and no `issuer`: not held, "reached the agent without the door". `call_held.json` is the admitted user's call, `outcome: admitted`, `guardrail: at8e36cosq1r:1`, beside three refused records (`none`, `stranger`, `bypass`) each within N: held, admitted 1 of 1, refused 3 of 3 | nothing reads a call record (§3.5) | `src/verdict/caller.py`: `calls(records, callers, pin, max_seconds)` returning `{read, held, admitted, refused, expected_admitted, expected_refused, reasons}` |
+| S1 the call records | F10.1, F10.3, F10.4 | `tests/fixtures/m10/s1-call-records/`: six files for festival-desk, each in the **read** shape of §2 but the first. `record_no_caller.json` is **today's answer record shape**, as `build.compose_answer` writes it (the fields §3.2 lists, no `subject`, no `outcome`): the reader must read it as not held, "names no caller". `call_stranger_answered.json` has `subject: stranger`, not in `callers`, and `outcome: admitted`: not held, "a caller the manifest does not admit was answered". `call_bypass.json` has `outcome: admitted` with `reason: not the door` and no `issuer`: not held, "reached the agent without the door". `call_wrong_subject.json` has `outcome: admitted` with a `subject` that is in `callers` but is not the caller the run stated: not held, "names a caller other than the one that called" (finding 5). `call_refused_late.json` is the stranger's refusal with `delivered` 601 s after `time`: not held, "recorded later than N" (finding 5). `calls_held.json` is the admitted user's call, `outcome: admitted`, beside three refused records (`none`, `stranger`, `bypass`) each with `delivered` within N: held, admitted 1 of 1, refused 3 of 3 | nothing reads a call record (§3.5) | `src/verdict/caller.py`: `calls(records, stated, callers, max_seconds)` returning `{read, held, admitted, refused, expected_admitted, expected_refused, reasons}`, `stated` the run file's callers per step; and `from_raw(event)`, whose raw fixture is PR 2's first commit (§2) |
 | S2 a manifest with no `callers` | F10.4 | `tests/fixtures/m10/s2-manifest-no-callers/manifest.yaml`: festival-desk's manifest as its repository holds it at `19864419` (pin `at8e36cosq1r:1`, every seat the author, `may_be_called_by: []`, no `callers`). Two planted tests: `src.validate.callers.callers_errors(manifest)` must refuse it naming the field; and `with_callers.yaml`, the same manifest with `callers: [{subject: lantern-desk, issuer: <the pool>}]`, must pass the manifest schema | `src/validate/callers.py` is not in the tree; the schema's `additionalProperties: false` refuses `callers` (§3.3) | `src/validate/callers.py`: `callers_errors(manifest)`; `src/manifest/schema.json`; `src/validate/agent.py` `evaluate()` calling it |
 | S3 a caller admitted with one key | F10.5 | `tests/fixtures/m10/s3-caller-added/cases.json`: refagent's manifest, as this tree holds it, gaining `callers: [{subject: …, issuer: …}]` with the Tool Owner's ruling alone, in a repository whose base holds `callers: []`; and the key removed the same way. `two-key` must refuse each naming the path and ADR-0009 amendment 2; with Security's second key the same diff passes (M07's two-key seed pattern, `tests/test_m07_two_key_seed.py`) | `two_key.relaxations` has no entry for `callers` (§3.4) | `src/gates/two_key.py` (entry 7, ADR-0009 amendment 2) |
 | S4 the guardrail stays on the call | F10.2 | two **guards**, no fixture: the fixture agent's stack as the construct synthesises it today (`tests/fixtures/m09/s1-festival-desk/`, through `tests/test_m09_platform.synth`) conditions the agent role's invoke on the stack's own guardrail at its version; and the latest CI-written envelope under `evals/history/` reads refagent's `plants_fired` equal to `plants_expected`, 7 of 7. Both pass today and must pass after the door is added to the construct | nothing: they pass, and that is the point | `infra/construct/governed_agent.py` (changed at PR 2) and `src/verdict/gate.py` (in the tree) |
@@ -340,7 +359,7 @@ not choose them.
 | The platform's own call through the door | `.github/workflows/deploy.yml`, "The agent answers its own goldens": a token for the `platform` client fetched from the pool, passed to `src/agent/run.py`, which sends it on the invoke; `run.py` gains the header | Security (the step); Engineering (`run.py`) |
 | The call record's delivery | `infra/security/` and `infra/bootstrap/`: the records reach `calls/agents/<name>/` in the audit bucket, by CloudTrail's data event or the runtime's log subscription as the probe decides, under a bucket statement no agent role can use | Security |
 | The relaxation | `src/gates/two_key.py`: entry 7, a subject added to `callers`, the key removed, or the construct's authoriser widened; `docs/adr/ADR-0009-…` amendment 2, its last | Engineering (the gate); Product (the ADR, naming the Tool Owner's and Security's keys) |
-| The reading | `src/verdict/caller.py`: `calls(records, callers, pin, max_seconds)` | Engineering |
+| The reading | `src/verdict/caller.py`: `from_raw(event)` (the raw record to the read shape, §2) and `calls(records, stated, callers, max_seconds)` | Engineering (the module); Data Owner (the read shape, §11 R5) |
 | The observer | `scripts/observe_caller.py`, in `evals.yml` on `main` (as `observe_rules.py`); `.github/CODEOWNERS` already takes `scripts/observe_*.py` as Engineering's with no edit (M09 feasibility §2 item 8) | Engineering (the script); Security (the workflow step and the read grant on `calls/`) |
 | The envelope | `caller` in `src/verdict/schema.json`; `build` composes it; `CLAIM_10_CHECKS` and `READ_THE_CALLER` in `gate.py`; row 10's reading in `src/ledger.py` | Engineering |
 | The documents | `docs/developer/quickstart.md` and `template-README.md` say what `callers` is, that an empty list is the default, and how a caller gets in | Product |
@@ -372,9 +391,10 @@ the plant going RED under the measurement, which PR 2 is for. refagent's
 **PR 3's run, stated at open.** festival-desk's `callers` pull request
 admitted and merged; its stack redeployed with the pool and the
 authoriser, its three goldens answered through the door as `platform`
-with `g-030` still blocked by its rule, 1 of 1; the admitted user's call
-answered with the pin on the record; the no-token call, the stranger's
-call and the bypass each refused, each on the record within 600 s.
+with `g-030` still blocked by its rule, 1 of 1, and the answer record
+naming its pin; the admitted user's call answered, its record naming the
+user; the no-token call, the stranger's call and the bypass each refused,
+each on a record delivered within 600 s of its event time.
 **Expected: admitted 1 of 1, refused 3 of 3**, F10.1 to F10.5 held, row
 10 GREEN. Stated risks, each a reading and not a reason to change the
 plant:
@@ -404,9 +424,9 @@ plant:
   the guard that the construct change relaxed nothing for an agent with
   `callers: []`.
 
-RED if a call that did not pass the door is answered; if the admitted
-call's record lacks the pin, `g-030` reads other than 1 of 1 through the
-door, or refagent's plants fall under 7 of 7; if a record names no caller
+RED if a call that did not pass the door is answered; if the answer
+record through the door lacks the pin, `g-030` reads other than 1 of 1
+through the door, or refagent's plants fall under 7 of 7; if a record names no caller
 or the wrong one; if the no-token call or the stranger is answered, or
 refused with no record within N; if a caller is admitted with one key in
 agentkeel; if a seed's test passes for a reason other than its reader; if
@@ -450,17 +470,23 @@ SPEC/00 §10.5: no document describes these as working.
 ## 9. Cut list
 
 In order, if the cap is threatened. **Never cut:** the door, the
-`callers` field and its refusal, the call record, the four live calls,
-S1 to S4 or their readers, row 10's reading of `caller`, or the measured
-value.
+`callers` field and its refusal, the call record, the four live calls
+with the bypass refused, the platform's own goldens caller through the
+door (the `platform` client: without it the bypass arm has nothing to
+refuse, reviewer finding 6), S1 to S4 or their readers, row 10's reading
+of `caller`, or the measured value.
 
 | # | Item | Then | Why |
 |---|---|---|---|
 | 1 | The quickstart's and template README's sections on callers | one paragraph each naming the field and that an empty list is the default; the rewrite at the close by `docs-writer` | documents, not readings |
 | 2 | `ratings-helper`'s `callers: []` | refagent's manifest alone gains the field; `callers_errors` refuses a manifest with no field only for an agent the platform check reads in an agent repository, and `ratings-helper`'s stub is read as before | the stub has no code and no runtime (SPEC/00 §12); one less Tool Owner diff |
-| 3 | The subject on the record (F10.3's second half) | F10.3 reads the record's client against the admitted user's client and names it as reading the client; the subject is read from the answer the owner received, by hand, and recorded in the run file's `observed` as a note the observer does not read | the probe's question (b) may answer no; the record still names a caller, less finely |
-| 4 | The `platform` client through the door for the goldens step | the deploy's goldens step keeps IAM, and the runtime admits both the pool's tokens and the platform's IAM principals (door 1 in a mixed mode, if AWS offers one; else door 2 for the goldens path alone) | the deploy step is Security's workflow change and the first deploy after PR 2 is where it would fail; F10.1's bypass arm then names the platform's roles as admitted by the construct, which the claim allows ("a caller outside the platform") |
-| 5 | `src/validate/callers.py`'s issuer check (that `issuer` is the agent's own pool) | the construct refuses an issuer it did not make at synth; the platform check reads the field's shape only | the refusal moves from the platform check to the build; the reading is the same |
+| 3 | The subject on the record (F10.3's second half) | F10.3 reads the record's client against the admitted user's client and names it as reading the client; the subject is read from the answer the owner received, by hand, and recorded in the run file's `observed` as a note the observer does not read. The plain sentence's "who asked" then reads as "which app asked", and the explainer's "What happened" says so (reviewer note 12) | the probe's question (b) may answer no; the record still names a caller, less finely |
+| 4 | `src/validate/callers.py`'s issuer check (that `issuer` is the agent's own pool) | the construct refuses an issuer it did not make at synth; the platform check reads the field's shape only | the refusal moves from the platform check to the build; the reading is the same |
+
+A fifth item, the `platform` client replaced by a mixed mode admitting
+IAM beside tokens, was in the first draft and is struck: it would change
+the door and remove the bypass call's refusal, both never cut (finding
+6).
 
 ## 10. The amendments to SPEC/00 made at this PR
 
@@ -473,8 +499,13 @@ and said "SPEC/00 plans no M10".
 - **§8 preamble:** eleven milestones, at most 44 PRs; M10 opened by a
   Product ruling after M09 closed GREEN and was tagged; reopens none of
   M09's rows and repairs nothing M09 found.
-- **§8 M10:** the entry this SPEC is written from.
-- **§10.3:** row 10, title and plain sentence.
+- **§5:** the Tool Owner's row gains `callers` (reviewer finding 7);
+  CLAUDE.md's seat table follows it.
+- **§8 M10:** the entry this SPEC is written from; item 2 corrected to
+  the agent's own stack (finding 8).
+- **§10.3:** row 10, title "Outsiders come in by the front door"
+  (finding 9: the sentence's stranger is the one turned away) and plain
+  sentence.
 - **§10.5:** M10 has no recording, by Product's ruling at M10 PR 1
   (ADR-0015 carries the rule; ADR-0005 has no amendment left); §15's
   video clause reads nine videos, M09's and M10's ruled not recorded,
@@ -504,11 +535,14 @@ the same stop and go in as proposals until each seat's ruling file reads
   "the platform issued"; each call's record, not "the answer's record";
   the bypass arm as a platform principal the construct does not name).
 - **R2 (Security).** The door. Proposed: door 1 (§2), the runtime's own
-  JWT authoriser on a Cognito user pool per agent in the agent's stack,
-  with the three unknowns probed by Security with throwaway names before
-  PR 2 opens and the outputs committed in PR 2 as
-  `milestones/M10/runs/door_probe.md`. If (c) answers no, door 2. Door 3
-  is not proposed. **This is the item most likely to threaten the cap**,
+  JWT authoriser on a Cognito user pool per agent in the agent's stack
+  (the construct, not the bootstrap: SPEC/00 §8 M10 item 2 says so,
+  corrected at this PR, reviewer finding 8), with the three unknowns
+  probed by Security with throwaway names before PR 2 opens and the
+  outputs committed in PR 2 as `milestones/M10/runs/door_probe.md`. If
+  (c) answers no, door 2. If (a) answers no, the bootstrap's grants are
+  narrowed by a runtime tag the construct sets, failing which door 2
+  (finding 4). Door 3 is not proposed. **This is the item most likely to threaten the cap**,
   as R3 was at M09: a door whose refusals leave no record within N has
   no reading for F10.4, and a RED close on the record arm is the stated
   result of that.
@@ -527,15 +561,19 @@ the same stop and go in as proposals until each seat's ruling file reads
   not a relaxation; the `platform` client admitted by the construct and
   not listed. refagent's and `ratings-helper`'s manifests gain `callers:
   []` at PR 2 under the Tool Owner's key.
-- **R5 (Data Owner).** The call record's shape. Proposed (§2): `subject`,
-  `issuer`, `agent`, `outcome`, `reason`, `guardrail`, `request_id`,
-  `time`, one object per call under `calls/agents/<name>/`, written by
-  the door's delivery and never by the agent; pharmadelta's scorer reads
-  the answer record, which is unchanged but for the `platform` caller
-  the deploy's goldens run now presents (M09 R7's shape stands).
+- **R5 (Data Owner).** The call record's read shape. Proposed (§2):
+  `subject`, `issuer`, `agent`, `outcome`, `reason`, `request_id`,
+  `time`, `delivered`; no guardrail (finding 2); `build`'s `from_raw`
+  maps the raw record AWS delivered onto it (finding 1), and the raw
+  record stays beside it on the envelope. One raw object per call under
+  `calls/agents/<name>/`, written by the door's delivery and never by
+  the agent; pharmadelta's scorer reads the answer record, which is
+  unchanged but for the `platform` caller the deploy's goldens run now
+  presents (M09 R7's shape stands).
 - **R6 (Threshold Owner).** N. Proposed: `detection.max_seconds`, 600 s,
   reused; no bar added and none moved, so no Threshold Owner diff at PR
-  1 or PR 2.
+  1 or PR 2. Read as M05 read it: the object's `LastModified` against
+  AWS's `eventTime` (finding 3).
 - **R7 (Product).** M09's standing items carried as housekeeping in this
   PR, each named in `rulings/pr1.md`: SPEC/06 §6's "installed on all
   repositories" corrected to "selected repositories" with the

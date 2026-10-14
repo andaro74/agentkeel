@@ -26,7 +26,8 @@ cut 3, §10.2 Acts 1 to 3, §10.5: row 6 closed RED and S3 moves to M07;
 §8's count and its M09 entry, §10.3 row 09, §10.5, §15: a tenth
 milestone, opened after M08 closed and tagged; ADR-0014;
 `milestones/M09/rulings/pr1.md`, put to Product) · Amended at M10 PR 1
-(§3, §7 row 10, §8's count and its M10 entry, §10.3 row 10, §10.5, §15:
+(§3, §5 the Tool Owner's row, §7 row 10, §8's count and its M10 entry,
+§10.3 row 10, §10.5, §15:
 an eleventh milestone, the public caller, opened after M09 closed GREEN
 and was tagged; ADR-0015; `milestones/M10/rulings/pr1.md`, put to
 Product)
@@ -115,7 +116,7 @@ P11. **Only CI-written envelopes are evidence.** A local run
 | Product | what to build, when it's acceptable | `SPEC/**`, `milestones/**`, `CLAUDE.md`, `.claude/skills/**`, `docs/**`, `README.md`, `LICENSE` | define correctness; merge code |
 | Rule Owner | what the agent may say and do | `rules/**` and `agents/*/rules/**`, guardrail id/version in manifest | edit goldens; write product code |
 | Data Owner | what CORRECT means | `evals/goldens/**`, `data/**` (slate, rights table, clause index, corpus), rulings on FRAGILE, corpus admission | weaken a golden to green a build |
-| Tool Owner | tool and edge contracts | `tools/**` and `agents/*/tools/**` schemas, `may_call`, `may_be_called_by` | change a schema without a major bump |
+| Tool Owner | tool and edge contracts; who may call an agent | `tools/**` and `agents/*/tools/**` schemas, `may_call`, `may_be_called_by`, `callers` (a manifest's outside callers, M10 PR 1; a subject added is two keys with Security's, SPEC/10 §6) | change a schema without a major bump; admit a caller with one key |
 | Threshold Owner | the bars, and which models are measured | `thresholds.yaml`, judge rubric, judge model id, agent model id + version + region (A-vs-A compares the pair) | move a bar in its `relaxes:` direction, or a pin's `deprecated_after` later, to null or removed with the model unchanged (ADR-0009 amendment 1), without two keys |
 | Security | what tooling and infra MAY DO | platform repo: workflows, `.github/CODEOWNERS` (ADR-0003 amendment 2), construct (`infra/construct/**`), bootstrap stack (`infra/bootstrap/**`), the rest of `infra/**` (with `infra/platform_grant.yaml`, the Apps' grant), `scripts/platform_check.py` (the reader of that grant; ADR-0012, M07 PR 3), KMS key policy, cosign identity, security account; seats → groups in a manifest | define scope |
 | Engineering | that it works | `src/**`, `scripts/**` but for `scripts/platform_check.py` (ADR-0012), `Makefile`, root config (`pyproject.toml`, `uv.lock`, `.python-version`, `.gitignore`, `.gitattributes`), `tests/**`, `agents/<name>/**` but for the fields and folders other seats own (ADR-0003 amendment 1), `evals/history/**` (CI-written only), `evals/local/**` (gitignored, no gate) | self-approve any of the above |
@@ -798,8 +799,9 @@ described as working until it has refused its seeded case (§10.5).
    if nobody). The platform's own goldens caller is admitted by the
    construct, named `platform` on the record, and is not an outside caller.
 2. **A door the platform controls**, which Security rules (SPEC/10 §11
-   R2): proposed, the runtime's own JWT authoriser on an identity pool the
-   bootstrap stack deploys, so that a call signed as an IAM principal no
+   R2): proposed, the runtime's own JWT authoriser on an identity pool
+   the agent's own stack deploys (the construct, as the agent's guardrail
+   is since M09), so that a call signed as an IAM principal no
    longer reaches the runtime at all and the only way in is a token the
    pool issued to a subject the manifest admits. The alternatives, with
    their costs, are in SPEC/10 §2. Either way the guardrail stays where
@@ -1067,7 +1069,7 @@ finding on camera is the point.
 | 07 | Upgrades come to you | A new platform version, a new model, or a retirement arrives as a PR; the team never edits the pipeline. |
 | 08 | We rehearsed the bad day | A hostile agent tried six things; all six were stopped, recorded, and recovered from. |
 | 09 | Every agent gets its own rules | A team writes the rules for its own agent on top of the platform's, each rule is shown to stop the question it was written for, and a team can add rules but cannot take the platform's away. |
-| 10 | Strangers come in by the front door | Someone outside the team can only ask an agent a question through the platform's front door, under a name the agent's owners agreed to; every answer still carries the agent's rules, every question is recorded with who asked, and a stranger is turned away and the attempt written down. |
+| 10 | Outsiders come in by the front door | Someone outside the team can only ask an agent a question through the platform's front door, under a name the agent's owners agreed to; every answer still carries the agent's rules, every question is recorded with who asked, and a stranger is turned away and the attempt written down. |
 
 Plus two framing pages:
 - `docs/milestones/README.md` — the plain-language index: milestone,
