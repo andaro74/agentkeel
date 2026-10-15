@@ -192,7 +192,6 @@ def with_empty_callers(tmp_path: Path):
     git(repo.root, "worktree", "remove", "--force", str(repo.base))
 
 
-@expected_failure
 @pytest.mark.parametrize("case", sorted(CASES["relaxed_with_one_key"]))
 def test_s3_a_caller_admitted_with_one_key_is_refused(with_empty_callers, case):
     """A subject added to `callers`, or the key removed, with the Tool Owner's ruling alone: `two-key` must refuse it

@@ -104,3 +104,22 @@ def test_the_platform_check_refuses_a_manifest_with_no_callers_under_the_named_c
     root, bundle = door_layout(tmp_path / "with", [{"subject": "lantern-desk", "issuer": "self"}])
     admitted = platform_check.evaluate(bundle, "agentkeel-studio/festival-desk", root=root, lookup=stand_in_lookup)
     assert {name for name, errs in admitted.items() if errs} == set(), admitted
+
+
+# --- two-key entry 7 (ADR-0016), beyond the seed's four cases --------------------------------------------
+
+
+def test_entry_7_reads_subjects_not_bytes():
+    from src.gates.two_key import caller_relaxations
+
+    one = [{"subject": "lantern-desk", "issuer": "self"}]
+    two = one + [{"subject": "box-office", "issuer": "self"}]
+    assert caller_relaxations({}, {"callers": []}) == []  # absent to [] (the two manifests of this PR)
+    assert caller_relaxations({"callers": two}, {"callers": one}) == []  # a subject removed
+    assert caller_relaxations({"callers": one}, {"callers": one[::-1] + []}) == []  # the same list
+    assert caller_relaxations({}, {"callers": one}) == ["callers: subject 'lantern-desk' admitted (ADR-0016 entry 7)"]
+    assert caller_relaxations({"callers": one}, {"callers": two}) == ["callers: subject 'box-office' admitted (ADR-0016 entry 7)"]
+    assert caller_relaxations({"callers": one}, {}) == ["callers removed from a value (ADR-0016 entry 7)"]
+    assert caller_relaxations({"callers": one}, {"callers": None}) == ["callers removed from a value (ADR-0016 entry 7)"]
+    assert caller_relaxations({"callers": []}, {"callers": "lantern-desk"}) == ["callers no longer a list from a value (ADR-0016 entry 7)"]
+    assert caller_relaxations({}, {}) == []

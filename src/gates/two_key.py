@@ -42,6 +42,17 @@ and ADR-0009's amendment 1 (M04 PR 1):
    (threshold-owner F1 on M07 PR 2), after its seeded case
    (`tests/test_m07_two_key_seed.py`).
 
+and ADR-0016 (M10 PR 2; SPEC/10 §2, §4 F10.5, §6):
+
+7. a subject added to a manifest's `callers`, or the key removed from a
+   value (the Tool Owner's key, as the field's owner; any second seat).
+   Absent to `[]` is not one, and neither is a subject removed: both
+   admit no one new. A `callers` that stops being a list is read as
+   removed, since a gate that cannot say does not pass it. Read from
+   M10 PR 2, after its seeded case (`tests/test_m10_seeds.py`, S3). The
+   construct's authoriser widened is Python no entry here reads; it stays
+   under Security's `ruling-cited` and `security-reviewer` (SPEC/10 §8).
+
 Two keys are two ruling files with this PR's `pr:`, their `seat:` distinct.
 The file of the seat that owns the path covers it (SPEC/02 §2 "Covers");
 the other names the path, exactly, in its `keys:` (ADR-0009; until M03 PR
@@ -252,6 +263,23 @@ def date_relaxation(before: dict[str, Any], after: dict[str, Any]) -> str | None
     return f"deprecated_after {old.isoformat()} -> {new.isoformat()} moved later with the model unchanged" if new > old else None
 
 
+def caller_relaxations(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
+    """ADR-0016, entry 7: each subject admitted to `callers`, or the key removed from a value; [] if neither.
+
+    Absent to `[]` and a subject removed are not relaxations (SPEC/10 §2). Compared on subjects: a first
+    write that names a subject admits one and is read as such. `before` and `after` are the two manifests."""
+    def subjects(manifest: dict[str, Any]) -> set[str]:
+        listed = manifest.get("callers")
+        return {e.get("subject") for e in listed if isinstance(e, dict)} if isinstance(listed, list) else set()
+
+    found = [f"callers: subject {subject!r} admitted (ADR-0016 entry 7)"
+             for subject in sorted(s for s in subjects(after) - subjects(before) if isinstance(s, str))]  # fmt: skip
+    if isinstance(before.get("callers"), list) and not isinstance(after.get("callers"), list):
+        what = "removed" if "callers" not in after or after.get("callers") is None else "no longer a list"
+        found.append(f"callers {what} from a value (ADR-0016 entry 7)")
+    return found
+
+
 def relaxations(tree: Tree, base: Tree) -> list[Relaxation]:
     owners, _ = owner_table(base, tree)
     found: list[Relaxation] = []
@@ -312,6 +340,9 @@ def relaxations(tree: Tree, base: Tree) -> list[Relaxation]:
             # ADR-0009 amendment 1, entry 6. The Threshold Owner's key (ADR-0010).
             if moved := date_relaxation(before, after):
                 found.append(Relaxation(path, f"{moved} (ADR-0009 amendment 1, entry 6)", "Threshold Owner"))
+            # ADR-0016, entry 7 (M10 PR 2): a caller admitted, or the key removed from a value. The Tool Owner's key.
+            for what in caller_relaxations(before, after):
+                found.append(Relaxation(path, what, "Tool Owner"))
             old_mem, new_mem = before.get("memory"), after.get("memory")
             if isinstance(old_mem, dict):
                 if after.get("memory") is None:  # set to null, or the key deleted outright (cold review of PR 2, F5)
