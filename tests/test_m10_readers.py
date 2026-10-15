@@ -499,3 +499,10 @@ def test_run_refuses_a_door_for_refagent_and_a_door_without_a_token(monkeypatch,
     monkeypatch.setattr(run, "ROOT", tmp_path)
     assert run.main(["--out", str(tmp_path / "raw.json"), "--bundle", "agents/festival-desk", "--commit", "0" * 40]) == 2
     assert "a door with no token" in capsys.readouterr().out
+
+
+def test_the_gates_attribute_callers_to_the_tool_owner():
+    """ruling-cited reads a manifest field by field (ADR-0003 amendment 1): callers is the Tool Owner's (SPEC/00 section 5)."""
+    from src.gates import MANIFEST_FIELD_SEATS
+
+    assert MANIFEST_FIELD_SEATS["callers"] == "Tool Owner"
