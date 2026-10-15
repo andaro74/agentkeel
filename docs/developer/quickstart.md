@@ -159,6 +159,39 @@ email hidden) have no planted question of their own. The first agent with a
 after two repairs to the platform's own deploy path
 (`milestones/M09/README.md`, close detail).
 
+## 5b. Who may call your agent (`callers`)
+
+Your `manifest.yaml` says who outside the platform may ask your agent a
+question, in a field called `callers`. It is a list, and **an empty list is
+the default**: `callers: []` means nobody outside the platform, which is
+what the template ships and what the platform's own agent has. The platform
+check refuses a manifest that leaves the field out: every agent says who
+may call it, even if nobody.
+
+```yaml
+callers:
+  - subject: lantern-desk   # a name: lowercase letters, digits and hyphens, 3 to 31 characters
+    issuer: self            # the only issuer at M10: your agent's own identity pool
+```
+
+What the platform builds for an agent with one or more callers: an identity
+pool of your agent's own with one user per subject, and a door in front of
+your agent's runtime, which is the only way in from outside. A caller gets
+in by signing in to the pool as its subject (the owner sets the first
+credential by hand, outside any repository) and presenting the token at the
+door; the door admits a token for a listed subject and refuses everything
+else, a stranger's token and no token alike, and every call, admitted or
+refused, leaves a record in the security account naming who asked. The
+platform's own test questions after a deploy go through the same door, as
+`platform`, which is not a name you can list. Your agent's rules stay on
+every answer: the door is in front of the runtime and cannot take them off.
+Adding a subject is two signatures in the platform's own repository; in
+yours it is one pull request, and the platform check admits it on the
+field's shape alone. The first door was built at M10 PR 2 and has not been
+deployed for any agent yet: whether a stranger is turned away and written
+down in time is read at the first deploy after it, and until then this
+section says what the door is meant to do, not what it has done.
+
 ## 6. Push, wait for the check, merge
 
 Push. When `platform-check` passes, merge with a **merge commit** (the

@@ -77,6 +77,74 @@ Written at M10 PR 1 open. The row in `milestones/README.md` is the one
   records are made up. No real person, title, contract or studio
   workflow detail (SPEC/00 §9).
 
+### Measure detail (PR 2, 2026-10-15)
+
+- **PR 2 of 4, the measure.** Every reader SPEC/10 §6 names landed, each
+  in the commit that took its seed's marker off: the raw record fixture
+  from the probe first and alone (`3a929b6`); the schema's `callers` and
+  the two manifests' `callers: []` (`7ba474f`; S2's schema case read);
+  `src/validate/callers.py` from `evaluate()` (`a9ffab3`; S2's missing-key
+  case read); `two-key` entry 7 under ADR-0016 (`7100808`; S3's two cases
+  read, its two guards still passing); `src/verdict/caller.py`, `caller`
+  on the envelope, `CLAIM_10_CHECKS` wired and row 10's reading
+  (`5e2cf70`; S1 read), named as `M10_READERS` in the commit after it
+  (`2898100`); the observer and its two `evals.yml` steps (`7a0ff78`);
+  the door in the construct, the bootstrap's grants, the doored fixture
+  and S4's first guard rewritten (`1734656`); the deploy's door step and
+  `run.py`'s door path (`1c5b71f`); the call records' delivery in the
+  security account (`e9d915d`). The run file's marker stays on:
+  `observed` is null until the owner makes the run.
+- **The plant goes RED here.** On PR 2's own envelope `caller` is unread:
+  no door is deployed and no call has been made, so row 10's reading is
+  RED ("caller not read: the envelope records no call", or, once
+  `evals.yml` runs the observer, "the run has not been made", every
+  falsifier unread) whatever refagent's own verdict. `F10_1` to `F10_5`
+  are test-only witnesses on every envelope from the merge; the gate rules
+  nothing on `caller`.
+- **The rulings decided before PR 2 opened** (2026-10-15, after the
+  probe, each as the brief put them, with one correction from the probe's
+  files): R2 door 2 in the hybrid form; R3 as proposed with the bypass arm
+  an assumed role; R4, R5, R6 and ADR-0016 as proposed. Written as this
+  PR's five ruling files, each a draft until it reads "Ruled by". The
+  correction: the brief read the probe's (b) as NO; the data event of an
+  admitted call does carry the token's `sub` and `iss`, so (b) is PARTLY
+  (`runs/door_probe.md`). The decision R2 reaches is the same.
+- **What this PR does not do.** No live call; no festival-desk pull
+  request; no pool user's credential; no golden under `evals/goldens/`,
+  no bar, nothing under `src/baseline/`, no rule file; refagent stays
+  outside the door; no recording; no fifth pull request.
+
+### By-hand steps before PR 3's run, each with what it must precede
+
+1. **Security deploys the security stack** (`infra/security/`, by hand,
+   in the security account): the Logs destination the doors subscribe to,
+   the Firehose that writes under `calls/agents/<name>/`, the bucket's
+   `calls/` statements, the read role's `calls/` prefix. Before
+   festival-desk's deploy: the construct's subscription names the
+   destination's ARN, and a deploy whose subscription has no destination
+   fails on it, which is a PR 3 repair, not a finding of the claim.
+2. **Security deploys the bootstrap stack** (`infra/bootstrap/`, by
+   hand): the execution role's door grants, the deploy role's read of a
+   door client's secret, the agent ceiling's one new action. Before
+   festival-desk's deploy, for the same reason.
+3. **The owner opens festival-desk's `callers` pull request** (one
+   subject, `lantern-desk`, `issuer: self`), states it in the run file
+   first, and merges it once the platform check admits it; the scheduled
+   deploy puts the door on and asks the three goldens through it as
+   `platform`.
+4. **The owner sets lantern-desk's first credential** by hand
+   (`admin-set-user-password`, permanent), outside the repository.
+5. **The owner makes the four calls** in the run file's order, each
+   stated first: admitted (lantern-desk's token at the door), none (no
+   token at the door), stranger (a throwaway pool's user's token at the
+   door; the pool made and deleted outside the repository), bypass (an
+   assumed role holding the grant, straight at the runtime; its request
+   id and the role's ARN under `observed.bypass`). The owner fills
+   `observed` and nothing else.
+6. PR 3's run reads the records; if the platform's own deploy path needs
+   a repair first, PR 3 is that repair and PR 4's run reads them (SPEC/10
+   §5.1).
+
 ### Read before PR 2, each with the pull request whose merge it must precede
 
 SPEC/10 §11, and the **Unsure** list in PR 1's body. A step is attempted
@@ -144,3 +212,17 @@ git diff 833ab2b...HEAD --stat -- evals/goldens thresholds.yaml src/baseline rul
 Any reader of a call record, a `callers` field or a two-key entry for it
 in this PR, a door, a workflow or `infra/` change, a golden, a bar, or a
 change to festival-desk from an agentkeel session, makes the plant wrong.
+
+### What a reader can run, at PR 2
+
+```
+git log a67de63..HEAD --format=%h     # PR 2's commits: the raw fixture first, then one reader per commit
+uv run pytest tests/test_m10_seeds.py -q              # 9 passed, 1 xfailed (the run, not made)
+uv run pytest tests/test_m10_seeds.py -q --runxfail   # 9 passed, 1 failed: "seed run: the run has not been made"
+uv run pytest tests/test_m10_readers.py tests/test_m10_platform.py tests/test_p5_disagree.py -q
+make plants     # S1 to S4 and the run; every reader "in the tree" (the run's marker stays on)
+make validate   # twenty-one checks, ok
+make ledger     # exits 0; "as row M10 reads it" ends "caller not read: the envelope records no call; RED"
+git diff a67de63...HEAD --stat -- evals/goldens thresholds.yaml src/baseline rules data/ tests/fixtures/m09   # empty
+PYTHONPATH=. CDK_OUTDIR=/tmp/door AGENTKEEL_BUNDLE=tests/fixtures/m10/s4-festival-desk-door uv run python infra/construct/app.py   # the doored stack, cdk-nag clean
+```
