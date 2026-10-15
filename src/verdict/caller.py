@@ -329,7 +329,10 @@ def record(observation: dict[str, Any], max_seconds: float) -> dict[str, Any]:
         try:
             read = from_raw(wrapper)
         except Unreadable as exc:
-            unreadable.append(f"{wrapper.get('key')}: {exc}")
+            # One of the run's four calls whose record could not be read (a credential the observer refused to
+            # copy, a shape neither source has) names no caller; a line of some other call's is not the run's.
+            if wrapper.get("step") in STEPS:
+                unreadable.append(f"{wrapper.get('key')} ({wrapper.get('step')}): {wrapper.get('error') or exc}")
             continue
         records.append({"step": wrapper.get("step"), "source": wrapper.get("source"), "key": wrapper.get("key"),
                         "last_modified": wrapper.get("last_modified"), "read": read, "raw": wrapper.get("raw")})  # fmt: skip

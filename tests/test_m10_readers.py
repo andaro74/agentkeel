@@ -12,6 +12,7 @@ Nothing here calls AWS, GitHub or a model.
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -316,3 +317,138 @@ def test_a_credential_in_an_observed_record_is_filed_under_f10_3_and_an_unreadab
     missing = caller.record(observation(callers=None, answer=None), MAX_SECONDS)
     assert missing["F10_2"]["read"] is False and missing["F10_4"]["held"] is False
     assert any("callers at its merge were not read" in r for r in missing["F10_4"]["reasons"])
+
+
+# --- the observer writes raw records (scripts/observe_caller.py) -------------------------------------------
+
+
+def run_file_text(observed: Any) -> str:
+    run = yaml.safe_load((ROOT / "milestones" / "M10" / "runs" / "f10_x_caller_run.yaml").read_text(encoding="utf-8"))
+    return yaml.safe_dump({**run, "observed": observed}, sort_keys=False)
+
+
+def test_the_observer_writes_a_run_not_made_as_not_made_and_derives_stated_from_the_run_file(tmp_path, monkeypatch):
+    from scripts import observe_caller as observer
+
+    def never(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("a run not made reads nothing")
+
+    monkeypatch.setattr(observer, "gh", never)
+    monkeypatch.setattr(observer, "read_bucket", never)
+    run = tmp_path / "run.yaml"  # its own run file, not the tree's, which the owner fills at PR 3
+    run.write_text(run_file_text(None), encoding="utf-8")
+    out = tmp_path / "caller.json"
+    assert observer.main(["--read", "bucket,github", "--run", str(run), "--out", str(out)]) == 0
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert written["made"] is False and written["records"] is None and written["callers"] is None
+    assert written["stated"] == {
+        "admitted": {"subject": "lantern-desk", "outcome": "admitted", "reason": None},
+        "none": {"subject": None, "outcome": "refused", "reason": "no identity"},
+        "stranger": {"subject": "stranger", "outcome": "refused", "reason": "not admitted"},
+        "bypass": {"subject": None, "outcome": "refused", "reason": "not the door"},  # the principal is observed.bypass's
+    }
+    assert caller.record(written, MAX_SECONDS)["F10_1"]["read"] is False
+
+
+class FakeS3:
+    """The audit bucket as the read role sees it: the door's objects, the trail's, the answer record."""
+
+    def __init__(self, keyed: dict[str, tuple[str, bytes]]) -> None:
+        self.keyed = keyed  # key -> (LastModified, body)
+
+    def get_paginator(self, name: str) -> Any:
+        assert name == "list_objects_v2"
+        keyed = self.keyed
+
+        class Paginator:
+            def paginate(self, Bucket: str, Prefix: str) -> list[dict[str, Any]]:  # noqa: N803
+                return [{"Contents": [{"Key": k, "LastModified": v[0]} for k, v in keyed.items() if k.startswith(Prefix)]}]
+
+        return Paginator()
+
+    def get_object(self, Bucket: str, Key: str) -> dict[str, Any]:  # noqa: N803
+        import io
+
+        modified, data = self.keyed[Key]
+        return {"Body": io.BytesIO(data), "LastModified": modified}
+
+
+def test_the_observer_steps_each_line_by_request_id_finds_the_bypass_event_and_copies_no_credential(tmp_path, monkeypatch):
+    from scripts import observe_caller as observer
+
+    access = json.loads((RAW / "access_log.json").read_text(encoding="utf-8"))
+    leak = json.loads((RAW / "credential_leak.json").read_text(encoding="utf-8"))["raw"]
+    lines = "\n".join(json.dumps(line) for line in access["lines"] + [leak]) + "\n"
+    bypass = raw_events()["bypass"]
+    bypass["raw"] = {**bypass["raw"], "eventTime": "2026-10-20T10:03:00Z"}  # the probe's event, on the run's day
+    trail_key = "AWSLogs/581208540944/CloudTrail/us-west-2/2026/10/20/581208540944_CloudTrail_us-west-2_20261020T1005Z_x.json.gz"
+    import gzip
+
+    keyed = {
+        access["key"]: (access["last_modified"], lines.encode()),
+        trail_key: ("2026-10-20T10:06:05Z", gzip.compress(json.dumps({"Records": [bypass["raw"], {"eventName": "GetAgentRuntime"}]}).encode())),
+        "envelopes/agents/festival-desk/abc.json": ("2026-10-19T09:00:00Z", (FIXTURES / "s1-call-records" / "record_no_caller.json").read_bytes()),
+    }
+    import types
+
+    monkeypatch.setitem(sys.modules, "boto3", types.SimpleNamespace(client=lambda *a, **k: FakeS3(keyed)))
+    observed = {"callers": {"pull_request": 4}, "deploy": {"run_id": 1, "answer_key": "envelopes/agents/festival-desk/abc.json"},
+                "admitted": {"request_id": "a1a1a1a1-0000-4000-8000-000000000011"},
+                "none": {"request_id": "a1a1a1a1-0000-4000-8000-000000000012"},
+                "stranger": {"request_id": "a1a1a1a1-0000-4000-8000-000000000013"},
+                "bypass": {"request_id": bypass["raw"]["requestID"], "principal": bypass["raw"]["userIdentity"]["arn"]}}  # fmt: skip
+    run = tmp_path / "run.yaml"
+    run.write_text(run_file_text(observed), encoding="utf-8")
+    out = tmp_path / "caller.json"
+    assert observer.main(["--read", "bucket", "--run", str(run), "--out", str(out)]) == 0
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert written["made"] is True and written["records_errors"] == []
+    steps = [(r["source"], r["step"]) for r in written["records"]]
+    assert steps == [("access-log", None), ("access-log", "admitted"), ("access-log", "none"), ("access-log", "stranger"),
+                     ("access-log", None), ("data-event", "bypass")]  # fmt: skip
+    refused = written["records"][4]
+    assert refused["raw"] is None and "carries a credential" in refused["error"]
+    assert written["records"][5]["raw"]["requestID"] == bypass["raw"]["requestID"]
+    assert written["answer"]["what"] == "agent answer" and written["answer"]["key"].endswith("abc.json")
+    assert written["stated"]["bypass"]["subject"] == bypass["raw"]["userIdentity"]["arn"]
+    # build reads it: the credential-bearing line was not copied, so it is not a record, and the four hold
+    written["callers"] = CALLERS
+    reading = caller.record(written, MAX_SECONDS)
+    assert (reading["admitted"], reading["refused"]) == (1, 3)
+    assert reading["F10_1"]["held"] and reading["F10_3"]["held"] and reading["F10_4"]["held"]
+
+
+def test_the_observer_reads_the_callers_pull_request_and_the_manifest_at_its_merge(tmp_path, monkeypatch):
+    import base64
+    import urllib.error
+
+    from scripts import observe_caller as observer
+
+    manifest_bytes = (FIXTURES / "s2-manifest-no-callers" / "with_callers.yaml").read_bytes()
+    answers = {
+        "/repos/agentkeel-studio/festival-desk/pulls/4": {"merged": True, "merged_at": "t", "head": {"sha": "a" * 40}, "merge_commit_sha": "4" * 40},
+        f"/repos/agentkeel-studio/festival-desk/commits/{'a' * 40}/check-runs?per_page=100": {"check_runs": [
+            {"name": "platform-check", "app": {"id": 5144253}, "conclusion": "success", "output": {"summary": "Every check passed."}}]},
+        f"/repos/agentkeel-studio/festival-desk/contents/manifest.yaml?ref={'4' * 40}": {
+            "encoding": "base64", "content": base64.b64encode(manifest_bytes).decode()},
+    }  # fmt: skip
+
+    def fake_gh(path: str) -> Any:
+        if path not in answers:
+            raise urllib.error.HTTPError(path, 404, "not found", {}, None)  # type: ignore[arg-type]
+        return answers[path]
+
+    monkeypatch.setattr(observer, "gh", fake_gh)
+    run = tmp_path / "run.yaml"
+    run.write_text(run_file_text({"callers": {"pull_request": 4}}), encoding="utf-8")
+    out = tmp_path / "caller.json"
+    assert observer.main(["--read", "github", "--run", str(run), "--out", str(out)]) == 0
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert written["pull"]["merged"] is True and written["pull"]["check_runs"][0]["conclusion"] == "success"
+    assert written["callers"] == [{"subject": "lantern-desk", "issuer": "self"}] and written["manifest_error"] is None
+    # an unmerged pull request reads no manifest, and says so
+    answers["/repos/agentkeel-studio/festival-desk/pulls/4"]["merged"] = False
+    out.unlink()
+    assert observer.main(["--read", "github", "--run", str(run), "--out", str(out)]) == 0
+    again = json.loads(out.read_text(encoding="utf-8"))
+    assert again["callers"] is None and "not merged" in again["manifest_error"]
