@@ -130,7 +130,6 @@ def test_s1_a_call_record_names_its_caller_and_the_door_refused_the_rest():
 # --- S2: a manifest with no callers, read by validate.callers and the schema ------------------------
 
 
-@expected_failure
 def test_s2_a_manifest_that_does_not_say_who_may_call_is_refused():
     """festival-desk's manifest at 19864419 has no `callers`. `src.validate.callers.callers_errors(manifest)` must
     refuse it naming the field (F10.4). Today nothing reads such a field (SPEC/10 §3.3)."""

@@ -311,6 +311,11 @@ def deploy_layout(tmp_path: Path) -> tuple[Path, Path]:
     shutil.copy2(BASELINE, root / "rules" / "baseline.yaml")
     bundle = root / "agents" / "festival-desk"
     shutil.copytree(FIXTURE, bundle)
+    # M10 PR 2 (SPEC/10 §2; seed S2's reader): the platform check now refuses a manifest with no `callers` key.
+    # The fixture is festival-desk as its repository held it before that key existed and is never edited
+    # (tests/fixtures/README.md); the copy the deploy's case is read over says who may call it: nobody.
+    with (bundle / "manifest.yaml").open("a", encoding="utf-8", newline="\n") as manifest:
+        manifest.write("callers: []\n")
     return root, bundle
 
 
