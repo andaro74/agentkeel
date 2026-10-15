@@ -17,7 +17,10 @@ Two readers the seed test names (`tests/test_m10_seeds.py`, S1):
 - `from_raw(record)`: the raw record AWS delivered to the *read* shape
   SPEC/10 §2 fixes: `subject`, `issuer`, `agent`, `outcome`, `reason`,
   `request_id`, `time` (AWS's time of the call) and `delivered` (the
-  object's `LastModified`). Two raw shapes (R2, door 2 hybrid): the API's
+  object's `LastModified`). `outcome` is the door's: admitted means the
+  authoriser let the caller in, whether or not the agent then answered (a
+  proxy failure is the integration's status, kept in the raw line). Two raw
+  shapes (R2, door 2 hybrid): the API's
   access-log line, for a call that reached the door's front, and
   CloudTrail's `InvokeAgentRuntime` data event, for a call made straight at
   the runtime. **A raw record carries no credential** (R5): one that does is
@@ -50,11 +53,22 @@ PLATFORM = "platform"  # the construct's own goldens caller; never in `callers` 
 NOT_THE_DOOR = "not the door"
 ABSENT = (None, "", "-")  # API Gateway writes "-" for a $context value it has none of
 DATA_EVENT_SOURCE = "bedrock-agentcore.amazonaws.com"
-# A header, a field or a value a log line could carry and an envelope never may (SPEC/10 §2, R5).
-CREDENTIAL_KEYS = ("authorization", "token", "workloadaccesstoken", "access_token", "id_token", "refresh_token",
-                   "secret", "client_secret", "password", "x-amz-security-token", "cookie")
+# A header, a field or a value a log line could carry and an envelope never may (SPEC/10 §2, R5). A key is a
+# credential's when it contains one of these words (data-owner F2 on PR 2: `accessKeyId`, `sessionToken`,
+# `x-api-key` and `userToken` are credentials under names the exact list missed), but for the few benign keys
+# that contain one (a JWT's `token_use`, CloudTrail's `sessionCredentialFromConsole`).
+CREDENTIAL_WORDS = ("authorization", "token", "secret", "password", "cookie", "credential", "apikey", "api-key",
+                    "api_key", "signature", "x-amz-security")  # an access key *id* is an identifier: dropped, not refused
+BENIGN_KEYS = ("token_use", "token_endpoint", "tokenvalidityunits", "sessioncredentialfromconsole", "signatureversion")
 JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*")
+CREDENTIAL_VALUE = re.compile(r"^(Bearer |Basic |AWS4-HMAC-SHA256 )", re.IGNORECASE)
 HIDDEN = "HIDDEN_DUE_TO_SECURITY_REASONS"  # CloudTrail's own redaction, which is not a credential
+# What a raw record carries that an envelope under evals/history/ (public evidence) must not: the caller's
+# address and user agent, a key id, a principal id, a session's context and the TLS details (data-owner F1 on
+# PR 2; Security and Data Owner). Dropped by the observer before it copies and by build before it records, each
+# drop named in the wrapper, so "what AWS delivered less the named keys" stays checkable. The reading needs
+# none of them: who called is the ARN or the token's claims, when is eventTime, what is the error code.
+DROPPED_KEYS = ("ip", "sourceIPAddress", "userAgent", "tlsDetails", "accessKeyId", "principalId", "sessionContext")
 
 
 class Unreadable(Exception):
@@ -100,14 +114,40 @@ def refuse_credential(raw: Any, at: str = "raw") -> None:
     if isinstance(raw, dict):
         for key, value in raw.items():
             path = f"{at}.{key}"
-            if str(key).lower() in CREDENTIAL_KEYS and not _absent(value) and value != HIDDEN:
+            if is_credential_key(key) and not _absent(value) and value != HIDDEN:
                 raise Credential(f"{path}: a raw record carries a credential ({key}); refused, never copied (SPEC/10 §2, R5)")
             refuse_credential(value, path)
     elif isinstance(raw, list):
         for index, value in enumerate(raw):
             refuse_credential(value, f"{at}[{index}]")
-    elif isinstance(raw, str) and raw != HIDDEN and JWT.search(raw):
+    elif isinstance(raw, str) and raw != HIDDEN and (JWT.search(raw) or CREDENTIAL_VALUE.match(raw)):
         raise Credential(f"{at}: a raw record carries a token; refused, never copied (SPEC/10 §2, R5)")
+
+
+def is_credential_key(key: Any) -> bool:
+    lowered = str(key).lower()
+    return lowered not in BENIGN_KEYS and any(word in lowered for word in CREDENTIAL_WORDS)
+
+
+def redact(raw: Any) -> tuple[Any, list[str]]:
+    """The raw record less DROPPED_KEYS, anywhere in it, and the paths dropped (sorted). What is kept is AWS's."""
+    dropped: list[str] = []
+
+    def walk(node: Any, at: str) -> Any:
+        if isinstance(node, dict):
+            out = {}
+            for key, value in node.items():
+                path = f"{at}.{key}" if at else str(key)
+                if key in DROPPED_KEYS:
+                    dropped.append(path)
+                    continue
+                out[key] = walk(value, path)
+            return out
+        if isinstance(node, list):
+            return [walk(value, f"{at}[{index}]") for index, value in enumerate(node)]
+        return node
+
+    return walk(raw, ""), sorted(dropped)
 
 
 # --- from_raw: the raw record to the read shape -----------------------------------
@@ -156,7 +196,16 @@ def _read_access_log(raw: dict[str, Any], delivered: str | None) -> dict[str, An
         outcome = "admitted" if status.startswith("2") else "refused"
     reason = raw.get("reason")
     if _absent(reason):
-        reason = ("no identity" if outcome == "refused" and subject is None else None)
+        # No token: the API's own 401 before any authoriser ran, its error set and the authoriser's absent. A line
+        # with no authoriser context for any other cause (the authoriser failed, a 5xx) is the door failing, not a
+        # caller refused for no identity (data-owner F3 on PR 2); `calls` holds no step on it.
+        if outcome == "refused" and subject is None and status == "401" and _absent(raw.get("auth_error")) \
+                and not _absent(raw.get("error")):  # fmt: skip
+            reason = "no identity"
+        elif outcome == "refused":
+            reason = "the door failed"
+        else:
+            reason = None
     return {"subject": subject, "issuer": issuer, "agent": None if _absent(raw.get("agent")) else raw.get("agent"),
             "outcome": outcome, "reason": reason, "request_id": None if _absent(raw.get("request_id")) else raw.get("request_id"),
             "time": iso_of_epoch_ms(raw.get("time_epoch_ms")), "delivered": delivered}  # fmt: skip
@@ -167,6 +216,9 @@ def from_raw(record: dict[str, Any], delivered: str | None = None) -> dict[str, 
     to the read shape SPEC/10 §2 fixes. Refuses a record that carries a credential (R5)."""
     if not isinstance(record, dict):
         raise Unreadable("not a raw record: not a mapping")
+    if "raw" in record and record["raw"] is None:
+        # The observer's wrapper for a record it refused to copy (a credential): nothing to read (cold review F1).
+        raise Unreadable(record.get("error") or "the observer copied no raw record")
     raw = record.get("raw") if isinstance(record.get("raw"), dict) else record
     delivered = record.get("last_modified") or delivered if raw is not record else delivered
     refuse_credential(raw)
@@ -334,8 +386,17 @@ def record(observation: dict[str, Any], max_seconds: float) -> dict[str, Any]:
             if wrapper.get("step") in STEPS:
                 unreadable.append(f"{wrapper.get('key')} ({wrapper.get('step')}): {wrapper.get('error') or exc}")
             continue
+        if read.get("agent") not in (None, observation.get("agent")) and observation.get("agent"):
+            # A line under calls/agents/<name>/ that names another agent is not this agent's record: a forged or
+            # misdelivered line (security-reviewer F1 on PR 2); named, not read.
+            if wrapper.get("step") in STEPS:
+                unreadable.append(f"{wrapper.get('key')} ({wrapper.get('step')}): the record names agent {read.get('agent')!r}, "
+                                  f"not {observation.get('agent')!r}")  # fmt: skip
+            continue
+        kept, dropped = redact(wrapper.get("raw"))  # the observer dropped them already; build drops them again (R5)
         records.append({"step": wrapper.get("step"), "source": wrapper.get("source"), "key": wrapper.get("key"),
-                        "last_modified": wrapper.get("last_modified"), "read": read, "raw": wrapper.get("raw")})  # fmt: skip
+                        "last_modified": wrapper.get("last_modified"), "read": read, "raw": kept,
+                        "dropped": sorted(set(dropped) | set(wrapper.get("dropped") or []))})  # fmt: skip
     out["records"] = records
     callers = observation.get("callers") if isinstance(observation.get("callers"), list) else None
     stepped = [{**r["read"], "step": r["step"]} for r in records if r["step"] in STEPS]

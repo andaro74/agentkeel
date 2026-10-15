@@ -275,8 +275,8 @@ def caller_relaxations(before: dict[str, Any], after: dict[str, Any]) -> list[st
     found = [f"callers: subject {subject!r} admitted (ADR-0016 entry 7)"
              for subject in sorted(s for s in subjects(after) - subjects(before) if isinstance(s, str))]  # fmt: skip
     if isinstance(before.get("callers"), list) and not isinstance(after.get("callers"), list):
-        what = "removed" if "callers" not in after or after.get("callers") is None else "no longer a list"
-        found.append(f"callers {what} from a value (ADR-0016 entry 7)")
+        # Removed, nulled, or no longer a list: one reading and one string (ADR-0016 decision 1; tool-owner F3 on PR 2).
+        found.append("callers removed from a value (ADR-0016 entry 7)")
     return found
 
 

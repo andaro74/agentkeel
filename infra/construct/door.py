@@ -22,9 +22,14 @@ across invocations, and `pow` over the modulus; no library the runtime lacks),
 then `exp`, `iss`, `token_use` and `client_id`. A token the pool did not issue
 is refused `not admitted` with the subject and issuer it *claimed*, unverified,
 so the stranger's record names the stranger (SPEC/10 §4 F10.3). A header that
-is not a token is `no identity`. A missing header never reaches this code:
-API Gateway refuses it first and logs the 401 (door_probe.md, "What the probe
-does not say").
+is not a token, or a token whose header or payload is not an object, is `no
+identity`. What it writes into its context is clipped: a claimed subject to
+the subject pattern (or a client id's shape), an issuer to a URL's charset
+with a length cap, so no quote, newline or second key a stranger puts in a
+token can reach the access-log line (security-reviewer F1 on PR 2). A
+missing header is expected never to reach this code: API Gateway refuses it
+first and logs the 401, which is read at festival-desk's deploy
+(door_probe.md, "What the probe does not say").
 
 **The proxy** exchanges to the door's own token (the door client's secret read
 from Cognito with `DescribeUserPoolClient`, never stored anywhere else;
@@ -41,17 +46,21 @@ from __future__ import annotations
 # `$context` is API Gateway's. A value it has none of is written as "-"; from_raw reads "-" as absent.
 ACCESS_LOG_FORMAT = (
     '{"source":"access-log","agent":"%s","request_id":"$context.requestId","time_epoch_ms":"$context.requestTimeEpoch",'
-    '"status":"$context.status","method":"$context.httpMethod","path":"$context.path","ip":"$context.identity.sourceIp",'
+    '"status":"$context.status","method":"$context.httpMethod","path":"$context.routeKey","ip":"$context.identity.sourceIp",'
     '"error":"$context.error.message","auth_error":"$context.authorizer.error","subject":"$context.authorizer.subject",'
     '"issuer":"$context.authorizer.issuer","outcome":"$context.authorizer.outcome","reason":"$context.authorizer.reason",'
     '"integration_status":"$context.integration.status"}'
 )
 
-AUTHORISER_SOURCE = r'''import base64, hashlib, json, os, time, urllib.request
+AUTHORISER_SOURCE = r'''import base64, hashlib, json, os, re, time, urllib.request
 E = os.environ
 ISS = "https://cognito-idp.%s.amazonaws.com/%s" % (E["REGION"], E["POOL_ID"])
 CALLERS = set(E["CALLERS"].split(","))
+NAME = re.compile(r"^[a-z][a-z0-9-]{2,30}$|^[a-z0-9]{10,40}$")
+URL = re.compile(r"^https://[a-z0-9.\-]{3,80}/[A-Za-z0-9_\-]{1,60}$")
 _jwks = {}
+def clip(value, pattern):
+    return value if isinstance(value, str) and pattern.match(value) else "-"
 def b64(s):
     return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
 def jwks():
@@ -74,15 +83,17 @@ def handler(event, context):
     try:
         h, p, s = token.split(".")
         header, claims = json.loads(b64(h)), json.loads(b64(p))
+        assert isinstance(header, dict) and isinstance(claims, dict)
     except Exception:
         return answer(False, None, None, "no identity")
-    claimed = claims.get("username") or claims.get("client_id") or claims.get("sub")
-    iss = claims.get("iss")
+    claimed = clip(claims.get("username") or claims.get("client_id") or claims.get("sub"), NAME)
+    iss = clip(claims.get("iss"), URL)
     try:
-        ok = header.get("alg") == "RS256" and iss == ISS and verified(h, p, s, jwks()[header.get("kid")])
+        ok = header.get("alg") == "RS256" and claims.get("iss") == ISS and verified(h, p, s, jwks()[header.get("kid")])
+        ok = ok and claims.get("token_use") == "access" and float(claims.get("exp", 0)) >= time.time()
     except Exception:
         ok = False
-    if not ok or claims.get("token_use") != "access" or claims.get("exp", 0) < time.time():
+    if not ok:
         return answer(False, claimed, iss, "not admitted")
     if claims.get("client_id") == E["DOOR_CLIENT_ID"] and "username" not in claims:
         return answer(True, "platform", iss, None)

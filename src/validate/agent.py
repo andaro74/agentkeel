@@ -214,7 +214,7 @@ def evaluate(agent: Path, repository: str, root: Path = ROOT, *, lookup=None,
             agent_rules.rules_errors(tree / "agents" / name, root=root) if own_rules else [])
         # M10 PR 2 (SPEC/10 §2, §6; seed S2; F10.4): the manifest says who may call the agent, even if nobody.
         # Read for every agent: a manifest with no `callers` key is refused here, for this named reader.
-        errors["an agent's manifest says who may call it, even if nobody (callers)"] = callers.callers_errors(doc)
+        errors["an agent's manifest says who may call it, even if nobody: callers"] = callers.callers_errors(doc)
     finally:
         seats.login_holds_seat.cache_clear()
         if previous is None:

@@ -634,7 +634,9 @@ jobs:
       # an agent with callers, from its outputs. Empty for an agent without, whose stack has no such outputs. The door
       # client's secret stays in Cognito: this role reads it (DescribeUserPoolClient, on a tagged agent's pool), mints
       # the client-credentials token at the pool's token endpoint, and hands the token to the goldens run as an
-      # environment variable, masked. The token's life is one hour; nothing here writes it anywhere.
+      # environment variable. Both are masked; the token is written to this step's output on the runner, which the
+      # next step reads, and nowhere else; its life is one hour. The secret goes to curl through a netrc file in the
+      # runner's temp, never on a command line.
       - name: The door the stack built
         if: steps.registry.outputs.skip == 'false'
         id: door
@@ -652,9 +654,12 @@ jobs:
           secret=$(aws cognito-idp describe-user-pool-client --user-pool-id "$pool" --client-id "$client" \
             --query UserPoolClient.ClientSecret --output text)
           echo "::add-mask::$secret"
-          token=$(curl -sSf -X POST "$endpoint" -u "$client:$secret" \
+          host=$(printf '%s' "$endpoint" | sed -E 's#https://([^/]+)/.*#\1#')
+          printf 'machine %s login %s password %s\n' "$host" "$client" "$secret" > "$RUNNER_TEMP/door.netrc"
+          token=$(curl -sSf -X POST "$endpoint" --netrc-file "$RUNNER_TEMP/door.netrc" \
             -H 'Content-Type: application/x-www-form-urlencoded' \
             -d "grant_type=client_credentials&scope=$scope" | python3 -c 'import json, sys; print(json.load(sys.stdin)["access_token"])')
+          rm -f "$RUNNER_TEMP/door.netrc"
           echo "::add-mask::$token"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "token=$token" >> "$GITHUB_OUTPUT"

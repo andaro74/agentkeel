@@ -77,14 +77,17 @@ ATTEMPTS = ("a1", "a2", "a3", "a4", "a5", "a6")
 VPC_ENDPOINTS = {"bedrock-runtime", "dynamodb", "ecr.api", "ecr.dkr", "kms", "logs", "s3"}
 
 
-def test_s1_the_platform_check_admits_the_hostile_copy():
+def test_s1_the_platform_check_admits_the_hostile_copy(tmp_path):
     """The drill's premise (SPEC/08 §1): the platform check reads an agent's manifest, goldens, seats and
     the EXISTENCE of its code, never the code. So the hostile copy, with six attempts in `agent.py`,
     passes `evaluate()`. If this ever fails, the hostile copy would be refused before it deployed and the
-    drill could not be run — so it is a guard, not a planted failure, and carries no xfail marker."""
+    drill could not be run — so it is a guard, not a planted failure, and carries no xfail marker. From M10
+    PR 2 the check also reads `callers`; the copy read here says nobody (tests/test_m10_seeds.py)."""
     from src.validate import agent as platform_check
 
-    errors = platform_check.evaluate(HOSTILE, "agentkeel-studio/drill-agent", lookup=stand_in_lookup)
+    from tests.test_m10_seeds import with_nobody_admitted
+
+    errors = platform_check.evaluate(with_nobody_admitted(HOSTILE, tmp_path), "agentkeel-studio/drill-agent", lookup=stand_in_lookup)
     refused = {name: errs for name, errs in errors.items() if errs}
     assert not refused, f"the platform check refused the hostile copy: {refused}"
 

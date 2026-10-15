@@ -861,6 +861,9 @@ class BootstrapStack(cdk.Stack):
                      "cognito-idp:CreateUserPoolDomain", "cognito-idp:DescribeUserPoolDomain",
                      "cognito-idp:UpdateUserPoolDomain", "cognito-idp:DeleteUserPoolDomain"],
             resources=[f"arn:aws:cognito-idp:{REGION}:{self.account}:userpool/*"],
+            # A tagged agent's pool only (security-reviewer F3 on PR 2): the pool carries the agent tag from its
+            # create, and every later call on it, its users, clients, server and domain is on the pool's ARN.
+            conditions={"Null": {f"aws:ResourceTag/{AGENT_TAG}": "false"}},
         ))  # fmt: skip
         door_grants.append(iam.PolicyStatement(
             sid="MakeADoorFunctionOnly",
@@ -1678,9 +1681,10 @@ SUPPRESSIONS = {
         "SPEC/10 §6, R2 (M10 PR 2): what GovernedAgent renders for an agent with callers, one statement per "
         "resource type, on the platform's own names where the service takes a resource (function:agentkeel-*-door-*, "
         "/agentkeel/doors/*, /aws/lambda/agentkeel-*-door-*, the agent role path for PassRole to Lambda), on "
-        "userpool/* where the pool's id is the service's, on /apis and /apis/* for the HTTP API, and on * for "
-        "CreateUserPool, which takes no resource and is held to the agent tag in the request. The deploy boundary "
-        f"(seed S4) caps it. {CEILING}"
+        "userpool/* where the pool's id is the service's, held to the agent tag on the pool; on /apis and /apis/* "
+        "for the HTTP API, with no tag condition, since an API's routes, integrations, authorisers and stages are "
+        "made under /apis/<id>/ and carry no tag of their own; and on * for CreateUserPool, which takes no resource "
+        f"and is held to the agent tag in the request. The deploy boundary (seed S4) caps it. {CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "

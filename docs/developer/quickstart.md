@@ -233,6 +233,7 @@ have shipped.
 | `the agent's own guardrail` | You have a `rules/` folder and `guardrail` is null, is the reference agent's, or is not the one the registry holds for your agent. Pin a placeholder of your own on the first pull request, then the registry's id and version. |
 | `an agent's rules on the platform baseline, add-only` | Your `rules/guardrail.yaml` removes, weakens or redefines a platform rule, carries a key the format does not have, plants a golden with no named rule or names a rule it does not build; the message names the rule and the way. |
 | `an agent's goldens` names a guardrail golden | A `kind: guardrail` golden that `rules/guardrail.yaml` does not name in `plants` with a `blocks` entry. Name it, or make it ordinary or trap. |
+| `an agent's manifest says who may call it, even if nobody: callers` | `manifest.yaml` has no `callers` field, or an entry in it is not `{subject, issuer: self}` with a subject that is a name and not `platform`, or two entries share a subject. Add `callers: []` if nobody outside may call; see section 5b. |
 | `the files the platform's image copies` | A file the image needs is missing: `__init__.py`, `agent.py`, `server.py`, `prompt.txt`, `manifest.yaml` or `tools/`. |
 | `the repository's ruleset is the export` | The repository's settings were changed. Only the owner can fix this. |
 | The deploy run fails at the registry | Another repository already deployed under your agent's name. Rename it. |

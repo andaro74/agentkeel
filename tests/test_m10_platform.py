@@ -419,3 +419,51 @@ def test_the_proxy_exchanges_to_the_door_token_and_invokes_the_runtimes_bearer_e
     module["handler"]({"body": "{}", "headers": {}}, None)
     assert [c[0] for c in calls].count("describe") == 1 and sum(1 for c in calls if c[0] == "http" and c[1] == ENV["TOKEN_ENDPOINT"]) == 1
     assert isinstance(types, object)
+
+
+# --- the seat reads on PR 2: what they found, held here -------------------------------------------------------
+
+
+def test_the_doored_stacks_nag_report_has_no_non_compliant_row(tmp_path):
+    """security-reviewer F4 on PR 2: the committed construct report is refagent's, whose stack has no door, so the
+    door's cdk-nag rows are read here, from the fixture's own synth, as check_cdk_nag reads the committed apps."""
+    import csv
+    import os
+    import subprocess
+    import sys
+
+    out = tmp_path / "door"
+    done = subprocess.run([sys.executable, str(ROOT / "infra" / "construct" / "app.py")], cwd=ROOT, capture_output=True,
+                          text=True, check=False, env={**os.environ, "PYTHONPATH": str(ROOT), "CDK_OUTDIR": str(out),
+                                                       "AGENTKEEL_BUNDLE": FIXTURE.relative_to(ROOT).as_posix()})  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    with (out / "AwsSolutions--AgentkeelAgent-NagReport.csv").open(encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows, "no cdk-nag report was written"
+    non_compliant = [(r["Rule ID"], r["Resource ID"]) for r in rows if r["Compliance"] == "Non-Compliant"]
+    assert non_compliant == [], non_compliant
+    suppressed = {(r["Rule ID"], r["Resource ID"]) for r in rows if r["Compliance"] == "Suppressed"}
+    assert ("AwsSolutions-COG2", "AgentkeelAgent/Agent/Pool") in suppressed
+    assert ("AwsSolutions-COG8", "AgentkeelAgent/Agent/Pool") in suppressed
+
+
+def test_the_authoriser_clips_what_it_writes_and_survives_a_malformed_payload(monkeypatch):
+    """security-reviewer F1 and F2 on PR 2: a claimed subject or issuer that is not a name or a URL reaches the
+    access-log line as `-`, never with a quote or a newline; a payload that is not an object, or an exp that is
+    not a number, is refused, not crashed on."""
+    quoted = authorise(monkeypatch, sign(claims(username='box"office\n,"agent":"other', iss="https://evil/\"x")))
+    assert quoted["isAuthorized"] is False and quoted["context"] == {"subject": "-", "issuer": "-", "outcome": "refused", "reason": "not admitted"}
+    long_name = authorise(monkeypatch, sign(claims(username="Box Office " * 4)))  # not a name, not a client id
+    assert long_name["context"]["subject"] == "-"
+    # the context never carries anything but the four keys, each a clipped string
+    for out in (quoted, long_name):
+        assert set(out["context"]) == {"subject", "issuer", "outcome", "reason"}
+        assert all(isinstance(v, str) and '"' not in v and "\n" not in v for v in out["context"].values())
+    header = b64url(json.dumps({"alg": "RS256", "kid": "k1"}).encode())
+    not_an_object = f"{header}.{b64url(b'[]')}.{b64url(b'sig')}"
+    assert authorise(monkeypatch, not_an_object)["context"]["reason"] == "no identity"
+    string_exp = authorise(monkeypatch, sign(claims(exp="never")))
+    assert string_exp["isAuthorized"] is False and string_exp["context"]["reason"] == "not admitted"
+    assert authorise(monkeypatch, sign(claims(exp=None)))["isAuthorized"] is False
+    # the route key, not the request path, is what the format writes
+    assert "$context.routeKey" in door.ACCESS_LOG_FORMAT and "$context.path" not in door.ACCESS_LOG_FORMAT

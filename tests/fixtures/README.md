@@ -421,9 +421,9 @@ The no-token call left no event, so there is nothing of it to copy.
 | the platform account | `000000000000` |
 | the laptop's address | `198.51.100.7` |
 | the bypass role's access key id and role id | `ASIAEXAMPLEEXAMPLE00`, `AROAEXAMPLEEXAMPLE000` |
-| the probe's pool and the stranger's pool | `us-west-2_pr0bep00l`, `us-west-2_0therp00l` |
-| the callers client, the machine client, the wrong client | `ca11ersc1ient…`, `d00rc1ient…`, `wr0ngc1ient…` |
-| the two users' `sub` claims | `00000000-0000-4000-8000-00000000a0a1`, `…b0b1` |
+| the probe's pool (the stranger's pool and the wrong client appear in no event: a refused call's event carries no claims) | `us-west-2_pr0bep00l` |
+| the machine client's id (the callers client's appears in no event: the admitted event's claims carry `sub`, not `client_id`) | `d00rc1ient…` |
+| the admitted user's `sub` claim | `00000000-0000-4000-8000-00000000a0a1` |
 | the signing key id (`kid`) | `pr0bek1d…=` |
 | the runtime's id suffix | `probe_door_agent-f1xture000` |
 | the five request ids, by call: admitted, stranger, wrong-client, bypass, platform | `b2b2b2b2-0000-4000-8000-00000000000{1,3,4,5,6}` |
@@ -431,3 +431,13 @@ The no-token call left no event, so there is nothing of it to copy.
 | the four `sharedEventID`s | `c1c1c1c1-…-000000000101` to `…104` |
 | the two `jti` claims (admitted, platform) | `a4a4a4a4-…-000000000001`, `…006` |
 | the two session ids (admitted, platform) | `probe-door-admitted-0…01`, `probe-door-platform-0…06` |
+
+Kept as the probe wrote them, each a throwaway name or AWS's own string and
+none real: the role name `probe-door-bypass`, the runtime name
+`probe_door_agent`, the trail object's name (`…_20261014T1425Z_bndt3mMSZpEcbfrN`),
+the two user agents (`Python-urllib/3.14`; Boto3's, with the laptop's OS
+and Python versions) and the TLS details. The observer and `build` drop the
+user agent, the address, the key id, the principal id, the session context
+and the TLS details before a record reaches an envelope (`DROPPED_KEYS`,
+`src/verdict/caller.py`; data-owner F1 on M10 PR 2); the fixture keeps them
+as the probe's bytes, for `from_raw`'s read.

@@ -137,7 +137,10 @@ threaten the cap, and §11 R2's probe answers it before PR 2 opens.
   this PR; the Tool Owner's ruling at R4): `required: [subject, issuer]`,
   `additionalProperties: false`, `uniqueItems: true`, and no two entries
   with one `subject`; `subject` matches `^[a-z][a-z0-9-]{2,30}$` and is
-  never `platform`, which `callers_errors` refuses by name; `issuer` is the
+  never `platform`, which the schema's pattern excludes
+  (`^(?!platform$)[a-z][a-z0-9-]{2,30}$`, so a manifest read by the schema
+  alone cannot admit the platform's own name) and `callers_errors` refuses
+  by name (the Tool Owner's reading on PR 2, finding 1); `issuer` is the
   symbol `self` at M10, an enum of one meaning the agent's own pool, since
   the pool is made by the construct from this very list and its URL cannot
   be in the manifest before it exists; a second issuer is a later
@@ -188,7 +191,13 @@ threaten the cap, and §11 R2's probe answers it before PR 2 opens.
   guardrail: the delivery cannot see the agent role's model call
   (finding 2).
 - **Admitted.** A call whose read record has `outcome: admitted` and
-  whose `subject` is in the agent's `callers` (or is `platform`).
+  whose `subject` is in the agent's `callers` (or is `platform`). The
+  outcome is the door's: admitted means the authoriser let the caller in,
+  whether or not the agent then answered; a proxy or runtime failure after
+  admission is the line's integration status, kept in the raw record, and
+  no falsifier of claim 10 (data-owner note on PR 2). A line with no
+  authoriser context that is not the API's own 401 reads `the door failed`,
+  a fourth reason, which no stated call holds.
 - **Refused.** A call whose read record has `outcome: refused` with its
   reason, and `delivered` minus `time` at most N (the same two
   timestamps M05's `alarm_latency_s` read: AWS's event time against the
@@ -467,6 +476,11 @@ plant:
 - **refagent is not behind a door at M10** (§8). Its envelope's 7 of 7 is
   the guard that the construct change relaxed nothing for an agent with
   `callers: []`.
+- **The bypass arm's record rests on CloudTrail's delivery.** The probe's
+  events arrived in 298 s, half of N; AWS documents up to fifteen minutes.
+  A bypass refusal delivered after 600 s reads not held (F10.4's record
+  arm) and row 10 closes RED on it. A risk of the design, named here, not
+  a reason to move N (data-owner note on PR 2; Threshold Owner).
 
 RED if a call that did not pass the door is answered; if the answer
 record through the door lacks the pin, `g-030` reads other than 1 of 1

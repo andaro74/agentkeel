@@ -24,7 +24,7 @@ from src.validate.callers import FIELD, callers_errors
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).parent / "fixtures" / "m10"
 M09_AGENT = ROOT / "tests" / "fixtures" / "m09" / "s1-festival-desk"
-CALLERS_CHECK = "an agent's manifest says who may call it, even if nobody (callers)"
+CALLERS_CHECK = "an agent's manifest says who may call it, even if nobody: callers"
 
 
 def manifest(**override: Any) -> dict[str, Any]:
@@ -122,7 +122,7 @@ def test_entry_7_reads_subjects_not_bytes():
     assert caller_relaxations({"callers": one}, {"callers": two}) == ["callers: subject 'box-office' admitted (ADR-0016 entry 7)"]
     assert caller_relaxations({"callers": one}, {}) == ["callers removed from a value (ADR-0016 entry 7)"]
     assert caller_relaxations({"callers": one}, {"callers": None}) == ["callers removed from a value (ADR-0016 entry 7)"]
-    assert caller_relaxations({"callers": []}, {"callers": "lantern-desk"}) == ["callers no longer a list from a value (ADR-0016 entry 7)"]
+    assert caller_relaxations({"callers": []}, {"callers": "lantern-desk"}) == ["callers removed from a value (ADR-0016 entry 7)"]
     assert caller_relaxations({}, {}) == []
 
 
@@ -252,11 +252,20 @@ def test_a_record_the_observer_stepped_is_read_for_that_step_and_the_platforms_o
 # --- the whole reading, and row 10's reading of it (P5) ----------------------------------------------------
 
 
+FESTIVAL_DESK_RUNTIME = "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/agentkeel_festival_desk-f1xture000"
+
+
+def on_festival_desks_runtime(event: dict[str, Any]) -> dict[str, Any]:
+    """The probe's data event as the run would leave it: on festival-desk's runtime, not the probe's throwaway."""
+    resources = [{"accountId": "000000000000", "type": "AWS::BedrockAgentCore::Runtime", "ARN": FESTIVAL_DESK_RUNTIME}]
+    return {**event, "raw": {**event["raw"], "resources": resources}}
+
+
 def observation(**override: Any) -> dict[str, Any]:
     """What scripts/observe_caller.py writes after the run: the four records stepped by request id, the answer
     record of the door's deploy, the manifest's callers and the stated callers derived from the run file."""
     lines = access_lines()
-    bypass = raw_events()["bypass"]
+    bypass = on_festival_desks_runtime(raw_events()["bypass"])
     records = [
         {**lines["lantern-desk"], "step": "admitted"},
         {**lines["none"], "step": "none"},
@@ -379,7 +388,7 @@ def test_the_observer_steps_each_line_by_request_id_finds_the_bypass_event_and_c
     access = json.loads((RAW / "access_log.json").read_text(encoding="utf-8"))
     leak = json.loads((RAW / "credential_leak.json").read_text(encoding="utf-8"))["raw"]
     lines = "\n".join(json.dumps(line) for line in access["lines"] + [leak]) + "\n"
-    bypass = raw_events()["bypass"]
+    bypass = on_festival_desks_runtime(raw_events()["bypass"])
     bypass["raw"] = {**bypass["raw"], "eventTime": "2026-10-20T10:03:00Z"}  # the probe's event, on the run's day
     trail_key = "AWSLogs/581208540944/CloudTrail/us-west-2/2026/10/20/581208540944_CloudTrail_us-west-2_20261020T1005Z_x.json.gz"
     import gzip
@@ -506,3 +515,81 @@ def test_the_gates_attribute_callers_to_the_tool_owner():
     from src.gates import MANIFEST_FIELD_SEATS
 
     assert MANIFEST_FIELD_SEATS["callers"] == "Tool Owner"
+
+
+# --- the seat reads on PR 2: what they found, held here -------------------------------------------------------
+
+
+def test_a_record_the_observer_refused_to_copy_is_unreadable_and_names_no_caller():
+    """cold review F1 on PR 2: the observer's wrapper for a credential-bearing line (`raw: null`, its error) is not
+    read as an access-log line; stepped, it is F10.3's (the call's record names no caller) and no record."""
+    import pytest
+
+    stripped = {"source": "access-log", "key": "calls/agents/festival-desk/x", "last_modified": "2026-10-20T10:04:20Z",
+                "step": "admitted", "raw": None, "dropped": [], "error": "raw.authorization: a raw record carries a credential"}  # fmt: skip
+    with pytest.raises(caller.Unreadable, match="carries a credential"):
+        caller.from_raw(stripped)
+    reading = caller.record(observation(records=[stripped]), MAX_SECONDS)
+    assert reading["records"] == [] and reading["F10_3"]["held"] is False
+    assert any("(admitted): raw.authorization" in r for r in reading["F10_3"]["reasons"])
+    assert reading["admitted"] == 0
+
+
+def test_the_dropped_keys_never_reach_the_envelope_and_are_named():
+    """data-owner F1 on PR 2: the caller's address, user agent, key id, principal id, session context and the TLS
+    details are dropped by the observer before it copies and by build before it records, each drop named."""
+    bypass = raw_events()["bypass"]
+    kept, dropped = caller.redact(bypass["raw"])
+    assert dropped == ["sourceIPAddress", "tlsDetails", "userAgent", "userIdentity.accessKeyId", "userIdentity.principalId",
+                       "userIdentity.sessionContext"]  # fmt: skip
+    assert "sourceIPAddress" not in kept and "accessKeyId" not in kept["userIdentity"] and kept["userIdentity"]["arn"]
+    line, dropped_line = caller.redact(access_lines()["lantern-desk"]["raw"])
+    assert dropped_line == ["ip"] and "ip" not in line
+    reading = caller.record(observation(), MAX_SECONDS)
+    for record in reading["records"]:
+        assert "ip" not in record["raw"] and "sourceIPAddress" not in record["raw"] and "userAgent" not in record["raw"]
+        assert record["dropped"]
+    # the observer drops them before it copies, and names them in the wrapper
+    from scripts import observe_caller as observer
+
+    wrapped = observer.wrap("data-event", "k", "2026-10-20T10:06:05Z", bypass["raw"], "bypass")
+    assert wrapped["dropped"] == dropped and "userAgent" not in wrapped["raw"]
+
+
+def test_the_credential_match_reads_the_key_by_its_words_and_the_value_by_its_shape():
+    """data-owner F2 on PR 2: `sessionToken`, `x-api-key` and `userToken` are credentials under names an exact list
+    missed; a JWT's `token_use` and CloudTrail's redaction are not; a SigV4 or Basic value is one under any key."""
+    import pytest
+
+    line = access_lines()["lantern-desk"]["raw"]
+    for key, value in (("sessionToken", "FQoGZXIvYXdzE"), ("x-api-key", "abc123"), ("userToken", "eyJx"),
+                       ("note", "AWS4-HMAC-SHA256 Credential=ASIA/20261020/us-west-2/execute-api/aws4_request"),
+                       ("note", "Basic ZDAwcjpzM2NyZXQ=")):  # fmt: skip
+        with pytest.raises(caller.Credential):
+            caller.from_raw({**line, key: value})
+    assert caller.from_raw({**line, "token_use": "access", "signatureVersion": "4", "userToken": caller.HIDDEN,
+                            "token": caller.HIDDEN})["subject"] == "lantern-desk"  # fmt: skip
+
+
+def test_a_line_with_no_authoriser_context_that_is_not_the_apis_401_reads_as_the_door_failing():
+    """data-owner F3 on PR 2: the no-token reading is the API's own 401 with its error and no authoriser error; an
+    authoriser failure or a 5xx with the same empty context is the door failing, which no stated call holds."""
+    none = access_lines()["none"]
+    assert caller.from_raw(none)["reason"] == "no identity"
+    crashed = {**none, "raw": {**none["raw"], "status": "500", "error": "Internal Server Error", "auth_error": "The authorizer returned an error"}}
+    read = caller.from_raw(crashed)
+    assert (read["outcome"], read["reason"], read["subject"]) == ("refused", "the door failed", None)
+    held = caller.calls([{**read, "step": "none"}], STATED, CALLERS, MAX_SECONDS)
+    assert held["refused"] == 0 and any("reads 'the door failed', not 'no identity'" in r for r in held["reasons"])
+    forbidden_no_context = {**none, "raw": {**none["raw"], "status": "403", "error": "Forbidden"}}
+    assert caller.from_raw(forbidden_no_context)["reason"] == "the door failed"
+
+
+def test_a_line_naming_another_agent_under_this_agents_prefix_is_not_this_agents_record():
+    """security-reviewer F1 on PR 2: a line under calls/agents/festival-desk/ whose `agent` is another's is a forged or
+    misdelivered line; build names it under F10.3 and records nothing of it, and the observer copies none."""
+    other = access_lines()["lantern-desk"]
+    other = {**other, "step": "admitted", "raw": {**other["raw"], "agent": "other-desk"}}
+    reading = caller.record(observation(records=[other]), MAX_SECONDS)
+    assert reading["records"] == [] and reading["F10_3"]["held"] is False
+    assert any("names agent 'other-desk', not 'festival-desk'" in r for r in reading["F10_3"]["reasons"])

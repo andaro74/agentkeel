@@ -477,7 +477,10 @@ class SecurityStack(cdk.Stack):
         stream.node.add_dependency(delivery_role)
         subscriber_role = iam.Role(
             self, "CallsSubscriberRole", role_name=CALLS_SUBSCRIBER_ROLE,
-            assumed_by=iam.ServicePrincipal(f"logs.{REGION}.amazonaws.com"),
+            # This account's destination only, against the confused deputy (security-reviewer note on PR 2).
+            assumed_by=iam.ServicePrincipal(f"logs.{REGION}.amazonaws.com").with_conditions({
+                "StringEquals": {"aws:SourceAccount": SECURITY_ACCOUNT},
+                "ArnLike": {"aws:SourceArn": f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:*"}}),
             description="agentkeel: the Logs destination hands the doors' access-log batches to the delivery stream as this.",
         )  # fmt: skip
         subscriber_role.add_to_policy(iam.PolicyStatement(
@@ -547,7 +550,8 @@ SUPPRESSIONS = {
         "SPEC/05 §6: 'the read-only role reads the prefixes the observer needs and not *'. AWSLogs/*, agents/*, "
         "test/* and, from M06 PR 2, envelopes/agents/* (an agent from the template's answer records, SPEC/06 R7) "
         "are those prefixes; the keys under them are written by AWS, by the agents and by deploy.yml at run time. "
-        "M07 PR 2 (SPEC/07 §6): observations/*, whose keys are observe.yml's run ids.",
+        "M07 PR 2 (SPEC/07 §6): observations/*, whose keys are observe.yml's run ids. M10 PR 2 (SPEC/10 §6): "
+        "calls/*, the door's call records, whose keys the delivery stream writes from each line's agent and the time.",
     ),
     "ObservationPutRole/DefaultPolicy/Resource": (
         "AwsSolutions-IAM5",
@@ -572,12 +576,6 @@ SUPPRESSIONS = {
         "prefixes to the call records: the delivery stream writes under calls/* because each key is the stream's "
         "own, from the line's agent and the time of delivery, which exists only when the stream writes it; put "
         "and abort only, and the bucket's policy refuses any other principal there.",
-    ),
-    "CallsStream/Resource": (
-        "AwsSolutions-KDF1",
-        "SPEC/05 §6's audit bucket, which SPEC/10 §6 (M10 PR 2) gives the call records: the stream that delivers them "
-        "is encrypted with an AWS-owned key (DeliveryStreamEncryptionConfigurationInput, AWS_OWNED_CMK), which this "
-        "rule reads only as a customer-managed key; the objects it writes are encrypted again by the bucket.",
     ),
 }
 # Each IAM5 suppression names the findings it covers (open.md row 4; security-reviewer F10 on M06 PR 2).

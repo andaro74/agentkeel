@@ -242,8 +242,13 @@ def wrap(source: str, key: str, last_modified: str, raw: dict[str, Any], step: s
     try:
         reader.refuse_credential(raw)
     except reader.Credential as exc:
-        return {"source": source, "key": key, "last_modified": last_modified, "step": step, "raw": None, "error": str(exc)}
-    return {"source": source, "key": key, "last_modified": last_modified, "step": step, "raw": raw, "error": None}
+        return {"source": source, "key": key, "last_modified": last_modified, "step": step, "raw": None, "dropped": [],
+                "error": str(exc)}  # fmt: skip
+    # The caller's address, user agent, key id and the rest of DROPPED_KEYS never leave the bucket (R5): what is
+    # copied is what AWS delivered less the named keys, and the names are written beside it.
+    kept, dropped = reader.redact(raw)
+    return {"source": source, "key": key, "last_modified": last_modified, "step": step, "raw": kept, "dropped": dropped,
+            "error": None}  # fmt: skip
 
 
 def read_bucket(observation: dict[str, Any]) -> None:
@@ -261,6 +266,12 @@ def read_bucket(observation: dict[str, Any]) -> None:
         for obj in objects(s3, prefix):
             for line in lines_of(body(s3, obj["key"])):
                 step = by_request.get(line.get("request_id"))
+                if line.get("agent") != agent:
+                    # Under this agent's prefix and naming another: not copied, named (security-reviewer F1 on PR 2).
+                    records.append({"source": "access-log", "key": obj["key"], "last_modified": obj["last_modified"],
+                                    "step": step, "raw": None, "dropped": [],
+                                    "error": f"the line names agent {line.get('agent')!r} under {prefix}"})  # fmt: skip
+                    continue
                 records.append(wrap("access-log", obj["key"], obj["last_modified"], line, step))
     except Exception as exc:  # noqa: BLE001 - an unread prefix is an observation
         errors.append(f"{prefix}: {type(exc).__name__}: {exc}")

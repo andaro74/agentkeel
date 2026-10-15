@@ -71,6 +71,21 @@ STATED = {
 CALLERS = [{"subject": "lantern-desk", "issuer": "self"}, {"subject": "box-office", "issuer": "self"}]
 
 
+def with_nobody_admitted(fixture: Path, tmp_path: Path) -> Path:
+    """A copy of an older milestone's fixture agent whose manifest says nobody may call it (`callers: []`).
+
+    From M10 PR 2 the platform check refuses a manifest with no `callers` key (SPEC/10 §2; seed S2's reader), and
+    the fixtures of M08 and M09 predate the key and are never edited (tests/fixtures/README.md). Their guard tests
+    read the copy; the fixture's bytes stay as planted."""
+    import shutil
+
+    copy = tmp_path / fixture.name
+    shutil.copytree(fixture, copy)
+    with (copy / "manifest.yaml").open("a", encoding="utf-8", newline="\n") as manifest:
+        manifest.write("callers: []\n")
+    return copy
+
+
 def load_yaml(path: Path) -> Any:
     holds(path.is_file(), f"{path.relative_to(ROOT).as_posix()} is in the tree")
     return yaml.safe_load(path.read_text(encoding="utf-8"))

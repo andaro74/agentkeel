@@ -899,7 +899,8 @@
               "key",
               "last_modified",
               "read",
-              "raw"
+              "raw",
+              "dropped"
             ],
             "properties": {
               "step": {
@@ -970,9 +971,12 @@
                     ]
                   },
                   "reason": {
-                    "type": [
-                      "string",
-                      "null"
+                    "enum": [
+                      "no identity",
+                      "not admitted",
+                      "not the door",
+                      "the door failed",
+                      null
                     ]
                   },
                   "request_id": {
@@ -996,10 +1000,17 @@
                 }
               },
               "raw": {
+                "description": "What AWS delivered, less the keys named in dropped (the caller's address, user agent, key id, principal id, session context and TLS details never reach public evidence; R5, data-owner F1 on M10 PR 2).",
                 "type": [
                   "object",
                   "null"
                 ]
+              },
+              "dropped": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
