@@ -98,6 +98,13 @@ seats:
 may_call: []
 may_be_called_by: []
 
+# Tool Owner (M10 PR 2; SPEC/10 §2, §11 R4; milestones/M10/rulings/pr2-tool-owner.md):
+# the outside subjects this agent admits through a door the platform
+# controls. Empty: refagent is not behind a door at M10 (SPEC/10 §8); its
+# runtime keeps IAM authorisation and the eval role's grant. Absent to [] is
+# not a relaxation (ADR-0016); a subject added here is two keys.
+callers: []
+
 # Tool Owner: ceilings (SPEC/00 §6). Read by validate from M02, when an edge
 # exists.
 ceilings:

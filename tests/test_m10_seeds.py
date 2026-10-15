@@ -141,7 +141,6 @@ def test_s2_a_manifest_that_does_not_say_who_may_call_is_refused():
     assert errors and any("callers" in e for e in errors), errors
 
 
-@expected_failure
 def test_s2_a_manifest_with_callers_passes_the_schema():
     """The same manifest with one `callers` entry must pass `src/manifest/schema.json` (F10.4: a manifest can say).
     Today the schema's `additionalProperties: false` refuses the key (SPEC/10 §3.3)."""
@@ -156,12 +155,16 @@ def test_s2_a_manifest_with_callers_passes_the_schema():
 # --- S3: a caller admitted with one key, read by two-key ---------------------------------------------
 
 LINE = "may_be_called_by: []\n"
+EMPTY = "callers: []\n"  # what M10 PR 2 wrote into refagent's manifest (SPEC/10 §2: `[]` the default)
 
 
 def manifest_with(callers: str) -> str:
-    """refagent's manifest as the tree holds it, with the `callers` block after `may_be_called_by`."""
+    """refagent's manifest as the tree holds it, its `callers: []` line taken out and the case's block put after
+    `may_be_called_by`. Until PR 2 the tree had no `callers` key and the block was simply added (PR 1)."""
     text = (ROOT / REFAGENT_MANIFEST).read_text(encoding="utf-8").replace("\r\n", "\n")
-    holds(text.count(LINE) == 1 and "callers" not in text, "refagent's manifest has may_be_called_by once and no callers yet")
+    holds(text.count(LINE) == 1 and text.count("\ncallers:") == text.count(EMPTY) == 1,
+          "refagent's manifest has may_be_called_by once and one `callers: []` key (M10 PR 2)")  # fmt: skip
+    text = text.replace(EMPTY, "")
     block = "" if callers == "<the line deleted>" else callers
     return text.replace(LINE, LINE + block)
 

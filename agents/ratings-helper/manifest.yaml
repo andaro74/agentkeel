@@ -61,6 +61,11 @@ seats:
 may_call: []
 may_be_called_by: []
 
+# Tool Owner (M10 PR 2; SPEC/10 §2, §11 R4; milestones/M10/rulings/pr2-tool-owner.md):
+# no outside caller. A stub has no runtime and no door; the platform check
+# refuses a manifest with no `callers` key, so the key is here, empty.
+callers: []
+
 # Tool Owner: at the platform's bounds (thresholds.yaml ceilings).
 ceilings:
   concurrency: 2
