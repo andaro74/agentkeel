@@ -95,7 +95,6 @@ def reader(module: str, name: str, seed: str, what: str) -> Any:
 CALLS_WHAT = "nothing reads a call record"
 
 
-@expected_failure
 def test_s1_a_call_record_names_its_caller_and_the_door_refused_the_rest():
     """`src.verdict.caller.calls(records, stated, callers, max_seconds)` over six fixtures (F10.1, F10.3, F10.4).
     Today's answer record names no caller: not held. A stranger answered: not held, naming the subject. A

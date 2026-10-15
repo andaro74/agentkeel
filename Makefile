@@ -149,6 +149,19 @@ F9_3_CASES := test_s3_a_silent_plant_is_read_from_the_answer_record
 F9_4_CASES := test_s1_the_platform_check_admits_an_agent_with_its_own_rules,test_s5_a_plant_with_no_named_rule_is_refused
 F9_5_CASES := test_s4_refagents_rules_are_whole
 RULES_OBS ?=
+# M10 PR 2 (SPEC/10 section 4). F10_1 to F10_5: S1's call records read by src/verdict/caller.py (F10_1, F10_3,
+# F10_4), S2's two manifests read by src/validate/callers.py and the schema (F10_4), S3's two cases refused by
+# two-key entry 7 (F10_5), and S4's two guards (F10_2: the construct's invoke condition on the fixture agent's
+# stack, refagent's plants whole on the latest envelope); test-only witnesses, the only claim 10 checks on an
+# envelope. The live reading is CALLER_OBS, scripts/observe_caller.py's reading of the call records, the answer
+# record and the manifest: build rules it into `caller`, and only the ledger's row 10 reading reads it. Empty,
+# the envelope has no caller, and row 10 reads it as not read.
+F10_1_CASES := test_s1_a_call_record_names_its_caller_and_the_door_refused_the_rest
+F10_2_CASES := test_s4_guard_the_invoke_is_conditioned_on_the_agents_own_guardrail,test_s4_guard_refagents_plants_are_whole_on_the_latest_envelope
+F10_3_CASES := test_s1_a_call_record_names_its_caller_and_the_door_refused_the_rest
+F10_4_CASES := test_s1_a_call_record_names_its_caller_and_the_door_refused_the_rest,test_s2_a_manifest_that_does_not_say_who_may_call_is_refused,test_s2_a_manifest_with_callers_passes_the_schema
+F10_5_CASES := test_s3_a_caller_admitted_with_one_key_is_refused[a subject added],test_s3_a_caller_admitted_with_one_key_is_refused[the key removed]
+CALLER_OBS ?=
 CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)") \
           $(if $(F0_3_OBS),--check-pr F0_3 "$(F0_3_OBS)") \
           $(if $(JUNIT),--check-cases F1_1 "$(F1_1_CASES)" "$(JUNIT)") \
@@ -187,6 +200,11 @@ CHECKS := $(if $(F0_2_JUNIT),--check-junit F0_2 tests.test_f0_2 "$(F0_2_JUNIT)")
           $(if $(JUNIT),--check-cases F9_3 "$(F9_3_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F9_4 "$(F9_4_CASES)" "$(JUNIT)") \
           $(if $(JUNIT),--check-cases F9_5 "$(F9_5_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F10_1 "$(F10_1_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F10_2 "$(F10_2_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F10_3 "$(F10_3_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F10_4 "$(F10_4_CASES)" "$(JUNIT)") \
+          $(if $(JUNIT),--check-cases F10_5 "$(F10_5_CASES)" "$(JUNIT)") \
           $(if $(RUN_URL),--run-url "$(RUN_URL)")
 # CI passes a file path; the gate's exit code is written there, so a REJECTED
 # envelope (exit 2) is told from a RED one and is not recorded (M01 item 9).
@@ -219,7 +237,7 @@ define chain
 	$(if $(A_VS_A),-uv run python -m src.agent.run --out $(1)/$(2).agent-raw-b.json --recheck-runtime)
 	uv run python -m src.cost_cap --raw $(1)/$(2).baseline-raw.json --raw $(1)/$(2).agent-raw.json $(A_VS_A_RUNS)
 	$(if $(SWAPS_OBS),uv run python scripts/rule_swaps.py "$(SWAPS_OBS)" --out "$(SWAPS_RULED)")
-	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)") $(if $(TEMPLATE_OBS),--template "$(TEMPLATE_OBS)") $(if $(UPGRADE_OBS),--upgrade "$(UPGRADE_OBS)" $(if $(JUNIT),--surfaces "$(JUNIT)")) $(if $(APP_OBS),--app-observation "$(APP_OBS)") $(if $(DRILL_OBS),--drill "$(DRILL_OBS)") $(if $(RULES_OBS),--rules "$(RULES_OBS)")
+	uv run python -m src.verdict.build envelope --raw $(1)/$(2).agent-raw.json --control-card $(1)/$(2).baseline-card.json --out $(1)/$(2).json $(3) $(CHECKS) $(A_VS_A_FLAGS) $(if $(SWAPS_OBS),--swaps "$(SWAPS_RULED)") $(if $(CONTAINMENT_OBS),--containment "$(CONTAINMENT_OBS)") $(if $(TEMPLATE_OBS),--template "$(TEMPLATE_OBS)") $(if $(UPGRADE_OBS),--upgrade "$(UPGRADE_OBS)" $(if $(JUNIT),--surfaces "$(JUNIT)")) $(if $(APP_OBS),--app-observation "$(APP_OBS)") $(if $(DRILL_OBS),--drill "$(DRILL_OBS)") $(if $(RULES_OBS),--rules "$(RULES_OBS)") $(if $(CALLER_OBS),--caller "$(CALLER_OBS)")
 	uv run python -m src.verdict.gate $(1)/$(2).json; code=$$?; $(if $(GATE_EXIT),echo $$code > "$(GATE_EXIT)";) exit $$code
 endef
 else

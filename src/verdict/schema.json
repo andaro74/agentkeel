@@ -826,6 +826,315 @@
         }
       }
     },
+    "caller": {
+      "description": "From M10 PR 2 (SPEC/10 section 2, section 4, section 6). The public caller's live run as scripts/observe_caller.py read the call records in the audit bucket (raw, each with its object's LastModified), the answer record of the deploy that put the door on and the agent's callers at its merge, and verdict.build (src/verdict/caller.py) ruled on them: F10.1 no call reached the agent without the door, F10.2 the guardrail on the call through the door, F10.3 each record names the caller the run stated, F10.4 the no-identity and stranger calls refused on a record within N; and the measured value, admitted n of n and refused m of m. Each record's read shape (SPEC/10 section 2) stays beside the raw one. The gate rules nothing on it; the ledger's row 10 reading (gate.caller_misses) is the measurement. Not made reads every falsifier unread. Optional, so no envelope before it becomes invalid.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "looked_up_at",
+        "made",
+        "repository",
+        "agent",
+        "max_seconds",
+        "admitted",
+        "expected_admitted",
+        "refused",
+        "expected_refused",
+        "records",
+        "F10_1",
+        "F10_2",
+        "F10_3",
+        "F10_4"
+      ],
+      "properties": {
+        "looked_up_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "made": {
+          "type": "boolean"
+        },
+        "repository": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_seconds": {
+          "description": "N as build read it, detection.max_seconds; the gate reads N again at the envelope's commit.",
+          "type": "number"
+        },
+        "admitted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_admitted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "refused": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_refused": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "step",
+              "source",
+              "key",
+              "last_modified",
+              "read",
+              "raw"
+            ],
+            "properties": {
+              "step": {
+                "enum": [
+                  "admitted",
+                  "none",
+                  "stranger",
+                  "bypass",
+                  "platform",
+                  null
+                ]
+              },
+              "source": {
+                "enum": [
+                  "access-log",
+                  "data-event",
+                  null
+                ]
+              },
+              "key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last_modified": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "read": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "subject",
+                  "issuer",
+                  "agent",
+                  "outcome",
+                  "reason",
+                  "request_id",
+                  "time",
+                  "delivered"
+                ],
+                "properties": {
+                  "subject": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "issuer": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "agent": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "outcome": {
+                    "enum": [
+                      "admitted",
+                      "refused"
+                    ]
+                  },
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "request_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "time": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "delivered": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "raw": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "F10_1": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "read",
+            "held",
+            "reasons"
+          ],
+          "properties": {
+            "read": {
+              "type": "boolean"
+            },
+            "held": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "F10_2": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "read",
+            "held",
+            "reasons",
+            "pin",
+            "plant",
+            "blocked"
+          ],
+          "properties": {
+            "read": {
+              "type": "boolean"
+            },
+            "held": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "pin": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "plant": {
+              "type": "string"
+            },
+            "blocked": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        },
+        "F10_3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "read",
+            "held",
+            "reasons"
+          ],
+          "properties": {
+            "read": {
+              "type": "boolean"
+            },
+            "held": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "F10_4": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "read",
+            "held",
+            "reasons",
+            "manifest_callers"
+          ],
+          "properties": {
+            "read": {
+              "type": "boolean"
+            },
+            "held": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "manifest_callers": {
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
     "swaps": {
       "description": "From M04 PR 3 (SPEC/04 §4). The M04 swap PRs as scripts/rule_swaps.py read them: GitHub's record of each pull and the gate's verdict on that pull's own envelope. Recorded, never gated (Product, M04 PR 3). Optional, so no envelope before it becomes invalid.",
       "type": "array",

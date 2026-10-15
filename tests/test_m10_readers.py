@@ -123,3 +123,196 @@ def test_entry_7_reads_subjects_not_bytes():
     assert caller_relaxations({"callers": one}, {"callers": None}) == ["callers removed from a value (ADR-0016 entry 7)"]
     assert caller_relaxations({"callers": []}, {"callers": "lantern-desk"}) == ["callers no longer a list from a value (ADR-0016 entry 7)"]
     assert caller_relaxations({}, {}) == []
+
+
+# --- from_raw: the raw record to the read shape, for both raw sources (SPEC/10 §2; R5) ------------------
+
+import json  # noqa: E402
+
+from src.verdict import SCHEMA_PATH, caller, gate  # noqa: E402
+
+RAW = FIXTURES / "s1-call-records" / "raw"
+
+
+def raw_events() -> dict[str, dict[str, Any]]:
+    loaded = json.loads((RAW / "data_events.json").read_text(encoding="utf-8"))
+    return {event["call"]: event for event in loaded["events"]}
+
+
+def access_lines() -> dict[str, dict[str, Any]]:
+    loaded = json.loads((RAW / "access_log.json").read_text(encoding="utf-8"))
+    by_subject = {}
+    for line in loaded["lines"]:
+        wrapper = {"source": "access-log", "key": loaded["key"], "last_modified": loaded["last_modified"], "raw": line}
+        by_subject[line["subject"] if line["subject"] != "-" else "none"] = wrapper
+    return by_subject
+
+
+READ_FIELDS = {"subject", "issuer", "agent", "outcome", "reason", "request_id", "time", "delivered"}
+
+
+def test_a_data_event_of_an_admitted_token_call_names_the_tokens_sub_and_issuer():
+    """door_probe.md (b): the event carries the claims, so the record names the pool user's sub, not a name."""
+    read = caller.from_raw(raw_events()["admitted"])
+    assert set(read) == READ_FIELDS
+    assert read["subject"] == "00000000-0000-4000-8000-00000000a0a1"
+    assert read["issuer"] == "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_pr0bep00l"
+    assert (read["outcome"], read["reason"], read["agent"]) == ("admitted", None, "probe-door-agent")
+    assert read["time"] == "2026-10-14T14:21:48Z" and read["delivered"] == "2026-10-14T14:26:47Z"
+    assert read["request_id"] == "b2b2b2b2-0000-4000-8000-000000000001"
+
+
+def test_a_data_event_of_a_refused_token_call_names_no_caller_and_is_not_the_door():
+    """door_probe.md (c): the stranger's refusal names no one (userIdentity anonymous, no claims), 298 s to deliver."""
+    read = caller.from_raw(raw_events()["stranger"])
+    assert read["subject"] is None and read["issuer"] is None
+    assert (read["outcome"], read["reason"]) == ("refused", "not the door")
+    assert caller.seconds(read["time"], read["delivered"]) == 298.0
+
+
+def test_a_data_event_of_a_sigv4_call_names_the_principals_arn_and_is_refused_as_not_the_door():
+    """door_probe.md (a): the bypass as an assumed role, refused 'Authorization method mismatch'."""
+    read = caller.from_raw(raw_events()["bypass"])
+    assert read["subject"] == "arn:aws:sts::000000000000:assumed-role/probe-door-bypass/probe-door-bypass"
+    assert read["issuer"] is None and read["outcome"] == "refused" and read["reason"] == "not the door"
+    platform = caller.from_raw(raw_events()["platform"])
+    assert platform["subject"] == "d00rc1ient0000000000000000" and platform["outcome"] == "admitted"
+
+
+def test_an_access_log_line_names_the_authorisers_subject_and_the_no_token_call_is_no_identity():
+    lines = access_lines()
+    admitted = caller.from_raw(lines["lantern-desk"])
+    assert set(admitted) == READ_FIELDS
+    assert (admitted["subject"], admitted["outcome"], admitted["reason"], admitted["agent"]) == ("lantern-desk", "admitted", None, "festival-desk")
+    assert admitted["time"] == "2026-10-20T10:00:00Z" and admitted["delivered"] == "2026-10-20T10:04:20Z"
+    assert admitted["request_id"] == "a1a1a1a1-0000-4000-8000-000000000011"
+    none = caller.from_raw(lines["none"])
+    assert (none["subject"], none["issuer"], none["outcome"], none["reason"]) == (None, None, "refused", "no identity")
+    assert caller.seconds(none["time"], none["delivered"]) == 200.0
+    stranger = caller.from_raw(lines["stranger"])
+    assert (stranger["subject"], stranger["outcome"], stranger["reason"]) == ("stranger", "refused", "not admitted")
+    platform = caller.from_raw(lines["platform"])
+    assert (platform["subject"], platform["outcome"]) == ("platform", "admitted")
+
+
+def test_a_raw_record_with_a_credential_is_refused_naming_the_field():
+    import pytest
+
+    leak = json.loads((RAW / "credential_leak.json").read_text(encoding="utf-8"))
+    with pytest.raises(caller.Credential, match="raw.authorization: a raw record carries a credential"):
+        caller.from_raw(leak)
+    # a token as a value under any name, and CloudTrail's own redaction, which is not one
+    with pytest.raises(caller.Credential, match="carries a token"):
+        caller.from_raw({**leak["raw"], "authorization": "-", "note": leak["raw"]["authorization"].split(" ", 1)[1]})
+    hidden = raw_events()["admitted"]
+    assert caller.from_raw({**hidden, "raw": {**hidden["raw"], "requestParameters": {"userToken": caller.HIDDEN}}})["outcome"] == "admitted"
+    with pytest.raises(caller.Unreadable, match="neither"):
+        caller.from_raw({"what": "agent answer"})
+
+
+def test_agent_of_runtime_reads_the_platforms_runtime_names():
+    assert caller.agent_of("arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/agentkeel_festival_desk-AbC123") == "festival-desk"
+    assert caller.agent_of("arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/refagent-Du2VJx6xWc") == "refagent"
+    assert caller.agent_of(None) is None
+
+
+# --- calls: beyond the seed's six cases -----------------------------------------------------------------
+
+from .test_m10_seeds import CALLERS, MAX_SECONDS, STATED  # noqa: E402
+
+
+def held_records() -> list[dict[str, Any]]:
+    return json.loads((FIXTURES / "s1-call-records" / "calls_held.json").read_text(encoding="utf-8"))["records"]
+
+
+def test_no_record_reads_as_unread_and_a_missing_step_as_a_reason():
+    unread = caller.calls([], STATED, CALLERS, MAX_SECONDS)
+    assert unread["read"] is False and unread["held"] is None and unread["reasons"] == ["no call record was read"]
+    assert (unread["expected_admitted"], unread["expected_refused"]) == (1, 3)
+    three = caller.calls(held_records()[:3], STATED, CALLERS, MAX_SECONDS)
+    assert three["held"] is False and three["refused"] == 2
+    assert "no record of the bypass call was read (F10.4)" in three["reasons"]
+
+
+def test_a_record_the_observer_stepped_is_read_for_that_step_and_the_platforms_own_call_counts_for_nothing():
+    records = held_records()
+    stepped = [{**r, "step": s} for r, s in zip(records, ("admitted", "none", "stranger", "bypass"))]
+    platform = {**records[0], "subject": "platform", "step": "platform"}
+    read = caller.calls(stepped + [platform], {**STATED, "platform": {"subject": "platform", "outcome": "admitted"}}, CALLERS, MAX_SECONDS)
+    assert read["held"] is True and (read["admitted"], read["refused"]) == (1, 3)
+    assert read["steps"]["platform"] == "platform"
+    # a refusal for the wrong reason, and a stated admitted call that reads refused
+    wrong_reason = {**records[1], "reason": "not admitted"}
+    assert any("reason reads 'not admitted', not 'no identity'" in r for r in caller.calls([wrong_reason], STATED, CALLERS, MAX_SECONDS)["reasons"])
+    refused_instead = {**records[0], "outcome": "refused", "reason": "not admitted"}
+    assert any("was stated 'admitted' and its record reads refused" in r for r in caller.calls([refused_instead], STATED, CALLERS, MAX_SECONDS)["reasons"])
+
+
+# --- the whole reading, and row 10's reading of it (P5) ----------------------------------------------------
+
+
+def observation(**override: Any) -> dict[str, Any]:
+    """What scripts/observe_caller.py writes after the run: the four records stepped by request id, the answer
+    record of the door's deploy, the manifest's callers and the stated callers derived from the run file."""
+    lines = access_lines()
+    bypass = raw_events()["bypass"]
+    records = [
+        {**lines["lantern-desk"], "step": "admitted"},
+        {**lines["none"], "step": "none"},
+        {**lines["stranger"], "step": "stranger"},
+        {**bypass, "step": "bypass"},
+        {**lines["platform"], "step": "platform"},
+    ]
+    answer = json.loads((FIXTURES / "s1-call-records" / "record_no_caller.json").read_text(encoding="utf-8"))
+    stated = {**STATED, "bypass": {**STATED["bypass"], "subject": "arn:aws:sts::000000000000:assumed-role/probe-door-bypass/probe-door-bypass"}}
+    return {"looked_up_at": "2026-10-20T10:30:00Z", "made": True, "repository": "agentkeel-studio/festival-desk",
+            "agent": "festival-desk", "records": records, "answer": answer, "callers": CALLERS, "stated": stated, **override}  # fmt: skip
+
+
+def test_the_whole_reading_holds_on_the_fixtures_and_validates():
+    reading = caller.record(observation(), MAX_SECONDS)
+    assert reading["made"] is True and (reading["admitted"], reading["refused"]) == (1, 3)
+    for name in caller.READINGS:
+        assert reading[name]["read"] is True and reading[name]["held"] is True, (name, reading[name])
+    assert reading["F10_2"]["pin"] == "at8e36cosq1r:1" and reading["F10_2"]["blocked"] is True
+    assert reading["F10_4"]["manifest_callers"] == CALLERS
+    assert [r["step"] for r in reading["records"]] == ["admitted", "none", "stranger", "bypass", "platform"]
+    assert reading["records"][3]["source"] == "data-event" and reading["records"][3]["raw"]["eventName"] == "InvokeAgentRuntime"
+    from jsonschema import Draft202012Validator
+
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    errors = sorted(e.message for e in Draft202012Validator(schema["properties"]["caller"]).iter_errors(reading))
+    assert errors == []
+    assert gate.caller_misses({"caller": reading, "plants_fired": 7, "plants_expected": 7}, MAX_SECONDS, "the tree") == []
+
+
+def test_a_run_not_made_reads_every_falsifier_unread_and_row_10_reads_red():
+    reading = caller.record({"made": False, "repository": "agentkeel-studio/festival-desk", "agent": "festival-desk"}, MAX_SECONDS)
+    assert reading["made"] is False and all(reading[n]["read"] is False for n in caller.READINGS)
+    misses = gate.caller_misses({"caller": reading, "plants_fired": 7, "plants_expected": 7}, MAX_SECONDS, "the tree")
+    assert misses[0] == "the run has not been made: no door is deployed and no call was read"
+    assert any(m.startswith("F10_1 unread") for m in misses) and not any("calls admitted" in m for m in misses)
+    assert gate.caller_misses({}, MAX_SECONDS, "the tree") == ["caller not read: the envelope records no call"]
+    assert gate.caller_reading({"caller": reading})[0] == "callers admitted 0 of 0, refused 0 of 0 (run not made)"
+
+
+def test_row_10_holds_n_the_counts_and_refagents_plants_again():
+    reading = caller.record(observation(), MAX_SECONDS)
+    envelope = {"caller": reading, "plants_fired": 7, "plants_expected": 7}
+    assert any("read against N 600, the commit's is 300.0" in m for m in gate.caller_misses(envelope, 300.0, "x"))
+    assert any("N cannot be read" in m for m in gate.caller_misses(envelope, None, "x"))
+    short = {**envelope, "plants_fired": 6}
+    assert any("refagent's plants read 6 of 7" in m and "F10.2" in m for m in gate.caller_misses(short, MAX_SECONDS, "x"))
+    forged = {**envelope, "caller": {**reading, "admitted": 0}}
+    assert "calls admitted 0 of 1" in gate.caller_misses(forged, MAX_SECONDS, "x")
+
+
+def test_a_credential_in_an_observed_record_is_filed_under_f10_3_and_an_unreadable_part_is_named():
+    leak = json.loads((RAW / "credential_leak.json").read_text(encoding="utf-8"))
+    reading = caller.record(observation(records=[{**leak, "step": "admitted"}]), MAX_SECONDS)
+    assert reading["F10_3"]["held"] is False
+    assert any("carries a credential" in r for r in reading["F10_3"]["reasons"])
+    assert reading["records"] == []
+    missing = caller.record(observation(callers=None, answer=None), MAX_SECONDS)
+    assert missing["F10_2"]["read"] is False and missing["F10_4"]["held"] is False
+    assert any("callers at its merge were not read" in r for r in missing["F10_4"]["reasons"])
