@@ -146,8 +146,9 @@ def test_the_read_role_reads_its_prefixes_and_the_put_role_trusts_main_only(secu
     read = next(p for k, p in policies.items() if "ReadRole" in k)["PolicyDocument"]["Statement"]
     listed = next(s for s in read if "s3:ListBucket" in s["Action"])
     # M07 PR 2: observations/ is listed and read; bundles/ is listed only.
+    # M10 PR 2 (SPEC/10 §6): calls/, the door's call records, listed and read.
     assert listed["Condition"] == {"StringLike": {"s3:prefix": ["AWSLogs/*", "agents/*", "test/*", "envelopes/agents/*",
-                                                               "observations/*", "bundles/*"]}}  # fmt: skip
+                                                               "observations/*", "calls/*", "bundles/*"]}}  # fmt: skip
     reading = next(s for s in read if "s3:GetObject" in s["Action"])
     assert "observations/*" in json.dumps(reading["Resource"]) and "bundles/" not in json.dumps(reading["Resource"])
     assert all(r.get("PermissionsBoundary") for r in both.values())
@@ -226,3 +227,70 @@ def test_the_trail_logs_the_two_new_prefixes_and_still_not_its_own_delivery(secu
     assert f"{BUCKET}/bundles/" in logged and f"{BUCKET}/observations/" in logged and f"{BUCKET}/AWSLogs/" not in logged
     (bucket,) = of_type(security, "AWS::S3::Bucket")
     assert bucket["ObjectLockConfiguration"]["Rule"]["DefaultRetention"] == {"Mode": "COMPLIANCE", "Days": 1}  # no retention changed
+
+
+# --- M10 PR 2 (SPEC/10 §6; R2): the call records' delivery -------------------------------------------------
+
+
+def test_the_calls_delivery_writes_under_calls_by_the_lines_agent_and_nothing_else_may(security):
+    (stream,) = of_type(security, "AWS::KinesisFirehose::DeliveryStream")
+    s3 = stream["ExtendedS3DestinationConfiguration"]
+    assert stream["DeliveryStreamName"] == "agentkeel-calls"
+    assert s3["Prefix"] == "calls/agents/!{partitionKeyFromQuery:agent}/!{timestamp:yyyy/MM/dd}/"
+    assert s3["ErrorOutputPrefix"].startswith("calls/errors/")
+    assert s3["BufferingHints"] == {"IntervalInSeconds": 60, "SizeInMBs": 64}
+    assert s3["CompressionFormat"] == "UNCOMPRESSED" and s3["DynamicPartitioningConfiguration"]["Enabled"] is True
+    processors = [(p["Type"], {q["ParameterName"]: q["ParameterValue"] for q in p["Parameters"]})
+                  for p in s3["ProcessingConfiguration"]["Processors"]]  # fmt: skip
+    assert processors == [("Decompression", {"CompressionFormat": "GZIP"}),
+                          ("CloudWatchLogProcessing", {"DataMessageExtraction": "true"}),
+                          ("MetadataExtraction", {"MetadataExtractionQuery": "{agent: .agent}", "JsonParsingEngine": "JQ-1.6"}),
+                          ("AppendDelimiterToRecord", {"Delimiter": "\\n"})]  # fmt: skip
+    assert stream["DeliveryStreamEncryptionConfigurationInput"] == {"KeyType": "AWS_OWNED_CMK"}
+    policy = bucket_policy(security)
+    allow = policy["TheCallsDeliveryPutsUnderCalls"]
+    assert allow["Effect"] == "Allow" and json.dumps(allow["Resource"]).endswith('"/calls/*"]]}')
+    assert allow["Condition"] == {"ArnEquals": {"aws:PrincipalArn": "arn:aws:iam::897698239547:role/agentkeel-calls-delivery"}}
+    deny = policy["NobodyElsePutsUnderCalls"]
+    assert deny["Effect"] == "Deny" and deny["Action"] == "s3:PutObject"
+    assert deny["Condition"] == {"ArnNotEquals": {"aws:PrincipalArn": "arn:aws:iam::897698239547:role/agentkeel-calls-delivery"}}
+
+
+def test_the_destination_admits_the_platform_accounts_subscriptions_and_hands_them_to_the_one_stream(security):
+    import json
+
+    (destination,) = of_type(security, "AWS::Logs::Destination")
+    assert destination["DestinationName"] == "agentkeel-calls"
+    policy = json.loads(destination["DestinationPolicy"])
+    (statement,) = policy["Statement"]
+    assert statement == {"Sid": "ThePlatformAccountsDoorsSubscribe", "Effect": "Allow", "Principal": {"AWS": "581208540944"},
+                         "Action": "logs:PutSubscriptionFilter",
+                         "Resource": "arn:aws:logs:us-west-2:897698239547:destination:agentkeel-calls"}  # fmt: skip
+    named = roles(security)
+    subscriber = named["agentkeel-calls-subscriber"]
+    assert subscriber["AssumeRolePolicyDocument"]["Statement"][0]["Principal"] == {"Service": "logs.us-west-2.amazonaws.com"}
+    delivery = named["agentkeel-calls-delivery"]
+    trust = delivery["AssumeRolePolicyDocument"]["Statement"][0]
+    assert trust["Principal"] == {"Service": "firehose.amazonaws.com"} and trust["Condition"] == {"StringEquals": {"sts:ExternalId": "897698239547"}}
+    policies = [p["PolicyDocument"]["Statement"] for p in of_type(security, "AWS::IAM::Policy")
+                if "CallsDeliveryRole" in json.dumps(p["Roles"])]  # fmt: skip
+    (statements,) = policies
+    assert [s["Sid"] for s in statements] == ["WriteUnderCallsOnly", "TheBucketItWritesTo"]
+    assert statements[0]["Resource"] == "arn:aws:s3:::agentkeel-audit-897698239547/calls/*"
+    # every role in this stack still carries the boundary, and the ceiling now allows what the stream calls
+    assert all("PermissionsBoundary" in r for r in named.values())
+    (boundary,) = [p for p in of_type(security, "AWS::IAM::ManagedPolicy") if p["ManagedPolicyName"] == "agentkeel-security-boundary"]
+    allowed = {a for s in boundary["PolicyDocument"]["Statement"] if s["Effect"] == "Allow"
+               for a in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])}  # fmt: skip
+    assert {"s3:AbortMultipartUpload", "s3:GetBucketLocation", "s3:ListBucketMultipartUploads", "firehose:PutRecord", "firehose:PutRecordBatch"} <= allowed
+
+
+def test_the_read_role_reads_calls_and_the_trail_logs_it(security):
+    (read,) = [p for p in of_type(security, "AWS::IAM::Policy") if "ReadRole" in str(p["Roles"])]
+    statements = read["PolicyDocument"]["Statement"]
+    listing = next(s for s in statements if s["Sid"] == "ListTheObserversPrefixes")
+    assert "calls/*" in listing["Condition"]["StringLike"]["s3:prefix"]
+    reading = next(s for s in statements if s["Sid"] == "ReadTheObserversPrefixes")
+    assert "arn:aws:s3:::agentkeel-audit-897698239547/calls/*" in reading["Resource"]
+    (trail,) = of_type(security, "AWS::CloudTrail::Trail")
+    assert "arn:aws:s3:::agentkeel-audit-897698239547/calls/" in selectors(trail)
