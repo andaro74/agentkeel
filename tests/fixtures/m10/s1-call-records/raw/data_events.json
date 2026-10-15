@@ -1,0 +1,295 @@
+{
+  "_comment": "M10 PR 2's first commit (SPEC/10 section 2 'The call record', section 5.1): the five InvokeAgentRuntime data events Security's door probe of 2026-10-14 left in a throwaway trail's S3 objects, each with the object's LastModified (its arrival), copied from ~/probe-door/out/records-trail-s3-20261014T144332Z.json. Timestamps, error codes and error messages are byte for byte the probe's; every account, address, key, principal, pool, client, user, request, event, session and token id is a placeholder (the table is in tests/fixtures/README.md). The sixth call, no token, left no event: there is no record of it to copy. This is the raw shape src/verdict/caller.from_raw reads for a call made straight at the runtime; the door's own record is the access-log line beside this file. A fixture, never evidence.",
+  "read_at": "2026-10-14T14:43:32.894221Z",
+  "events": [
+    {
+      "call": "admitted",
+      "source": "data-event",
+      "key": "AWSLogs/000000000000/CloudTrail/us-west-2/2026/10/14/000000000000_CloudTrail_us-west-2_20261014T1425Z_bndt3mMSZpEcbfrN.json.gz",
+      "last_modified": "2026-10-14T14:26:47Z",
+      "raw": {
+        "eventVersion": "1.11",
+        "userIdentity": {
+          "type": "AWSAccount",
+          "principalId": "",
+          "accountId": "anonymous"
+        },
+        "eventTime": "2026-10-14T14:21:48Z",
+        "eventSource": "bedrock-agentcore.amazonaws.com",
+        "eventName": "InvokeAgentRuntime",
+        "awsRegion": "us-west-2",
+        "sourceIPAddress": "198.51.100.7",
+        "userAgent": "Python-urllib/3.14",
+        "requestParameters": null,
+        "responseElements": {
+          "runtimeSessionId": "probe-door-admitted-00000000000000000000000000000001",
+          "contentType": "application/json",
+          "response": "HIDDEN_DUE_TO_SECURITY_REASONS",
+          "statusCode": 200
+        },
+        "additionalEventData": {
+          "jwt": {
+            "headers": {
+              "kid": "pr0bek1d00000000000000000000000000000000000=",
+              "alg": "RS256"
+            },
+            "claims": {
+              "sub": "00000000-0000-4000-8000-00000000a0a1",
+              "token_use": "access",
+              "scope": "aws.cognito.signin.user.admin",
+              "auth_time": 1791987707,
+              "iss": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_pr0bep00l",
+              "exp": 1791991307,
+              "iat": 1791987707,
+              "jti": "a4a4a4a4-0000-4000-8000-000000000001"
+            },
+            "type": "JWS"
+          }
+        },
+        "requestID": "b2b2b2b2-0000-4000-8000-000000000001",
+        "eventID": "e3e3e3e3-0000-4000-8000-000000000001",
+        "readOnly": false,
+        "resources": [
+          {
+            "accountId": "000000000000",
+            "type": "AWS::BedrockAgentCore::Runtime",
+            "ARN": "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/probe_door_agent-f1xture000"
+          },
+          {
+            "accountId": "000000000000",
+            "type": "AWS::BedrockAgentCore::RuntimeEndpoint",
+            "ARN": "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/probe_door_agent-f1xture000/runtime-endpoint/DEFAULT"
+          }
+        ],
+        "eventType": "AwsApiCall",
+        "managementEvent": false,
+        "recipientAccountId": "000000000000",
+        "sharedEventID": "c1c1c1c1-0000-4000-8000-000000000103",
+        "eventCategory": "Data",
+        "tlsDetails": {
+          "tlsVersion": "TLSv1.3",
+          "cipherSuite": "TLS_AES_128_GCM_SHA256",
+          "clientProvidedHostHeader": "bedrock-agentcore.us-west-2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "call": "stranger",
+      "source": "data-event",
+      "key": "AWSLogs/000000000000/CloudTrail/us-west-2/2026/10/14/000000000000_CloudTrail_us-west-2_20261014T1425Z_bndt3mMSZpEcbfrN.json.gz",
+      "last_modified": "2026-10-14T14:26:47Z",
+      "raw": {
+        "eventVersion": "1.11",
+        "userIdentity": {
+          "type": "AWSAccount",
+          "principalId": "",
+          "accountId": "anonymous"
+        },
+        "eventTime": "2026-10-14T14:21:49Z",
+        "eventSource": "bedrock-agentcore.amazonaws.com",
+        "eventName": "InvokeAgentRuntime",
+        "awsRegion": "us-west-2",
+        "sourceIPAddress": "198.51.100.7",
+        "userAgent": "Python-urllib/3.14",
+        "errorCode": "UnrecognizedClientException",
+        "errorMessage": "Claim 'iss' value mismatch with configuration.",
+        "requestParameters": null,
+        "responseElements": null,
+        "requestID": "b2b2b2b2-0000-4000-8000-000000000003",
+        "eventID": "e3e3e3e3-0000-4000-8000-000000000003",
+        "readOnly": false,
+        "resources": [
+          {
+            "accountId": "000000000000",
+            "type": "AWS::BedrockAgentCore::Runtime",
+            "ARN": "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/probe_door_agent-f1xture000"
+          }
+        ],
+        "eventType": "AwsApiCall",
+        "managementEvent": false,
+        "recipientAccountId": "000000000000",
+        "sharedEventID": "c1c1c1c1-0000-4000-8000-000000000102",
+        "eventCategory": "Data",
+        "tlsDetails": {
+          "tlsVersion": "TLSv1.3",
+          "cipherSuite": "TLS_AES_128_GCM_SHA256",
+          "clientProvidedHostHeader": "bedrock-agentcore.us-west-2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "call": "wrong-client",
+      "source": "data-event",
+      "key": "AWSLogs/000000000000/CloudTrail/us-west-2/2026/10/14/000000000000_CloudTrail_us-west-2_20261014T1425Z_bndt3mMSZpEcbfrN.json.gz",
+      "last_modified": "2026-10-14T14:26:47Z",
+      "raw": {
+        "eventVersion": "1.11",
+        "userIdentity": {
+          "type": "AWSAccount",
+          "principalId": "",
+          "accountId": "anonymous"
+        },
+        "eventTime": "2026-10-14T14:21:49Z",
+        "eventSource": "bedrock-agentcore.amazonaws.com",
+        "eventName": "InvokeAgentRuntime",
+        "awsRegion": "us-west-2",
+        "sourceIPAddress": "198.51.100.7",
+        "userAgent": "Python-urllib/3.14",
+        "errorCode": "UnrecognizedClientException",
+        "errorMessage": "Claim 'client_id' value mismatch with configuration.",
+        "requestParameters": null,
+        "responseElements": null,
+        "requestID": "b2b2b2b2-0000-4000-8000-000000000004",
+        "eventID": "e3e3e3e3-0000-4000-8000-000000000004",
+        "readOnly": false,
+        "resources": [
+          {
+            "accountId": "000000000000",
+            "type": "AWS::BedrockAgentCore::Runtime",
+            "ARN": "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/probe_door_agent-f1xture000"
+          }
+        ],
+        "eventType": "AwsApiCall",
+        "managementEvent": false,
+        "recipientAccountId": "000000000000",
+        "sharedEventID": "c1c1c1c1-0000-4000-8000-000000000101",
+        "eventCategory": "Data",
+        "tlsDetails": {
+          "tlsVersion": "TLSv1.3",
+          "cipherSuite": "TLS_AES_128_GCM_SHA256",
+          "clientProvidedHostHeader": "bedrock-agentcore.us-west-2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "call": "bypass",
+      "source": "data-event",
+      "key": "AWSLogs/000000000000/CloudTrail/us-west-2/2026/10/14/000000000000_CloudTrail_us-west-2_20261014T1425Z_bndt3mMSZpEcbfrN.json.gz",
+      "last_modified": "2026-10-14T14:26:47Z",
+      "raw": {
+        "eventVersion": "1.11",
+        "userIdentity": {
+          "type": "AssumedRole",
+          "principalId": "AROAEXAMPLEEXAMPLE000:probe-door-bypass",
+          "arn": "arn:aws:sts::000000000000:assumed-role/probe-door-bypass/probe-door-bypass",
+          "accountId": "000000000000",
+          "accessKeyId": "ASIAEXAMPLEEXAMPLE00",
+          "sessionContext": {
+            "sessionIssuer": {
+              "type": "Role",
+              "principalId": "AROAEXAMPLEEXAMPLE000",
+              "arn": "arn:aws:iam::000000000000:role/probe-door-bypass",
+              "accountId": "000000000000",
+              "userName": "probe-door-bypass"
+            },
+            "attributes": {
+              "creationDate": "2026-10-14T14:21:49Z",
+              "mfaAuthenticated": "false"
+            }
+          }
+        },
+        "eventTime": "2026-10-14T14:21:50Z",
+        "eventSource": "bedrock-agentcore.amazonaws.com",
+        "eventName": "InvokeAgentRuntime",
+        "awsRegion": "us-west-2",
+        "sourceIPAddress": "198.51.100.7",
+        "userAgent": "Boto3/1.43.54 md/Botocore#1.43.54 ua/2.1 os/windows#11 md/arch#amd64 lang/python#3.14.3 md/pyimpl#CPython m/b,e,Z,D cfg/retry-mode#legacy Botocore/1.43.54",
+        "errorCode": "AccessDenied",
+        "errorMessage": "Authorization method mismatch. The agent is configured for a different authorization method than what was used in your request. Check the agent's authorization configuration and ensure your request uses the matching method (OAuth or SigV4)",
+        "requestParameters": null,
+        "responseElements": null,
+        "requestID": "b2b2b2b2-0000-4000-8000-000000000005",
+        "eventID": "e3e3e3e3-0000-4000-8000-000000000005",
+        "readOnly": false,
+        "resources": [
+          {
+            "accountId": "000000000000",
+            "type": "AWS::BedrockAgentCore::Runtime",
+            "ARN": "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/probe_door_agent-f1xture000"
+          }
+        ],
+        "eventType": "AwsApiCall",
+        "managementEvent": false,
+        "recipientAccountId": "000000000000",
+        "eventCategory": "Data",
+        "tlsDetails": {
+          "tlsVersion": "TLSv1.3",
+          "cipherSuite": "TLS_AES_128_GCM_SHA256",
+          "clientProvidedHostHeader": "bedrock-agentcore.us-west-2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "call": "platform",
+      "source": "data-event",
+      "key": "AWSLogs/000000000000/CloudTrail/us-west-2/2026/10/14/000000000000_CloudTrail_us-west-2_20261014T1425Z_bndt3mMSZpEcbfrN.json.gz",
+      "last_modified": "2026-10-14T14:26:47Z",
+      "raw": {
+        "eventVersion": "1.11",
+        "userIdentity": {
+          "type": "AWSAccount",
+          "principalId": "",
+          "accountId": "anonymous"
+        },
+        "eventTime": "2026-10-14T14:21:51Z",
+        "eventSource": "bedrock-agentcore.amazonaws.com",
+        "eventName": "InvokeAgentRuntime",
+        "awsRegion": "us-west-2",
+        "sourceIPAddress": "198.51.100.7",
+        "userAgent": "Python-urllib/3.14",
+        "requestParameters": null,
+        "responseElements": {
+          "runtimeSessionId": "probe-door-platform-00000000000000000000000000000006",
+          "contentType": "application/json",
+          "response": "HIDDEN_DUE_TO_SECURITY_REASONS",
+          "statusCode": 200
+        },
+        "additionalEventData": {
+          "jwt": {
+            "headers": {
+              "kid": "pr0bek1d00000000000000000000000000000000000=",
+              "alg": "RS256"
+            },
+            "claims": {
+              "sub": "d00rc1ient0000000000000000",
+              "token_use": "access",
+              "scope": "probe-door-api/invoke",
+              "auth_time": 1791987710,
+              "iss": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_pr0bep00l",
+              "exp": 1791991310,
+              "iat": 1791987710,
+              "version": 2,
+              "jti": "a4a4a4a4-0000-4000-8000-000000000006"
+            },
+            "type": "JWS"
+          }
+        },
+        "requestID": "b2b2b2b2-0000-4000-8000-000000000006",
+        "eventID": "e3e3e3e3-0000-4000-8000-000000000006",
+        "readOnly": false,
+        "resources": [
+          {
+            "accountId": "000000000000",
+            "type": "AWS::BedrockAgentCore::Runtime",
+            "ARN": "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/probe_door_agent-f1xture000"
+          },
+          {
+            "accountId": "000000000000",
+            "type": "AWS::BedrockAgentCore::RuntimeEndpoint",
+            "ARN": "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/probe_door_agent-f1xture000/runtime-endpoint/DEFAULT"
+          }
+        ],
+        "eventType": "AwsApiCall",
+        "managementEvent": false,
+        "recipientAccountId": "000000000000",
+        "sharedEventID": "c1c1c1c1-0000-4000-8000-000000000104",
+        "eventCategory": "Data",
+        "tlsDetails": {
+          "tlsVersion": "TLSv1.3",
+          "cipherSuite": "TLS_AES_128_GCM_SHA256",
+          "clientProvidedHostHeader": "bedrock-agentcore.us-west-2.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

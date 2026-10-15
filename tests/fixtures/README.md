@@ -403,7 +403,31 @@ and the account are made up; no real person.
 | Seed | File | What is wrong with it (or, for the guards, why they pass) |
 |---|---|---|
 | S1 | `m10/s1-call-records/` | `record_no_caller.json`: today's answer record for festival-desk, every field `compose_answer` writes and no caller: `caller.calls` must read it as not held, "names no caller". `call_stranger_answered.json`: subject `stranger`, not in `callers`, `outcome: admitted`: not held. `call_bypass.json`: `outcome: admitted`, `reason: not the door`, no issuer: not held. `call_wrong_subject.json`: `box-office`, in `callers` but not the stated caller of the `admitted` step: not held. `call_refused_late.json`: the stranger refused, `delivered` 601 s after `time`: not held, later than N (600 s). `calls_held.json`: the four calls as the run file states them, each refusal within N: held, admitted 1 of 1, refused 3 of 3 |
+| S1, raw (PR 2's first commit) | `m10/s1-call-records/raw/` | `data_events.json`: the five `InvokeAgentRuntime` data events Security's door probe left (2026-10-14; `milestones/M10/runs/door_probe.md`), each with its object's `LastModified`, timestamps and error messages byte for byte, every real id a placeholder (the table below); the raw shape `caller.from_raw` reads for a call made straight at the runtime. `access_log.json`: one delivered object of the door's access-log lines in the construct's format, for the platform's own call, the admitted user, no token and a stranger: the raw shape for a call through the door, written before any door is deployed, so PR 3's first live object is what shows it. `credential_leak.json`: an access-log line carrying a bearer token, which `from_raw` must refuse naming the field |
 | S2 | `m10/s2-manifest-no-callers/` | `manifest.yaml`: festival-desk's manifest at `19864419`, no `callers` field: `callers_errors` must refuse it naming the field. `with_callers.yaml`: the same with one subject, `issuer: self` (the agent's own pool): the manifest schema must admit it; today `additionalProperties: false` refuses the key |
 | S3 | `m10/s3-caller-added/cases.json` | refagent's manifest with `callers: []` as the base; a subject added, or the key removed, with the Tool Owner's ruling alone: `two-key` must refuse each naming ADR-0016 (entry 7) and pass with a second seat's key. Two guard cases with bases of their own, each a real diff: a subject removed (a narrowing) and the key first written as `[]`; one key passes each, today and after entry 7 |
 | S4 | none (the construct, the latest envelope) | two guards: the fixture agent's synthesised stack conditions the invoke on its own guardrail and its runtime has no authoriser yet; refagent's latest CI-written envelope reads plants 7 of 7, GREEN. Pass today; the door's construct change must leave both whole (F10.2) |
 | run | `milestones/M10/runs/f10_x_caller_run.yaml` | `observed: null`: the four calls on festival-desk after PR 2 merges and the door is deployed, each stated first, read by `scripts/observe_caller.py` |
+
+**Placeholders in `m10/s1-call-records/raw/data_events.json`** (M10 PR 2; the
+brief's rule that every real id in the probe's output is replaced before it
+reaches the repository). The scrub was a script over the probe's second
+read, and this is its table; what is not in it (times, error codes, error
+messages, the user agents, the TLS details) is the probe's byte for byte.
+The no-token call left no event, so there is nothing of it to copy.
+
+| In the probe | In the fixture |
+|---|---|
+| the platform account | `000000000000` |
+| the laptop's address | `198.51.100.7` |
+| the bypass role's access key id and role id | `ASIAEXAMPLEEXAMPLE00`, `AROAEXAMPLEEXAMPLE000` |
+| the probe's pool and the stranger's pool | `us-west-2_pr0bep00l`, `us-west-2_0therp00l` |
+| the callers client, the machine client, the wrong client | `ca11ersc1ient…`, `d00rc1ient…`, `wr0ngc1ient…` |
+| the two users' `sub` claims | `00000000-0000-4000-8000-00000000a0a1`, `…b0b1` |
+| the signing key id (`kid`) | `pr0bek1d…=` |
+| the runtime's id suffix | `probe_door_agent-f1xture000` |
+| the five request ids, by call: admitted, stranger, wrong-client, bypass, platform | `b2b2b2b2-0000-4000-8000-00000000000{1,3,4,5,6}` |
+| the five event ids, the same order | `e3e3e3e3-…-00000000000{1,3,4,5,6}` |
+| the four `sharedEventID`s | `c1c1c1c1-…-000000000101` to `…104` |
+| the two `jti` claims (admitted, platform) | `a4a4a4a4-…-000000000001`, `…006` |
+| the two session ids (admitted, platform) | `probe-door-admitted-0…01`, `probe-door-platform-0…06` |
