@@ -66,6 +66,8 @@ def manifest(name: str, version: str | None = None) -> str:
     source = yaml.safe_load((REFAGENT / "manifest.yaml").read_text(encoding="utf-8"))
     doc = {"name": name, "version": "1.0.0", **{k: source[k] for k in KEPT},
            "seats": {seat: None for seat in SEATS}, "may_call": [], "may_be_called_by": [],
+           # M10 PR 2 (SPEC/10 §2): nobody outside the platform may call a new agent until its owners say so.
+           "callers": [],
            "platform_version": version or platform_version()}  # fmt: skip
     # The template is never made retired, whatever refagent's manifest says.
     doc["rollout"] = "all-at-once"
@@ -73,7 +75,8 @@ def manifest(name: str, version: str | None = None) -> str:
         "# Your agent's manifest (docs/developer/quickstart.md in agentkeel).\n"
         "# Every seat is a GitHub login with access to this repository; the platform\n"
         "# check refuses a pull request while any is null. The guardrail is the\n"
-        "# platform's: an agent from the template pins it as given (M06).\n"
+        "# platform's: an agent from the template pins it as given (M06). callers is\n"
+        "# who outside the platform may ask it a question; [] is nobody (M10).\n"
     )
     return head + yaml.safe_dump(doc, sort_keys=False)
 

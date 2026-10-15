@@ -252,7 +252,9 @@ def agent_repo(tmp_path: Path, fixture: str, **manifest: Any) -> Path:
     shutil.copytree(build.ROOT / "agents" / "refagent" / "tools", root / "tools")
     doc = yaml.safe_load((root / "manifest.yaml").read_text(encoding="utf-8"))
     platform_pin = yaml.safe_load((build.ROOT / "agents" / "refagent" / "manifest.yaml").read_text(encoding="utf-8"))
-    doc |= {"guardrail": platform_pin["guardrail"], **manifest}
+    # M10 PR 2 (SPEC/10 §2): the check refuses a manifest with no `callers`; the M06 seeds predate the key and are
+    # never edited, so the repository they stand up says nobody may call it, as the template ships.
+    doc |= {"guardrail": platform_pin["guardrail"], "callers": [], **manifest}
     (root / "manifest.yaml").write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
     return root
 

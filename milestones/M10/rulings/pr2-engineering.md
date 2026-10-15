@@ -24,6 +24,7 @@ authorises:
   - src/manifest/schema.json
   - src/agent/run.py
   - scripts/observe_caller.py
+  - scripts/make_template.py
   - Makefile
   - tests/**
 evidence:
