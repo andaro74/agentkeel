@@ -10,4 +10,4 @@ index c5e9fc8..ad14f29 100644
 +may_call: [ratings-helper@v1]
  may_be_called_by: []
  
- # Tool Owner: ceilings (SPEC/00 §6). Read by validate from M02, when an edge
+ # Tool Owner (M10 PR 2; SPEC/10 §2, §11 R4; milestones/M10/rulings/pr2-tool-owner.md):
