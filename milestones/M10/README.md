@@ -109,6 +109,23 @@ Written at M10 PR 1 open. The row in `milestones/README.md` is the one
   correction: the brief read the probe's (b) as NO; the data event of an
   admitted call does carry the token's `sub` and `iss`, so (b) is PARTLY
   (`runs/door_probe.md`). The decision R2 reaches is the same.
+- **The four seat reads before the PR opened** (each verbatim in its
+  ruling file and the PR body): `engineering-cold-reviewer` 0 BLOCK, 2
+  FINDING, 6 NOTE; `security-reviewer` 0 BLOCK, 7 FINDING, 10 NOTE;
+  `tool-owner` 0 BLOCK, 3 FINDING, 14 NOTE; `data-owner` 0 BLOCK, 3
+  FINDING, 9 NOTE. Every finding in a path of this PR's was repaired in one
+  commit after the reads (`1a3e336`), the measurement being of the tree
+  that ships: a record the observer refused to copy reads as no record; the
+  caller's address, user agent, key id, principal id, session context and
+  TLS details are dropped before any record reaches an envelope, each drop
+  named; the credential match reads a key by its words and a value by its
+  shape; a line with no authoriser context that is not the API's own 401
+  reads as the door failing; a line naming another agent under this
+  agent's prefix is not copied; the authoriser clips what it writes and
+  survives a malformed payload; the pool's execution-role grants are held
+  to the agent tag; the dead stream suppression is gone; the subscriber
+  role's trust is this account's. What stands is in `rulings/pr2.md`'s
+  Unsure table, A to Q.
 - **What this PR does not do.** No live call; no festival-desk pull
   request; no pool user's credential; no golden under `evals/goldens/`,
   no bar, nothing under `src/baseline/`, no rule file; refagent stays
