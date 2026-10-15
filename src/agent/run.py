@@ -88,6 +88,24 @@ def invoke_deployed(client: Any, runtime_arn: str, question: str) -> dict[str, A
     return json.loads(body)
 
 
+def invoke_through_door(url: str, token: str, question: str) -> dict[str, Any]:
+    """M10 PR 2 (SPEC/10 §6; R2): the deployed runtime answers through its door, as the door client (`platform`).
+
+    The API's authoriser admits the token, the proxy exchanges to the door's own and invokes the runtime; the
+    body and the answer are the same bytes `invoke_deployed` sends and reads. The token is a bearer the deploy
+    minted for this run; it is sent and never written."""
+    import urllib.error
+    import urllib.request
+
+    request = urllib.request.Request(url, data=json.dumps({"question": question}).encode("utf-8"), method="POST",
+                                     headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})  # fmt: skip
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return json.loads(response.read())
+    except urllib.error.HTTPError as exc:
+        raise ValueError(f"the door answered {exc.code}: {exc.read().decode('utf-8', errors='replace')[:300]}") from exc
+
+
 def runtime_moved(runtime_arn: str) -> str | None:
     """None if the runtime still runs this tree's bundle and table, else why not (the match, read again)."""
     from scripts import runtime_for_tree
@@ -119,11 +137,22 @@ def main(argv: list[str] | None = None) -> int:
     guardrail = manifest["guardrail"]  # the pin both calls carry (M03 PR 2); None before M03
     runtime_arn = os.environ.get("AGENTKEEL_RUNTIME_ARN")
     table = os.environ.get("AGENTKEEL_RIGHTS_TABLE")
+    # M10 PR 2: an agent with a door is asked through it (deploy.yml's "The door the stack built"); empty for refagent
+    # and for an agent whose callers are [], whose runtime is called as before.
+    door_url, door_token = os.environ.get("AGENTKEEL_DOOR_URL") or None, os.environ.get("AGENTKEEL_DOOR_TOKEN") or None
 
     # The mode, before anything else it prints. The fallback used to be
     # silent, and a silent fallback is how "refagent in the runner" and
     # "refagent in the construct" became the same envelope.
     print(f"mode: runtime {runtime_arn}" if runtime_arn else "mode: runner (AGENTKEEL_RUNTIME_ARN unset)")
+    if door_url:
+        print(f"through the door at {door_url}, as the door client")
+    if own and door_url:
+        print("refagent is not behind a door at M10 (SPEC/10 section 8): AGENTKEEL_DOOR_URL is not read for it")
+        return 2
+    if door_url and not door_token:
+        print("a door with no token: the deploy minted none (AGENTKEEL_DOOR_TOKEN unset)")
+        return 2
     if not own and (not runtime_arn or not args.commit):
         print(f"{bundle} is not refagent: it is asked in its deployed runtime only, with --commit naming its repository's commit")
         return 2
@@ -145,7 +174,9 @@ def main(argv: list[str] | None = None) -> int:
             continue
         entry = {"id": golden["id"], "kind": golden["kind"], "question": golden["question"]}
         try:
-            if runtime_arn:
+            if runtime_arn and door_url and door_token:
+                entry.update(invoke_through_door(door_url, door_token, golden["question"]))
+            elif runtime_arn:
                 entry.update(invoke_deployed(client, runtime_arn, golden["question"]))
             else:
                 entry.update(agent.answer(client, golden["question"], model_id, rows, source, guardrail))
@@ -187,7 +218,10 @@ def main(argv: list[str] | None = None) -> int:
         # The pin, as the envelope's guardrail_version: "<id>:<version>" (M03 PR 2).
         "guardrail": f"{guardrail['id']}:{guardrail['version']}" if guardrail else None,
         "retrieval": None,  # the knowledge base is cut to M03 (SPEC/01 §10, cut 3)
-        "where": "the deployed runtime" if runtime_arn else "refagent's code, in the runner",
+        "where": ("the deployed runtime, through its door" if door_url else "the deployed runtime") if runtime_arn
+                 else "refagent's code, in the runner",
+        # M10 PR 2: the door the questions went through, or null; the answer record carries it (build answer).
+        "door": door_url,
         # ADR-0007: what verdict.build copies into the envelope, which the gate
         # then checks for pairing and against the bundle's manifest pin.
         "mode": "runtime" if runtime_arn else "runner",

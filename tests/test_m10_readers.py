@@ -452,3 +452,50 @@ def test_the_observer_reads_the_callers_pull_request_and_the_manifest_at_its_mer
     assert observer.main(["--read", "github", "--run", str(run), "--out", str(out)]) == 0
     again = json.loads(out.read_text(encoding="utf-8"))
     assert again["callers"] is None and "not merged" in again["manifest_error"]
+
+
+# --- the platform's own call through the door (src/agent/run.py; SPEC/10 §6) ----------------------------------
+
+
+def test_run_asks_through_the_door_with_the_token_and_the_body_only(monkeypatch):
+    import io
+    import urllib.request
+
+    from src.agent import run
+
+    seen: list[Any] = []
+
+    class Response(io.BytesIO):
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *exc: Any) -> None:
+            pass
+
+    def urlopen(request: Any, timeout: float = 0) -> Response:
+        seen.append((request.full_url, dict(request.header_items()), request.data))
+        return Response(json.dumps({"stop_reason": "end_turn", "parsed": {"table_row": "r-019"}}).encode())
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    out = run.invoke_through_door("https://x.execute-api.us-west-2.amazonaws.com/invocations", "d00r-t0ken", "g-001?")
+    assert out["parsed"] == {"table_row": "r-019"}
+    (call,) = seen
+    assert call[0].endswith("/invocations") and call[1]["Authorization"] == "Bearer d00r-t0ken"
+    assert json.loads(call[2]) == {"question": "g-001?"} and set(call[1]) == {"Authorization", "Content-type"}
+
+
+def test_run_refuses_a_door_for_refagent_and_a_door_without_a_token(monkeypatch, tmp_path, capsys):
+    from src.agent import run
+
+    monkeypatch.setenv("AGENTKEEL_RUNTIME_ARN", "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/refagent-x")
+    monkeypatch.setenv("AGENTKEEL_DOOR_URL", "https://x.execute-api.us-west-2.amazonaws.com/invocations")
+    monkeypatch.setenv("AGENTKEEL_DOOR_TOKEN", "t")
+    assert run.main(["--out", str(tmp_path / "raw.json")]) == 2
+    assert "refagent is not behind a door at M10" in capsys.readouterr().out
+    monkeypatch.delenv("AGENTKEEL_DOOR_TOKEN")
+    monkeypatch.setenv("AGENTKEEL_RUNTIME_ARN", "arn:aws:bedrock-agentcore:us-west-2:000000000000:runtime/agentkeel_festival_desk-x")
+    bundle = tmp_path / "agents" / "festival-desk"
+    shutil.copytree(FIXTURES / "s4-festival-desk-door", bundle)
+    monkeypatch.setattr(run, "ROOT", tmp_path)
+    assert run.main(["--out", str(tmp_path / "raw.json"), "--bundle", "agents/festival-desk", "--commit", "0" * 40]) == 2
+    assert "a door with no token" in capsys.readouterr().out

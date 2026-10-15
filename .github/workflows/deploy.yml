@@ -630,14 +630,48 @@ jobs:
             echo "no guardrail built by the stack: the agent carries no rules/ and pins the platform's" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      # M10 PR 2 (SPEC/10 §6; R2 door 2 hybrid; milestones/M10/rulings/pr2-security.md): the door the stack built for
+      # an agent with callers, from its outputs. Empty for an agent without, whose stack has no such outputs. The door
+      # client's secret stays in Cognito: this role reads it (DescribeUserPoolClient, on a tagged agent's pool), mints
+      # the client-credentials token at the pool's token endpoint, and hands the token to the goldens run as an
+      # environment variable, masked. The token's life is one hour; nothing here writes it anywhere.
+      - name: The door the stack built
+        if: steps.registry.outputs.skip == 'false'
+        id: door
+        run: |
+          set -euo pipefail
+          outputs=$(aws cloudformation describe-stacks --stack-name agentkeel-"$NAME" --query "Stacks[0].Outputs" --output json)
+          read_output() { printf '%s' "$outputs" | python3 -c 'import json, sys; o = json.load(sys.stdin) or []; print(next((x["OutputValue"] for x in o if x["OutputKey"] == sys.argv[1]), ""))' "$1"; }
+          url=$(read_output DoorUrl); pool=$(read_output DoorPoolId); client=$(read_output DoorClientId)
+          endpoint=$(read_output DoorTokenEndpoint); scope=$(read_output DoorScope)
+          if [ -z "$url" ] || [ -z "$pool" ] || [ -z "$client" ]; then
+            echo "url=" >> "$GITHUB_OUTPUT"; echo "token=" >> "$GITHUB_OUTPUT"
+            echo "no door built by the stack: the agent's callers are [] and its runtime keeps IAM authorisation" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          secret=$(aws cognito-idp describe-user-pool-client --user-pool-id "$pool" --client-id "$client" \
+            --query UserPoolClient.ClientSecret --output text)
+          echo "::add-mask::$secret"
+          token=$(curl -sSf -X POST "$endpoint" -u "$client:$secret" \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            -d "grant_type=client_credentials&scope=$scope" | python3 -c 'import json, sys; print(json.load(sys.stdin)["access_token"])')
+          echo "::add-mask::$token"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+          echo "the goldens are asked through the door at $url as the door client (platform on the record)" >> "$GITHUB_STEP_SUMMARY"
+
       # Item 4 (R7): the deployed agent, asked its own goldens in its runtime, scored by build. From M09 PR 2 the
       # record also names the guardrail the stack built, which the call carried (the construct conditions the
-      # invoke on it), never the manifest's pin.
+      # invoke on it), never the manifest's pin. From M10 PR 2, for an agent with a door, the questions go through
+      # the door as the door client (AGENTKEEL_DOOR_URL and the token), never straight at the runtime, which admits
+      # that client's token only; refagent's path is unchanged.
       - name: The agent answers its own goldens
         if: steps.registry.outputs.skip == 'false'
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           PIN: ${{ steps.guardrail.outputs.pin }}
+          AGENTKEEL_DOOR_URL: ${{ steps.door.outputs.url }}
+          AGENTKEEL_DOOR_TOKEN: ${{ steps.door.outputs.token }}
         run: |
           set -euo pipefail
           arn=$(aws cloudformation describe-stacks --stack-name agentkeel-"$NAME" \

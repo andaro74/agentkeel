@@ -55,8 +55,10 @@
 # Rewritten at M10 PR 2 (SPEC/10 §4, §6; milestones/M10/rulings/pr2-security.md): evals.yml gains two steps that run
 # scripts/observe_caller.py (the door's call records, the bypass call's data event and the answer record as agentkeel-audit-read;
 # the callers pull request and the manifest at its merge as the eval role) and hands make evals CALLER_OBS. Security.
+# Rewritten at M10 PR 2: deploy.yml's deploy-agent reads the door's outputs, mints the door client's token and asks the goldens
+# through the door for an agent with callers (R2; milestones/M10/rulings/pr2-security.md). Security.
 bedf184401fe99b3e2e3d893c3e7e3569f7dc6eecc689d8585b12fd5ffb98d48  .github/workflows/cold-review-ruling.yml
-c6afa6d60119182068da80669ab2ff8228b987303e26452a259f24a6d5c84bcc  .github/workflows/deploy.yml
+6193eec43d2f5a87c0c2dc45096d06d54b857fee3f5fdf9ee07bf7b52d0f7f6c  .github/workflows/deploy.yml
 d1346e69d4f68ac177832556241a9be7507e9da6282d2dc99001a9e63237a327  .github/workflows/evals.yml
 7710a46c72455b3b474639c772335fba027be8f9cd539492f5f1c822bbc88b75  .github/workflows/gates.yml
 977005d6918897772b83d279230d5febb4c3c35150d0037d08ed139af8727414  .github/workflows/model-watch.yml
