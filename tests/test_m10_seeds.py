@@ -226,19 +226,31 @@ def test_s3_guard_a_narrowing_or_a_first_empty_list_needs_no_second_key(tmp_path
 # --- S4: the guardrail stays on the call (two guards, not seeds; they pass) -------------------------------
 
 
+M10_AGENT = ROOT / "tests" / "fixtures" / "m10" / "s4-festival-desk-door"  # M09's agent with two callers (PR 2)
+
+
 @pytest.fixture(scope="module")
 def fixture_template(tmp_path_factory) -> dict[str, Any]:
-    """M09's fixture agent's stack as the construct synthesises it today (the agent the door goes on)."""
-    code, said, template = synth(M09_AGENT.relative_to(ROOT), tmp_path_factory.mktemp("festival-desk-m10"))
+    """The fixture agent with callers, as the construct synthesises it with the door (M10 PR 2)."""
+    code, said, template = synth(M10_AGENT.relative_to(ROOT), tmp_path_factory.mktemp("festival-desk-m10"))
     assert code == 0, said
     return template
 
 
-def test_s4_guard_the_invoke_is_conditioned_on_the_agents_own_guardrail(fixture_template):
-    """F10.2's first guard: every Allow on `bedrock:InvokeModel` in the fixture agent's stack carries the
-    `bedrock:GuardrailIdentifier` condition on the stack's own guardrail at its version, and the runtime
-    carries no authoriser yet (the door is PR 2's; this line is rewritten there, not deleted). Passes today and
-    must pass after the door is added to the construct. No marker."""
+@pytest.fixture(scope="module")
+def refagent_template(tmp_path_factory) -> dict[str, Any]:
+    from tests.test_m10_platform import synth_refagent
+
+    return synth_refagent(tmp_path_factory.mktemp("refagent-m10"))
+
+
+def test_s4_guard_the_invoke_is_conditioned_on_the_agents_own_guardrail(fixture_template, refagent_template):
+    """F10.2's first guard, rewritten at PR 2 as PR 1 said it would be: every Allow on `bedrock:InvokeModel` in
+    the doored fixture agent's stack still carries the `bedrock:GuardrailIdentifier` condition on the stack's own
+    guardrail at its version (the door is in front of the runtime and cannot take it off, SPEC/10 §1), the
+    runtime's authoriser admits the pool's door client and nothing else (R2), and refagent's runtime carries no
+    authoriser (SPEC/10 §8). Passed before the door at PR 1 with the authoriser asserted absent; passes after it.
+    No marker."""
     guardrail, _ = the_one(fixture_template, "AWS::Bedrock::Guardrail")
     version, _ = the_one(fixture_template, "AWS::Bedrock::GuardrailVersion")
     invokes = [s for policy in of_type(fixture_template, "AWS::IAM::Policy").values()
@@ -249,7 +261,11 @@ def test_s4_guard_the_invoke_is_conditioned_on_the_agents_own_guardrail(fixture_
         identifier = statement["Condition"]["StringEquals"]["bedrock:GuardrailIdentifier"]
         assert identifier == {"Fn::Join": ["", [{"Fn::GetAtt": [guardrail, "GuardrailArn"]}, ":", {"Fn::GetAtt": [version, "Version"]}]]}
     runtime = next(iter(of_type(fixture_template, "AWS::BedrockAgentCore::Runtime").values()))["Properties"]
-    assert "AuthorizerConfiguration" not in runtime, "the door is not in the tree yet (SPEC/10 §3.1)"
+    door_client = [logical for logical, c in of_type(fixture_template, "AWS::Cognito::UserPoolClient").items()
+                   if c["Properties"]["ClientName"] == "door"]  # fmt: skip
+    assert runtime["AuthorizerConfiguration"]["CustomJWTAuthorizer"]["AllowedClients"] == [{"Ref": door_client[0]}]
+    refagent = next(iter(of_type(refagent_template, "AWS::BedrockAgentCore::Runtime").values()))["Properties"]
+    assert "AuthorizerConfiguration" not in refagent, "refagent is not behind a door at M10 (SPEC/10 §8)"
 
 
 def test_s4_guard_refagents_plants_are_whole_on_the_latest_envelope():

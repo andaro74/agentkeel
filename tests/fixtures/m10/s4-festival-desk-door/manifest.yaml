@@ -1,0 +1,52 @@
+# festival-desk's manifest as tests/fixtures/m09/s1-festival-desk/ holds it (M09 seed S1, never edited), copied at
+# M10 PR 2 with one field added at the end: `callers`, two made-up subjects of a made-up festival's staff, each
+# issued by the agent's own pool (SPEC/10 section 2; R4). Seed S4's first guard synthesises this folder through
+# the construct and reads the door it gets: the runtime's authoriser naming the pool's door client only, the
+# invoke still conditioned on the stack's own guardrail (F10.2). The platform check admits it (callers_errors).
+# A fixture, never evidence; the live file is agentkeel-studio/festival-desk's.
+name: festival-desk
+version: 1.0.0
+model:
+  id: anthropic.claude-sonnet-4-6
+  version: null
+  profile: us.anthropic.claude-sonnet-4-6
+  region: us-west-2
+judge_model_id: null
+guardrail:
+  id: fest1va1desk
+  version: "1"
+endpoint_allowlist:
+- bedrock-runtime
+- dynamodb
+- ecr.api
+- ecr.dkr
+- kms
+- logs
+- s3
+ceilings:
+  concurrency: 2
+  rps_per_edge: 1
+  depth: 2
+  fan_out: 3
+max_tokens_per_session: 20000
+daily_usd: 10
+memory: null
+data_class: internal
+deprecated_after: null
+rollout: all-at-once
+seats:
+  product: andaro74
+  rule-owner: andaro74
+  data-owner: andaro74
+  tool-owner: andaro74
+  threshold-owner: andaro74
+  security: andaro74
+  engineering: andaro74
+may_call: []
+may_be_called_by: []
+platform_version: m08
+callers:
+- subject: lantern-desk
+  issuer: self
+- subject: box-office
+  issuer: self

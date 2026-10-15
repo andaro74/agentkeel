@@ -359,7 +359,13 @@ class BootstrapStack(cdk.Stack):
                              # M03 PR 2: the guardrail on the runtime's converse
                              # (SPEC/03 §6). A ceiling, not a grant: the construct
                              # grants it on the one guardrail.
-                             "bedrock:ApplyGuardrail"],
+                             "bedrock:ApplyGuardrail",
+                             # M10 PR 2 (SPEC/10 §6; R2; milestones/M10/rulings/pr2-security.md: a
+                             # ceiling widened, as M05's put was): the door's proxy reads the door
+                             # client's secret from Cognito at call time, on its own pool, which the
+                             # construct grants; no agent role's own policy allows it. The secret is
+                             # stored nowhere else.
+                             "cognito-idp:DescribeUserPoolClient"],
                     resources=["*"],
                 ),
                 # M05 PR 2 (SPEC/05 §6; a Security ruling, rulings/pr2-security.md: a
@@ -818,6 +824,72 @@ class BootstrapStack(cdk.Stack):
             resources=[guardrails],
             conditions={"Null": {f"aws:ResourceTag/{AGENT_TAG}": "false"}},
         ))  # fmt: skip
+        # M10 PR 2 (SPEC/10 §2, §6; R2 door 2 hybrid; milestones/M10/rulings/pr2-security.md): what the construct
+        # renders for an agent with `callers`, resource type by resource type, as the rows above
+        # (`tests/test_m10_platform.py` holds the list against the doored fixture's template). The pool, its users,
+        # clients, resource server and domain; the two door functions and their permissions; the HTTP API and its
+        # parts; the three log groups and the subscription to the security account's destination. Each is held to
+        # the platform's own names (`agentkeel-*`, `/agentkeel/doors/*`, `/aws/lambda/agentkeel-*-door-*`) where the
+        # service takes a resource ARN, and to the one service where it does not (a user pool's ARN carries an id
+        # the service assigns at create). The door's roles are agent-path roles under the boundary, which the
+        # statements above already make and pass; PassRole to Lambda is the one addition there. A policy of its
+        # own on the role (`agentkeel-cfn-exec-door`): the role's default policy is at the size CloudFormation takes
+        # for one document, and a second document CDK makes on overflow cannot carry a cdk-nag reason by path.
+        door_grants: list[iam.PolicyStatement] = []
+        door_grants.append(iam.PolicyStatement(
+            sid="PassADoorRoleToLambdaOnly",
+            actions=["iam:PassRole"],
+            resources=[agent_roles],
+            conditions={"StringEquals": {"iam:PassedToService": "lambda.amazonaws.com"}},
+        ))  # fmt: skip
+        door_grants.append(iam.PolicyStatement(
+            sid="MakeAnAgentsPoolOnlyWithItsTag",
+            actions=["cognito-idp:CreateUserPool"],
+            resources=["*"],
+            conditions={"Null": {f"aws:RequestTag/{AGENT_TAG}": "false"}},
+        ))  # fmt: skip
+        door_grants.append(iam.PolicyStatement(
+            sid="ManageAnAgentsPoolItsUsersClientsServerAndDomain",
+            actions=["cognito-idp:DescribeUserPool", "cognito-idp:UpdateUserPool", "cognito-idp:DeleteUserPool",
+                     "cognito-idp:TagResource", "cognito-idp:UntagResource", "cognito-idp:ListTagsForResource",
+                     "cognito-idp:GetUserPoolMfaConfig", "cognito-idp:SetUserPoolMfaConfig",
+                     "cognito-idp:AdminCreateUser", "cognito-idp:AdminGetUser", "cognito-idp:AdminDeleteUser",
+                     "cognito-idp:CreateUserPoolClient", "cognito-idp:DescribeUserPoolClient",
+                     "cognito-idp:UpdateUserPoolClient", "cognito-idp:DeleteUserPoolClient",
+                     "cognito-idp:CreateResourceServer", "cognito-idp:DescribeResourceServer",
+                     "cognito-idp:UpdateResourceServer", "cognito-idp:DeleteResourceServer",
+                     "cognito-idp:CreateUserPoolDomain", "cognito-idp:DescribeUserPoolDomain",
+                     "cognito-idp:UpdateUserPoolDomain", "cognito-idp:DeleteUserPoolDomain"],
+            resources=[f"arn:aws:cognito-idp:{REGION}:{self.account}:userpool/*"],
+        ))  # fmt: skip
+        door_grants.append(iam.PolicyStatement(
+            sid="MakeADoorFunctionOnly",
+            actions=["lambda:CreateFunction", "lambda:GetFunction", "lambda:GetFunctionConfiguration",
+                     "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration", "lambda:DeleteFunction",
+                     "lambda:TagResource", "lambda:UntagResource", "lambda:ListTags",
+                     "lambda:AddPermission", "lambda:RemovePermission", "lambda:GetPolicy",
+                     "lambda:GetFunctionCodeSigningConfig", "lambda:GetRuntimeManagementConfig"],
+            resources=[f"arn:aws:lambda:{REGION}:{self.account}:function:agentkeel-*-door-*"],
+        ))  # fmt: skip
+        door_grants.append(iam.PolicyStatement(
+            sid="MakeADoorApiOnly",
+            actions=["apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:PUT", "apigateway:DELETE",
+                     "apigateway:TagResource", "apigateway:UntagResource"],
+            resources=[f"arn:aws:apigateway:{REGION}::/apis", f"arn:aws:apigateway:{REGION}::/apis/*",
+                       f"arn:aws:apigateway:{REGION}::/tags/*"],
+        ))  # fmt: skip
+        door_grants.append(iam.PolicyStatement(
+            sid="MakeTheDoorsLogGroupsAndItsSubscriptionOnly",
+            # No logs:Delete*: the deploy boundary denies them flat, so the construct retains the log groups and the
+            # subscription (DeletionPolicy Retain), as it does the rights table, and CloudFormation never calls one.
+            actions=["logs:CreateLogGroup", "logs:PutRetentionPolicy",
+                     "logs:DescribeLogGroups", "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource",
+                     "logs:TagLogGroup", "logs:UntagLogGroup", "logs:ListTagsLogGroup",
+                     "logs:PutSubscriptionFilter", "logs:DescribeSubscriptionFilters"],
+            resources=[f"arn:aws:logs:{REGION}:{self.account}:log-group:/agentkeel/doors/*",
+                       f"arn:aws:logs:{REGION}:{self.account}:log-group:/aws/lambda/agentkeel-*-door-*"],
+        ))  # fmt: skip
+        iam.Policy(self, "DoorGrants", policy_name="agentkeel-cfn-exec-door", roles=[role], statements=door_grants)
         role.add_to_policy(iam.PolicyStatement(
             sid="NeverTouchTheBoundaryOrAKeyPolicy",
             effect=iam.Effect.DENY,
@@ -872,6 +944,16 @@ class BootstrapStack(cdk.Stack):
                      # refused on the first.
                      "cloudformation:GetTemplateSummary", "cloudformation:DeleteChangeSet"],
             resources=[f"arn:aws:cloudformation:{REGION}:{self.account}:stack/agentkeel-*/*"],
+        ))  # fmt: skip
+        # M10 PR 2 (SPEC/10 §6, deploy.yml "The agent answers its own goldens"; R2): for an agent with a door, the
+        # goldens step mints the door client's token and calls the API as `platform`. The client's secret stays in
+        # Cognito and is read here, on a pool the construct made (tagged as an agent's); no InvokeAgentRuntime grant
+        # is widened, since a doored runtime admits the door client's token only (milestones/M10/rulings/pr2-security.md).
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ReadADoorClientsSecretOnAnAgentsPoolOnly",
+            actions=["cognito-idp:DescribeUserPoolClient"],
+            resources=[f"arn:aws:cognito-idp:{REGION}:{self.account}:userpool/*"],
+            conditions={"Null": {f"aws:ResourceTag/{AGENT_TAG}": "false"}},
         ))  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="PassTheExecutionRoleAndNothingElse",
@@ -1584,7 +1666,21 @@ SUPPRESSIONS = {
         f"is by its subnets; TagResource at create is on guardrail/*, held to the request tag, because the create "
         f"handler tags the new guardrail before it carries one, so refagent's guardrail is out of reach by ARN "
         f"(the deploy boundary denies tagging it, flat, both ARN forms) and another untagged guardrail in this "
-        f"shared account only by a tagged request from a template GovernedAgent renders. {CEILING}"
+        f"shared account only by a tagged request from a template GovernedAgent renders. {CEILING} M10 PR 2 "
+        f"(SPEC/10 §6, R2 door 2 hybrid): the door an agent with callers gets, one statement per resource type "
+        f"again: CreateUserPool takes no resource and is held to the request tag; the pool's users, clients, "
+        f"resource server and domain are on userpool/*, whose id the service assigns at create; the two door "
+        f"functions on function:agentkeel-*-door-*, the API on /apis and /apis/*, the three log groups and the "
+        f"subscription on /agentkeel/doors/* and /aws/lambda/agentkeel-*-door-*; PassRole to Lambda on the agent "
+        f"path only; a policy of its own, DoorGrants, which carries this reason."
+    ),
+    "DoorGrants/Resource": (
+        "SPEC/10 §6, R2 (M10 PR 2): what GovernedAgent renders for an agent with callers, one statement per "
+        "resource type, on the platform's own names where the service takes a resource (function:agentkeel-*-door-*, "
+        "/agentkeel/doors/*, /aws/lambda/agentkeel-*-door-*, the agent role path for PassRole to Lambda), on "
+        "userpool/* where the pool's id is the service's, on /apis and /apis/* for the HTTP API, and on * for "
+        "CreateUserPool, which takes no resource and is held to the agent tag in the request. The deploy boundary "
+        f"(seed S4) caps it. {CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "
@@ -1597,7 +1693,9 @@ SUPPRESSIONS = {
         "template, SPEC/06 §6 items 4 and 7): the push and CreateRepository on repository/agentkeel/*, each "
         "agent's image made on its first push; InvokeAgentRuntime on runtime/agentkeel_*, an agent from the "
         "template's runtime, not runtime/*; ssm:PutParameter on /agentkeel/marker/*/rights-table-digest, each "
-        "agent's table marker."
+        "agent's table marker. M10 PR 2 (SPEC/10 §6; R2): DescribeUserPoolClient on userpool/*, held to the agent "
+        "tag, so the goldens step mints the door client's token for an agent with a door; the pool's id is the "
+        "service's."
     ),
     "DeveloperRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the developer role (§1), boundary on'. This is seed S4's principal. "
@@ -1648,12 +1746,19 @@ APPLIES_TO = {
         ("ssm", "parameter/agentkeel/security/*"))] + [
         "Resource::arn:aws:iam::<AWS::AccountId>:role/agentkeel/agents/*",
         "Resource::arn:aws:iam::<AWS::AccountId>:role/aws-service-role/network.bedrock-agentcore.amazonaws.com/*"],
+    # M10 PR 2 (SPEC/10 §6): the door's resources, by the platform's own names where the service takes one.
+    "DoorGrants/Resource": ["Resource::*", "Resource::arn:aws:iam::<AWS::AccountId>:role/agentkeel/agents/*"] + [
+        f"Resource::{_ARN.format(service, rest)}" for service, rest in (
+            ("cognito-idp", "userpool/*"), ("lambda", "function:agentkeel-*-door-*"),
+            ("logs", "log-group:/agentkeel/doors/*"), ("logs", "log-group:/aws/lambda/agentkeel-*-door-*"))] + [
+        f"Resource::arn:aws:apigateway:{REGION}::/apis/*", f"Resource::arn:aws:apigateway:{REGION}::/tags/*"],
     "DeployRole/DefaultPolicy/Resource": ["Action::cloudformation:Describe*", "Resource::*"] + [
         f"Resource::{_ARN.format(service, rest)}" for service, rest in (
             ("bedrock-agentcore", "runtime/agentkeel_*"), ("bedrock-agentcore", "runtime/refagent*"),
             ("cloudformation", "stack/agentkeel-*/*"), ("dynamodb", "table/agentkeel-*-rights"),
             ("ecr", "repository/agentkeel-*"), ("ecr", "repository/agentkeel/*"),
-            ("ssm", "parameter/agentkeel/marker/*/rights-table-digest"))],
+            ("ssm", "parameter/agentkeel/marker/*/rights-table-digest"),
+            ("cognito-idp", "userpool/*"))],  # M10 PR 2: the door client's secret, on a tagged agent's pool
     "DeveloperRole/DefaultPolicy/Resource": ["Action::bedrock:List*", "Action::cloudformation:Describe*",
                                              "Action::logs:Describe*", "Action::logs:Get*", "Resource::*"],
     "EvalRole/DefaultPolicy/Resource": ["Resource::*", "Resource::<RefagentGuardrail.GuardrailArn>:*"] + [
@@ -1668,6 +1773,7 @@ for path, reason in SUPPRESSIONS.items():
     NagSuppressions.add_resource_suppressions_by_path(
         stack, f"AgentkeelBootstrap/{path}",
         [{"id": "AwsSolutions-IAM5", "reason": reason, "appliesTo": APPLIES_TO[path]}])
+
 # Not an IAM wildcard: cdk-nag cannot resolve these rules at all. They are
 # CDK's own endpoint security groups, and their source is the VPC's CIDR,
 # an intrinsic function at synth.
