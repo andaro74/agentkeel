@@ -390,7 +390,7 @@ def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
     claim_7 = CLAIM_7_CHECKS if descends_from(commit, M07_READERS, root) else ()
     claim_8 = CLAIM_8_CHECKS if descends_from(commit, M08_READERS, root) else ()
     claim_9 = CLAIM_9_CHECKS if descends_from(commit, M09_READERS, root) else ()
-    claim_10 = CLAIM_10_CHECKS if M10_READERS is not None and descends_from(commit, M10_READERS, root) else ()
+    claim_10 = CLAIM_10_CHECKS if descends_from(commit, M10_READERS, root) else ()
     return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6 + claim_7 + claim_8 + claim_9 + claim_10
 
 

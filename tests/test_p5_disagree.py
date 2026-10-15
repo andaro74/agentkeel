@@ -374,10 +374,5 @@ def test_build_holds_a_caller_run_and_row_10_reads_it_again():
 
 
 def test_the_gate_requires_f10_checks_from_m10s_readers_and_not_before():
-    from src import verdict
-
-    if verdict.M10_READERS is None:
-        assert "F10_1" not in gate.required_checks("HEAD")  # not yet named: the commit after the readers names it
-        return
     assert {"F10_1", "F10_2", "F10_3", "F10_4", "F10_5"} <= set(gate.required_checks("HEAD"))
     assert "F10_1" not in gate.required_checks("a67de63")  # M10 PR 1's merge, before the readers
