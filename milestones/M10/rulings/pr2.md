@@ -33,7 +33,7 @@ pr: 55
 
 # Ruling: M10 PR 2, Product
 
-DRAFT. Ruled by: pending.
+Ruled by andaro74 as Product, 2026-10-15, as written.
 
 ## What this PR is
 

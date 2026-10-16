@@ -33,7 +33,7 @@ pr: 55
 
 # Ruling: M10 PR 2, Security
 
-DRAFT. Ruled by: pending.
+Ruled by andaro74 as Security, 2026-10-15, as written.
 
 ## R2. The door is door 2 in the hybrid form
 

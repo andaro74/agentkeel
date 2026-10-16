@@ -37,7 +37,7 @@ pr: 55
 
 # Ruling: M10 PR 2, Engineering
 
-DRAFT. Ruled by: pending.
+Ruled by andaro74 as Engineering, 2026-10-15, as written.
 
 ## What this covers
 

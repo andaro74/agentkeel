@@ -20,7 +20,7 @@ pr: 55
 
 # Ruling: M10 PR 2, Tool Owner
 
-DRAFT. Ruled by: pending.
+Ruled by andaro74 as Tool Owner, 2026-10-15, as written.
 
 ## R4. The manifest field
 

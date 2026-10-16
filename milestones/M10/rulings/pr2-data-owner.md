@@ -20,7 +20,7 @@ pr: 55
 
 # Ruling: M10 PR 2, Data Owner
 
-DRAFT. Ruled by: pending.
+Ruled by andaro74 as Data Owner, 2026-10-15, as written.
 
 ## R5. The call record's read shape
 
