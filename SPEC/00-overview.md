@@ -799,14 +799,21 @@ described as working until it has refused its seeded case (§10.5).
    if nobody). The platform's own goldens caller is admitted by the
    construct, named `platform` on the record, and is not an outside caller.
 2. **A door the platform controls**, which Security rules (SPEC/10 §11
-   R2): proposed, the runtime's own JWT authoriser on an identity pool
-   the agent's own stack deploys (the construct, as the agent's guardrail
-   is since M09), so that a call signed as an IAM principal no
-   longer reaches the runtime at all and the only way in is a token the
-   pool issued to a subject the manifest admits. The alternatives, with
-   their costs, are in SPEC/10 §2. Either way the guardrail stays where
-   it is, on the agent role's model call inside the runtime (M03 PR 2,
-   M09 PR 2); the door is in front of the runtime and cannot take it off.
+   R2): proposed at PR 1, the runtime's own JWT authoriser on an identity
+   pool the agent's own stack deploys (the construct, as the agent's
+   guardrail is since M09). **Ruled at M10 PR 2 on the probe's record
+   (`milestones/M10/runs/door_probe.md`): door 2 in the hybrid form.** The
+   runtime keeps its JWT authoriser, so a call signed as an IAM principal
+   no longer reaches it at all, and admits one client only, the door's
+   own; an API in front, with a Lambda authoriser checking a caller's
+   token against the manifest's `callers` and a proxy that exchanges to
+   the door's token, is the only way in for a subject the manifest admits,
+   and its access log is the record of every call, the no-token case
+   included, which the runtime's own edge did not record. The
+   alternatives, with their costs, are in SPEC/10 §2. Either way the
+   guardrail stays where it is, on the agent role's model call inside the
+   runtime (M03 PR 2, M09 PR 2); the door is in front of the runtime and
+   cannot take it off.
 3. **A call record per call**, in the audit bucket of the security
    account, written by the door's log delivery, never by the agent:
    subject, issuer, agent, outcome (admitted, refused, and why), the

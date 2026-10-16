@@ -82,6 +82,7 @@ MANIFEST_FIELD_SEATS: dict[str, str] = {
     "may_be_called_by": "Tool Owner",
     "ceilings": "Tool Owner",
     "version": "Tool Owner",
+    "callers": "Tool Owner",  # M10 PR 2 (SPEC/00 §5 as amended at M10 PR 1; SPEC/10 §2): the outside subjects admitted
 }
 MANIFEST = re.compile(r"^agents/[^/]+/manifest\.yaml$")
 

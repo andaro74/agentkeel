@@ -326,3 +326,53 @@ def test_build_holds_a_plant_run_and_row_9_reads_it_again():
 def test_the_gate_requires_f9_checks_from_m09s_readers_and_not_before():
     assert {"F9_1", "F9_2", "F9_3", "F9_4", "F9_5"} <= set(gate.required_checks("HEAD"))
     assert "F9_1" not in gate.required_checks("460990b")  # M09 PR 1's merge, before the readers
+
+
+# --- M10 PR 2 (SPEC/10 §4, P5): a case for each new check ---------------------
+
+
+def test_the_observer_claims_admitted_and_build_reads_the_record():
+    """observe_caller writes raw records; caller rules. A record the observer stepped as the admitted call whose
+    line names another subject is read as naming a caller other than the one that called (F10.3)."""
+    from src.verdict import caller
+
+    from .test_m10_readers import access_lines
+    from .test_m10_seeds import CALLERS, MAX_SECONDS, STATED
+
+    line = {**access_lines()["lantern-desk"], "step": "admitted", "admitted": True}  # the observer's own claim
+    line["raw"] = {**line["raw"], "subject": "box-office"}
+    reading = caller.calls([{**caller.from_raw(line), "step": "admitted"}], STATED, CALLERS, MAX_SECONDS)
+    assert reading["held"] is False and reading["admitted"] == 0
+    assert any("other than the one that called: 'box-office'" in r for r in reading["reasons"])
+
+
+def test_build_writes_no_claim_10_checks_and_the_gate_requires_them(chain):
+    """F10_1 to F10_5 from M10's readers: build says GREEN without them, the gate does not (SPEC/10 §4)."""
+    envelope_path, _, _ = chain(agent=True)
+    envelope = gate.read(envelope_path)
+    assert envelope["verdict"] == "GREEN"
+    required = gate.CLAIM_1_CHECKS + gate.CLAIM_2_CHECKS + gate.CLAIM_10_CHECKS
+    verdict, reasons = gate.judge(envelope, load_golden_kinds(GOLDENS_DIR), {}, [], required=required)
+    assert verdict == "RED"
+    for name in ("F10_1", "F10_2", "F10_3", "F10_4", "F10_5"):
+        assert f"checks.{name} is missing from an agent envelope" in reasons
+
+
+def test_build_holds_a_caller_run_and_row_10_reads_it_again():
+    """build ruled the run; row 10's reading holds the counts, N and refagent's plants again (P5)."""
+    from src.verdict import caller
+
+    from .test_m10_readers import observation
+    from .test_m10_seeds import MAX_SECONDS
+
+    reading = caller.record(observation(), MAX_SECONDS)
+    envelope = {"caller": reading, "plants_fired": 7, "plants_expected": 7}
+    assert gate.caller_misses(envelope, MAX_SECONDS, "the tree") == []
+    forged = {**envelope, "caller": {**reading, "refused": 3, "F10_4": {**reading["F10_4"], "held": False, "reasons": ["x"]}}}
+    assert any(m.startswith("F10_4 not held") for m in gate.caller_misses(forged, MAX_SECONDS, "the tree"))
+    assert any("calls refused 2 of 3" in m for m in gate.caller_misses({**envelope, "caller": {**reading, "refused": 2}}, MAX_SECONDS, "x"))
+
+
+def test_the_gate_requires_f10_checks_from_m10s_readers_and_not_before():
+    assert {"F10_1", "F10_2", "F10_3", "F10_4", "F10_5"} <= set(gate.required_checks("HEAD"))
+    assert "F10_1" not in gate.required_checks("a67de63")  # M10 PR 1's merge, before the readers

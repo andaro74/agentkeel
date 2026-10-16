@@ -212,6 +212,11 @@ M08_READERS = "91be2c298ba0"
 # commit after it, as M05's to M08's were. On PR 2's branch, and main keeps it because pull requests land as
 # merge commits (ADR-0004 amendment 1).
 M09_READERS = "9d2f3a7356d5"
+# The commit that wired claim 10's five checks, F10_1 to F10_5 from the seed tests of S1, S2, S3 and S4's two
+# guards, into the Makefile (M10 PR 2; SPEC/10 section 4). The gate requires them from here. Named in the
+# commit after it, as M05's to M09's were. On PR 2's branch, and main keeps it because pull requests land as
+# merge commits (ADR-0004 amendment 1).
+M10_READERS = "5e2cf705886c"
 
 
 def descends_from(commit: str, anchor: str, root: Path = ROOT) -> bool:

@@ -106,14 +106,17 @@ def test_s1_guard_the_fixture_is_in_refagents_format():
     assert kinds == ["guardrail", "ordinary", "trap"], kinds
 
 
-def test_s1_the_platform_check_admits_an_agent_with_its_own_rules():
+def test_s1_the_platform_check_admits_an_agent_with_its_own_rules(tmp_path):
     """The platform check must admit an agent repository that pins a guardrail of its own and plants a
     guardrail golden for its own rule (F9.1, F9.4). Today `evaluate()` refuses it twice: on the pin
     (src/validate/agent.py:114-116, "one guardrail for every agent at M06") and on g-030's kind
-    (src/validate/agent_goldens.py:88-90). That is the false state (SPEC/09 §3.2, §3.4)."""
+    (src/validate/agent_goldens.py:88-90). That is the false state (SPEC/09 §3.2, §3.4). From M10 PR 2 the
+    check also reads `callers`; the copy read here says nobody (tests/test_m10_seeds.py)."""
     from src.validate import agent as platform_check
 
-    errors = platform_check.evaluate(AGENT, "agentkeel-studio/festival-desk", lookup=stand_in_lookup)
+    from tests.test_m10_seeds import with_nobody_admitted
+
+    errors = platform_check.evaluate(with_nobody_admitted(AGENT, tmp_path), "agentkeel-studio/festival-desk", lookup=stand_in_lookup)
     refused = {name: errs for name, errs in errors.items() if errs}
     assert not refused, f"seed S1: the platform check refuses an agent's own pin and its guardrail golden: {refused}"
 

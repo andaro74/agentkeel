@@ -71,6 +71,21 @@ STATED = {
 CALLERS = [{"subject": "lantern-desk", "issuer": "self"}, {"subject": "box-office", "issuer": "self"}]
 
 
+def with_nobody_admitted(fixture: Path, tmp_path: Path) -> Path:
+    """A copy of an older milestone's fixture agent whose manifest says nobody may call it (`callers: []`).
+
+    From M10 PR 2 the platform check refuses a manifest with no `callers` key (SPEC/10 §2; seed S2's reader), and
+    the fixtures of M08 and M09 predate the key and are never edited (tests/fixtures/README.md). Their guard tests
+    read the copy; the fixture's bytes stay as planted."""
+    import shutil
+
+    copy = tmp_path / fixture.name
+    shutil.copytree(fixture, copy)
+    with (copy / "manifest.yaml").open("a", encoding="utf-8", newline="\n") as manifest:
+        manifest.write("callers: []\n")
+    return copy
+
+
 def load_yaml(path: Path) -> Any:
     holds(path.is_file(), f"{path.relative_to(ROOT).as_posix()} is in the tree")
     return yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -95,7 +110,6 @@ def reader(module: str, name: str, seed: str, what: str) -> Any:
 CALLS_WHAT = "nothing reads a call record"
 
 
-@expected_failure
 def test_s1_a_call_record_names_its_caller_and_the_door_refused_the_rest():
     """`src.verdict.caller.calls(records, stated, callers, max_seconds)` over six fixtures (F10.1, F10.3, F10.4).
     Today's answer record names no caller: not held. A stranger answered: not held, naming the subject. A
@@ -130,7 +144,6 @@ def test_s1_a_call_record_names_its_caller_and_the_door_refused_the_rest():
 # --- S2: a manifest with no callers, read by validate.callers and the schema ------------------------
 
 
-@expected_failure
 def test_s2_a_manifest_that_does_not_say_who_may_call_is_refused():
     """festival-desk's manifest at 19864419 has no `callers`. `src.validate.callers.callers_errors(manifest)` must
     refuse it naming the field (F10.4). Today nothing reads such a field (SPEC/10 §3.3)."""
@@ -141,7 +154,6 @@ def test_s2_a_manifest_that_does_not_say_who_may_call_is_refused():
     assert errors and any("callers" in e for e in errors), errors
 
 
-@expected_failure
 def test_s2_a_manifest_with_callers_passes_the_schema():
     """The same manifest with one `callers` entry must pass `src/manifest/schema.json` (F10.4: a manifest can say).
     Today the schema's `additionalProperties: false` refuses the key (SPEC/10 §3.3)."""
@@ -156,12 +168,16 @@ def test_s2_a_manifest_with_callers_passes_the_schema():
 # --- S3: a caller admitted with one key, read by two-key ---------------------------------------------
 
 LINE = "may_be_called_by: []\n"
+EMPTY = "callers: []\n"  # what M10 PR 2 wrote into refagent's manifest (SPEC/10 §2: `[]` the default)
 
 
 def manifest_with(callers: str) -> str:
-    """refagent's manifest as the tree holds it, with the `callers` block after `may_be_called_by`."""
+    """refagent's manifest as the tree holds it, its `callers: []` line taken out and the case's block put after
+    `may_be_called_by`. Until PR 2 the tree had no `callers` key and the block was simply added (PR 1)."""
     text = (ROOT / REFAGENT_MANIFEST).read_text(encoding="utf-8").replace("\r\n", "\n")
-    holds(text.count(LINE) == 1 and "callers" not in text, "refagent's manifest has may_be_called_by once and no callers yet")
+    holds(text.count(LINE) == 1 and text.count("\ncallers:") == text.count(EMPTY) == 1,
+          "refagent's manifest has may_be_called_by once and one `callers: []` key (M10 PR 2)")  # fmt: skip
+    text = text.replace(EMPTY, "")
     block = "" if callers == "<the line deleted>" else callers
     return text.replace(LINE, LINE + block)
 
@@ -190,7 +206,6 @@ def with_empty_callers(tmp_path: Path):
     git(repo.root, "worktree", "remove", "--force", str(repo.base))
 
 
-@expected_failure
 @pytest.mark.parametrize("case", sorted(CASES["relaxed_with_one_key"]))
 def test_s3_a_caller_admitted_with_one_key_is_refused(with_empty_callers, case):
     """A subject added to `callers`, or the key removed, with the Tool Owner's ruling alone: `two-key` must refuse it
@@ -226,19 +241,31 @@ def test_s3_guard_a_narrowing_or_a_first_empty_list_needs_no_second_key(tmp_path
 # --- S4: the guardrail stays on the call (two guards, not seeds; they pass) -------------------------------
 
 
+M10_AGENT = ROOT / "tests" / "fixtures" / "m10" / "s4-festival-desk-door"  # M09's agent with two callers (PR 2)
+
+
 @pytest.fixture(scope="module")
 def fixture_template(tmp_path_factory) -> dict[str, Any]:
-    """M09's fixture agent's stack as the construct synthesises it today (the agent the door goes on)."""
-    code, said, template = synth(M09_AGENT.relative_to(ROOT), tmp_path_factory.mktemp("festival-desk-m10"))
+    """The fixture agent with callers, as the construct synthesises it with the door (M10 PR 2)."""
+    code, said, template = synth(M10_AGENT.relative_to(ROOT), tmp_path_factory.mktemp("festival-desk-m10"))
     assert code == 0, said
     return template
 
 
-def test_s4_guard_the_invoke_is_conditioned_on_the_agents_own_guardrail(fixture_template):
-    """F10.2's first guard: every Allow on `bedrock:InvokeModel` in the fixture agent's stack carries the
-    `bedrock:GuardrailIdentifier` condition on the stack's own guardrail at its version, and the runtime
-    carries no authoriser yet (the door is PR 2's; this line is rewritten there, not deleted). Passes today and
-    must pass after the door is added to the construct. No marker."""
+@pytest.fixture(scope="module")
+def refagent_template(tmp_path_factory) -> dict[str, Any]:
+    from tests.test_m10_platform import synth_refagent
+
+    return synth_refagent(tmp_path_factory.mktemp("refagent-m10"))
+
+
+def test_s4_guard_the_invoke_is_conditioned_on_the_agents_own_guardrail(fixture_template, refagent_template):
+    """F10.2's first guard, rewritten at PR 2 as PR 1 said it would be: every Allow on `bedrock:InvokeModel` in
+    the doored fixture agent's stack still carries the `bedrock:GuardrailIdentifier` condition on the stack's own
+    guardrail at its version (the door is in front of the runtime and cannot take it off, SPEC/10 §1), the
+    runtime's authoriser admits the pool's door client and nothing else (R2), and refagent's runtime carries no
+    authoriser (SPEC/10 §8). Passed before the door at PR 1 with the authoriser asserted absent; passes after it.
+    No marker."""
     guardrail, _ = the_one(fixture_template, "AWS::Bedrock::Guardrail")
     version, _ = the_one(fixture_template, "AWS::Bedrock::GuardrailVersion")
     invokes = [s for policy in of_type(fixture_template, "AWS::IAM::Policy").values()
@@ -249,7 +276,11 @@ def test_s4_guard_the_invoke_is_conditioned_on_the_agents_own_guardrail(fixture_
         identifier = statement["Condition"]["StringEquals"]["bedrock:GuardrailIdentifier"]
         assert identifier == {"Fn::Join": ["", [{"Fn::GetAtt": [guardrail, "GuardrailArn"]}, ":", {"Fn::GetAtt": [version, "Version"]}]]}
     runtime = next(iter(of_type(fixture_template, "AWS::BedrockAgentCore::Runtime").values()))["Properties"]
-    assert "AuthorizerConfiguration" not in runtime, "the door is not in the tree yet (SPEC/10 §3.1)"
+    door_client = [logical for logical, c in of_type(fixture_template, "AWS::Cognito::UserPoolClient").items()
+                   if c["Properties"]["ClientName"] == "door"]  # fmt: skip
+    assert runtime["AuthorizerConfiguration"]["CustomJWTAuthorizer"]["AllowedClients"] == [{"Ref": door_client[0]}]
+    refagent = next(iter(of_type(refagent_template, "AWS::BedrockAgentCore::Runtime").values()))["Properties"]
+    assert "AuthorizerConfiguration" not in refagent, "refagent is not behind a door at M10 (SPEC/10 §8)"
 
 
 def test_s4_guard_refagents_plants_are_whole_on_the_latest_envelope():

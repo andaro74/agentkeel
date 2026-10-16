@@ -224,7 +224,7 @@ SEEDS_M10: dict[str, tuple[str, str, str]] = {
     "S1": ("F10.1, F10.3, F10.4", "tests/fixtures/m10/s1-call-records/", "src/verdict/caller.py"),
     "S2": ("F10.4", "tests/fixtures/m10/s2-manifest-no-callers/", "src/validate/callers.py"),
     "S3": ("F10.5", "tests/fixtures/m10/s3-caller-added/", "src/gates/two_key.py"),
-    "S4": ("F10.2", "the construct and the latest envelope (two guards, no fixture)",
+    "S4": ("F10.2", "tests/fixtures/m10/s4-festival-desk-door/ (the doored fixture, PR 2) and the latest envelope (two guards)",
            "infra/construct/governed_agent.py, src/verdict/gate.py"),
     "run": ("F10.1-F10.4, live", "milestones/M10/runs/f10_x_caller_run.yaml", "scripts/observe_caller.py"),
 }

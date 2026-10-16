@@ -157,6 +157,22 @@
 # own count of refagent's plants. On PR 2's own envelope the run reads not
 # made, so row 9 reads RED: no agent repository with rules exists yet.
 #
+# M10 PR 2 (SPEC/10 §4): the public caller's live run.
+# `scripts/observe_caller.py` reads it in two parts, each under the credentials
+# it needs, into one file: the door's call records under calls/agents/<name>/
+# in the security account's bucket, the bypass call's data event in the
+# platform account's trail objects there, and the answer record of the deploy
+# that put the door on (`agentkeel-audit-read`, before the eval role); then,
+# as the eval role, GitHub (the callers pull request, the platform's check runs
+# on its head, and the agent's manifest at the merge commit, for its callers).
+# `make evals` hands build the observation (CALLER_OBS), which rules it into
+# `caller`; the gate rules nothing on it, and only the ledger's row 10 reading
+# reads it. A record that carries a credential is not copied; a part that
+# cannot be read is written as unread; a run file whose `observed` is null as
+# not made; none fails the job. F10_1 to F10_5 are read from the seed tests
+# (the Makefile). On PR 2's own envelope the run reads not made, so row 10
+# reads RED: no door is deployed and no call has been made yet.
+#
 # What this does not do:
 # - stop someone with write access from editing this file, or from adding
 #   a workflow that assumes the same role. `validate` fails on a workflow
@@ -449,6 +465,13 @@ jobs:
         if: steps.current.outputs.measured_at == ''
         run: uv run python scripts/observe_rules.py --read bucket --out "$RUNNER_TEMP/rules.json"
 
+      # M10 PR 2 (SPEC/10 §4): the door's call records, the bypass call's data event and the answer record of the
+      # deploy that put the door on, as agentkeel-audit-read. A run file whose `observed` is null is written not
+      # made, and row 10 reads that as unread.
+      - name: Look up M10's call records in the security account's audit bucket
+        if: steps.current.outputs.measured_at == ''
+        run: uv run python scripts/observe_caller.py --read bucket --out "$RUNNER_TEMP/caller.json"
+
       # The three claims the role's trust policy matches on: `aud` and `sub`
       # exactly, `job_workflow_ref` by pattern. When an assume is refused, look
       # here first: the first deploy trusted a `sub` this repo never issues
@@ -528,6 +551,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: uv run python scripts/observe_rules.py --read github,registry,guardrail --out "$RUNNER_TEMP/rules.json"
+
+      # M10 PR 2 (SPEC/10 §4): the callers pull request and the agent's manifest at its merge commit, as the eval
+      # role with the Actions token. It never fails the job.
+      - name: Look up M10's callers pull request and the manifest it merged
+        if: steps.current.outputs.measured_at == ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: uv run python scripts/observe_caller.py --read github --out "$RUNNER_TEMP/caller.json"
 
       # Item 18: one refused call on a denied action, and one through an
       # unpinned profile. Neither has a seeded case (SPEC/01 §9), so this is
@@ -626,7 +657,7 @@ jobs:
           AGENTKEEL_RUNTIME_ARN: ${{ steps.runtime.outputs.arn }}
           # Empty: one run of each subject. 1: two (M04 PR 2).
           A_VS_A: ${{ steps.a_vs_a.outputs.a_vs_a }}
-        run: make evals A_VS_A="$A_VS_A" F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" SEED_PRS_OBS="$RUNNER_TEMP/seed_prs.json" BYPASS_OBS="$RUNNER_TEMP/bypass.json" DOORS_OBS="$RUNNER_TEMP/doors.json" INGEST_OBS="$RUNNER_TEMP/f3_5.json" CONTAINMENT_OBS="$RUNNER_TEMP/containment.json" TEMPLATE_OBS="$RUNNER_TEMP/template.json" UPGRADE_OBS="$RUNNER_TEMP/upgrade.json" APP_OBS="$RUNNER_TEMP/app-observation.json" DRILL_OBS="$RUNNER_TEMP/drill.json" RULES_OBS="$RUNNER_TEMP/rules.json" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
+        run: make evals A_VS_A="$A_VS_A" F0_2_JUNIT="$RUNNER_TEMP/junit.xml" F0_3_OBS="$RUNNER_TEMP/f0_3.json" S4_OBS="$RUNNER_TEMP/s4.json" S6_OBS="$RUNNER_TEMP/s6.json" JUNIT="$RUNNER_TEMP/junit.xml" SEED_PRS_OBS="$RUNNER_TEMP/seed_prs.json" BYPASS_OBS="$RUNNER_TEMP/bypass.json" DOORS_OBS="$RUNNER_TEMP/doors.json" INGEST_OBS="$RUNNER_TEMP/f3_5.json" CONTAINMENT_OBS="$RUNNER_TEMP/containment.json" TEMPLATE_OBS="$RUNNER_TEMP/template.json" UPGRADE_OBS="$RUNNER_TEMP/upgrade.json" APP_OBS="$RUNNER_TEMP/app-observation.json" DRILL_OBS="$RUNNER_TEMP/drill.json" RULES_OBS="$RUNNER_TEMP/rules.json" CALLER_OBS="$RUNNER_TEMP/caller.json" RUN_URL="$RUN_URL" GATE_EXIT="$RUNNER_TEMP/gate_exit" 2>&1 | tee "$RUNNER_TEMP/evals.out"
 
       # Which refagent answered, as the runner printed it. From ADR-0007 the
       # envelope records the mode itself (`mode`, `runtime_arn`); this line is

@@ -159,6 +159,39 @@ email hidden) have no planted question of their own. The first agent with a
 after two repairs to the platform's own deploy path
 (`milestones/M09/README.md`, close detail).
 
+## 5b. Who may call your agent (`callers`)
+
+Your `manifest.yaml` says who outside the platform may ask your agent a
+question, in a field called `callers`. It is a list, and **an empty list is
+the default**: `callers: []` means nobody outside the platform, which is
+what the template ships and what the platform's own agent has. The platform
+check refuses a manifest that leaves the field out: every agent says who
+may call it, even if nobody.
+
+```yaml
+callers:
+  - subject: lantern-desk   # a name: lowercase letters, digits and hyphens, 3 to 31 characters
+    issuer: self            # the only issuer at M10: your agent's own identity pool
+```
+
+What the platform builds for an agent with one or more callers: an identity
+pool of your agent's own with one user per subject, and a door in front of
+your agent's runtime, which is the only way in from outside. A caller gets
+in by signing in to the pool as its subject (the owner sets the first
+credential by hand, outside any repository) and presenting the token at the
+door; the door admits a token for a listed subject and refuses everything
+else, a stranger's token and no token alike, and every call, admitted or
+refused, leaves a record in the security account naming who asked. The
+platform's own test questions after a deploy go through the same door, as
+`platform`, which is not a name you can list. Your agent's rules stay on
+every answer: the door is in front of the runtime and cannot take them off.
+Adding a subject is two signatures in the platform's own repository; in
+yours it is one pull request, and the platform check admits it on the
+field's shape alone. The first door was built at M10 PR 2 and has not been
+deployed for any agent yet: whether a stranger is turned away and written
+down in time is read at the first deploy after it, and until then this
+section says what the door is meant to do, not what it has done.
+
 ## 6. Push, wait for the check, merge
 
 Push. When `platform-check` passes, merge with a **merge commit** (the
@@ -200,6 +233,7 @@ have shipped.
 | `the agent's own guardrail` | You have a `rules/` folder and `guardrail` is null, is the reference agent's, or is not the one the registry holds for your agent. Pin a placeholder of your own on the first pull request, then the registry's id and version. |
 | `an agent's rules on the platform baseline, add-only` | Your `rules/guardrail.yaml` removes, weakens or redefines a platform rule, carries a key the format does not have, plants a golden with no named rule or names a rule it does not build; the message names the rule and the way. |
 | `an agent's goldens` names a guardrail golden | A `kind: guardrail` golden that `rules/guardrail.yaml` does not name in `plants` with a `blocks` entry. Name it, or make it ordinary or trap. |
+| `an agent's manifest says who may call it, even if nobody: callers` | `manifest.yaml` has no `callers` field, or an entry in it is not `{subject, issuer: self}` with a subject that is a name and not `platform`, or two entries share a subject. Add `callers: []` if nobody outside may call; see section 5b. |
 | `the files the platform's image copies` | A file the image needs is missing: `__init__.py`, `agent.py`, `server.py`, `prompt.txt`, `manifest.yaml` or `tools/`. |
 | `the repository's ruleset is the export` | The repository's settings were changed. Only the owner can fix this. |
 | The deploy run fails at the registry | Another repository already deployed under your agent's name. Rename it. |

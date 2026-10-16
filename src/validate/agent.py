@@ -61,7 +61,7 @@ from typing import Any
 
 import yaml
 
-from src.validate import agent_goldens, agent_rules, edges, lifecycle, ruleset, seats
+from src.validate import agent_goldens, agent_rules, callers, edges, lifecycle, ruleset, seats
 from src.validate.checks import check_manifests
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -212,6 +212,9 @@ def evaluate(agent: Path, repository: str, root: Path = ROOT, *, lookup=None,
         # that carries rules/; one without is guarded by the platform's as at M06.
         errors["an agent's rules on the platform baseline, add-only, each plant naming a rule it builds"] = (
             agent_rules.rules_errors(tree / "agents" / name, root=root) if own_rules else [])
+        # M10 PR 2 (SPEC/10 §2, §6; seed S2; F10.4): the manifest says who may call the agent, even if nobody.
+        # Read for every agent: a manifest with no `callers` key is refused here, for this named reader.
+        errors["an agent's manifest says who may call it, even if nobody: callers"] = callers.callers_errors(doc)
     finally:
         seats.login_holds_seat.cache_clear()
         if previous is None:

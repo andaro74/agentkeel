@@ -10,15 +10,20 @@ from typing import Any
 
 import aws_cdk as cdk
 import jsii
+from aws_cdk import aws_apigatewayv2 as apigw
 from aws_cdk import aws_bedrock as bedrock
 from aws_cdk import aws_bedrockagentcore as agentcore
+from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_kms as kms
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_logs as logs
 from aws_cdk import aws_ssm as ssm
 from constructs import Construct, IValidation
 
+from infra.construct import door
 from src import manifest as manifest_module
 from src.validate import agent_rules
 
@@ -82,6 +87,21 @@ AGENT_TAG = "agentkeel:agent"  # on the agent's role; the audit bucket's policy 
 # from the template has a key. After a key is made its policy is not changed by any role here.
 PLATFORM_ROLES = ("agentkeel-deploy", "agentkeel-cfn-exec", "agentkeel-evals", "agentkeel-developer",
                   "agentkeel-model-watch", "agentkeel-envelope-row-put")  # fmt: skip
+# M10 PR 2 (SPEC/10 §2, §6; R2 door 2 hybrid; milestones/M10/runs/door_probe.md). An agent whose manifest has
+# `callers` gets a door: a Cognito user pool of its own (one user per subject, a callers client, a door client with
+# a client-credentials scope), the runtime's JWT authoriser admitting the door client ONLY, and an HTTP API in
+# front with a Lambda authoriser (the callers' tokens against the manifest's list) and a proxy Lambda that
+# exchanges to the door's token and invokes the runtime. The API's access log goes to a log group here and, by a
+# subscription, to the security account's destination, which delivers it under calls/agents/<name>/ in the audit
+# bucket (infra/security/). The two Lambdas run outside the platform VPC: the runtime's bearer endpoint and the
+# pool's token endpoint are public service endpoints the VPC has no way to (stated under Unsure, Security).
+SECURITY_ACCOUNT = "897698239547"
+CALLS_DESTINATION = f"arn:aws:logs:us-west-2:{SECURITY_ACCOUNT}:destination:agentkeel-calls"
+DOOR_LOG_GROUPS = "/agentkeel/doors/"
+LAMBDA_LOG_GROUPS = "/aws/lambda/"
+DOOR_RUNTIME = "python3.14"  # the latest Lambda runtime cdk-nag knows (L1), as infra/audit's seed function
+DOOR_TIMEOUT_MS = 29_000  # API Gateway's integration ceiling; the proxy's own timeout is one second under it
+PLATFORM_SCOPE = "invoke"  # the door client's scope on the agent's resource server: <agentkeel-name>/invoke
 
 
 class GovernedAgent(Construct):
@@ -191,7 +211,23 @@ class GovernedAgent(Construct):
         if self.retired and self.agent_name == PLATFORM_AGENT:
             rules.refuse(f"{self.node.path}: {PLATFORM_AGENT} is the platform's own agent and is never retired "
                          "by a manifest (SPEC/07 section 6).")
+        # M10 PR 2 (SPEC/10 §2, §6; R2): the outside subjects the manifest admits (Tool Owner). With any, the
+        # agent gets a door: its pool before the runtime, whose authoriser names the pool's door client, and the
+        # API after it, whose proxy names the runtime. refagent's `callers` is `[]`: no pool, no authoriser, the
+        # eval role's and the deploy role's SigV4 calls as before (SPEC/10 §8).
+        self.callers: list[str] = [c["subject"] for c in self.manifest.get("callers") or []]
+        if self.callers and self.agent_name == PLATFORM_AGENT:
+            rules.refuse(f"{self.node.path}: {PLATFORM_AGENT} is not behind a door at M10 (SPEC/10 section 8); "
+                         "its callers must be [].")
+        self.pool: cognito.CfnUserPool | None = None
+        self.door_client: cognito.CfnUserPoolClient | None = None
+        self.callers_client: cognito.CfnUserPoolClient | None = None
+        self.door_api: apigw.CfnApi | None = None
+        if self.callers and not self.retired:
+            self._pool()
         self.runtime = None if self.retired else self._runtime(image_digest or UNPINNED)
+        if self.runtime is not None and self.pool is not None:
+            self._door(rules)
 
     # --- the network -------------------------------------------------------
 
@@ -525,11 +561,23 @@ class GovernedAgent(Construct):
         subnets = ssm.StringListParameter.value_for_typed_list_parameter(self, SUBNETS_PARAM)
         image = (f"{stack.account}.dkr.ecr.{stack.region}.amazonaws.com/"
                  f"{self.image_repository}@{image_digest}")  # fmt: skip
+        # M10 PR 2 (SPEC/10 §2, §6; R2 door 2 hybrid; door_probe.md (a), (d)): with a pool, the runtime takes
+        # bearer tokens only and admits the door client alone, so a SigV4 call from any principal with the grant,
+        # a caller's own token and no token are each refused at the service's edge, before the container. Set
+        # on a deployed runtime it updates in place (version n to n+1, the ARN unchanged). Without a pool, as
+        # before: IAM is the only check.
+        authoriser = None
+        if self.pool is not None and self.door_client is not None:
+            authoriser = agentcore.CfnRuntime.AuthorizerConfigurationProperty(
+                custom_jwt_authorizer=agentcore.CfnRuntime.CustomJWTAuthorizerConfigurationProperty(
+                    discovery_url=f"https://cognito-idp.{stack.region}.amazonaws.com/{self.pool.ref}/.well-known/openid-configuration",
+                    allowed_clients=[self.door_client.ref]))
         return agentcore.CfnRuntime(
             self, "Runtime",
             agent_runtime_name=self.runtime_name,
             role_arn=self.role.role_arn,
             description=f"agentkeel {self.agent_name}, from the bundle {self.bundle}.",
+            authorizer_configuration=authoriser,
             agent_runtime_artifact=agentcore.CfnRuntime.AgentRuntimeArtifactProperty(
                 container_configuration=agentcore.CfnRuntime.ContainerConfigurationProperty(container_uri=image)),
             network_configuration=agentcore.CfnRuntime.NetworkConfigurationProperty(
@@ -556,6 +604,164 @@ class GovernedAgent(Construct):
                 "AGENTKEEL_AUDIT_PREFIX": f"agents/{self.agent_name}/events/",
             },
         )  # fmt: skip
+
+
+    # --- the door (M10 PR 2; SPEC/10 §2, §6; R2 door 2 hybrid) -------------------
+
+    def _pool(self) -> None:
+        """The agent's own identity pool: one user per subject in `callers`, a callers client and the door client.
+
+        The pool is retained, as the guardrail is: its users' first credentials are set by hand (SPEC/10 §5.1),
+        and a redeploy must not lose them. A user's logical id is its subject, so a subject removed from the
+        list removes that user and no other. MFA is off and the password policy is the pool's: a subject is an
+        identity for a machine caller whose first credential the owner sets by hand (SPEC/10 §8, "The subject's
+        credential"); the pool's advanced security is not bought."""
+        stack = cdk.Stack.of(self)
+        pool = cognito.CfnUserPool(
+            self, "Pool",
+            user_pool_name=f"agentkeel-{self.agent_name}",
+            admin_create_user_config=cognito.CfnUserPool.AdminCreateUserConfigProperty(allow_admin_create_user_only=True),
+            policies=cognito.CfnUserPool.PoliciesProperty(password_policy=cognito.CfnUserPool.PasswordPolicyProperty(
+                minimum_length=12, require_lowercase=True, require_uppercase=True, require_numbers=True,
+                require_symbols=True, temporary_password_validity_days=1)),
+            mfa_configuration="OFF",
+            account_recovery_setting=cognito.CfnUserPool.AccountRecoverySettingProperty(recovery_mechanisms=[
+                cognito.CfnUserPool.RecoveryOptionProperty(name="admin_only", priority=1)]),
+            deletion_protection="INACTIVE",
+            user_pool_tags={AGENT_TAG: self.agent_name},
+        )  # fmt: skip
+        pool.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+        self.pool = pool
+        for subject in self.callers:
+            user = cognito.CfnUserPoolUser(
+                self, "Caller" + "".join(part.capitalize() for part in subject.split("-")),
+                user_pool_id=pool.ref, username=subject, message_action="SUPPRESS",
+            )  # fmt: skip
+            user.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+        server = cognito.CfnUserPoolResourceServer(
+            self, "ResourceServer", user_pool_id=pool.ref, identifier=f"agentkeel-{self.agent_name}",
+            name=f"agentkeel-{self.agent_name}",
+            scopes=[cognito.CfnUserPoolResourceServer.ResourceServerScopeTypeProperty(
+                scope_name=PLATFORM_SCOPE, scope_description="the platform's own goldens caller, through the door")],
+        )  # fmt: skip
+        validity = cognito.CfnUserPoolClient.TokenValidityUnitsProperty(access_token="hours", id_token="hours",
+                                                                       refresh_token="days")  # fmt: skip
+        self.callers_client = cognito.CfnUserPoolClient(
+            self, "CallersClient", user_pool_id=pool.ref, client_name="callers", generate_secret=False,
+            explicit_auth_flows=["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"],
+            prevent_user_existence_errors="ENABLED", enable_token_revocation=True,
+            access_token_validity=1, id_token_validity=1, refresh_token_validity=1, token_validity_units=validity,
+        )  # fmt: skip
+        self.door_client = cognito.CfnUserPoolClient(
+            self, "DoorClient", user_pool_id=pool.ref, client_name="door", generate_secret=True,
+            allowed_o_auth_flows=["client_credentials"], allowed_o_auth_flows_user_pool_client=True,
+            allowed_o_auth_scopes=[f"agentkeel-{self.agent_name}/{PLATFORM_SCOPE}"],
+            supported_identity_providers=["COGNITO"], enable_token_revocation=True,
+            access_token_validity=1, id_token_validity=1, refresh_token_validity=1, token_validity_units=validity,
+        )  # fmt: skip
+        self.door_client.node.add_dependency(server)
+        self.domain_prefix = f"agentkeel-{self.agent_name}-{stack.account}"
+        cognito.CfnUserPoolDomain(self, "Domain", user_pool_id=pool.ref, domain=self.domain_prefix)
+        self.token_endpoint = f"https://{self.domain_prefix}.auth.{stack.region}.amazoncognito.com/oauth2/token"
+
+    def _door_role(self, construct_id: str, function_name: str, rules: _StackRules) -> iam.Role:
+        """A door function's role: under the agent path with the boundary (so the execution role may make it, and
+        the stack's S5 check reads it), its own log group and nothing else here."""
+        stack = cdk.Stack.of(self)
+        role = iam.Role(
+            self, construct_id,
+            path=AGENT_ROLE_PATH,
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            permissions_boundary=iam.ManagedPolicy.from_managed_policy_arn(self, f"{construct_id}Boundary", self.boundary_arn),
+            description=f"agentkeel {self.agent_name}: the door's {function_name.rsplit('-', 1)[-1]}, inside the boundary.",
+        )  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="ItsOwnLogStreams", actions=["logs:CreateLogStream", "logs:PutLogEvents"],
+            resources=[f"arn:aws:logs:{stack.region}:{stack.account}:log-group:{LAMBDA_LOG_GROUPS}{function_name}:*"],
+        ))  # fmt: skip
+        rules.own_role(role, self.boundary_arn, given=False)
+        return role
+
+    def _door(self, rules: _StackRules) -> None:
+        """The API in front of the runtime: the authoriser, the proxy, the access log and its delivery."""
+        assert self.pool is not None and self.door_client is not None and self.callers_client is not None
+        assert self.runtime is not None
+        stack = cdk.Stack.of(self)
+        region, account = stack.region, stack.account
+        names = {"authoriser": f"agentkeel-{self.agent_name}-door-authoriser", "proxy": f"agentkeel-{self.agent_name}-door-proxy"}
+        for kind, source in (("authoriser", door.AUTHORISER_SOURCE), ("proxy", door.PROXY_SOURCE)):
+            if len(source.encode("utf-8")) > door.ZIPFILE_LIMIT:
+                rules.refuse(f"{self.node.path}: the door's {kind} is {len(source.encode('utf-8'))} bytes, over "
+                             f"CloudFormation's {door.ZIPFILE_LIMIT} for inline code")  # fmt: skip
+        # The three log groups and the subscription are retained: the deploy boundary denies logs:Delete* flat (SPEC/01
+        # §6; seed S4), so CloudFormation must never call DeleteLogGroup or DeleteSubscriptionFilter, as it never calls
+        # DeleteTable on the rights table. A retired agent's stack keeps them; the access log is the call record's source.
+        access_log = logs.CfnLogGroup(self, "DoorAccessLog", log_group_name=f"{DOOR_LOG_GROUPS}{self.agent_name}/access",
+                                      retention_in_days=30)  # fmt: skip
+        access_log.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+        # Every line to the security account's destination, which delivers it under calls/agents/<name>/ (infra/security/).
+        # A cross-account subscription to a Logs destination carries no role: the destination's policy admits this account.
+        delivery = logs.CfnSubscriptionFilter(self, "DoorCalls", log_group_name=access_log.ref,
+                                              destination_arn=CALLS_DESTINATION, filter_pattern="")  # fmt: skip
+        delivery.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+        delivery.node.add_dependency(access_log)
+        functions: dict[str, lambda_.CfnFunction] = {}
+        for kind, source in (("authoriser", door.AUTHORISER_SOURCE), ("proxy", door.PROXY_SOURCE)):
+            name = names[kind]
+            role = self._door_role(f"Door{kind.capitalize()}Role", name, rules)
+            if kind == "proxy":
+                # The door client's secret stays in Cognito and is read at call time, by this role and no other
+                # (Unsure I on M10 PR 1: no copy in Secrets Manager or SSM).
+                role.add_to_policy(iam.PolicyStatement(sid="ReadTheDoorClientsSecret",
+                                                       actions=["cognito-idp:DescribeUserPoolClient"],
+                                                       resources=[self.pool.attr_arn]))  # fmt: skip
+            log_group = logs.CfnLogGroup(self, f"Door{kind.capitalize()}Log", log_group_name=f"{LAMBDA_LOG_GROUPS}{name}",
+                                         retention_in_days=30)  # fmt: skip
+            log_group.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+            environment = {"REGION": region, "POOL_ID": self.pool.ref, "DOOR_CLIENT_ID": self.door_client.ref}
+            if kind == "authoriser":
+                environment |= {"CALLERS_CLIENT_ID": self.callers_client.ref, "CALLERS": ",".join(self.callers)}
+            else:
+                environment |= {"TOKEN_ENDPOINT": self.token_endpoint, "SCOPE": f"agentkeel-{self.agent_name}/{PLATFORM_SCOPE}",
+                                "RUNTIME_ARN": self.runtime.attr_agent_runtime_arn}  # fmt: skip
+            function = lambda_.CfnFunction(
+                self, f"Door{kind.capitalize()}", function_name=name, runtime=DOOR_RUNTIME, handler="index.handler",
+                role=role.role_arn, code=lambda_.CfnFunction.CodeProperty(zip_file=source),
+                timeout=10 if kind == "authoriser" else DOOR_TIMEOUT_MS // 1000 - 1, memory_size=256,
+                environment=lambda_.CfnFunction.EnvironmentProperty(variables=environment),
+                description=f"agentkeel {self.agent_name}: the door's {kind} (SPEC/10 section 6).",
+                tags=[cdk.CfnTag(key=AGENT_TAG, value=self.agent_name)],
+            )  # fmt: skip
+            function.node.add_dependency(log_group)
+            functions[kind] = function
+        api = apigw.CfnApi(self, "Door", name=f"agentkeel-{self.agent_name}-door", protocol_type="HTTP",
+                           description=f"agentkeel {self.agent_name}: the door the platform controls (SPEC/10 section 2).",
+                           tags={AGENT_TAG: self.agent_name})  # fmt: skip
+        self.door_api = api
+        authoriser = apigw.CfnAuthorizer(
+            self, "DoorAuthorizer", api_id=api.ref, authorizer_type="REQUEST", name="callers",
+            authorizer_uri=f"arn:aws:apigateway:{region}:lambda:path/2015-03-31/functions/{functions['authoriser'].attr_arn}/invocations",
+            authorizer_payload_format_version="2.0", enable_simple_responses=True,
+            identity_source=["$request.header.Authorization"], authorizer_result_ttl_in_seconds=0,
+        )  # fmt: skip
+        integration = apigw.CfnIntegration(
+            self, "DoorProxyIntegration", api_id=api.ref, integration_type="AWS_PROXY",
+            integration_uri=functions["proxy"].attr_arn, payload_format_version="2.0", timeout_in_millis=DOOR_TIMEOUT_MS,
+        )  # fmt: skip
+        apigw.CfnRoute(self, "DoorInvocations", api_id=api.ref, route_key="POST /invocations",
+                       authorization_type="CUSTOM", authorizer_id=authoriser.ref, target=f"integrations/{integration.ref}")  # fmt: skip
+        apigw.CfnStage(
+            self, "DoorStage", api_id=api.ref, stage_name="$default", auto_deploy=True,
+            access_log_settings=apigw.CfnStage.AccessLogSettingsProperty(
+                destination_arn=access_log.attr_arn, format=door.ACCESS_LOG_FORMAT % self.agent_name),
+        )  # fmt: skip
+        lambda_.CfnPermission(self, "DoorAuthoriserPermission", action="lambda:InvokeFunction",
+                              function_name=functions["authoriser"].ref, principal="apigateway.amazonaws.com",
+                              source_arn=f"arn:aws:execute-api:{region}:{account}:{api.ref}/authorizers/{authoriser.ref}")  # fmt: skip
+        lambda_.CfnPermission(self, "DoorProxyPermission", action="lambda:InvokeFunction",
+                              function_name=functions["proxy"].ref, principal="apigateway.amazonaws.com",
+                              source_arn=f"arn:aws:execute-api:{region}:{account}:{api.ref}/*/*/invocations")  # fmt: skip
+        self.door_url = f"{api.attr_api_endpoint}/invocations"
 
 
 def _parameter(scope: Construct, construct_id: str, name: str) -> str:

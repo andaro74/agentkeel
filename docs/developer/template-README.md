@@ -11,7 +11,7 @@ What is here:
 
 | File | What it is |
 |---|---|
-| `manifest.yaml` | The agent's name, model, guardrail and owners (seats). Every seat starts empty. |
+| `manifest.yaml` | The agent's name, model, guardrail, owners (seats) and `callers`, who outside the platform may ask it a question. Every seat starts empty; `callers` starts as `[]`, nobody, and the check refuses a manifest without it. See "Who may call your agent" in the quickstart. |
 | `goldens/` | The agent's own tests. Starts empty. You add at least one ordinary question and one trap. |
 | `data/table.json`, `data/clauses.json` | The rows and clauses the agent answers from. Each test cites one of each. |
 | `rules/guardrail.yaml` (optional) | Your agent's own rules, on top of the platform's. Not shipped by the template; add the folder when your agent needs a rule of its own. See "Your own rules" in the quickstart. |
@@ -46,6 +46,15 @@ What you cannot change from here:
   build, is refused. Whether the rule stopped the question is read from
   the guardrail's trace after your merge and recorded; at M09 a silent
   rule does not stop your merge.
+- **The door.** With one or more `callers`, the platform builds your
+  agent an identity pool (one user per subject) and a door in front of its
+  runtime, and that door is the only way in from outside: a listed
+  subject's token is admitted, a stranger's token and no token are refused,
+  and every call, admitted or refused, is recorded in the security account
+  with who asked. Your agent's rules stay on every answer; the door cannot
+  take them off. The first door was built at M10 PR 2 and has not been
+  deployed for any agent yet; what it does is read at the first deploy
+  after it.
 - **The guardrail itself.** With a `rules/` folder, the platform builds a
   guardrail for your agent from the merged rules when it deploys, named
   `agentkeel-<your agent's name>`, and puts your agent's calls through it.

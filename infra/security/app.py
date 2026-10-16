@@ -88,12 +88,15 @@ anything seven years (M08); read the lock's retention in a gate (SPEC/05
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
 import aws_cdk as cdk
 from aws_cdk import aws_cloudtrail as cloudtrail
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kinesisfirehose as firehose
+from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 from constructs import Construct
@@ -141,11 +144,24 @@ OWN_PREFIX = "agents/${aws:PrincipalTag/agentkeel:agent}/*"
 THUMBPRINTS = ["6938fd4d98bab03faadb97b34396831e3780aea1", "1c58a3a8518e8759bf075b76b750d4f2df264fcd"]
 # What the observer reads (scripts/observe_containment.py), and nothing else.
 # envelopes/agents/ from M06 PR 2 (item 4's records); observations/ from M07 PR 2 (the App-viewpoint observation).
-READ_PREFIXES = ["AWSLogs/", "agents/", "test/", "envelopes/agents/", "observations/"]
+# calls/ from M10 PR 2 (SPEC/10 §2, §6): the door's call records, delivered by this stack's Firehose.
+READ_PREFIXES = ["AWSLogs/", "agents/", "test/", "envelopes/agents/", "observations/", "calls/"]
 # Listed, not read (M07 PR 2): whether a retired agent's signed bundle is there. Its bytes are not the observer's.
 LIST_ONLY_PREFIXES = ["bundles/"]
 # The object events this account's trail logs: the attempts and the evidence, not the delivery.
-LOGGED_PREFIXES = ["agents/", "test/", "envelopes/", "bundles/", "observations/"]
+LOGGED_PREFIXES = ["agents/", "test/", "envelopes/", "bundles/", "observations/", "calls/"]
+# M10 PR 2 (SPEC/10 §2 "The call record", §6 "The call record's delivery"; R2 door 2 hybrid; Security): the door's
+# access-log lines reach this bucket by a CloudWatch Logs subscription in the platform account to a Logs
+# destination here, which hands them to a Firehose here that writes under calls/agents/<name>/. One destination
+# and one stream for every doored agent: the line's own `agent` field is the partition key. Nothing in the
+# platform account holds a role on this bucket for it; the destination's policy admits that account's
+# subscriptions, and the stream's role is this stack's, under its boundary.
+CALLS_PREFIX = "calls/"
+CALLS_STREAM = "agentkeel-calls"
+CALLS_DESTINATION = "agentkeel-calls"
+CALLS_ROLE = "agentkeel-calls-delivery"
+CALLS_SUBSCRIBER_ROLE = "agentkeel-calls-subscriber"
+NEWLINE = "\\n"  # the delimiter Firehose appends to each extracted line: the two characters, as its console writes them
 # Written once (M07 PR 2): a put without If-None-Match is refused, as under envelopes/.
 PUT_ONCE = {"bundles/": "ABundleIsWrittenOnce", "observations/": "AnObservationIsWrittenOnce"}
 # Seed S6's two object actions, granted on test/ so that the lock is what refuses them.
@@ -168,6 +184,7 @@ class SecurityStack(cdk.Stack):
         put_role = self._put_role(provider)
         answer_role = self._answer_put_role(provider)
         observation_role = self._observation_put_role(provider)
+        calls_destination = self._calls_delivery(bucket)
 
         cdk.CfnOutput(self, "AuditBucket", value=bucket.bucket_name)
         cdk.CfnOutput(self, "AuditReadRoleArn", value=read_role.role_arn)
@@ -175,6 +192,7 @@ class SecurityStack(cdk.Stack):
         cdk.CfnOutput(self, "AnswerPutRoleArn", value=answer_role.role_arn)
         cdk.CfnOutput(self, "ObservationPutRoleArn", value=observation_role.role_arn)
         cdk.CfnOutput(self, "TrailArn", value=trail.attr_arn)
+        cdk.CfnOutput(self, "CallsDestinationArn", value=calls_destination.attr_arn)
 
     # --- the boundary ------------------------------------------------------
 
@@ -188,8 +206,17 @@ class SecurityStack(cdk.Stack):
                 iam.PolicyStatement(
                     sid="ReadTheAuditBucketAndPutNewObjects",
                     actions=["s3:GetObject", "s3:GetObjectVersion", "s3:GetObjectRetention", "s3:ListBucket",
-                             "s3:ListBucketVersions", "s3:PutObject"],
+                             "s3:ListBucketVersions", "s3:PutObject",
+                             # M10 PR 2: what Firehose's S3 delivery calls beside PutObject (its documented role).
+                             "s3:AbortMultipartUpload", "s3:GetBucketLocation", "s3:ListBucketMultipartUploads"],
                     resources=[bucket_arn, f"{bucket_arn}/*"],
+                ),
+                # M10 PR 2: the Logs destination hands each batch to the delivery stream, and nothing else here
+                # may put to a stream. A ceiling; the subscriber role's own policy names the one stream.
+                iam.PolicyStatement(
+                    sid="TheDestinationHandsCallsToTheStream",
+                    actions=["firehose:PutRecord", "firehose:PutRecordBatch"],
+                    resources=[f"arn:aws:firehose:{REGION}:{SECURITY_ACCOUNT}:deliverystream/{CALLS_STREAM}"],
                 ),
                 iam.PolicyStatement(
                     sid="NeverEraseNeverUnlockNeverEscalate", effect=iam.Effect.DENY,
@@ -274,6 +301,20 @@ class SecurityStack(cdk.Stack):
             sid="TheStandinNeverWritesARefusalEvent", effect=iam.Effect.DENY, principals=[iam.AnyPrincipal()],
             actions=["s3:PutObject"], resources=[objects("agents/refagent/events/*")],
             conditions={"ArnEquals": {"aws:PrincipalArn": STANDIN_ROLE}},
+        ))  # fmt: skip
+        # M10 PR 2 (SPEC/10 §6): the call records' prefix. This stack's delivery role puts under calls/ and no
+        # other principal does: an agent role, a platform role, the put roles above are refused there by name of
+        # the one role that may. The delivery role is made below, so its ARN is named here as the stack will.
+        delivery_role_arn = f"arn:aws:iam::{SECURITY_ACCOUNT}:role/{CALLS_ROLE}"
+        bucket.add_to_resource_policy(iam.PolicyStatement(
+            sid="TheCallsDeliveryPutsUnderCalls", principals=[iam.AnyPrincipal()],
+            actions=["s3:PutObject", "s3:AbortMultipartUpload"], resources=[objects(f"{CALLS_PREFIX}*")],
+            conditions={"ArnEquals": {"aws:PrincipalArn": delivery_role_arn}},
+        ))  # fmt: skip
+        bucket.add_to_resource_policy(iam.PolicyStatement(
+            sid="NobodyElsePutsUnderCalls", effect=iam.Effect.DENY, principals=[iam.AnyPrincipal()],
+            actions=["s3:PutObject"], resources=[objects(f"{CALLS_PREFIX}*")],
+            conditions={"ArnNotEquals": {"aws:PrincipalArn": delivery_role_arn}},
         ))  # fmt: skip
         # Seed S6: granted, on test/ only, so that Object Lock is what must refuse the two object actions.
         bucket.add_to_resource_policy(iam.PolicyStatement(
@@ -386,6 +427,78 @@ class SecurityStack(cdk.Stack):
             resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/bundles/*"]))
         return role
 
+    # --- the call records' delivery (M10 PR 2; SPEC/10 §6; R2) ----------------------
+
+    def _calls_delivery(self, bucket: s3.Bucket) -> logs.CfnDestination:
+        """A Firehose that writes the door's access-log lines under calls/agents/<name>/, and the Logs destination
+        the platform account's door subscriptions send to.
+
+        The stream decompresses CloudWatch Logs' batches, extracts each log event's message (one access-log line,
+        JSON), reads `agent` from it as the partition key and appends a newline, so each object under
+        calls/agents/<name>/ is newline-delimited JSON of that agent's lines and nothing of another's. A line it
+        cannot partition goes under calls/errors/. Buffered sixty seconds or sixty-four megabytes, whichever
+        first: well under N (600 s). Server-side encrypted with an AWS-owned key; the bucket encrypts again."""
+        delivery_role = iam.Role(
+            self, "CallsDeliveryRole", role_name=CALLS_ROLE,
+            assumed_by=iam.ServicePrincipal("firehose.amazonaws.com").with_conditions(
+                {"StringEquals": {"sts:ExternalId": SECURITY_ACCOUNT}}),
+            description="agentkeel: the call records' delivery stream writes under calls/ as this (SPEC/10 section 6).",
+        )  # fmt: skip
+        delivery_role.add_to_policy(iam.PolicyStatement(
+            sid="WriteUnderCallsOnly", actions=["s3:PutObject", "s3:AbortMultipartUpload"],
+            resources=[f"arn:aws:s3:::{AUDIT_BUCKET}/{CALLS_PREFIX}*"]))
+        delivery_role.add_to_policy(iam.PolicyStatement(
+            sid="TheBucketItWritesTo", actions=["s3:GetBucketLocation", "s3:ListBucket", "s3:ListBucketMultipartUploads"],
+            resources=[bucket.bucket_arn]))
+        processor = firehose.CfnDeliveryStream.ProcessorProperty
+        parameter = firehose.CfnDeliveryStream.ProcessorParameterProperty
+        stream = firehose.CfnDeliveryStream(
+            self, "CallsStream", delivery_stream_name=CALLS_STREAM, delivery_stream_type="DirectPut",
+            delivery_stream_encryption_configuration_input=firehose.CfnDeliveryStream.DeliveryStreamEncryptionConfigurationInputProperty(
+                key_type="AWS_OWNED_CMK"),
+            extended_s3_destination_configuration=firehose.CfnDeliveryStream.ExtendedS3DestinationConfigurationProperty(
+                bucket_arn=bucket.bucket_arn, role_arn=delivery_role.role_arn,
+                prefix=f"{CALLS_PREFIX}agents/!{{partitionKeyFromQuery:agent}}/!{{timestamp:yyyy/MM/dd}}/",
+                error_output_prefix=f"{CALLS_PREFIX}errors/!{{firehose:error-output-type}}/!{{timestamp:yyyy/MM/dd}}/",
+                buffering_hints=firehose.CfnDeliveryStream.BufferingHintsProperty(interval_in_seconds=60, size_in_m_bs=64),
+                compression_format="UNCOMPRESSED",
+                dynamic_partitioning_configuration=firehose.CfnDeliveryStream.DynamicPartitioningConfigurationProperty(
+                    enabled=True, retry_options=firehose.CfnDeliveryStream.RetryOptionsProperty(duration_in_seconds=60)),
+                processing_configuration=firehose.CfnDeliveryStream.ProcessingConfigurationProperty(enabled=True, processors=[
+                    processor(type="Decompression", parameters=[parameter(parameter_name="CompressionFormat", parameter_value="GZIP")]),
+                    processor(type="CloudWatchLogProcessing", parameters=[parameter(parameter_name="DataMessageExtraction", parameter_value="true")]),
+                    processor(type="MetadataExtraction", parameters=[
+                        parameter(parameter_name="MetadataExtractionQuery", parameter_value="{agent: .agent}"),
+                        parameter(parameter_name="JsonParsingEngine", parameter_value="JQ-1.6")]),
+                    processor(type="AppendDelimiterToRecord", parameters=[parameter(parameter_name="Delimiter", parameter_value=NEWLINE)]),
+                ]),
+            ),
+        )  # fmt: skip
+        stream.node.add_dependency(delivery_role)
+        subscriber_role = iam.Role(
+            self, "CallsSubscriberRole", role_name=CALLS_SUBSCRIBER_ROLE,
+            # This account's destination only, against the confused deputy (security-reviewer note on PR 2).
+            assumed_by=iam.ServicePrincipal(f"logs.{REGION}.amazonaws.com").with_conditions({
+                "StringEquals": {"aws:SourceAccount": SECURITY_ACCOUNT},
+                "ArnLike": {"aws:SourceArn": f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:*"}}),
+            description="agentkeel: the Logs destination hands the doors' access-log batches to the delivery stream as this.",
+        )  # fmt: skip
+        subscriber_role.add_to_policy(iam.PolicyStatement(
+            sid="PutToTheCallsStreamOnly", actions=["firehose:PutRecord", "firehose:PutRecordBatch"],
+            resources=[stream.attr_arn]))
+        destination = logs.CfnDestination(
+            self, "CallsDestination", destination_name=CALLS_DESTINATION, role_arn=subscriber_role.role_arn,
+            target_arn=stream.attr_arn,
+            # The platform account's subscriptions, and no other account's: each doored agent's stack puts one
+            # (infra/construct/governed_agent.py, DoorCalls).
+            destination_policy=json.dumps({"Version": "2012-10-17", "Statement": [{
+                "Sid": "ThePlatformAccountsDoorsSubscribe", "Effect": "Allow",
+                "Principal": {"AWS": AGENT_ACCOUNT}, "Action": "logs:PutSubscriptionFilter",
+                "Resource": f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:destination:{CALLS_DESTINATION}"}]}),
+        )  # fmt: skip
+        destination.node.add_dependency(subscriber_role)
+        return destination
+
     def _observation_put_role(self, provider: iam.CfnOIDCProvider) -> iam.Role:
         """observe.yml on main, and only there: what it read as the observer App (SPEC/07 section 6, item 9).
 
@@ -437,7 +550,8 @@ SUPPRESSIONS = {
         "SPEC/05 §6: 'the read-only role reads the prefixes the observer needs and not *'. AWSLogs/*, agents/*, "
         "test/* and, from M06 PR 2, envelopes/agents/* (an agent from the template's answer records, SPEC/06 R7) "
         "are those prefixes; the keys under them are written by AWS, by the agents and by deploy.yml at run time. "
-        "M07 PR 2 (SPEC/07 §6): observations/*, whose keys are observe.yml's run ids.",
+        "M07 PR 2 (SPEC/07 §6): observations/*, whose keys are observe.yml's run ids. M10 PR 2 (SPEC/10 §6): "
+        "calls/*, the door's call records, whose keys the delivery stream writes from each line's agent and the time.",
     ),
     "ObservationPutRole/DefaultPolicy/Resource": (
         "AwsSolutions-IAM5",
@@ -456,6 +570,13 @@ SUPPRESSIONS = {
         "SPEC/05 §6: envelopes to the audit bucket from main (evals.yml, and from M06 PR 2 deploy.yml's answer "
         "records, SPEC/06 R7). envelopes/* because each key is a commit, which exists only when CI writes it.",
     ),
+    "CallsDeliveryRole/DefaultPolicy/Resource": (
+        "AwsSolutions-IAM5",
+        "SPEC/05 §6's 'so does every role infra/security/ makes', as SPEC/10 §6 (M10 PR 2) extends the bucket's "
+        "prefixes to the call records: the delivery stream writes under calls/* because each key is the stream's "
+        "own, from the line's agent and the time of delivery, which exists only when the stream writes it; put "
+        "and abort only, and the bucket's policy refuses any other principal there.",
+    ),
 }
 # Each IAM5 suppression names the findings it covers (open.md row 4; security-reviewer F10 on M06 PR 2).
 _OBJECTS = f"Resource::arn:aws:s3:::{AUDIT_BUCKET}/"
@@ -465,6 +586,7 @@ APPLIES_TO = {
     "PutRole/DefaultPolicy/Resource": [f"{_OBJECTS}envelopes/*"],
     "AnswerPutRole/DefaultPolicy/Resource": [f"{_OBJECTS}envelopes/agents/*", f"{_OBJECTS}bundles/*"],
     "ObservationPutRole/DefaultPolicy/Resource": [f"{_OBJECTS}observations/*"],
+    "CallsDeliveryRole/DefaultPolicy/Resource": [f"{_OBJECTS}calls/*"],
 }
 for path, (rule, reason) in SUPPRESSIONS.items():
     applies = {"appliesTo": APPLIES_TO[path]} if path in APPLIES_TO else {}

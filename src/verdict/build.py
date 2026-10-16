@@ -71,6 +71,14 @@ run's own plant count. And `build answer` writes each golden's observation
 and the stack's guardrail pin (`--guardrail`) on the answer record, so the
 plant run can be read from it.
 
+From M10 PR 2, with `--caller`, `caller`: the live run of the public caller,
+ruled here (src/verdict/caller.py) on what `scripts/observe_caller.py` read:
+each call record as the audit bucket holds it (raw, with its `LastModified`),
+read into SPEC/10 §2's shape against the run's stated callers and the
+manifest's `callers`, the answer record of the deploy that put the door on,
+and N (`detection.max_seconds`). Admitted n of n, refused m of m, each on the
+record within N. Recorded, never gated (SPEC/10 §4); row 10 reads it.
+
 From M04 PR 3, with `--swaps`, `swaps`: what `scripts/rule_swaps.py` wrote,
 the gate's verdict on each swap PR's own envelope beside GitHub's record of
 the pull. Copied, not read: build rules on no envelope (P5), and nothing
@@ -105,7 +113,7 @@ from typing import Any
 
 import yaml
 
-from src.verdict import agent_rules, containment, drill, template, upgrade
+from src.verdict import agent_rules, caller, containment, drill, template, upgrade
 # M06 PR 2 (SPEC/06 §4, BLOCK 3): build is the comparer of panel 1's rows with the registry's.
 from src.verdict.template import panel_not_in_registry  # noqa: F401  (S4's reader, by this name)
 # M07 PR 2 (SPEC/07 §4): build is the reader of a retirement's records, of a rollback's digests, of panel
@@ -734,6 +742,17 @@ def rules_record(path: Path) -> dict[str, Any]:
         raise Refused(f"{path}: {exc}") from exc
 
 
+def caller_record(path: Path, thresholds: dict[str, Any]) -> dict[str, Any]:
+    """scripts/observe_caller.py's observation, ruled into `caller` against N, detection.max_seconds (SPEC/10 §4)."""
+    n = (thresholds.get("detection") or {}).get("max_seconds")
+    if not isinstance(n, (int, float)) or isinstance(n, bool) or n <= 0:
+        raise Refused("thresholds.yaml has no detection.max_seconds: N for a refusal's record cannot be read")
+    try:
+        return caller.record(load_json(path), float(n))
+    except caller.Unreadable as exc:
+        raise Refused(f"{path}: {exc}") from exc
+
+
 def agent_blocks(agent_dir: Path) -> dict[str, str]:
     """An agent repository's plants, each with its named rule, from its two control files (M09 PR 2).
 
@@ -826,6 +845,7 @@ def compose_envelope(
     upgrade_reading: dict[str, Any] | None = None,
     drill_reading: dict[str, Any] | None = None,
     rules_reading: dict[str, Any] | None = None,
+    caller_reading: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """`bars` and `incumbent` (its runs, and where the pin was read) give F4_4; `second`, the
     agent's second raw and its scores, gives A-vs-A and F4_3; `control_second`, the control's
@@ -934,6 +954,10 @@ def compose_envelope(
     # reads it. On PR 2's own envelope it reads unread: no agent repository with rules exists (SPEC/09 §7).
     if gated and rules_reading is not None:
         one_subject["agent_rules"] = rules_reading
+    # M10 PR 2 (SPEC/10 §4): the public caller's live run, recorded and gated by nothing; row 10 reads it. On
+    # PR 2's own envelope it reads unread: no door is deployed and no call has been made (SPEC/10 §7).
+    if gated and caller_reading is not None:
+        one_subject["caller"] = caller_reading
     return {
         "commit": raw["commit"],
         "tag": tag,
@@ -1104,6 +1128,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--drill", type=Path, metavar="OBSERVATION")
     # M09 PR 2 (SPEC/09 §4): the plant run in an agent repository, as scripts/observe_rules.py read it. Recorded only.
     parser.add_argument("--rules", type=Path, metavar="OBSERVATION")
+    # M10 PR 2 (SPEC/10 §4): the public caller's run, as scripts/observe_caller.py read it. Recorded only.
+    parser.add_argument("--caller", type=Path, metavar="OBSERVATION")
     parser.add_argument("--app-observation", type=Path, metavar="STORED")
     parser.add_argument("--surfaces", type=Path, metavar="JUNIT_XML")
     parser.add_argument("--run-url")
@@ -1243,6 +1269,7 @@ def main(argv: list[str] | None = None) -> int:
                                                    app=stored, surfaces=args.surfaces) if args.upgrade else None,
                     drill_reading=drill_record(args.drill, thresholds) if args.drill else None,
                     rules_reading=rules_record(args.rules) if args.rules else None,
+                    caller_reading=caller_record(args.caller, thresholds) if args.caller else None,
                 )  # fmt: skip
             emit(envelope, args.out, envelope=True)
     except Refused as refusal:

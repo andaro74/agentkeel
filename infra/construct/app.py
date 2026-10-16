@@ -64,6 +64,15 @@ class RefagentStack(cdk.Stack):
             cdk.CfnOutput(self, "GuardrailId", value=self.agent.built_guardrail.attr_guardrail_id)
             cdk.CfnOutput(self, "GuardrailVersion", value=self.agent.built_version.attr_version)
             cdk.CfnOutput(self, "GuardrailDigest", value=self.agent.rules_digest or "")
+        # M10 PR 2 (SPEC/10 §6; R2): the door an agent with callers got, which deploy.yml's goldens step calls as
+        # the door client (`platform`) and the owner's calls reach (SPEC/10 §5.1). No secret: the door client's
+        # secret stays in Cognito, read by DescribeUserPoolClient.
+        if self.agent.door_api is not None and self.agent.pool is not None and self.agent.door_client is not None:
+            cdk.CfnOutput(self, "DoorUrl", value=self.agent.door_url)
+            cdk.CfnOutput(self, "DoorPoolId", value=self.agent.pool.ref)
+            cdk.CfnOutput(self, "DoorClientId", value=self.agent.door_client.ref)
+            cdk.CfnOutput(self, "DoorTokenEndpoint", value=self.agent.token_endpoint)
+            cdk.CfnOutput(self, "DoorScope", value=f"agentkeel-{self.agent.agent_name}/invoke")
 
 
 # A fixed output directory, so `make validate` reads the NagReport of the
@@ -124,5 +133,29 @@ NagSuppressions.add_resource_suppressions_by_path(
     stack, f"{STACK_ID}/{AGENT_ID}/Role/DefaultPolicy/Resource",
     [{"id": "AwsSolutions-IAM5", "reason": reason, "appliesTo": [finding]} for finding, reason in WILDCARDS.items()],
 )
+# M10 PR 2 (SPEC/10 §2, §6, §8; R2 door 2 hybrid): the door an agent with callers gets. Each suppression names the
+# SPEC/10 line it serves; refagent's stack has no door and none of these.
+if stack.agent.door_api is not None:
+    NagSuppressions.add_resource_suppressions_by_path(stack, f"{STACK_ID}/{AGENT_ID}/Pool", [
+        {"id": "AwsSolutions-COG2", "reason": (
+            "SPEC/10 §2 'The identity pool' and §8 'The subject's credential': a subject is an identity for a machine "
+            "caller, one user per manifest subject, whose first credential the owner sets by hand and which the "
+            "authoriser checks against the manifest's callers on every call; an MFA factor would be a second "
+            "by-hand enrolment nothing reads. Not planted.")},
+        {"id": "AwsSolutions-COG8", "reason": (
+            "SPEC/10 §2 'The door', cost column, and §8: the pool admits by issuer, client and username and the "
+            "runtime admits the door client only; the Plus feature plan (threat protection) is a paid tier whose "
+            "readings no falsifier of claim 10 names. Not bought at M10.")},
+    ])
+    for kind in ("Authoriser", "Proxy"):
+        NagSuppressions.add_resource_suppressions_by_path(
+            stack, f"{STACK_ID}/{AGENT_ID}/Door{kind}Role/DefaultPolicy/Resource",
+            [{"id": "AwsSolutions-IAM5", "reason": (
+                "SPEC/01 §6, 'its own log group', as the agent role's: the door function's own log group under "
+                f"/aws/lambda/agentkeel-{stack.agent.agent_name}-door-{kind.lower()}, whose streams Lambda names at "
+                "run time; CreateLogStream and PutLogEvents only, inside the agent boundary (seed S5)."),
+              "appliesTo": [f"Resource::arn:aws:logs:{REGION}:{ACCOUNT}:log-group:/aws/lambda/agentkeel-"
+                            f"{stack.agent.agent_name}-door-{kind.lower()}:*"]}],
+        )  # fmt: skip
 cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 app.synth()

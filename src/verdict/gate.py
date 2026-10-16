@@ -80,7 +80,7 @@ from typing import Any
 import yaml
 
 from src.verdict import M04_READERS as verdict_m04_readers
-from src.verdict import M05_READERS, M06_READERS, M07_READERS, M08_READERS, M09_READERS
+from src.verdict import M05_READERS, M06_READERS, M07_READERS, M08_READERS, M09_READERS, M10_READERS
 from src.verdict import (
     ROOT,
     canonical_sha256,
@@ -164,6 +164,12 @@ CLAIM_8_CHECKS = ("F8_1", "F8_2", "F8_3", "F8_4", "F8_5")
 # The live reading is in `agent_rules`, read by row 9 (READ_THE_RULES), never required here: a silent plant
 # in an agent repository stops no merge at M09 (ADR-0014 decision 5). Held from M09_READERS, which wired them.
 CLAIM_9_CHECKS = ("F9_1", "F9_2", "F9_3", "F9_4", "F9_5")
+# What an agent envelope must carry from M10 PR 2 (SPEC/10 section 4): F10_1 to F10_5, from the seed tests of
+# S1, S2, S3 and S4's two guards. Test-only witnesses: each says a reader refused its fixture, or a guard held,
+# not that a caller was admitted or refused. The live reading is in `caller`, read by row 10 (READ_THE_CALLER),
+# never required here: a bypass, an answered stranger or an unrecorded refusal stops no merge at M10 (ADR-0015
+# decision 5). Held from M10_READERS, which wired them.
+CLAIM_10_CHECKS = ("F10_1", "F10_2", "F10_3", "F10_4", "F10_5")
 
 GOLDENS = ROOT / "evals" / "goldens" / "v1"
 HISTORY = ROOT / "evals" / "history"
@@ -222,6 +228,14 @@ DRILL_RUNS = ("run1", "run2", "run3", "evidence", "quarantine")
 # the measurement. Expected at PR 3's run: fired 1 of 1, F9.1 to F9.5 held (SPEC/09 §7).
 READ_THE_RULES = {"M09"}
 RULES_READINGS = ("F9_1", "F9_2", "F9_3", "F9_4")
+# Rows whose claim is read from the public caller's live run an envelope keeps in `caller` (SPEC/10 §4, §7).
+# Gated by nothing, but a run not made, a falsifier unread or not held, a call admitted or refused other than
+# as stated, or refagent's plants under whole after the door's construct change makes the row's reading RED
+# whatever the run's own verdict, as READ_THE_RULES does for row 9. On PR 2's own envelope it reads unread (no
+# door is deployed, no call made), so row 10 reads RED there: the plant going RED under the measurement.
+# Expected at PR 3's run: admitted 1 of 1, refused 3 of 3, F10.1 to F10.5 held (SPEC/10 §7).
+READ_THE_CALLER = {"M10"}
+CALLER_READINGS = ("F10_1", "F10_2", "F10_3", "F10_4")
 
 
 class Rejected(Exception):
@@ -376,7 +390,8 @@ def required_checks(commit: str, root: Path = ROOT) -> tuple[str, ...]:
     claim_7 = CLAIM_7_CHECKS if descends_from(commit, M07_READERS, root) else ()
     claim_8 = CLAIM_8_CHECKS if descends_from(commit, M08_READERS, root) else ()
     claim_9 = CLAIM_9_CHECKS if descends_from(commit, M09_READERS, root) else ()
-    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6 + claim_7 + claim_8 + claim_9
+    claim_10 = CLAIM_10_CHECKS if descends_from(commit, M10_READERS, root) else ()
+    return CLAIM_1_CHECKS + CLAIM_2_CHECKS + claim_3 + claim_4 + claim_5 + claim_6 + claim_7 + claim_8 + claim_9 + claim_10
 
 
 def read_subject(path: Path, envelope: dict[str, Any], agent: bool, root: Path) -> None:
@@ -662,7 +677,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
              quickstart: tuple[float | None, str] | None = None,
              upgrade: tuple[dict[str, float] | None, str] | None = None,
              drill: tuple[float | None, str] | None = None,
-             rules: bool = False) -> str:
+             rules: bool = False,
+             caller: tuple[float | None, str] | None = None) -> str:
     """The ledger's Measured cell. `verdict` is the gate's own (`rule`), never the envelope's.
 
     An M00 envelope: its control tallies. From M01: the agent's tallies, then
@@ -702,6 +718,12 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     repository (`READ_THE_RULES`): planted rules fired n of m, each
     falsifier's reading and each miss are named, and a GREEN run reads RED
     (M09 PR 2). No bar: the value is n of m, expected 1 of 1 (SPEC/09 §7).
+
+    `caller` is N and where it was read, for a row whose claim is read from
+    the public caller's live run (`READ_THE_CALLER`): admitted n of n and
+    refused m of m, each falsifier's reading and each miss are named, and a
+    GREEN run reads RED (M10 PR 2). Expected admitted 1 of 1, refused 3 of 3
+    (SPEC/10 §7).
     """
     results = envelope["goldens"]
     agent = {g: r for g, r in results.items() if r["scope"] == "agent"}
@@ -724,7 +746,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
     upgraded = upgrade_misses(envelope, *upgrade) if upgrade is not None and agent else []
     drilled = drill_misses(envelope, *drill) if drill is not None and agent else []
     ruled = rules_misses(envelope) if rules and agent else []
-    if (misses or held or shipped or upgraded or drilled or ruled) and verdict == "GREEN":
+    called = caller_misses(envelope, *caller) if caller is not None and agent else []
+    if (misses or held or shipped or upgraded or drilled or ruled or called) and verdict == "GREEN":
         verdict = "RED"
     parts = [
         *heads,
@@ -744,6 +767,8 @@ def measured(envelope: dict[str, Any], verdict: str, control_card: dict[str, Any
         *drilled,
         *(rules_reading(envelope) if rules and agent else []),
         *ruled,
+        *(caller_reading(envelope) if caller is not None and agent else []),
+        *called,
         verdict,
         f"envelope `{envelope['commit']}`",
     ]
@@ -1134,6 +1159,57 @@ def rules_reading(envelope: dict[str, Any]) -> list[str]:
     return parts
 
 
+def caller_misses(envelope: dict[str, Any], n: float | None, where: str) -> list[str]:
+    """What row 10 finds wrong with the public caller's run an envelope recorded; [] if nothing (SPEC/10 §4, §7).
+
+    build ruled each falsifier on the records, the answer record and the manifest. This holds the counts
+    again: admitted to expected_admitted and refused to expected_refused, each at least one; N as build read
+    it to N at the envelope's commit; and refagent's plants whole on this very envelope (F10.2's second half,
+    the gate's own count). A run not made, a falsifier unread or not held is a miss; unread reads as not
+    read, never as held. On an envelope with no `caller`, or one whose run was not made, every falsifier is
+    a miss, which is PR 2's RED."""
+    reading = envelope.get("caller")
+    if reading is None:
+        return ["caller not read: the envelope records no call"]
+    misses = []
+    if n is None:
+        misses.append(f"no detection.max_seconds in thresholds.yaml at {where}: N cannot be read")
+    elif reading.get("max_seconds") != n:
+        misses.append(f"caller was read against N {reading.get('max_seconds')}, the commit's is {n} ({where})")
+    if not reading.get("made"):
+        misses.append("the run has not been made: no door is deployed and no call was read")
+    for name in CALLER_READINGS:
+        one = reading[name]
+        if not one["read"]:
+            misses.append(f"{name} unread: {'; '.join(one['reasons'][:2]) or 'no reason recorded'}")
+        elif one["held"] is not True:
+            misses.append(f"{name} not held: {'; '.join(one['reasons'][:3]) or 'no reason recorded'}")
+    for outcome in ("admitted", "refused"):
+        got, expected = reading[outcome], reading[f"expected_{outcome}"]
+        if reading.get("made") and expected < 1:
+            misses.append(f"no call stated {outcome}: a count of none cannot say the door {outcome} one")
+        elif got != expected:
+            misses.append(f"calls {outcome} {got} of {expected}")
+    if reading.get("made") and envelope.get("plants_fired") != envelope.get("plants_expected"):
+        misses.append(f"refagent's plants read {envelope.get('plants_fired')} of {envelope.get('plants_expected')} on the "
+                      "envelope after the door's construct change (F10.2)")  # fmt: skip
+    return misses
+
+
+def caller_reading(envelope: dict[str, Any]) -> list[str]:
+    """n of n, m of m and each falsifier in the Measured cell, as the envelope recorded them: printed; the misses decide."""
+    reading = envelope.get("caller")
+    if reading is None:
+        return []
+    parts = [f"callers admitted {reading['admitted']} of {reading['expected_admitted']}, refused {reading['refused']} of "
+             f"{reading['expected_refused']}" + ("" if reading.get("made") else " (run not made)")]  # fmt: skip
+    for name in CALLER_READINGS:
+        one = reading[name]
+        state = "unread" if not one["read"] else ("held" if one["held"] else "not held")
+        parts.append(f"{name} {state}")
+    return parts
+
+
 def latest(history_dir: Path = HISTORY) -> Path | None:
     """The envelope for the nearest commit at or behind HEAD."""
     have = {p.stem: p for p in replay_history.envelope_paths(history_dir)}
@@ -1218,7 +1294,8 @@ def measured_at(path: Path, history_dir: Path = HISTORY, *, milestone: str | Non
                     quickstart=quickstart_at(envelope["commit"]) if milestone in READ_THE_TEMPLATE else None,
                     upgrade=upgrade_bars_at(envelope["commit"]) if milestone in READ_THE_UPGRADE else None,
                     drill=detection_at(envelope["commit"]) if milestone in READ_THE_DRILL else None,
-                    rules=milestone in READ_THE_RULES)  # fmt: skip
+                    rules=milestone in READ_THE_RULES,
+                    caller=detection_at(envelope["commit"]) if milestone in READ_THE_CALLER else None)  # fmt: skip
 
 
 def control_against_base(envelope: dict[str, Any], path: Path, root: Path = ROOT) -> str | None:

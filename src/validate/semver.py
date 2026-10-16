@@ -6,8 +6,9 @@ bump of that schema's own `version`; a change to an agent's edges
 (`may_call`, `may_be_called_by`) or a major bump of any of its tool
 schemas is a major bump of the manifest's `version`; and an edge
 `<agent>@v<N>` names the major of that agent's manifest `version`. A
-manifest with no `version` is at `1.0.0` (refagent's, unchanged since M01,
-so that its bundle digest does not move for a field nothing reads yet).
+manifest with no `version` is at `1.0.0` (refagent's, unchanged since M01;
+its bundle digest moved at M10 PR 2 for `callers: []`, which is not an edge
+and computes no bump, tool-owner note on that PR).
 
 `check(tree, base)` fails when the tree asserts a smaller version than the
 diff computes to. The base is resolved as `golden_ids.default_base` does.
