@@ -224,9 +224,16 @@ def test_refagent_with_a_caller_is_refused_at_synth(tmp_path):
 # --- the execution role may make the door, and the deploy boundary denies none of it -------------------------
 
 
+def execution_role_policies(bootstrap_template: dict[str, Any]) -> list[dict[str, Any]]:
+    """The execution role's inline default policy and its managed DoorGrants (M10 PR 3: a managed policy, since IAM
+    holds a role's inline policies to 10,240 characters in all; `test_bootstrap.test_every_role_fits_iams_policy_quotas`)."""
+    return [policy for kind in ("AWS::IAM::Policy", "AWS::IAM::ManagedPolicy")
+            for policy in of_type(bootstrap_template, kind).values()
+            if "ExecutionRole" in json.dumps(policy["Properties"].get("Roles", []))]  # fmt: skip
+
+
 def test_the_execution_role_may_make_each_resource_type_the_door_adds(bootstrap_template, door_template):
-    granted = {a for policy in of_type(bootstrap_template, "AWS::IAM::Policy").values()
-               if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
+    granted = {a for policy in execution_role_policies(bootstrap_template)
                for s in policy["Properties"]["PolicyDocument"]["Statement"] if s["Effect"] == "Allow" for a in actions(s)}  # fmt: skip
     flat = {a for s in statements(named(bootstrap_template, "agentkeel-deploy-boundary"), "Deny")
             if not s.get("Condition") and s["Resource"] == "*" for a in actions(s)}  # fmt: skip
@@ -236,11 +243,25 @@ def test_the_execution_role_may_make_each_resource_type_the_door_adds(bootstrap_
         assert needs <= granted, (kind, sorted(needs - granted))
         assert not [a for a in needs if denies_by_pattern(flat, a)], kind
     # PassRole to Lambda is on the agent path and held to the service, as the pass to AgentCore is
-    passes = [s for policy in of_type(bootstrap_template, "AWS::IAM::Policy").values()
-              if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
+    passes = [s for policy in execution_role_policies(bootstrap_template)
               for s in policy["Properties"]["PolicyDocument"]["Statement"] if "iam:PassRole" in actions(s)]  # fmt: skip
     assert {s["Condition"]["StringEquals"]["iam:PassedToService"] for s in passes} == {"bedrock-agentcore.amazonaws.com", "lambda.amazonaws.com"}
     assert all("role/agentkeel/agents/" in json.dumps(s["Resource"]) for s in passes)
+
+
+def test_the_doors_grants_are_a_managed_policy_on_the_execution_role_and_nothing_of_the_door_is_inline(bootstrap_template):
+    """M10 PR 3: the bootstrap deploy of 2026-10-16 was refused with DoorGrants inline ("Maximum policy size of 10240
+    bytes exceeded for role agentkeel-cfn-exec"). The door's grants are the one managed policy, attached to the
+    execution role alone, carrying PR 2's six statements; the role's inline policy names no door action."""
+    door = named(bootstrap_template, "agentkeel-cfn-exec-door")
+    assert [list(r.values())[0] for r in door["Roles"]] == [next(l for l in of_type(bootstrap_template, "AWS::IAM::Role") if l.startswith("ExecutionRole"))]
+    assert [s["Sid"] for s in door["PolicyDocument"]["Statement"]] == [
+        "PassADoorRoleToLambdaOnly", "MakeAnAgentsPoolOnlyWithItsTag", "ManageAnAgentsPoolItsUsersClientsServerAndDomain",
+        "MakeADoorFunctionOnly", "MakeADoorApiOnly", "MakeTheDoorsLogGroupsAndItsSubscriptionOnly"]  # fmt: skip
+    inline = {a for policy in of_type(bootstrap_template, "AWS::IAM::Policy").values()
+              if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
+              for s in policy["Properties"]["PolicyDocument"]["Statement"] for a in actions(s)}  # fmt: skip
+    assert not {a for a in inline if a.startswith(("cognito-idp:", "lambda:", "apigateway:", "logs:"))}
 
 
 def test_the_deploy_role_reads_a_door_clients_secret_on_a_tagged_pool_and_the_agent_ceiling_allows_the_proxys_read(bootstrap_template):

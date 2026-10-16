@@ -832,9 +832,14 @@ class BootstrapStack(cdk.Stack):
         # the platform's own names (`agentkeel-*`, `/agentkeel/doors/*`, `/aws/lambda/agentkeel-*-door-*`) where the
         # service takes a resource ARN, and to the one service where it does not (a user pool's ARN carries an id
         # the service assigns at create). The door's roles are agent-path roles under the boundary, which the
-        # statements above already make and pass; PassRole to Lambda is the one addition there. A policy of its
-        # own on the role (`agentkeel-cfn-exec-door`): the role's default policy is at the size CloudFormation takes
-        # for one document, and a second document CDK makes on overflow cannot carry a cdk-nag reason by path.
+        # statements above already make and pass; PassRole to Lambda is the one addition there. A customer managed
+        # policy of its own on the role (`agentkeel-cfn-exec-door`, M10 PR 3): IAM holds a role's inline policies to
+        # 10,240 characters in all, and the default policy is 9,134 of them (whitespace out, as IAM counts). PR 2 made
+        # this an inline policy, and the bootstrap deploy of 2026-10-16 was refused on it at 12,071 ("Maximum policy
+        # size of 10240 bytes exceeded for role agentkeel-cfn-exec"); a managed policy has a ceiling of its own
+        # (6,144) and counts against the role's attached-policy quota (10), not its inline total. The same reason
+        # keeps it out of the default policy: a second document CDK makes on overflow is inline too, and cannot carry
+        # a cdk-nag reason by path. `tests/test_bootstrap.py` holds both ceilings on every role this stack makes.
         door_grants: list[iam.PolicyStatement] = []
         door_grants.append(iam.PolicyStatement(
             sid="PassADoorRoleToLambdaOnly",
@@ -892,7 +897,11 @@ class BootstrapStack(cdk.Stack):
             resources=[f"arn:aws:logs:{REGION}:{self.account}:log-group:/agentkeel/doors/*",
                        f"arn:aws:logs:{REGION}:{self.account}:log-group:/aws/lambda/agentkeel-*-door-*"],
         ))  # fmt: skip
-        iam.Policy(self, "DoorGrants", policy_name="agentkeel-cfn-exec-door", roles=[role], statements=door_grants)
+        iam.ManagedPolicy(
+            self, "DoorGrants", managed_policy_name="agentkeel-cfn-exec-door", roles=[role], statements=door_grants,
+            description="agentkeel: what CloudFormation may make for an agent's door (SPEC/10 §6), beside the "
+                        "execution role's inline policy, which IAM holds to 10,240 characters.",
+        )  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="NeverTouchTheBoundaryOrAKeyPolicy",
             effect=iam.Effect.DENY,
@@ -1675,7 +1684,9 @@ SUPPRESSIONS = {
         f"resource server and domain are on userpool/*, whose id the service assigns at create; the two door "
         f"functions on function:agentkeel-*-door-*, the API on /apis and /apis/*, the three log groups and the "
         f"subscription on /agentkeel/doors/* and /aws/lambda/agentkeel-*-door-*; PassRole to Lambda on the agent "
-        f"path only; a policy of its own, DoorGrants, which carries this reason."
+        f"path only; a policy of its own, DoorGrants, which carries this reason. M10 PR 3: DoorGrants is a customer "
+        f"managed policy, since IAM holds a role's inline policies to 10,240 characters in all and this document is "
+        f"9,134 of them; the deploy of 2026-10-16 was refused with DoorGrants inline (12,071)."
     ),
     "DoorGrants/Resource": (
         "SPEC/10 §6, R2 (M10 PR 2): what GovernedAgent renders for an agent with callers, one statement per "
@@ -1684,7 +1695,10 @@ SUPPRESSIONS = {
         "userpool/* where the pool's id is the service's, held to the agent tag on the pool; on /apis and /apis/* "
         "for the HTTP API, with no tag condition, since an API's routes, integrations, authorisers and stages are "
         "made under /apis/<id>/ and carry no tag of their own; and on * for CreateUserPool, which takes no resource "
-        f"and is held to the agent tag in the request. The deploy boundary (seed S4) caps it. {CEILING}"
+        f"and is held to the agent tag in the request. The deploy boundary (seed S4) caps it. M10 PR 3: a customer "
+        f"managed policy attached to the execution role, not an inline one: IAM holds a role's inline policies to "
+        f"10,240 characters in all, the default policy is 9,134 of them, and the bootstrap deploy of 2026-10-16 was "
+        f"refused with this document inline (12,071). The grants are the ones PR 2 ruled, unchanged. {CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "
