@@ -908,6 +908,18 @@ class BootstrapStack(cdk.Stack):
             actions=["logs:DescribeLogGroups"],
             resources=["*"],
         ))  # fmt: skip
+        # M10 PR 3, festival-desk's door deploy run 39052047504 (2026-10-17T17:05Z): an HTTP API stage with access logging
+        # is refused unless its creator holds CloudWatch Logs' vended log delivery ("Insufficient permissions to enable
+        # logging ... logs:CreateLogDelivery"). The list is API Gateway's own (developer guide, "Permissions to activate
+        # logging" for HTTP APIs, read 2026-10-17); none of these actions takes a resource. DeleteLogDelivery, the eighth
+        # on that list, is left out: the deploy boundary denies logs:Delete* flat (seed S4), so a stage's delete or a
+        # change of its log destination may be refused (Unsure, PR 3's ruling).
+        door_grants.append(iam.PolicyStatement(
+            sid="LetTheDoorsStageDeliverItsAccessLog",
+            actions=["logs:CreateLogDelivery", "logs:GetLogDelivery", "logs:UpdateLogDelivery",
+                     "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:DescribeResourcePolicies"],
+            resources=["*"],
+        ))  # fmt: skip
         door_grants.append(iam.PolicyStatement(
             sid="SubscribeToTheSecurityAccountsCallsDestinationOnly",
             actions=["logs:PutSubscriptionFilter"],
@@ -1717,7 +1729,12 @@ SUPPRESSIONS = {
         f"refused with this document inline (12,071). The grants are the ones PR 2 ruled, and two from festival-desk's "
         f"first door deploy (run 38997315544): DescribeLogGroups on *, since it takes no resource-level permission and "
         f"CloudFormation reads the access log group's ARN with it; PutSubscriptionFilter on the security account's one "
-        f"destination, which a cross-account subscription is authorised against as well as its log group. {CEILING}"
+        f"destination, which a cross-account subscription is authorised against as well as its log group; and "
+        f"from run 39052047504, the stage's access log: CloudWatch Logs' vended log delivery (CreateLogDelivery, "
+        f"GetLogDelivery, UpdateLogDelivery, ListLogDeliveries, PutResourcePolicy, DescribeResourcePolicies) on *, "
+        f"which API Gateway's developer guide lists for an HTTP API's logging and none of which takes a resource. "
+        f"PutResourcePolicy is the account's Logs resource policy; the deploy boundary still denies every logs:Delete*. "
+        f"{CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "

@@ -55,7 +55,10 @@ DOOR_NEEDED_BY_TYPE = {
     "AWS::ApiGatewayV2::Authorizer": {"apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:DELETE"},
     "AWS::ApiGatewayV2::Integration": {"apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:DELETE"},
     "AWS::ApiGatewayV2::Route": {"apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:DELETE"},
-    "AWS::ApiGatewayV2::Stage": {"apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:DELETE"},
+    # M10 PR 3 (run 39052047504): a stage with access logging needs vended log delivery from its creator.
+    "AWS::ApiGatewayV2::Stage": {"apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:DELETE",
+                                 "logs:CreateLogDelivery", "logs:GetLogDelivery", "logs:UpdateLogDelivery",
+                                 "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:DescribeResourcePolicies"},
     # No logs:Delete*: the deploy boundary denies them flat, so these four are retained and never deleted by a stack.
     "AWS::Logs::LogGroup": {"logs:CreateLogGroup", "logs:PutRetentionPolicy",
                             "logs:DescribeLogGroups", "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource"},
@@ -65,7 +68,8 @@ DOOR_NEEDED_BY_TYPE = {
 # M10 PR 3, from festival-desk's first door deploy (run 38997315544, 2026-10-17T03:05Z): an action that takes no
 # resource-level permission is granted on * or not at all, and a cross-account subscription is authorised against the
 # destination's ARN as well as the log group's. PR 2 held neither, and the test above read the action names only.
-ON_STAR_ONLY = {"logs:DescribeLogGroups", "cognito-idp:CreateUserPool"}
+ON_STAR_ONLY = {"logs:DescribeLogGroups", "cognito-idp:CreateUserPool", "logs:CreateLogDelivery", "logs:GetLogDelivery",
+                "logs:UpdateLogDelivery", "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:DescribeResourcePolicies"}
 CALLS_DESTINATION = "arn:aws:logs:us-west-2:897698239547:destination:agentkeel-calls"
 
 
@@ -294,7 +298,8 @@ def test_the_doors_grants_are_a_managed_policy_on_the_execution_role_and_nothing
     assert [s["Sid"] for s in door["PolicyDocument"]["Statement"]] == [
         "PassADoorRoleToLambdaOnly", "MakeAnAgentsPoolOnlyWithItsTag", "ManageAnAgentsPoolItsUsersClientsServerAndDomain",
         "MakeADoorFunctionOnly", "MakeADoorApiOnly", "MakeTheDoorsLogGroupsAndItsSubscriptionOnly",
-        "ListLogGroupsWhichTakesNoResource", "SubscribeToTheSecurityAccountsCallsDestinationOnly"]  # fmt: skip
+        "ListLogGroupsWhichTakesNoResource", "LetTheDoorsStageDeliverItsAccessLog",
+        "SubscribeToTheSecurityAccountsCallsDestinationOnly"]  # fmt: skip
     inline = {a for policy in of_type(bootstrap_template, "AWS::IAM::Policy").values()
               if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
               for s in policy["Properties"]["PolicyDocument"]["Statement"] for a in actions(s)}  # fmt: skip

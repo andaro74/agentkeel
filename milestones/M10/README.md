@@ -221,6 +221,15 @@ above; SPEC/10 §5.1).
    the delete a rollback would need, so a failed first door deploy's log
    groups are deleted by hand. The bootstrap is redeployed from this
    branch; the orphan pools and log groups are deleted by hand.
+7. **The second door deploy was refused at the stage** (run 39052047504,
+   2026-10-17T17:05Z, after the bootstrap redeploy and the log groups
+   deleted): the subscription and the log-group lookup passed; an HTTP
+   API stage with access logging needs CloudWatch Logs' vended log
+   delivery from its creator (`logs:CreateLogDelivery` and five more,
+   on `*`, as API Gateway's guide lists them). Granted in `DoorGrants`.
+   The guide's eighth, `logs:DeleteLogDelivery`, is denied by the
+   deploy boundary's flat `logs:Delete*` and is not granted: a stage's
+   delete or a change of its log destination may be refused.
 
 ### Read before PR 2, each with the pull request whose merge it must precede
 
