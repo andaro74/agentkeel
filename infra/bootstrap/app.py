@@ -891,11 +891,27 @@ class BootstrapStack(cdk.Stack):
             # No logs:Delete*: the deploy boundary denies them flat, so the construct retains the log groups and the
             # subscription (DeletionPolicy Retain), as it does the rights table, and CloudFormation never calls one.
             actions=["logs:CreateLogGroup", "logs:PutRetentionPolicy",
-                     "logs:DescribeLogGroups", "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource",
+                     "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource",
                      "logs:TagLogGroup", "logs:UntagLogGroup", "logs:ListTagsLogGroup",
                      "logs:PutSubscriptionFilter", "logs:DescribeSubscriptionFilters"],
             resources=[f"arn:aws:logs:{REGION}:{self.account}:log-group:/agentkeel/doors/*",
                        f"arn:aws:logs:{REGION}:{self.account}:log-group:/aws/lambda/agentkeel-*-door-*"],
+        ))  # fmt: skip
+        # M10 PR 3, from festival-desk's first door deploy (run 38997315544, 2026-10-17T03:05Z), refused twice:
+        # DescribeLogGroups takes no resource-level permission, so the grant above on two ARN patterns never applied,
+        # and CloudFormation could not read the access log group's ARN for the stage ("Access denied for operation
+        # 'logs:DescribeLogGroups'"); and a subscription to a destination in another account is authorised against
+        # the destination's ARN as well as the log group's ("not authorized to perform: logs:PutSubscriptionFilter on
+        # resource: arn:aws:logs:us-west-2:897698239547:destination:agentkeel-calls").
+        door_grants.append(iam.PolicyStatement(
+            sid="ListLogGroupsWhichTakesNoResource",
+            actions=["logs:DescribeLogGroups"],
+            resources=["*"],
+        ))  # fmt: skip
+        door_grants.append(iam.PolicyStatement(
+            sid="SubscribeToTheSecurityAccountsCallsDestinationOnly",
+            actions=["logs:PutSubscriptionFilter"],
+            resources=[f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:destination:agentkeel-calls"],
         ))  # fmt: skip
         iam.ManagedPolicy(
             self, "DoorGrants", managed_policy_name="agentkeel-cfn-exec-door", roles=[role], statements=door_grants,
@@ -1698,7 +1714,10 @@ SUPPRESSIONS = {
         f"and is held to the agent tag in the request. The deploy boundary (seed S4) caps it. M10 PR 3: a customer "
         f"managed policy attached to the execution role, not an inline one: IAM holds a role's inline policies to "
         f"10,240 characters in all, the default policy is 9,134 of them, and the bootstrap deploy of 2026-10-16 was "
-        f"refused with this document inline (12,071). The grants are the ones PR 2 ruled, unchanged. {CEILING}"
+        f"refused with this document inline (12,071). The grants are the ones PR 2 ruled, and two from festival-desk's "
+        f"first door deploy (run 38997315544): DescribeLogGroups on *, since it takes no resource-level permission and "
+        f"CloudFormation reads the access log group's ARN with it; PutSubscriptionFilter on the security account's one "
+        f"destination, which a cross-account subscription is authorised against as well as its log group. {CEILING}"
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "
@@ -1769,7 +1788,8 @@ APPLIES_TO = {
         f"Resource::{_ARN.format(service, rest)}" for service, rest in (
             ("cognito-idp", "userpool/*"), ("lambda", "function:agentkeel-*-door-*"),
             ("logs", "log-group:/agentkeel/doors/*"), ("logs", "log-group:/aws/lambda/agentkeel-*-door-*"))] + [
-        f"Resource::arn:aws:apigateway:{REGION}::/apis/*", f"Resource::arn:aws:apigateway:{REGION}::/tags/*"],
+        f"Resource::arn:aws:apigateway:{REGION}::/apis/*", f"Resource::arn:aws:apigateway:{REGION}::/tags/*",
+        f"Resource::arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:destination:agentkeel-calls"],  # M10 PR 3: no wildcard
     "DeployRole/DefaultPolicy/Resource": ["Action::cloudformation:Describe*", "Resource::*"] + [
         f"Resource::{_ARN.format(service, rest)}" for service, rest in (
             ("bedrock-agentcore", "runtime/agentkeel_*"), ("bedrock-agentcore", "runtime/refagent*"),

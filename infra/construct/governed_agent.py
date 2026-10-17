@@ -612,8 +612,11 @@ class GovernedAgent(Construct):
         """The agent's own identity pool: one user per subject in `callers`, a callers client and the door client.
 
         The pool is retained, as the guardrail is: its users' first credentials are set by hand (SPEC/10 §5.1),
-        and a redeploy must not lose them. A user's logical id is its subject, so a subject removed from the
-        list removes that user and no other. MFA is off and the password policy is the pool's: a subject is an
+        and a redeploy must not lose them; except by the one stack operation that created it (DeletionPolicy
+        RetainExceptOnCreate, M10 PR 3): festival-desk's first door deploy failed four times on 2026-10-17 and each
+        rollback skipped the new pool, leaving four orphans named for the agent. A pool a rollback made is empty
+        of credentials, so nothing is lost by deleting it; the execution role may (DeleteUserPool, tag-held). A
+        user's logical id is its subject, so a subject removed from the list removes that user and no other. MFA is off and the password policy is the pool's: a subject is an
         identity for a machine caller whose first credential the owner sets by hand (SPEC/10 §8, "The subject's
         credential"); the pool's advanced security is not bought."""
         stack = cdk.Stack.of(self)
@@ -630,14 +633,14 @@ class GovernedAgent(Construct):
             deletion_protection="INACTIVE",
             user_pool_tags={AGENT_TAG: self.agent_name},
         )  # fmt: skip
-        pool.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+        pool.apply_removal_policy(cdk.RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE)
         self.pool = pool
         for subject in self.callers:
             user = cognito.CfnUserPoolUser(
                 self, "Caller" + "".join(part.capitalize() for part in subject.split("-")),
                 user_pool_id=pool.ref, username=subject, message_action="SUPPRESS",
             )  # fmt: skip
-            user.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
+            user.apply_removal_policy(cdk.RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE)
         server = cognito.CfnUserPoolResourceServer(
             self, "ResourceServer", user_pool_id=pool.ref, identifier=f"agentkeel-{self.agent_name}",
             name=f"agentkeel-{self.agent_name}",
@@ -696,6 +699,9 @@ class GovernedAgent(Construct):
         # The three log groups and the subscription are retained: the deploy boundary denies logs:Delete* flat (SPEC/01
         # §6; seed S4), so CloudFormation must never call DeleteLogGroup or DeleteSubscriptionFilter, as it never calls
         # DeleteTable on the rights table. A retired agent's stack keeps them; the access log is the call record's source.
+        # Retained on a rollback too (RetainExceptOnCreate would need the delete the boundary denies): a door deploy
+        # that fails after making them leaves them, and every retry is refused with "log group already exists" until
+        # the owner deletes the three by hand (M10 PR 3; milestones/M10/README.md, the repair detail).
         access_log = logs.CfnLogGroup(self, "DoorAccessLog", log_group_name=f"{DOOR_LOG_GROUPS}{self.agent_name}/access",
                                       retention_in_days=30)  # fmt: skip
         access_log.apply_removal_policy(cdk.RemovalPolicy.RETAIN)
