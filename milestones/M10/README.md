@@ -195,6 +195,32 @@ above; SPEC/10 §5.1).
 3. **Standing**: the default policy has 1,106 characters of room before
    CDK splits it into a second inline document, which the role cannot
    hold either; the quota test is what says so before a deploy does.
+4. **The security stack** was deployed on 2026-10-16 by Security from
+   CloudShell in the security account, as a plain template synthesised
+   from this branch (the stack has no assets; the `agentkeel-security`
+   profile has had no role to assume since M05). The change set's Modify
+   rows on every role, the OIDC provider and the bucket were CDK path
+   metadata only; the property changes were PR 2's four. The destination
+   `agentkeel-calls` stands.
+5. **festival-desk's first door deploy was refused**, after its
+   `callers` pull request (#4) merged on 2026-10-17. Run 38997315544:
+   `logs:DescribeLogGroups` takes no resource-level permission, so PR 2's
+   grant on two log-group patterns never applied and the stage could not
+   read its log group's ARN; and `logs:PutSubscriptionFilter` is
+   authorised against the security account's destination as well as the
+   log group, which PR 2 did not grant. The rollback kept what it had
+   made as Retain: the three log groups and the pool. Every later run
+   (38998599409, 38999504064, 39000157276) was refused on "log group
+   already exists", and each left one more pool. PR 2's test read the
+   action names the handlers call and not the resources they are
+   granted on.
+6. **The repair**: `DescribeLogGroups` on `*`, `PutSubscriptionFilter`
+   on the one destination's ARN, both in `DoorGrants`; the pool and its
+   users `RetainExceptOnCreate`, so a failed first deploy deletes the
+   pool it made. The log groups stay `Retain`: the deploy boundary denies
+   the delete a rollback would need, so a failed first door deploy's log
+   groups are deleted by hand. The bootstrap is redeployed from this
+   branch; the orphan pools and log groups are deleted by hand.
 
 ### Read before PR 2, each with the pull request whose merge it must precede
 
