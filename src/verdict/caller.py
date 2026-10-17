@@ -98,10 +98,20 @@ def seconds(event_time: str | None, delivered: str | None) -> float | None:
         return None
 
 
+EPOCH_MS_FROM = 10**11  # an epoch at or above this is milliseconds (1973 in ms; year 5138 in seconds)
+
+
 def iso_of_epoch_ms(value: Any) -> str | None:
-    """API Gateway's `$context.requestTimeEpoch`, milliseconds, to AWS's ISO form with a Z."""
+    """API Gateway's `$context.requestTimeEpoch` to AWS's ISO form with a Z.
+
+    The access-log field is named `time_epoch_ms`, and a REST API writes milliseconds there, but an HTTP API writes
+    seconds: festival-desk's first live lines (2026-10-17, deploy run 39076739413) read `1792277674`. PR 2's
+    hand-written fixture had milliseconds, and read as milliseconds the live lines dated every call to 1970 (M10
+    PR 3, PR 2's Unsure G). Either unit is read by its size."""
     try:
-        return datetime.fromtimestamp(int(str(value)) / 1000, tz=UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+        epoch = int(str(value))
+        seconds = epoch / 1000 if epoch >= EPOCH_MS_FROM else epoch
+        return datetime.fromtimestamp(seconds, tz=UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
     except (TypeError, ValueError, OverflowError, OSError):
         return None
 
