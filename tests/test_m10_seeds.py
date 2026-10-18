@@ -296,8 +296,8 @@ def test_s4_guard_refagents_plants_are_whole_on_the_latest_envelope():
 # --- the run file (made after PR 2 merges; observed filled by the owner) -----------------------------------
 
 
-@expected_failure
 def test_the_caller_run_was_made():
+    """Marker off at M10 PR 4: the owner filled `observed` on 2026-10-18 (the run moved to PR 4, SPEC/10 §5.1)."""
     run = load_yaml(RUNS / "f10_x_caller_run.yaml")
     holds(isinstance(run, dict) and run.get("seed") == "run", "f10_x_caller_run.yaml is the run file")
     holds([s["id"] for s in run["steps"]] == ["admitted", "none", "stranger", "bypass"], "the run names its four calls")
