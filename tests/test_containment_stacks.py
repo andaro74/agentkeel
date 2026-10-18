@@ -294,3 +294,30 @@ def test_the_read_role_reads_calls_and_the_trail_logs_it(security):
     assert "arn:aws:s3:::agentkeel-audit-897698239547/calls/*" in reading["Resource"]
     (trail,) = of_type(security, "AWS::CloudTrail::Trail")
     assert "arn:aws:s3:::agentkeel-audit-897698239547/calls/" in selectors(trail)
+
+
+def test_the_calls_subscriber_role_trusts_logs_on_behalf_of_the_security_and_the_agent_account_only():
+    """M10 PR 3: CloudWatch Logs delivers a subscribed event on the sender's behalf. PR 2's trust named the security
+    account alone, so festival-desk's first access-log lines were refused at the assume (DeliveryErrors 1,
+    2026-10-17T22:54Z) and nothing reached calls/agents/."""
+    import json as _json
+    import os as _os
+    import subprocess as _subprocess
+    import sys as _sys
+    import tempfile as _tempfile
+    from pathlib import Path as _Path
+
+    root = _Path(__file__).resolve().parents[1]
+    with _tempfile.TemporaryDirectory() as out:
+        done = _subprocess.run([_sys.executable, str(root / "infra" / "security" / "app.py")], cwd=root,
+                               capture_output=True, text=True, check=False,
+                               env={**_os.environ, "PYTHONPATH": str(root), "CDK_OUTDIR": out})  # fmt: skip
+        assert done.returncode == 0, done.stderr
+        template = _json.loads((_Path(out) / "AgentkeelSecurity.template.json").read_text(encoding="utf-8"))
+    (role,) = [r for k, r in template["Resources"].items()
+               if r["Type"] == "AWS::IAM::Role" and k.startswith("CallsSubscriberRole")]  # fmt: skip
+    (statement,) = role["Properties"]["AssumeRolePolicyDocument"]["Statement"]
+    assert statement["Principal"] == {"Service": "logs.us-west-2.amazonaws.com"}
+    assert sorted(statement["Condition"]["StringEquals"]["aws:SourceAccount"]) == ["581208540944", "897698239547"]
+    assert sorted(statement["Condition"]["ArnLike"]["aws:SourceArn"]) == [
+        "arn:aws:logs:us-west-2:581208540944:*", "arn:aws:logs:us-west-2:897698239547:*"]

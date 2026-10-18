@@ -477,10 +477,15 @@ class SecurityStack(cdk.Stack):
         stream.node.add_dependency(delivery_role)
         subscriber_role = iam.Role(
             self, "CallsSubscriberRole", role_name=CALLS_SUBSCRIBER_ROLE,
-            # This account's destination only, against the confused deputy (security-reviewer note on PR 2).
+            # Against the confused deputy (security-reviewer note on PR 2): Logs on behalf of this account or the agent
+            # account, no other. CloudWatch Logs sends the destination's test message on the recipient's behalf and every
+            # subscribed event on the sender's (the Logs guide, "Step 1: Create a destination", read 2026-10-17). PR 2
+            # named this account alone, so festival-desk's first access-log lines were refused at the assume
+            # (DeliveryErrors 1 on the subscription, 2026-10-17T22:54Z; nothing under calls/agents/) (M10 PR 3).
             assumed_by=iam.ServicePrincipal(f"logs.{REGION}.amazonaws.com").with_conditions({
-                "StringEquals": {"aws:SourceAccount": SECURITY_ACCOUNT},
-                "ArnLike": {"aws:SourceArn": f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:*"}}),
+                "StringEquals": {"aws:SourceAccount": [SECURITY_ACCOUNT, AGENT_ACCOUNT]},
+                "ArnLike": {"aws:SourceArn": [f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:*",
+                                                f"arn:aws:logs:{REGION}:{AGENT_ACCOUNT}:*"]}}),
             description="agentkeel: the Logs destination hands the doors' access-log batches to the delivery stream as this.",
         )  # fmt: skip
         subscriber_role.add_to_policy(iam.PolicyStatement(

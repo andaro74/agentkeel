@@ -230,6 +230,20 @@ above; SPEC/10 §5.1).
    The guide's eighth, `logs:DeleteLogDelivery`, is denied by the
    deploy boundary's flat `logs:Delete*` and is not granted: a stage's
    delete or a change of its log destination may be refused.
+8. **The door stood, and its records did not arrive** (deploy run
+   39076739413, 2026-10-17T22:51Z): the stack built the door, the
+   goldens went through it as `platform` (GREEN, g-030 blocked), and the
+   access log holds three lines naming `platform`. None reached
+   `calls/agents/festival-desk/`: the subscription counted one delivery
+   error. CloudWatch Logs hands a subscribed event to the destination's
+   role on the sender's behalf, and PR 2's role trusted Logs on the
+   security account's behalf only, which is the destination's own test
+   message (the one object under `calls/errors/`). The trust now names
+   both accounts; the security stack is redeployed from CloudShell.
+9. **The reader read the access log's epoch as milliseconds**: an HTTP
+   API writes `$context.requestTimeEpoch` in seconds (`1792277674` on
+   the live lines), so every call dated to 1970. Either unit is read by
+   its size now, with a test on the live line's shape (PR 2's Unsure G).
 
 ### Read before PR 2, each with the pull request whose merge it must precede
 
