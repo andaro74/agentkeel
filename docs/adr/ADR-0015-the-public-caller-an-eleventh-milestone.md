@@ -1,7 +1,7 @@
 ---
 adr: ADR-0015
 title: The public caller; an eleventh milestone after the tenth; M10 records no video
-status: Proposed
+status: Accepted  # 2026-10-13, when milestones/M10/rulings/pr1.md read "Ruled by"; this line read Proposed until M10 PR 4 (the close; M09's close finding 14, again)
 date: 2026-10-13
 seat: Product
 authorises:

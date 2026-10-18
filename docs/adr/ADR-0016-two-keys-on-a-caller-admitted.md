@@ -1,7 +1,7 @@
 ---
 adr: ADR-0016
 title: Two keys on a caller admitted; entry 7 of the closed list
-status: Proposed
+status: Accepted  # 2026-10-15, when milestones/M10/rulings/pr2.md read "Ruled by"; this line read Proposed until M10 PR 4 (the close; M09's close finding 14, again)
 date: 2026-10-15
 seat: Product
 authorises:
