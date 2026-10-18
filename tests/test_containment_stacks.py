@@ -263,7 +263,8 @@ def test_the_destination_admits_the_platform_accounts_subscriptions_and_hands_th
     assert destination["DestinationName"] == "agentkeel-calls"
     policy = json.loads(destination["DestinationPolicy"])
     (statement,) = policy["Statement"]
-    assert statement == {"Sid": "ThePlatformsExecutionRoleSubscribesTheDoorsOnly", "Effect": "Allow", "Principal": {"AWS": "arn:aws:iam::581208540944:role/agentkeel-cfn-exec"},
+    assert statement == {"Sid": "ThePlatformsExecutionRoleSubscribesTheDoorsOnly", "Effect": "Allow", "Principal": {"AWS": "581208540944"},
+                         "Condition": {"ArnEquals": {"aws:PrincipalArn": "arn:aws:iam::581208540944:role/agentkeel-cfn-exec"}},
                          "Action": "logs:PutSubscriptionFilter",
                          "Resource": "arn:aws:logs:us-west-2:897698239547:destination:agentkeel-calls"}  # fmt: skip
     named = roles(security)
@@ -324,5 +325,6 @@ def test_the_calls_subscriber_role_trusts_logs_on_behalf_of_the_security_and_the
     # security-reviewer F3 on PR 3: the destination admits the platform's execution role alone, not the shared account.
     (destination,) = [r for r in template["Resources"].values() if r["Type"] == "AWS::Logs::Destination"]
     (allow,) = _json.loads(destination["Properties"]["DestinationPolicy"])["Statement"]
-    assert allow["Principal"] == {"AWS": "arn:aws:iam::581208540944:role/agentkeel-cfn-exec"}
+    assert allow["Principal"] == {"AWS": "581208540944"}  # Logs takes an account id here and nothing else
+    assert allow["Condition"] == {"ArnEquals": {"aws:PrincipalArn": "arn:aws:iam::581208540944:role/agentkeel-cfn-exec"}}
     assert allow["Action"] == "logs:PutSubscriptionFilter"

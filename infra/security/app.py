@@ -501,7 +501,11 @@ class SecurityStack(cdk.Stack):
             # under calls/agents/<the line's own agent>/ (security-reviewer F3 on PR 3).
             destination_policy=json.dumps({"Version": "2012-10-17", "Statement": [{
                 "Sid": "ThePlatformsExecutionRoleSubscribesTheDoorsOnly", "Effect": "Allow",
-                "Principal": {"AWS": f"arn:aws:iam::{AGENT_ACCOUNT}:role/agentkeel-cfn-exec"},
+                # A destination policy's principal must be an account id (CloudWatch Logs refused a role ARN at
+                # the deploy of 2026-10-18: "Principal section of policy contains ARN instead of account ID"), so
+                # the execution role is named by the caller's ARN in a condition (M10 PR 4).
+                "Principal": {"AWS": AGENT_ACCOUNT},
+                "Condition": {"ArnEquals": {"aws:PrincipalArn": f"arn:aws:iam::{AGENT_ACCOUNT}:role/agentkeel-cfn-exec"}},
                 "Action": "logs:PutSubscriptionFilter",
                 "Resource": f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:destination:{CALLS_DESTINATION}"}]}),
         )  # fmt: skip
