@@ -26,7 +26,7 @@ pr: 56
 
 # Ruling: M10 PR 3, Security
 
-DRAFT. Ruled by: pending.
+Ruled by andaro74 as Security, 2026-10-17, as written.
 
 ## How the by-hand deploys stand to this file
 

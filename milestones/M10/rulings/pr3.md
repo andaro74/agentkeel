@@ -17,7 +17,7 @@ pr: 56
 
 # Ruling: M10 PR 3, Product
 
-DRAFT. Ruled by: pending.
+Ruled by andaro74 as Product, 2026-10-17, as written.
 
 ## Which PR this is, and why
 
