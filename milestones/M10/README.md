@@ -371,7 +371,8 @@ are PR 3's "Repair detail" above).
    (`Fa6fghRCPHcEJxw=`, `403`, a token from the owner's throwaway pool),
    bypass 03:33:47 (`2d07b741…`, `AccessDenied`, as `m10-bypass`). Their
    records: 03:34:07 (two lines in one object), 03:35:03, 03:37:42.
-7. **PR 3 merged** (`#56`, `f05405f`, 05:37:56), its three rulings ruled
+7. **PR 3 merged** (`#56`, `f05405f`, 05:37:56 by GitHub's record; the
+   merge commit's own stamp reads 05:37:55), its three rulings ruled
    2026-10-17.
 8. **The narrowing refused** (Security, by hand, CloudShell, 2026-10-18):
    PR 3's destination principal (the execution role's ARN) refused by
