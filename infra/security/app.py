@@ -494,18 +494,17 @@ class SecurityStack(cdk.Stack):
         destination = logs.CfnDestination(
             self, "CallsDestination", destination_name=CALLS_DESTINATION, role_arn=subscriber_role.role_arn,
             target_arn=stream.attr_arn,
-            # The platform's CloudFormation execution role alone, whose own PutSubscriptionFilter is held to the doors'
-            # log groups (infra/bootstrap/app.py, DoorGrants): each doored agent's stack puts one (governed_agent.py,
-            # DoorCalls). PR 2 admitted the whole agent account, a shared one; once the trust admitted the agent
-            # account's events (M10 PR 3), any principal there could subscribe any log group and its lines would land
-            # under calls/agents/<the line's own agent>/ (security-reviewer F3 on PR 3).
+            # The platform account's subscriptions, and no other account's: each doored agent's stack puts one
+            # (infra/construct/governed_agent.py, DoorCalls). Not narrower, though security F3 on M10 PR 3 asked
+            # for the execution role alone: CloudWatch Logs refuses a destination policy whose principal is not an
+            # account id ("Principal section of policy contains ARN instead of account ID") and any condition but
+            # aws:PrincipalOrgID and aws:PrincipalOrgPaths (both refused at the deploys of 2026-10-18; the stack
+            # rolled back each time). So any principal in this shared account holding logs:PutSubscriptionFilter
+            # may subscribe a log group here, and a line naming an agent lands under that agent's prefix. Standing
+            # (milestones/M10/rulings/pr4-security.md).
             destination_policy=json.dumps({"Version": "2012-10-17", "Statement": [{
-                "Sid": "ThePlatformsExecutionRoleSubscribesTheDoorsOnly", "Effect": "Allow",
-                # A destination policy's principal must be an account id (CloudWatch Logs refused a role ARN at
-                # the deploy of 2026-10-18: "Principal section of policy contains ARN instead of account ID"), so
-                # the execution role is named by the caller's ARN in a condition (M10 PR 4).
+                "Sid": "ThePlatformAccountsDoorsSubscribe", "Effect": "Allow",
                 "Principal": {"AWS": AGENT_ACCOUNT},
-                "Condition": {"ArnEquals": {"aws:PrincipalArn": f"arn:aws:iam::{AGENT_ACCOUNT}:role/agentkeel-cfn-exec"}},
                 "Action": "logs:PutSubscriptionFilter",
                 "Resource": f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:destination:{CALLS_DESTINATION}"}]}),
         )  # fmt: skip
