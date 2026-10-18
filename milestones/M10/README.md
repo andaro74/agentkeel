@@ -143,7 +143,9 @@ Written at M10 PR 1 open. The row in `milestones/README.md` is the one
 2. **Security deploys the bootstrap stack** (`infra/bootstrap/`, by
    hand): the execution role's door grants, the deploy role's read of a
    door client's secret, the agent ceiling's one new action. Before
-   festival-desk's deploy, for the same reason.
+   festival-desk's deploy, for the same reason. The first deploy, from
+   PR 2's merge on 2026-10-16, was refused and rolled back (Repair
+   detail, below); the second is from PR 3's branch.
 3. **The owner opens festival-desk's `callers` pull request** (one
    subject, `lantern-desk`, `issuer: self`), states it in the run file
    first, and merges it once the platform check admits it; the scheduled
@@ -161,6 +163,89 @@ Written at M10 PR 1 open. The row in `milestones/README.md` is the one
 6. PR 3's run reads the records; if the platform's own deploy path needs
    a repair first, PR 3 is that repair and PR 4's run reads them (SPEC/10
    §5.1).
+
+### Repair detail (PR 3, 2026-10-16)
+
+The platform's own deploy path needed a repair before any call could be
+made, so PR 3 is that repair and PR 4's run reads the records (step 6
+above; SPEC/10 §5.1).
+
+1. **The bootstrap deploy was refused on an IAM quota.** From PR 2's
+   merge (`917601d`), `cdk deploy` of `AgentkeelBootstrap` on 2026-10-16
+   failed on `DoorGrants` with "Maximum policy size of 10240 bytes
+   exceeded for role agentkeel-cfn-exec" and rolled back
+   (`UPDATE_ROLLBACK_COMPLETE`); nothing of PR 2's bootstrap diff
+   landed, and the platform account stands as at M09. IAM holds a
+   role's inline policies to 10,240 characters in all; the execution
+   role's default policy is 9,134 and PR 2 made the door's grants a
+   second inline policy of 2,937 (12,071). PR 2's Unsure I named the
+   wrong ceiling: not the size CloudFormation takes for one document,
+   but IAM's for all of a role's inline documents. Neither cdk-nag nor
+   any test here measured it.
+2. **The repair**: `DoorGrants` is a customer managed policy attached to
+   the execution role (`agentkeel-cfn-exec-door`, its own ceiling 6,144,
+   counted against the role's ten attached policies and not its inline
+   total); its six statements are PR 2's, unchanged, under the same
+   cdk-nag path and reasons. `tests/test_bootstrap.py` now holds IAM's
+   three quotas on every role the stack makes, measured as IAM counts
+   (whitespace out) on the template's longer form; on PR 2's bootstrap
+   it fails with 12,071. `tests/test_m10_platform.py` reads the
+   execution role's grants from both policy kinds and holds that
+   nothing of the door is inline.
+3. **Standing**: the default policy has 1,106 characters of room before
+   CDK splits it into a second inline document, which the role cannot
+   hold either; the quota test is what says so before a deploy does.
+4. **The security stack** was deployed on 2026-10-16 by Security from
+   CloudShell in the security account, as a plain template synthesised
+   from this branch (the stack has no assets; the `agentkeel-security`
+   profile has had no role to assume since M05). The change set's Modify
+   rows on every role, the OIDC provider and the bucket were CDK path
+   metadata only; the property changes were PR 2's four. The destination
+   `agentkeel-calls` stands.
+5. **festival-desk's first door deploy was refused**, after its
+   `callers` pull request (#4) merged on 2026-10-17. Run 38997315544:
+   `logs:DescribeLogGroups` takes no resource-level permission, so PR 2's
+   grant on two log-group patterns never applied and the stage could not
+   read its log group's ARN; and `logs:PutSubscriptionFilter` is
+   authorised against the security account's destination as well as the
+   log group, which PR 2 did not grant. The rollback kept what it had
+   made as Retain: the three log groups and the pool. Every later run
+   (38998599409, 38999504064, 39000157276, and every scheduled run until
+   the next repair) was refused on "log group already exists", and each
+   left one more pool: 55 in all, deleted by hand on 2026-10-18. PR 2's test read the
+   action names the handlers call and not the resources they are
+   granted on.
+6. **The repair**: `DescribeLogGroups` on `*`, `PutSubscriptionFilter`
+   on the one destination's ARN, both in `DoorGrants`; the pool and its
+   users `RetainExceptOnCreate`, so a failed first deploy deletes the
+   pool it made. The log groups stay `Retain`: the deploy boundary denies
+   the delete a rollback would need, so a failed first door deploy's log
+   groups are deleted by hand. The bootstrap is redeployed from this
+   branch; the orphan pools and log groups are deleted by hand.
+7. **The second door deploy was refused at the stage** (run 39052047504,
+   2026-10-17T17:05Z, after the bootstrap redeploy and the log groups
+   deleted): the subscription and the log-group lookup passed; an HTTP
+   API stage with access logging needs CloudWatch Logs' vended log
+   delivery from its creator (`logs:CreateLogDelivery` and five more,
+   on `*`, as API Gateway's guide lists them). Granted in `DoorGrants`.
+   The guide's eighth, `logs:DeleteLogDelivery`, is denied by the
+   deploy boundary's flat `logs:Delete*` and is not granted: a stage's
+   delete or a change of its log destination may be refused.
+8. **The door stood, and its records did not arrive** (deploy run
+   39076739413, 2026-10-17T22:51Z): the stack built the door, the
+   run's goldens step reports asking through it as `platform` (its log,
+   not an envelope: F10.2 is read by PR 4's run), and the
+   access log holds three lines naming `platform`. None reached
+   `calls/agents/festival-desk/`: the subscription counted one delivery
+   error. CloudWatch Logs hands a subscribed event to the destination's
+   role on the sender's behalf, and PR 2's role trusted Logs on the
+   security account's behalf only, which is the destination's own test
+   message (the one object under `calls/errors/`). The trust now names
+   both accounts; the security stack is redeployed from CloudShell.
+9. **The reader read the access log's epoch as milliseconds**: an HTTP
+   API writes `$context.requestTimeEpoch` in seconds (`1792277674` on
+   the live lines), so every call dated to 1970. Either unit is read by
+   its size now, with a test on the live line's shape (PR 2's Unsure G).
 
 ### Read before PR 2, each with the pull request whose merge it must precede
 

@@ -832,9 +832,14 @@ class BootstrapStack(cdk.Stack):
         # the platform's own names (`agentkeel-*`, `/agentkeel/doors/*`, `/aws/lambda/agentkeel-*-door-*`) where the
         # service takes a resource ARN, and to the one service where it does not (a user pool's ARN carries an id
         # the service assigns at create). The door's roles are agent-path roles under the boundary, which the
-        # statements above already make and pass; PassRole to Lambda is the one addition there. A policy of its
-        # own on the role (`agentkeel-cfn-exec-door`): the role's default policy is at the size CloudFormation takes
-        # for one document, and a second document CDK makes on overflow cannot carry a cdk-nag reason by path.
+        # statements above already make and pass; PassRole to Lambda is the one addition there. A customer managed
+        # policy of its own on the role (`agentkeel-cfn-exec-door`, M10 PR 3): IAM holds a role's inline policies to
+        # 10,240 characters in all, and the default policy is 9,134 of them (whitespace out, as IAM counts). PR 2 made
+        # this an inline policy, and the bootstrap deploy of 2026-10-16 was refused on it at 12,071 ("Maximum policy
+        # size of 10240 bytes exceeded for role agentkeel-cfn-exec"); a managed policy has a ceiling of its own
+        # (6,144) and counts against the role's attached-policy quota (10), not its inline total. The same reason
+        # keeps it out of the default policy: a second document CDK makes on overflow is inline too, and cannot carry
+        # a cdk-nag reason by path. `tests/test_bootstrap.py` holds both ceilings on every role this stack makes.
         door_grants: list[iam.PolicyStatement] = []
         door_grants.append(iam.PolicyStatement(
             sid="PassADoorRoleToLambdaOnly",
@@ -886,13 +891,45 @@ class BootstrapStack(cdk.Stack):
             # No logs:Delete*: the deploy boundary denies them flat, so the construct retains the log groups and the
             # subscription (DeletionPolicy Retain), as it does the rights table, and CloudFormation never calls one.
             actions=["logs:CreateLogGroup", "logs:PutRetentionPolicy",
-                     "logs:DescribeLogGroups", "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource",
+                     "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource",
                      "logs:TagLogGroup", "logs:UntagLogGroup", "logs:ListTagsLogGroup",
                      "logs:PutSubscriptionFilter", "logs:DescribeSubscriptionFilters"],
             resources=[f"arn:aws:logs:{REGION}:{self.account}:log-group:/agentkeel/doors/*",
                        f"arn:aws:logs:{REGION}:{self.account}:log-group:/aws/lambda/agentkeel-*-door-*"],
         ))  # fmt: skip
-        iam.Policy(self, "DoorGrants", policy_name="agentkeel-cfn-exec-door", roles=[role], statements=door_grants)
+        # M10 PR 3, from festival-desk's first door deploy (run 38997315544, 2026-10-17T03:05Z), refused twice:
+        # DescribeLogGroups takes no resource-level permission, so the grant above on two ARN patterns never applied,
+        # and CloudFormation could not read the access log group's ARN for the stage ("Access denied for operation
+        # 'logs:DescribeLogGroups'"); and a subscription to a destination in another account is authorised against
+        # the destination's ARN as well as the log group's ("not authorized to perform: logs:PutSubscriptionFilter on
+        # resource: arn:aws:logs:us-west-2:897698239547:destination:agentkeel-calls").
+        door_grants.append(iam.PolicyStatement(
+            sid="ListLogGroupsWhichTakesNoResource",
+            actions=["logs:DescribeLogGroups"],
+            resources=["*"],
+        ))  # fmt: skip
+        # M10 PR 3, festival-desk's door deploy run 39052047504 (2026-10-17T17:05Z): an HTTP API stage with access logging
+        # is refused unless its creator holds CloudWatch Logs' vended log delivery ("Insufficient permissions to enable
+        # logging ... logs:CreateLogDelivery"). The list is API Gateway's own (developer guide, "Permissions to activate
+        # logging" for HTTP APIs, read 2026-10-17); none of these actions takes a resource. DeleteLogDelivery, the eighth
+        # on that list, is left out: the deploy boundary denies logs:Delete* flat (seed S4), so a stage's delete or a
+        # change of its log destination may be refused (Unsure, PR 3's ruling).
+        door_grants.append(iam.PolicyStatement(
+            sid="LetTheDoorsStageDeliverItsAccessLog",
+            actions=["logs:CreateLogDelivery", "logs:GetLogDelivery", "logs:UpdateLogDelivery",
+                     "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:DescribeResourcePolicies"],
+            resources=["*"],
+        ))  # fmt: skip
+        door_grants.append(iam.PolicyStatement(
+            sid="SubscribeToTheSecurityAccountsCallsDestinationOnly",
+            actions=["logs:PutSubscriptionFilter"],
+            resources=[f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:destination:agentkeel-calls"],
+        ))  # fmt: skip
+        iam.ManagedPolicy(
+            self, "DoorGrants", managed_policy_name="agentkeel-cfn-exec-door", roles=[role], statements=door_grants,
+            description="agentkeel: what CloudFormation may make for an agent's door (SPEC/10 §6), beside the "
+                        "execution role's inline policy, which IAM holds to 10,240 characters.",
+        )  # fmt: skip
         role.add_to_policy(iam.PolicyStatement(
             sid="NeverTouchTheBoundaryOrAKeyPolicy",
             effect=iam.Effect.DENY,
@@ -1675,7 +1712,9 @@ SUPPRESSIONS = {
         f"resource server and domain are on userpool/*, whose id the service assigns at create; the two door "
         f"functions on function:agentkeel-*-door-*, the API on /apis and /apis/*, the three log groups and the "
         f"subscription on /agentkeel/doors/* and /aws/lambda/agentkeel-*-door-*; PassRole to Lambda on the agent "
-        f"path only; a policy of its own, DoorGrants, which carries this reason."
+        f"path only; a policy of its own, DoorGrants, which carries this reason. M10 PR 3: DoorGrants is a customer "
+        f"managed policy, since IAM holds a role's inline policies to 10,240 characters in all and this document is "
+        f"9,134 of them; the deploy of 2026-10-16 was refused with DoorGrants inline (12,071)."
     ),
     "DoorGrants/Resource": (
         "SPEC/10 §6, R2 (M10 PR 2): what GovernedAgent renders for an agent with callers, one statement per "
@@ -1684,7 +1723,22 @@ SUPPRESSIONS = {
         "userpool/* where the pool's id is the service's, held to the agent tag on the pool; on /apis and /apis/* "
         "for the HTTP API, with no tag condition, since an API's routes, integrations, authorisers and stages are "
         "made under /apis/<id>/ and carry no tag of their own; and on * for CreateUserPool, which takes no resource "
-        f"and is held to the agent tag in the request. The deploy boundary (seed S4) caps it. {CEILING}"
+        f"and is held to the agent tag in the request. The deploy boundary (seed S4) caps only its logs:Delete* "
+        f"(none is granted here) and every iam:* (PassRole is the boundary's own exception); nothing else in it is "
+        f"capped. M10 PR 3: a customer "
+        f"managed policy attached to the execution role, not an inline one: IAM holds a role's inline policies to "
+        f"10,240 characters in all, the default policy is 9,134 of them, and the bootstrap deploy of 2026-10-16 was "
+        f"refused with this document inline (12,071). The grants are the ones PR 2 ruled, and two from festival-desk's "
+        f"first door deploy (run 38997315544): DescribeLogGroups on *, since it takes no resource-level permission and "
+        f"CloudFormation reads the access log group's ARN with it; PutSubscriptionFilter on the security account's one "
+        f"destination, which a cross-account subscription is authorised against as well as its log group; and "
+        f"from run 39052047504, the stage's access log: CloudWatch Logs' vended log delivery (CreateLogDelivery, "
+        f"GetLogDelivery, UpdateLogDelivery, ListLogDeliveries, PutResourcePolicy, DescribeResourcePolicies) on *, "
+        f"which API Gateway's developer guide lists for an HTTP API's logging. These reach the whole shared account: "
+        f"PutResourcePolicy writes any named Logs resource policy in the region, uncapped by the deploy boundary and "
+        f"not removable by the deploy plane (logs:Delete* is denied); with /apis/* (PR 2), Create/UpdateLogDelivery "
+        f"can repoint the access log of any HTTP API in the account, not only a door's. Accepted for the door's "
+        f"stage, by name, in milestones/M10/rulings/pr3-security.md (security-reviewer F1, F2 on PR 3)."
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "

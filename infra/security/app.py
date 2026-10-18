@@ -477,10 +477,15 @@ class SecurityStack(cdk.Stack):
         stream.node.add_dependency(delivery_role)
         subscriber_role = iam.Role(
             self, "CallsSubscriberRole", role_name=CALLS_SUBSCRIBER_ROLE,
-            # This account's destination only, against the confused deputy (security-reviewer note on PR 2).
+            # Against the confused deputy (security-reviewer note on PR 2): Logs on behalf of this account or the agent
+            # account, no other. CloudWatch Logs sends the destination's test message on the recipient's behalf and every
+            # subscribed event on the sender's (the Logs guide, "Step 1: Create a destination", read 2026-10-17). PR 2
+            # named this account alone, so festival-desk's first access-log lines were refused at the assume
+            # (DeliveryErrors 1 on the subscription, 2026-10-17T22:54Z; nothing under calls/agents/) (M10 PR 3).
             assumed_by=iam.ServicePrincipal(f"logs.{REGION}.amazonaws.com").with_conditions({
-                "StringEquals": {"aws:SourceAccount": SECURITY_ACCOUNT},
-                "ArnLike": {"aws:SourceArn": f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:*"}}),
+                "StringEquals": {"aws:SourceAccount": [SECURITY_ACCOUNT, AGENT_ACCOUNT]},
+                "ArnLike": {"aws:SourceArn": [f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:*",
+                                                f"arn:aws:logs:{REGION}:{AGENT_ACCOUNT}:*"]}}),
             description="agentkeel: the Logs destination hands the doors' access-log batches to the delivery stream as this.",
         )  # fmt: skip
         subscriber_role.add_to_policy(iam.PolicyStatement(
@@ -489,11 +494,15 @@ class SecurityStack(cdk.Stack):
         destination = logs.CfnDestination(
             self, "CallsDestination", destination_name=CALLS_DESTINATION, role_arn=subscriber_role.role_arn,
             target_arn=stream.attr_arn,
-            # The platform account's subscriptions, and no other account's: each doored agent's stack puts one
-            # (infra/construct/governed_agent.py, DoorCalls).
+            # The platform's CloudFormation execution role alone, whose own PutSubscriptionFilter is held to the doors'
+            # log groups (infra/bootstrap/app.py, DoorGrants): each doored agent's stack puts one (governed_agent.py,
+            # DoorCalls). PR 2 admitted the whole agent account, a shared one; once the trust admitted the agent
+            # account's events (M10 PR 3), any principal there could subscribe any log group and its lines would land
+            # under calls/agents/<the line's own agent>/ (security-reviewer F3 on PR 3).
             destination_policy=json.dumps({"Version": "2012-10-17", "Statement": [{
-                "Sid": "ThePlatformAccountsDoorsSubscribe", "Effect": "Allow",
-                "Principal": {"AWS": AGENT_ACCOUNT}, "Action": "logs:PutSubscriptionFilter",
+                "Sid": "ThePlatformsExecutionRoleSubscribesTheDoorsOnly", "Effect": "Allow",
+                "Principal": {"AWS": f"arn:aws:iam::{AGENT_ACCOUNT}:role/agentkeel-cfn-exec"},
+                "Action": "logs:PutSubscriptionFilter",
                 "Resource": f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:destination:{CALLS_DESTINATION}"}]}),
         )  # fmt: skip
         destination.node.add_dependency(subscriber_role)

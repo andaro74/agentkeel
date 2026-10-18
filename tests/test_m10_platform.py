@@ -55,12 +55,22 @@ DOOR_NEEDED_BY_TYPE = {
     "AWS::ApiGatewayV2::Authorizer": {"apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:DELETE"},
     "AWS::ApiGatewayV2::Integration": {"apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:DELETE"},
     "AWS::ApiGatewayV2::Route": {"apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:DELETE"},
-    "AWS::ApiGatewayV2::Stage": {"apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:DELETE"},
+    # M10 PR 3 (run 39052047504): a stage with access logging needs vended log delivery from its creator.
+    "AWS::ApiGatewayV2::Stage": {"apigateway:POST", "apigateway:GET", "apigateway:PATCH", "apigateway:DELETE",
+                                 "logs:CreateLogDelivery", "logs:GetLogDelivery", "logs:UpdateLogDelivery",
+                                 "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:DescribeResourcePolicies"},
     # No logs:Delete*: the deploy boundary denies them flat, so these four are retained and never deleted by a stack.
     "AWS::Logs::LogGroup": {"logs:CreateLogGroup", "logs:PutRetentionPolicy",
                             "logs:DescribeLogGroups", "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource"},
     "AWS::Logs::SubscriptionFilter": {"logs:PutSubscriptionFilter", "logs:DescribeSubscriptionFilters"},
 }  # fmt: skip
+
+# M10 PR 3, from festival-desk's first door deploy (run 38997315544, 2026-10-17T03:05Z): an action that takes no
+# resource-level permission is granted on * or not at all, and a cross-account subscription is authorised against the
+# destination's ARN as well as the log group's. PR 2 held neither, and the test above read the action names only.
+ON_STAR_ONLY = {"logs:DescribeLogGroups", "cognito-idp:CreateUserPool", "logs:CreateLogDelivery", "logs:GetLogDelivery",
+                "logs:UpdateLogDelivery", "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:DescribeResourcePolicies"}
+CALLS_DESTINATION = "arn:aws:logs:us-west-2:897698239547:destination:agentkeel-calls"
 
 
 def synth_refagent(out: Path) -> dict[str, Any]:
@@ -96,7 +106,7 @@ def test_the_pool_has_one_user_per_subject_a_callers_client_and_the_door_client(
     assert pool["Policies"]["PasswordPolicy"]["MinimumLength"] == 12
     assert pool["UserPoolTags"] == {"agentkeel:agent": "festival-desk"}
     (resource,) = of_type(door_template, "AWS::Cognito::UserPool").values()
-    assert resource.get("DeletionPolicy") == "Retain"
+    assert resource.get("DeletionPolicy") == "RetainExceptOnCreate"
     users = props(door_template, "AWS::Cognito::UserPoolUser")
     assert sorted(u["Username"] for u in users.values()) == sorted(SUBJECTS)
     assert all(u["MessageAction"] == "SUPPRESS" and u["UserPoolId"] == {"Ref": pool_id} for u in users.values())
@@ -110,6 +120,17 @@ def test_the_pool_has_one_user_per_subject_a_callers_client_and_the_door_client(
     assert server["Identifier"] == "agentkeel-festival-desk" and server["Scopes"][0]["ScopeName"] == "invoke"
     _, domain = the_one(door_template, "AWS::Cognito::UserPoolDomain")
     assert domain["Domain"] == {"Fn::Join": ["", ["agentkeel-festival-desk-", {"Ref": "AWS::AccountId"}]]}
+
+
+def test_the_pool_and_its_users_are_retained_except_by_the_operation_that_made_them_and_the_log_groups_always(door_template):
+    """M10 PR 3: 55 orphan pools from failed first deploys (2026-10-16, 17). The log groups stay Retain: the deploy
+    boundary denies the delete a rollback would need, so a failed first door deploy is cleaned by hand."""
+    for kind in ("AWS::Cognito::UserPool", "AWS::Cognito::UserPoolUser"):
+        for logical, resource in of_type(door_template, kind).items():
+            assert resource.get("DeletionPolicy") == "RetainExceptOnCreate", (logical, resource.get("DeletionPolicy"))
+    for kind in ("AWS::Logs::LogGroup", "AWS::Logs::SubscriptionFilter"):
+        for logical, resource in of_type(door_template, kind).items():
+            assert resource.get("DeletionPolicy") == "Retain", (logical, resource.get("DeletionPolicy"))
 
 
 def test_the_runtime_admits_the_door_client_only_and_the_invoke_is_still_conditioned_on_the_guardrail(door_template):
@@ -224,9 +245,16 @@ def test_refagent_with_a_caller_is_refused_at_synth(tmp_path):
 # --- the execution role may make the door, and the deploy boundary denies none of it -------------------------
 
 
+def execution_role_policies(bootstrap_template: dict[str, Any]) -> list[dict[str, Any]]:
+    """The execution role's inline default policy and its managed DoorGrants (M10 PR 3: a managed policy, since IAM
+    holds a role's inline policies to 10,240 characters in all; `test_bootstrap.test_every_role_fits_iams_policy_quotas`)."""
+    return [policy for kind in ("AWS::IAM::Policy", "AWS::IAM::ManagedPolicy")
+            for policy in of_type(bootstrap_template, kind).values()
+            if "ExecutionRole" in json.dumps(policy["Properties"].get("Roles", []))]  # fmt: skip
+
+
 def test_the_execution_role_may_make_each_resource_type_the_door_adds(bootstrap_template, door_template):
-    granted = {a for policy in of_type(bootstrap_template, "AWS::IAM::Policy").values()
-               if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
+    granted = {a for policy in execution_role_policies(bootstrap_template)
                for s in policy["Properties"]["PolicyDocument"]["Statement"] if s["Effect"] == "Allow" for a in actions(s)}  # fmt: skip
     flat = {a for s in statements(named(bootstrap_template, "agentkeel-deploy-boundary"), "Deny")
             if not s.get("Condition") and s["Resource"] == "*" for a in actions(s)}  # fmt: skip
@@ -236,11 +264,46 @@ def test_the_execution_role_may_make_each_resource_type_the_door_adds(bootstrap_
         assert needs <= granted, (kind, sorted(needs - granted))
         assert not [a for a in needs if denies_by_pattern(flat, a)], kind
     # PassRole to Lambda is on the agent path and held to the service, as the pass to AgentCore is
-    passes = [s for policy in of_type(bootstrap_template, "AWS::IAM::Policy").values()
-              if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
+    passes = [s for policy in execution_role_policies(bootstrap_template)
               for s in policy["Properties"]["PolicyDocument"]["Statement"] if "iam:PassRole" in actions(s)]  # fmt: skip
     assert {s["Condition"]["StringEquals"]["iam:PassedToService"] for s in passes} == {"bedrock-agentcore.amazonaws.com", "lambda.amazonaws.com"}
     assert all("role/agentkeel/agents/" in json.dumps(s["Resource"]) for s in passes)
+
+
+def granted_on(bootstrap_template: dict[str, Any], action: str) -> set[str]:
+    """The resources the execution role holds this action on, as the template writes them."""
+    found: set[str] = set()
+    for policy in execution_role_policies(bootstrap_template):
+        for s in policy["Properties"]["PolicyDocument"]["Statement"]:
+            if s["Effect"] == "Allow" and action in actions(s):
+                resource = s["Resource"]
+                found |= {json.dumps(r) for r in (resource if isinstance(resource, list) else [resource])}
+    return found
+
+
+def test_an_action_that_takes_no_resource_is_granted_on_star_and_the_subscription_reaches_the_destination(bootstrap_template):
+    for action in ON_STAR_ONLY:
+        assert json.dumps("*") in granted_on(bootstrap_template, action), action
+    on = granted_on(bootstrap_template, "logs:PutSubscriptionFilter")
+    assert any(CALLS_DESTINATION in r for r in on), on
+    assert any("log-group:/agentkeel/doors/*" in r for r in on), on
+
+
+def test_the_doors_grants_are_a_managed_policy_on_the_execution_role_and_nothing_of_the_door_is_inline(bootstrap_template):
+    """M10 PR 3: the bootstrap deploy of 2026-10-16 was refused with DoorGrants inline ("Maximum policy size of 10240
+    bytes exceeded for role agentkeel-cfn-exec"). The door's grants are the one managed policy, attached to the
+    execution role alone, carrying PR 2's six statements and PR 3's two; the role's inline policy names no door action."""
+    door = named(bootstrap_template, "agentkeel-cfn-exec-door")
+    assert [list(r.values())[0] for r in door["Roles"]] == [next(l for l in of_type(bootstrap_template, "AWS::IAM::Role") if l.startswith("ExecutionRole"))]
+    assert [s["Sid"] for s in door["PolicyDocument"]["Statement"]] == [
+        "PassADoorRoleToLambdaOnly", "MakeAnAgentsPoolOnlyWithItsTag", "ManageAnAgentsPoolItsUsersClientsServerAndDomain",
+        "MakeADoorFunctionOnly", "MakeADoorApiOnly", "MakeTheDoorsLogGroupsAndItsSubscriptionOnly",
+        "ListLogGroupsWhichTakesNoResource", "LetTheDoorsStageDeliverItsAccessLog",
+        "SubscribeToTheSecurityAccountsCallsDestinationOnly"]  # fmt: skip
+    inline = {a for policy in of_type(bootstrap_template, "AWS::IAM::Policy").values()
+              if "ExecutionRole" in json.dumps(policy["Properties"]["Roles"])
+              for s in policy["Properties"]["PolicyDocument"]["Statement"] for a in actions(s)}  # fmt: skip
+    assert not {a for a in inline if a.startswith(("cognito-idp:", "lambda:", "apigateway:", "logs:"))}
 
 
 def test_the_deploy_role_reads_a_door_clients_secret_on_a_tagged_pool_and_the_agent_ceiling_allows_the_proxys_read(bootstrap_template):
@@ -467,3 +530,9 @@ def test_the_authoriser_clips_what_it_writes_and_survives_a_malformed_payload(mo
     assert authorise(monkeypatch, sign(claims(exp=None)))["isAuthorized"] is False
     # the route key, not the request path, is what the format writes
     assert "$context.routeKey" in door.ACCESS_LOG_FORMAT and "$context.path" not in door.ACCESS_LOG_FORMAT
+
+
+def test_the_doored_stack_writes_no_logs_resource_policy_of_its_own(door_template):
+    """security-reviewer F1 on M10 PR 3: the execution role holds logs:PutResourcePolicy on * for the stage's vended
+    delivery, uncapped. The construct must never declare one; a template that did would be honoured."""
+    assert not of_type(door_template, "AWS::Logs::ResourcePolicy")

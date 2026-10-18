@@ -299,6 +299,49 @@ def test_both_budgets_count_bedrock_and_nothing_else(template):
 # construct's own template in both directions: every type it renders is
 # covered, and nothing is granted that no type needs.
 
+# --- IAM's quotas on a role's policies (M10 PR 3) -----------------------------------------------------------
+#
+# IAM holds a role's inline policies to 10,240 characters in all, a customer managed policy to 6,144, and a role to
+# ten attached managed policies (the default quota). CloudFormation checks none of this at synth: the bootstrap
+# deploy of 2026-10-16 was refused on the role, after the template passed every check here, with "Maximum policy
+# size of 10240 bytes exceeded for role agentkeel-cfn-exec" (the default policy at 9,134 and M10 PR 2's DoorGrants
+# at 2,937, inline). IAM counts the rendered document without whitespace; the template's intrinsics (Ref, Fn::Join)
+# render shorter than they are written, so the measure here is the larger one, and a document that fits here fits.
+
+INLINE_PER_ROLE, MANAGED_PER_POLICY, MANAGED_PER_ROLE = 10_240, 6_144, 10
+
+
+def iam_size(document: dict[str, Any]) -> int:
+    """Characters IAM counts: the document as JSON, whitespace out."""
+    return len(re.sub(r"\s", "", json.dumps(document, separators=(",", ":"))))
+
+
+def attached_roles(policy: dict[str, Any]) -> list[str]:
+    return [next(iter(r.values())) if isinstance(r, dict) else r for r in policy["Properties"].get("Roles", [])]
+
+
+def test_every_role_fits_iams_policy_quotas(template):
+    inline: dict[str, int] = {}
+    managed: dict[str, int] = {}
+    for logical, role in of_type(template, "AWS::IAM::Role").items():
+        inline[logical] = sum(iam_size(p["PolicyDocument"]) for p in role["Properties"].get("Policies", []))
+        managed[logical] = len(role["Properties"].get("ManagedPolicyArns", []))
+    for logical, policy in of_type(template, "AWS::IAM::Policy").items():
+        for role in attached_roles(policy):
+            inline[role] = inline.get(role, 0) + iam_size(policy["Properties"]["PolicyDocument"])
+    for logical, policy in of_type(template, "AWS::IAM::ManagedPolicy").items():
+        size = iam_size(policy["Properties"]["PolicyDocument"])
+        assert size <= MANAGED_PER_POLICY, (logical, size)
+        for role in attached_roles(policy):
+            managed[role] = managed.get(role, 0) + 1
+    over = {role: size for role, size in inline.items() if size > INLINE_PER_ROLE}
+    assert not over, over
+    assert not {role: n for role, n in managed.items() if n > MANAGED_PER_ROLE}
+    # the one this repaired: the execution role, with the door's grants beside its inline policy, not in it
+    execution = next(l for l in of_type(template, "AWS::IAM::Role") if l.startswith("ExecutionRole"))
+    assert inline[execution] <= INLINE_PER_ROLE and managed[execution] == 1
+
+
 CONSTRUCT_APP = ROOT / "infra" / "construct" / "app.py"
 
 # What CloudFormation calls to create, read and delete each resource type

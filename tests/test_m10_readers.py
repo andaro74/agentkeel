@@ -180,6 +180,24 @@ def test_a_data_event_of_a_sigv4_call_names_the_principals_arn_and_is_refused_as
     assert platform["subject"] == "d00rc1ient0000000000000000" and platform["outcome"] == "admitted"
 
 
+def test_an_http_apis_epoch_in_seconds_and_a_rest_apis_in_milliseconds_read_as_the_same_time():
+    """M10 PR 3: festival-desk's first live access-log line (deploy run 39076739413) carries `time_epoch_ms` in
+    seconds, as an HTTP API writes `$context.requestTimeEpoch`; read as milliseconds it was 1970-01-21."""
+    from src.verdict import caller as reader
+
+    assert reader.iso_of_epoch_ms("1792277674") == "2026-10-17T22:54:34Z"
+    assert reader.iso_of_epoch_ms("1792277674000") == "2026-10-17T22:54:34Z"
+    assert reader.iso_of_epoch_ms("-") is None and reader.iso_of_epoch_ms(None) is None
+    live = {"source": "access-log", "agent": "festival-desk", "request_id": "FaRqtjMpvHcEPHQ=",
+            "time_epoch_ms": "1792277674", "status": "200", "method": "POST", "path": "POST /invocations",
+            "error": "-", "auth_error": "-", "subject": "platform",
+            "issuer": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_EXAMPLE00", "outcome": "admitted",
+            "reason": "-", "integration_status": "200"}  # fmt: skip
+    read = reader.from_raw({"kind": "access-log", "key": "calls/agents/festival-desk/x",
+                            "last_modified": "2026-10-17T22:56:00Z", "raw": live})  # fmt: skip
+    assert read["time"] == "2026-10-17T22:54:34Z" and read["subject"] == "platform"
+
+
 def test_an_access_log_line_names_the_authorisers_subject_and_the_no_token_call_is_no_identity():
     lines = access_lines()
     admitted = caller.from_raw(lines["lantern-desk"])
