@@ -494,11 +494,15 @@ class SecurityStack(cdk.Stack):
         destination = logs.CfnDestination(
             self, "CallsDestination", destination_name=CALLS_DESTINATION, role_arn=subscriber_role.role_arn,
             target_arn=stream.attr_arn,
-            # The platform account's subscriptions, and no other account's: each doored agent's stack puts one
-            # (infra/construct/governed_agent.py, DoorCalls).
+            # The platform's CloudFormation execution role alone, whose own PutSubscriptionFilter is held to the doors'
+            # log groups (infra/bootstrap/app.py, DoorGrants): each doored agent's stack puts one (governed_agent.py,
+            # DoorCalls). PR 2 admitted the whole agent account, a shared one; once the trust admitted the agent
+            # account's events (M10 PR 3), any principal there could subscribe any log group and its lines would land
+            # under calls/agents/<the line's own agent>/ (security-reviewer F3 on PR 3).
             destination_policy=json.dumps({"Version": "2012-10-17", "Statement": [{
-                "Sid": "ThePlatformAccountsDoorsSubscribe", "Effect": "Allow",
-                "Principal": {"AWS": AGENT_ACCOUNT}, "Action": "logs:PutSubscriptionFilter",
+                "Sid": "ThePlatformsExecutionRoleSubscribesTheDoorsOnly", "Effect": "Allow",
+                "Principal": {"AWS": f"arn:aws:iam::{AGENT_ACCOUNT}:role/agentkeel-cfn-exec"},
+                "Action": "logs:PutSubscriptionFilter",
                 "Resource": f"arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:destination:{CALLS_DESTINATION}"}]}),
         )  # fmt: skip
         destination.node.add_dependency(subscriber_role)

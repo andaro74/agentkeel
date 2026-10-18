@@ -210,8 +210,9 @@ above; SPEC/10 §5.1).
    authorised against the security account's destination as well as the
    log group, which PR 2 did not grant. The rollback kept what it had
    made as Retain: the three log groups and the pool. Every later run
-   (38998599409, 38999504064, 39000157276) was refused on "log group
-   already exists", and each left one more pool. PR 2's test read the
+   (38998599409, 38999504064, 39000157276, and every scheduled run until
+   the next repair) was refused on "log group already exists", and each
+   left one more pool: 55 in all, deleted by hand on 2026-10-18. PR 2's test read the
    action names the handlers call and not the resources they are
    granted on.
 6. **The repair**: `DescribeLogGroups` on `*`, `PutSubscriptionFilter`
@@ -232,7 +233,8 @@ above; SPEC/10 §5.1).
    delete or a change of its log destination may be refused.
 8. **The door stood, and its records did not arrive** (deploy run
    39076739413, 2026-10-17T22:51Z): the stack built the door, the
-   goldens went through it as `platform` (GREEN, g-030 blocked), and the
+   run's goldens step reports asking through it as `platform` (its log,
+   not an envelope: F10.2 is read by PR 4's run), and the
    access log holds three lines naming `platform`. None reached
    `calls/agents/festival-desk/`: the subscription counted one delivery
    error. CloudWatch Logs hands a subscribed event to the destination's

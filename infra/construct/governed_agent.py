@@ -613,10 +613,14 @@ class GovernedAgent(Construct):
 
         The pool is retained, as the guardrail is: its users' first credentials are set by hand (SPEC/10 §5.1),
         and a redeploy must not lose them; except by the one stack operation that created it (DeletionPolicy
-        RetainExceptOnCreate, M10 PR 3): festival-desk's first door deploy failed four times on 2026-10-17 and each
-        rollback skipped the new pool, leaving four orphans named for the agent. A pool a rollback made is empty
-        of credentials, so nothing is lost by deleting it; the execution role may (DeleteUserPool, tag-held). A
-        user's logical id is its subject, so a subject removed from the list removes that user and no other. MFA is off and the password policy is the pool's: a subject is an
+        RetainExceptOnCreate, M10 PR 3): festival-desk's first door deploy failed again and again on 2026-10-16 and
+        17, once per scheduled run, and each rollback skipped the new pool, leaving 55 orphans named for the agent,
+        deleted by hand. A pool a rollback made is empty of credentials, so nothing is lost by deleting it; the
+        execution role may (DeleteUserPool, tag-held). Not yet fired on a failed first deploy (security-reviewer
+        N6 on PR 3). A user's logical id is its subject. A subject removed from the list leaves its user, and the
+        credential the owner set, in the pool (the user is retained too): the authoriser refuses it, since it
+        admits the subjects in its CALLERS alone, but re-admitting the same subject later is refused with "user
+        already exists" until the owner deletes the user by hand (security-reviewer F5 on PR 3). MFA is off and the password policy is the pool's: a subject is an
         identity for a machine caller whose first credential the owner sets by hand (SPEC/10 §8, "The subject's
         credential"); the pool's advanced security is not bought."""
         stack = cdk.Stack.of(self)

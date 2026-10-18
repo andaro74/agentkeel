@@ -110,8 +110,8 @@ def iso_of_epoch_ms(value: Any) -> str | None:
     PR 3, PR 2's Unsure G). Either unit is read by its size."""
     try:
         epoch = int(str(value))
-        seconds = epoch / 1000 if epoch >= EPOCH_MS_FROM else epoch
-        return datetime.fromtimestamp(seconds, tz=UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+        at = epoch / 1000 if epoch >= EPOCH_MS_FROM else epoch
+        return datetime.fromtimestamp(at, tz=UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
     except (TypeError, ValueError, OverflowError, OSError):
         return None
 

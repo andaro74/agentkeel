@@ -123,7 +123,7 @@ def test_the_pool_has_one_user_per_subject_a_callers_client_and_the_door_client(
 
 
 def test_the_pool_and_its_users_are_retained_except_by_the_operation_that_made_them_and_the_log_groups_always(door_template):
-    """M10 PR 3: four orphan pools from four failed first deploys (2026-10-17). The log groups stay Retain: the deploy
+    """M10 PR 3: 55 orphan pools from failed first deploys (2026-10-16, 17). The log groups stay Retain: the deploy
     boundary denies the delete a rollback would need, so a failed first door deploy is cleaned by hand."""
     for kind in ("AWS::Cognito::UserPool", "AWS::Cognito::UserPoolUser"):
         for logical, resource in of_type(door_template, kind).items():
@@ -530,3 +530,9 @@ def test_the_authoriser_clips_what_it_writes_and_survives_a_malformed_payload(mo
     assert authorise(monkeypatch, sign(claims(exp=None)))["isAuthorized"] is False
     # the route key, not the request path, is what the format writes
     assert "$context.routeKey" in door.ACCESS_LOG_FORMAT and "$context.path" not in door.ACCESS_LOG_FORMAT
+
+
+def test_the_doored_stack_writes_no_logs_resource_policy_of_its_own(door_template):
+    """security-reviewer F1 on M10 PR 3: the execution role holds logs:PutResourcePolicy on * for the stage's vended
+    delivery, uncapped. The construct must never declare one; a template that did would be honoured."""
+    assert not of_type(door_template, "AWS::Logs::ResourcePolicy")

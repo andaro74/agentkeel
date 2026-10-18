@@ -1723,7 +1723,9 @@ SUPPRESSIONS = {
         "userpool/* where the pool's id is the service's, held to the agent tag on the pool; on /apis and /apis/* "
         "for the HTTP API, with no tag condition, since an API's routes, integrations, authorisers and stages are "
         "made under /apis/<id>/ and carry no tag of their own; and on * for CreateUserPool, which takes no resource "
-        f"and is held to the agent tag in the request. The deploy boundary (seed S4) caps it. M10 PR 3: a customer "
+        f"and is held to the agent tag in the request. The deploy boundary (seed S4) caps only its logs:Delete* "
+        f"(none is granted here) and every iam:* (PassRole is the boundary's own exception); nothing else in it is "
+        f"capped. M10 PR 3: a customer "
         f"managed policy attached to the execution role, not an inline one: IAM holds a role's inline policies to "
         f"10,240 characters in all, the default policy is 9,134 of them, and the bootstrap deploy of 2026-10-16 was "
         f"refused with this document inline (12,071). The grants are the ones PR 2 ruled, and two from festival-desk's "
@@ -1732,9 +1734,11 @@ SUPPRESSIONS = {
         f"destination, which a cross-account subscription is authorised against as well as its log group; and "
         f"from run 39052047504, the stage's access log: CloudWatch Logs' vended log delivery (CreateLogDelivery, "
         f"GetLogDelivery, UpdateLogDelivery, ListLogDeliveries, PutResourcePolicy, DescribeResourcePolicies) on *, "
-        f"which API Gateway's developer guide lists for an HTTP API's logging and none of which takes a resource. "
-        f"PutResourcePolicy is the account's Logs resource policy; the deploy boundary still denies every logs:Delete*. "
-        f"{CEILING}"
+        f"which API Gateway's developer guide lists for an HTTP API's logging. These reach the whole shared account: "
+        f"PutResourcePolicy writes any named Logs resource policy in the region, uncapped by the deploy boundary and "
+        f"not removable by the deploy plane (logs:Delete* is denied); with /apis/* (PR 2), Create/UpdateLogDelivery "
+        f"can repoint the access log of any HTTP API in the account, not only a door's. Accepted for the door's "
+        f"stage, by name, in milestones/M10/rulings/pr3-security.md (security-reviewer F1, F2 on PR 3)."
     ),
     "DeployRole/DefaultPolicy/Resource": (
         "SPEC/01 §6: 'the deploy role, trusted with StringEquals on aud, the immutable sub for "
@@ -1805,8 +1809,7 @@ APPLIES_TO = {
         f"Resource::{_ARN.format(service, rest)}" for service, rest in (
             ("cognito-idp", "userpool/*"), ("lambda", "function:agentkeel-*-door-*"),
             ("logs", "log-group:/agentkeel/doors/*"), ("logs", "log-group:/aws/lambda/agentkeel-*-door-*"))] + [
-        f"Resource::arn:aws:apigateway:{REGION}::/apis/*", f"Resource::arn:aws:apigateway:{REGION}::/tags/*",
-        f"Resource::arn:aws:logs:{REGION}:{SECURITY_ACCOUNT}:destination:agentkeel-calls"],  # M10 PR 3: no wildcard
+        f"Resource::arn:aws:apigateway:{REGION}::/apis/*", f"Resource::arn:aws:apigateway:{REGION}::/tags/*"],
     "DeployRole/DefaultPolicy/Resource": ["Action::cloudformation:Describe*", "Resource::*"] + [
         f"Resource::{_ARN.format(service, rest)}" for service, rest in (
             ("bedrock-agentcore", "runtime/agentkeel_*"), ("bedrock-agentcore", "runtime/refagent*"),
