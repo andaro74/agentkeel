@@ -67,4 +67,13 @@ reads:
 #     none:     {request_id: ...}
 #     stranger: {request_id: ...}
 #     bypass:   {request_id: ..., principal: arn:aws:sts::<account>:assumed-role/<role>/<session>}
-observed: null
+# Filled by the owner on 2026-10-18 after the four calls (M10 PR 4; the run moved to PR 4 because PR 3 was the
+# deploy path's repair, SPEC/10 §5.1). Request ids read from the door's access log in the platform account
+# (admitted, none, stranger) and from the bypass client's output (bypass). Keys only, never a result.
+observed:
+  callers: {pull_request: 4}
+  deploy:  {run_id: 39076739413, answer_key: envelopes/agents/festival-desk/747c836b797400b00083f771e9d8dc5bde59145e.json}
+  admitted: {request_id: Fa6YgjvJvHcEJQw=}
+  none:     {request_id: Fa6bTjdkvHcEJ_Q=}
+  stranger: {request_id: Fa6fghRCPHcEJxw=}
+  bypass:   {request_id: 2d07b741-b24b-43c8-9a8d-3c9a07fd7774, principal: "arn:aws:sts::581208540944:assumed-role/m10-bypass/m10-bypass"}
