@@ -27,8 +27,7 @@ pr: 57
 
 # Ruling: M10 PR 4, Security
 
-DRAFT, written by the session on 2026-10-18 for the owner to rule as
-Security. A deploy made on this file before it reads "Ruled by" is
+Ruled by andaro74 as Security, 2026-10-18, as written. A deploy made on this file before it reads "Ruled by" is
 recorded below as one (M09 finding 4; pr3.md Unsure G).
 
 ## Security F3 stands: the calls destination admits the platform account, not the execution role

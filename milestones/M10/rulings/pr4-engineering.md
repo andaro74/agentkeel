@@ -22,8 +22,7 @@ pr: 57
 
 # Ruling: M10 PR 4, Engineering
 
-DRAFT, written by the session on 2026-10-18 for the owner to rule as
-Engineering.
+Ruled by andaro74 as Engineering, 2026-10-18, as written.
 
 ## The marker
 

@@ -23,8 +23,7 @@ pr: 57
 
 # Ruling: M10 PR 4, Data Owner
 
-DRAFT, written by the session on 2026-10-18 for the owner to rule as the
-Data Owner.
+Ruled by andaro74 as the Data Owner, 2026-10-18, as written.
 
 ## R5 on the first live records: what reached the envelope
 

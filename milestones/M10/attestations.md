@@ -41,7 +41,7 @@ policy's test following the policy (`e05095c`, `0ebfdbd`); no reader
 changed in PR 4, and the run file was not changed after the owner's
 `observed` block (`14ab792`).
 
-_Signed: _
+_Signed: andaro74, 2026-10-18_
 
 **2. Security — the door and the records are as ruled, and the records are from the separate account.**
 
@@ -61,7 +61,7 @@ forgery-proof. The two refused deploys were made on a draft of this PR's
 ruling; each rolled back and is recorded as such. No live control was left
 relaxed.
 
-_Signed: _
+_Signed: andaro74, 2026-10-18_
 
 **3. Tool Owner — the field admits what the two seats ruled and nothing else.**
 
@@ -75,7 +75,7 @@ every envelope since PR 2's merge). An agent repository has no `two-key`,
 so festival-desk's own admission took one commit, as SPEC/10 §8 says; not
 described otherwise.
 
-_Signed: _
+_Signed: andaro74, 2026-10-18_
 
 **4. Data Owner — the records on the envelope carry what R5 allows and nothing more.**
 
@@ -90,7 +90,7 @@ because the run file states it. No golden under `evals/goldens/` and
 nothing under `data/` changed in M10; `g-030` is as `02db54e` planted it and
 was blocked through the door on the deploy's answer record.
 
-_Signed: _
+_Signed: andaro74, 2026-10-18_
 
 **5. Product — the row's State is the envelope's, and the prose says what it does not mean.**
 
@@ -104,4 +104,4 @@ recording was ruled not recorded at PR 1 (ADR-0015 decision 6) and
 `docs/video/README.md`'s M10 row says so and nothing more. The count is
 4 of 4.
 
-_Signed: _
+_Signed: andaro74, 2026-10-18_
