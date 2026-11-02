@@ -11,7 +11,7 @@ the README of the stack it changed.
 | Ruling | PR | What |
 |---|---|---|
 | `endpoints-one-subnet` (Security), `endpoints-one-subnet-engineering`, `endpoints-one-subnet-product` | #58 | the five interface VPC endpoints in one subnet: ten ENIs to five, $74.40 a month to $36.50 expected |
-| `retire-four-agents` (Security), `retire-four-agents-product` | #PRNUM | the four closed milestones' agents deleted by hand (owner-check, window-check, drill-agent, festival-desk): their stacks, keys, tables, pool, guardrail, log groups, markers and image repositories; registry rows kept with `retired_at`. Read-back owed below |
+| `retire-four-agents` (Security), `retire-four-agents-product` | #59 | the four closed milestones' agents deleted by hand (owner-check, window-check, drill-agent, festival-desk): their stacks, keys, tables, pool, guardrail, log groups, markers and image repositories; registry rows kept with `retired_at`. Read-back owed below |
 
 ## Findings
 

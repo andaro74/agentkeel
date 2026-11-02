@@ -1,5 +1,5 @@
 ---
-# Maintenance PR #PRNUM. Security's key over the by-hand deletion of four
+# Maintenance PR #59. Security's key over the by-hand deletion of four
 # agent stacks in the agent account after the m10 close, and the finding
 # that the platform's own retire path refused three of them. The M10 close
 # ruled "nothing is deleted without a Security ruling"
@@ -21,10 +21,10 @@ evidence:
   - https://github.com/andaro74/agentkeel/actions/runs/41454360702
   - https://github.com/andaro74/agentkeel/actions/runs/41455395838
   - https://github.com/andaro74/agentkeel/actions/runs/41456176090
-pr: PRNUM
+pr: 59
 ---
 
-# Ruling: maintenance PR #PRNUM, Security
+# Ruling: maintenance PR #59, Security
 
 Drafted by Claude Fable 5.1 for Security, 2026-11-02; not yet ruled. The seat replaces this line with `Ruled by <login> as Security, <date>, as written` (or with the changes it made named) before the merge; `cold-review-ruling` fails while it reads Drafted.
 

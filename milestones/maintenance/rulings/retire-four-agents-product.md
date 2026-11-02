@@ -1,5 +1,5 @@
 ---
-# Maintenance PR #PRNUM. Product's key over the one Product path it
+# Maintenance PR #59. Product's key over the one Product path it
 # touches, milestones/maintenance/README.md: the ruling's row and the
 # findings section. Security's file is retire-four-agents.md.
 ruling: retire-four-agents-product
@@ -9,10 +9,10 @@ authorises:
   - milestones/maintenance/rulings/retire-four-agents-product.md
 evidence:
   - milestones/maintenance/rulings/retire-four-agents.md
-pr: PRNUM
+pr: 59
 ---
 
-# Ruling: maintenance PR #PRNUM, Product
+# Ruling: maintenance PR #59, Product
 
 Drafted by Claude Fable 5.1 for Product, 2026-11-02; not yet ruled. The seat replaces this line with `Ruled by <login> as Product, <date>, as written` (or with the changes it made named) before the merge; `cold-review-ruling` fails while it reads Drafted.
 
