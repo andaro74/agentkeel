@@ -582,6 +582,14 @@ def test_the_vpc_has_the_two_endpoints_an_image_pull_needs(template):
     assert len(interface) == 5
 
 
+def test_each_interface_endpoint_is_in_one_subnet(template):
+    """One ENI per interface endpoint, not two (2026-11-01). The five were ten ENIs, $74.40 in October 2026,
+    billed by the ENI-hour. All five in the same subnet, so a runtime in the other subnet crosses once."""
+    interface = [e for e in endpoints(template) if e.get("VpcEndpointType") == "Interface"]
+    assert all(len(e["SubnetIds"]) == 1 for e in interface)
+    assert len({json.dumps(e["SubnetIds"][0]) for e in interface}) == 1
+
+
 def test_both_are_published_for_the_construct(template):
     published = {p["Properties"]["Name"] for p in of_type(template, "AWS::SSM::Parameter").values()}
     assert {"/agentkeel/security/endpoint/ecr.api", "/agentkeel/security/endpoint/ecr.dkr"} <= published

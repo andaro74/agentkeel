@@ -35,13 +35,29 @@ Bedrock spend plus one refresh interval at the account quota, and a run
 that spends the month's figure in an afternoon is stopped after it, not
 during it. No smaller figure is invented.
 
-**Two parameters are written by hand.** `GovernedAgent` reads five
-endpoint destinations from SSM. The three interface endpoints publish
+**Two parameters are written by hand.** `GovernedAgent` reads seven
+endpoint destinations from SSM. The five interface endpoints publish
 their security group ids from this stack. The two gateway endpoints — S3
 and DynamoDB (ADR-0006) — are reached through a managed prefix list, and
 AWS gives no CloudFormation attribute for a prefix list id, so those two
 parameters are written by the same human, with one command each, below.
 Until they exist an agent stack does not deploy.
+
+**The interface endpoints are in one subnet** (2026-11-01). AWS bills an
+interface endpoint by the ENI-hour, $0.01 in us-west-2. Five endpoints in
+both subnets were ten ENIs: $74.40 for October 2026, the largest line in
+the account. In one subnet (`isolated` in us-west-2a) they are five ENIs,
+$36.50 a month. Nothing the construct reads changed: an endpoint's
+`SubnetIds` updates in place, so its security group id and its parameter
+are the same, and `/agentkeel/security/subnet-ids` still names both
+subnets, so a runtime may be placed in us-west-2b and reach the endpoints
+across the VPC. What was given up is the second Availability Zone for the
+endpoints. A NAT gateway was looked at and not taken: $32.85 a month before
+data, so no cheaper than this, and SPEC/01 §6 says no NAT. The next cut, if
+one is needed: the `kms` endpoint ($7.30 a month in one subnet) is on no
+list AWS gives for a runtime without internet access, and refagent's
+server makes no KMS call; removing it is a Security change to every
+manifest's `endpoint_allowlist` and to the construct's tests.
 
 ## One failure worth knowing about before you deploy
 
