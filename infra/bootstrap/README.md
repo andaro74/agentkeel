@@ -43,21 +43,39 @@ AWS gives no CloudFormation attribute for a prefix list id, so those two
 parameters are written by the same human, with one command each, below.
 Until they exist an agent stack does not deploy.
 
-**The interface endpoints are in one subnet** (2026-11-01). AWS bills an
-interface endpoint by the ENI-hour, $0.01 in us-west-2. Five endpoints in
-both subnets were ten ENIs: $74.40 for October 2026, the largest line in
-the account. In one subnet (`isolated` in us-west-2a) they are five ENIs,
-$36.50 a month. Nothing the construct reads changed: an endpoint's
-`SubnetIds` updates in place, so its security group id and its parameter
-are the same, and `/agentkeel/security/subnet-ids` still names both
-subnets, so a runtime may be placed in us-west-2b and reach the endpoints
-across the VPC. What was given up is the second Availability Zone for the
-endpoints. A NAT gateway was looked at and not taken: $32.85 a month before
-data, so no cheaper than this, and SPEC/01 §6 says no NAT. The next cut, if
-one is needed: the `kms` endpoint ($7.30 a month in one subnet) is on no
-list AWS gives for a runtime without internet access, and refagent's
-server makes no KMS call; removing it is a Security change to every
-manifest's `endpoint_allowlist` and to the construct's tests.
+**The interface endpoints are in one subnet** (2026-11-01; deployed
+2026-11-02, the record is at the end of this file). AWS bills an interface
+endpoint by the ENI-hour, $0.01 in us-west-2. Five endpoints in both
+subnets were ten ENIs: $74.40 for October 2026 (Cost Explorer, usage type
+`USW2-VpcEndpoint-Hours`, read 2026-11-01), the largest line in the
+account. In the first isolated subnet alone (index 0 of the region's AZ
+list, `isolated_subnets[0]`; `subnet-00008bbb7a11551a0`, us-west-2a, in
+the deployed account) they are five ENIs: 5 x $0.01 x 730 h = $36.50 a
+month expected, plus cross-AZ transfer at $0.01 a GB each way for a runtime
+placed in the other subnet, cents at eval volumes. Nothing the construct
+reads changed: `SubnetIds` is a no-interruption update (the change set of
+2026-11-02 read five Modify and no replacement), so each endpoint's
+security group id and its parameter are the same, and
+`/agentkeel/security/subnet-ids` still names both subnets. What was given
+up is the second Availability Zone for the endpoints: an impairment of
+us-west-2a now takes every interface endpoint from a runtime in
+us-west-2b, including a new runtime's image pull. Shrinking `SubnetIds`
+deletes the second ENI live, so deploy this change when no eval or runtime
+call is in flight. A NAT gateway was looked at and not taken: $0.045 x
+730 h = $32.85 a month before data, so no cheaper than this, and SPEC/01
+§6 says no NAT.
+
+**A proposal, not a change (Security's to rule):** the `kms` endpoint,
+$7.30 a month in one subnet. AWS's list of endpoints a VPC-mode runtime
+needs without internet access names ecr.api, ecr.dkr, the S3 gateway and
+logs, not kms (docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-vpc.html,
+"Required VPC endpoints", read 2026-11-01), and `agents/refagent/server.py`
+opens s3, dynamodb and bedrock-runtime clients and no KMS client (a read of
+the code, not of a run). Unknowns: the manifest comment says "kms: the
+agent's key"; an in-VPC repeat of seed S6 would then be refused by the
+network before the key policy, a different control reading from SPEC/01 §6;
+and removing it is a change to every manifest's `endpoint_allowlist` and
+to the construct's tests.
 
 ## One failure worth knowing about before you deploy
 
@@ -303,3 +321,26 @@ the platform's. It may not update, delete or untag one. Two narrower
 forms were not tried: the Resource `runtime/${*}`, IAM's literal
 asterisk, and a condition on `aws:TagKeys` for `TagResource`. Trying
 either costs a create that may be refused; carried to M08.
+
+## Deploy record, 2026-11-02: the interface endpoints in one subnet
+
+Deployed by the human's admin user, by hand, from `infra/bootstrap` with
+`npx aws-cdk@2 deploy`, after `npx aws-cdk@2 deploy --no-execute` and a
+read of the change set (`describe-change-set`): six Modify, no
+replacement; five `AWS::EC2::VPCEndpoint` on `SubnetIds`, and
+`DoorGrants` on metadata only (`cdk diff` had shown its description as a
+replacement because the stored template returns `§` as `?`; CloudFormation
+did not). `UPDATE_COMPLETE` at 2026-11-02T04:39:52Z.
+
+| Read | Before (2026-11-01) | After (2026-11-02T04:43Z) |
+|---|---|---|
+| `describe-vpc-endpoints`, interface, subnets per endpoint | 2 (`subnet-0f82c2f36bd203187`, `subnet-00008bbb7a11551a0`) | 1 (`subnet-00008bbb7a11551a0`, us-west-2a, `usw2-az1`) |
+| network interfaces per endpoint | 2 | 1 |
+| the five endpoint ids | `vpce-036305989f9ac53e7` (bedrock-runtime), `vpce-03a73e385f334f4be` (kms), `vpce-00af6e3d03fa6346a` (logs), `vpce-04b819e1d563554c8` (ecr.api), `vpce-0300e82aa0b42e9b0` (ecr.dkr) | the same five |
+| `/agentkeel/security/endpoint/*` | `sg-06b43d057b1b830d6`, `sg-01b80a6e3c1600fd9`, `sg-0081b33b9e519fa3b`, `sg-0d9fa1f8ba484f2ab`, `sg-04915dc609efc1afe` | the same five |
+| `/agentkeel/security/subnet-ids` | both subnets | both subnets |
+| refagent's runtime, `invoke_agent_runtime` with `g-001`'s question (`src.agent.run.invoke_deployed`, the admin user) | `r-019`, `ML-2.1`, one tool call, 3,528 tokens, 4.7 s | `r-019`, `ML-2.1`, one tool call, 3,528 tokens, 4.3 s |
+
+The two runtime calls are a read, not evidence (`evals/local/` is not
+either): the envelope that measures the runtime after this change is the
+CI-written one for the first `main` commit after the merge.
