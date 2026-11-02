@@ -582,6 +582,21 @@ def test_the_vpc_has_the_two_endpoints_an_image_pull_needs(template):
     assert len(interface) == 5
 
 
+def test_each_interface_endpoint_is_in_one_subnet(template):
+    """One ENI per interface endpoint, not two (2026-11-01). The five were ten ENIs, $74.40 in October 2026
+    (Cost Explorer, USW2-VpcEndpoint-Hours), billed by the ENI-hour. All five in the first isolated subnet
+    (index 0 of the region's AZ list), so a later edit cannot move them to the other one, or back to both,
+    without this test saying so."""
+    interface = [e for e in endpoints(template) if e.get("VpcEndpointType") == "Interface"]
+    assert len(interface) == 5
+    assert all(len(e["SubnetIds"]) == 1 for e in interface)
+    refs = {json.dumps(e["SubnetIds"][0]) for e in interface}
+    assert len(refs) == 1
+    subnet = template["Resources"][json.loads(refs.pop())["Ref"]]
+    assert subnet["Type"] == "AWS::EC2::Subnet"
+    assert subnet["Properties"]["AvailabilityZone"] == {"Fn::Select": [0, {"Fn::GetAZs": ""}]}
+
+
 def test_both_are_published_for_the_construct(template):
     published = {p["Properties"]["Name"] for p in of_type(template, "AWS::SSM::Parameter").values()}
     assert {"/agentkeel/security/endpoint/ecr.api", "/agentkeel/security/endpoint/ecr.dkr"} <= published
