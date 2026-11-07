@@ -14,7 +14,7 @@ pr: 59
 
 # Ruling: maintenance PR #59, Product
 
-Drafted by Claude Fable 5.1 for Product, 2026-11-02; not yet ruled. The seat replaces this line with `Ruled by <login> as Product, <date>, as written` (or with the changes it made named) before the merge; `cold-review-ruling` fails while it reads Drafted.
+Ruled by andaro74 as Product, 2026-11-07, as written.
 
 The maintenance README gains the row for `retire-four-agents` and a
 "Findings" section with finding 1 (the platform's retire path refuses an

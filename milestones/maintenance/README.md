@@ -86,7 +86,7 @@ the markers for owner-check and window-check; the four runtimes
 (`list-agent-runtimes` reads `refagent` and `agentkeel_label_impact` alone);
 `list-stacks` reads `agentkeel-refagent` and `agentkeel-label-impact` alone.
 
-**Still standing at the read, the owner's to finish:** log groups
+**Still standing at the 15:40Z read, finished by the owner the same day** (each read back as not found at 2026-11-07T17:30Z; the four repositories archived then): log groups
 `/aws/bedrock-agentcore/runtimes/agentkeel_drill_agent-jUPi0ADoVd-DEFAULT`,
 `/aws/bedrock-agentcore/runtimes/agentkeel_festival_desk-379Sz3GgxZ-DEFAULT`
 and `/agentkeel/doors/festival-desk/access` (with its retained subscription
