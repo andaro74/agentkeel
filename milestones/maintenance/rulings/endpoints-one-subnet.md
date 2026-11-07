@@ -20,7 +20,7 @@ pr: 58
 
 # Ruling: maintenance PR #58, Security
 
-Drafted by Claude Fable 5.1 for Security, 2026-11-02; not yet ruled. The seat replaces this line with `Ruled by <login> as Security, <date>, as written` (or with the changes it made named) before the merge; `cold-review-ruling` fails while it reads Drafted.
+Ruled by andaro74 as Security, 2026-11-07, as written.
 
 ## What is ruled
 
