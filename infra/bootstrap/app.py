@@ -29,7 +29,8 @@ What it makes:
   `bedrock-agentcore:InvokeAgentRuntime` on refagent's runtime only, and
   three reads of which bytes that runtime runs (ADR-0007, P1);
 - a **VPC with no internet gateway and no NAT**: interface endpoints for
-  bedrock-runtime, kms, logs, ecr.api and ecr.dkr, gateway endpoints for s3
+  bedrock-runtime, kms, logs, ecr.api and ecr.dkr, each in one subnet
+  (2026-11-01: five ENIs, not ten), gateway endpoints for s3
   and dynamodb (ruling e, ADR-0006), each with a policy scoped to this
   account. The one exception is s3's read of ECR's own layer bucket (B1);
 - one **KMS key per agent**, whose policy denies key-policy changes to
@@ -496,9 +497,29 @@ class BootstrapStack(cdk.Stack):
                 conditions={"StringEquals": {"aws:ResourceAccount": self.account}},
             )
 
+        # One subnet per interface endpoint (2026-11-01; deployed 2026-11-02,
+        # README "Deploy record"). AWS bills an interface endpoint by the
+        # ENI-hour, $0.01 in us-west-2. Five endpoints in both subnets were ten
+        # ENIs: $74.40 for October 2026 (Cost Explorer, usage type
+        # USW2-VpcEndpoint-Hours, read 2026-11-01), the largest line in the
+        # account. In the first isolated subnet alone (index 0 of the region's
+        # AZ list; subnet-00008bbb7a11551a0, us-west-2a, in the deployed
+        # account) they are five ENIs, 5 x $0.01 x 730 h = $36.50 a month
+        # expected, plus cross-AZ transfer at $0.01 a GB each way for a runtime
+        # placed in the other subnet. Private DNS resolves each service name to
+        # that one ENI, reached over the VPC's local route. The two subnets stay,
+        # so the runtime's network config and /agentkeel/security/subnet-ids are
+        # unchanged; SubnetIds is a no-interruption update (CloudFormation's
+        # change set, 2026-11-02: five Modify, no replacement), so the five
+        # security groups and the five parameters the construct reads are the
+        # same ids. What was given up: the endpoints' second Availability Zone.
+        # A NAT gateway was not the answer: $0.045 x 730 h = $32.85 a month
+        # before data, and SPEC/01 section 6 says no NAT.
+        one_subnet = ec2.SubnetSelection(subnets=[vpc.isolated_subnets[0]])
         for name, interface in INTERFACE_ENDPOINTS.items():
             endpoint = vpc.add_interface_endpoint(
-                f"Endpoint{endpoint_id(name)}", service=interface, private_dns_enabled=True)
+                f"Endpoint{endpoint_id(name)}", service=interface, private_dns_enabled=True,
+                subnets=one_subnet)
             endpoint.add_to_policy(this_account())
             self.endpoint_groups[name] = endpoint.connections.security_groups[0]
         for name, gateway in GATEWAY_ENDPOINTS.items():
