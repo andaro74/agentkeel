@@ -15,7 +15,7 @@ pr: 58
 
 # Ruling: maintenance PR #58, Product
 
-Drafted by Claude Fable 5.1 for Product, 2026-11-02; not yet ruled. The seat replaces this line with `Ruled by <login> as Product, <date>, as written` (or with the changes it made named) before the merge; `cold-review-ruling` fails while it reads Drafted.
+Ruled by andaro74 as Product, 2026-11-07, as written.
 
 A folder `milestones/maintenance/` for the rulings of pull requests after
 the `m10` close. `RULING_GLOB` accepts any folder under `milestones/`;

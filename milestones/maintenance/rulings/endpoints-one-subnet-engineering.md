@@ -15,7 +15,7 @@ pr: 58
 
 # Ruling: maintenance PR #58, Engineering
 
-Drafted by Claude Fable 5.1 for Engineering, 2026-11-02; not yet ruled. The seat replaces this line with `Ruled by <login> as Engineering, <date>, as written` (or with the changes it made named) before the merge; `cold-review-ruling` fails while it reads Drafted.
+Ruled by andaro74 as Engineering, 2026-11-07, as written.
 
 `test_each_interface_endpoint_is_in_one_subnet` holds the five interface
 endpoints in one subnet, the same for all five, the subnet whose
