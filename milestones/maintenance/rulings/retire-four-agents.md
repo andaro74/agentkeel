@@ -249,6 +249,16 @@ registry's `PutItem`. The gates on this PR read the ruling file, not the
 account. The record is this file and CloudTrail under `AWSLogs/` in the
 security account (R5), which no platform role can delete.
 
+## Made before this file was ruled
+
+The deletions were made on 2026-11-06 and 2026-11-07 while this file read
+Drafted, as the owner chose; the read-back in `milestones/maintenance/README.md`
+records each attempt and what stood after. Finding 2 held: festival-desk's
+retire head passed the check and the platform retired it (run 42329724674).
+M10 pr3 C is now read: the first delete of festival-desk's door stage was
+refused on `logs:DeleteLogDelivery` by the deploy boundary, and the retry
+completed it.
+
 ## Unsure
 
 - Whether Product carries finding 1 and finding 2 into SPEC/07 §8 or
