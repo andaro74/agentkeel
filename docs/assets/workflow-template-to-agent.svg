@@ -1,0 +1,115 @@
+<svg width="980" height="500" viewBox="0 0 980 500" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif">
+  <!--
+    From template to running agent, in five steps, as
+    docs/developer/quickstart.md gives them. One hue per step. Each card
+    has a plain sentence and the file or service an engineer would look
+    for. The three numbers in the footer are the Measured cell of ledger
+    row 7 (envelope dee74c3, CI run 37149475766); rows 6 and 7 are RED and
+    the image says so. None of CLAUDE.md's three restricted words. No
+    account id, host or identifier.
+  -->
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b7091"/>
+    </marker>
+  </defs>
+  <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">
+    <rect x="1" y="1" width="978" height="498" rx="16" fill="#0d1a2e" stroke="#2c3d5c" stroke-width="1.5"/>
+    <text x="30" y="42" fill="#cbd6e6" font-size="13" letter-spacing="3">FROM TEMPLATE TO RUNNING AGENT &#183; FIVE STEPS</text>
+  </g>
+
+  <!-- five cards, 172 x 270 at x = 30, 217, 404, 591, 778; y = 66 -->
+  <!-- 1 create (cyan) -->
+  <rect x="30" y="66" width="172" height="270" rx="12" fill="#0f2a3a" stroke="#22d3ee" stroke-width="2"/>
+  <circle cx="56" cy="94" r="14" fill="#22d3ee"/>
+  <text x="56" y="99" text-anchor="middle" fill="#0d1a2e" font-size="14" font-weight="bold">1</text>
+  <text x="46" y="140" fill="#a5f3fc" font-size="17" font-weight="bold">Create</text>
+  <text x="46" y="170" fill="#dbe4f0" font-size="13">A team makes a</text>
+  <text x="46" y="189" fill="#dbe4f0" font-size="13">repository from the</text>
+  <text x="46" y="208" fill="#dbe4f0" font-size="13">platform's template</text>
+  <text x="46" y="227" fill="#dbe4f0" font-size="13">and names its agent.</text>
+  <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" font-size="10.5" fill="#8b9bb4">
+    <text x="46" y="296">agent-template</text>
+    <text x="46" y="313">manifest.yaml</text>
+  </g>
+
+  <line x1="202" y1="201" x2="213" y2="201" stroke="#5b7091" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 2 fill the seats (violet) -->
+  <rect x="217" y="66" width="172" height="270" rx="12" fill="#182342" stroke="#a78bfa" stroke-width="2"/>
+  <circle cx="243" cy="94" r="14" fill="#a78bfa"/>
+  <text x="243" y="99" text-anchor="middle" fill="#0d1a2e" font-size="14" font-weight="bold">2</text>
+  <text x="233" y="140" fill="#ddd2fe" font-size="17" font-weight="bold">Fill the seats</text>
+  <text x="233" y="170" fill="#dbe4f0" font-size="13">Seven owners are</text>
+  <text x="233" y="189" fill="#dbe4f0" font-size="13">named. The team</text>
+  <text x="233" y="208" fill="#dbe4f0" font-size="13">writes its tests, its</text>
+  <text x="233" y="227" fill="#dbe4f0" font-size="13">rules and who may</text>
+  <text x="233" y="246" fill="#dbe4f0" font-size="13">call the agent.</text>
+  <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" font-size="10.5" fill="#8b9bb4">
+    <text x="233" y="279">seats: &#183; callers:</text>
+    <text x="233" y="296">goldens/</text>
+    <text x="233" y="313">rules/guardrail.yaml</text>
+  </g>
+
+  <line x1="389" y1="201" x2="400" y2="201" stroke="#5b7091" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 3 the platform check (blue) -->
+  <rect x="404" y="66" width="172" height="270" rx="12" fill="#12253f" stroke="#4da3ff" stroke-width="2"/>
+  <circle cx="430" cy="94" r="14" fill="#4da3ff"/>
+  <text x="430" y="99" text-anchor="middle" fill="#0d1a2e" font-size="14" font-weight="bold">3</text>
+  <text x="420" y="140" fill="#bfdcff" font-size="17" font-weight="bold">Pass the check</text>
+  <text x="420" y="170" fill="#dbe4f0" font-size="13">Every pull request is</text>
+  <text x="420" y="189" fill="#dbe4f0" font-size="13">read by the platform.</text>
+  <text x="420" y="208" fill="#dbe4f0" font-size="13">An empty seat or no</text>
+  <text x="420" y="227" fill="#dbe4f0" font-size="13">tests: it cannot</text>
+  <text x="420" y="246" fill="#dbe4f0" font-size="13">merge.</text>
+  <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" font-size="10.5" fill="#8b9bb4">
+    <text x="420" y="279">platform-check.yml</text>
+    <text x="420" y="296">a GitHub App's check,</text>
+    <text x="420" y="313">required by a ruleset</text>
+  </g>
+
+  <line x1="576" y1="201" x2="587" y2="201" stroke="#5b7091" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 4 signed (slate) -->
+  <rect x="591" y="66" width="172" height="270" rx="12" fill="#151f33" stroke="#94a3b8" stroke-width="2"/>
+  <circle cx="617" cy="94" r="14" fill="#94a3b8"/>
+  <text x="617" y="99" text-anchor="middle" fill="#0d1a2e" font-size="14" font-weight="bold">4</text>
+  <text x="607" y="140" fill="#e2e8f0" font-size="17" font-weight="bold">Signed</text>
+  <text x="607" y="170" fill="#dbe4f0" font-size="13">After the merge the</text>
+  <text x="607" y="189" fill="#dbe4f0" font-size="13">platform builds the</text>
+  <text x="607" y="208" fill="#dbe4f0" font-size="13">agent and signs what</text>
+  <text x="607" y="227" fill="#dbe4f0" font-size="13">it built. The team</text>
+  <text x="607" y="246" fill="#dbe4f0" font-size="13">does nothing here.</text>
+  <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" font-size="10.5" fill="#8b9bb4">
+    <text x="607" y="296">deploy.yml</text>
+    <text x="607" y="313">cosign &#183; Amazon ECR</text>
+  </g>
+
+  <line x1="763" y1="201" x2="774" y2="201" stroke="#5b7091" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 5 deployed (amber) -->
+  <rect x="778" y="66" width="172" height="270" rx="12" fill="#182a47" stroke="#f0a43a" stroke-width="2.5"/>
+  <circle cx="804" cy="94" r="14" fill="#f0a43a"/>
+  <text x="804" y="99" text-anchor="middle" fill="#0d1a2e" font-size="14" font-weight="bold">5</text>
+  <text x="794" y="140" fill="#ffe1ad" font-size="17" font-weight="bold">Deployed</text>
+  <text x="794" y="170" fill="#dbe4f0" font-size="13">The agent runs in the</text>
+  <text x="794" y="189" fill="#dbe4f0" font-size="13">platform's network,</text>
+  <text x="794" y="208" fill="#dbe4f0" font-size="13">is asked its own tests</text>
+  <text x="794" y="227" fill="#dbe4f0" font-size="13">and is listed in the</text>
+  <text x="794" y="246" fill="#dbe4f0" font-size="13">registry.</text>
+  <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" font-size="10.5" fill="#8b9bb4">
+    <text x="794" y="279">infra/construct/</text>
+    <text x="794" y="296">AgentCore Runtime</text>
+    <text x="794" y="313">registry &#183; DynamoDB</text>
+  </g>
+
+  <!-- footer: what was measured -->
+  <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" font-size="11.5">
+    <text x="30" y="372" fill="#cbd6e6" letter-spacing="2">WHAT WAS MEASURED &#183; LEDGER ROWS 6 AND 7, BOTH RED</text>
+    <text x="30" y="400" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; timed once: 3,615 s from a new repository to an agent deployed and listed (row 7)</text>
+    <text x="30" y="422" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; the first agent from the template took 32,264 s to deploy after its merge; the bar is 3,600 s (row 7)</text>
+    <text x="30" y="444" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; at row 6 the check refused every change, a correct one too, and no agent shipped</text>
+    <text x="30" y="472" fill="#667799"><tspan fill="#f0a43a">&#9679;</tspan>&#160; a proof of concept &#183; one person holds all seven seats</text>
+  </g>
+</svg>
