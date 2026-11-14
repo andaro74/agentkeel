@@ -39,7 +39,7 @@ pr: 61
 
 # Ruling: maintenance PR #61, Product: the README a first-time visitor reads
 
-Drafted by Claude Fable 5.2 for Product, 2026-11-14; not yet ruled. The seat replaces this line with `Ruled by <login> as Product, <date>, as written` (or with the changes it made named) before the merge; `cold-review-ruling` fails while it reads Drafted.
+Ruled by andaro74 as Product, 2026-11-14, as written.
 
 A maintenance PR (`milestones/maintenance/README.md`): no ledger row, no
 explainer, no claim, no plant, no measurement. It rewrites `README.md`,
