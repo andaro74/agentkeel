@@ -66,9 +66,12 @@ for `andaro74/pharmadelta` the same day (its #43, #45, #46).
    that the model-swap half is row 4 and row 4 is RED.
 3. **Every state and number is a ledger cell.** The count (five GREEN,
    six RED) is the State column. Each number in the table under "What the
-   platform refuses" and in two of the images is in that row's Measured
-   cell, and each row links its envelope under `evals/history/` and the
-   CI run that wrote it. `make ledger` exited 0 on this tree. The one date
+   platform refuses" and in two of the images is in that row's cells
+   (Measured; the 600 seconds is row 5's Falsifiers cell and the cap of
+   four is row 7's "PRs used / cap"), and each row links its envelope
+   under `evals/history/` and the CI run that wrote it. `make ledger`
+   exited 0 on this tree, a local run and not evidence; CI's `checks` job
+   is the reading. The one date
    that is not a cell is the read-back of 2026-11-07, which is the
    maintenance README's, made by hand; the README says "read-back" and
    links it.
@@ -113,6 +116,27 @@ for `andaro74/pharmadelta` the same day (its #43, #45, #46).
    from the template is its `.template-source.json`; that it runs on the
    platform is the maintenance README's read-back.
 
+## Cold review
+
+`engineering-cold-reviewer` read the diff `origin/main...c315c63` (nine
+files) and the ledger, and nothing else. BLOCK 0, FINDING 7, NOTE 10. Its
+report is in the PR body, verbatim. Engineering owns no path in this
+diff, so its findings are recorded here and not in a file of its own.
+Each finding was checked against the file it cites and repaired in the
+commit after `c315c63`:
+
+| # | Finding | Repair |
+|---|---|---|
+| F1 | "the planted key reached the answer": the run file says not refused, reached the tool result | reads "was not refused" |
+| F2 | "One Grafana panel": the tree has two | reads two panels, the registry and the stored verdicts |
+| F3 | "of six recordings, one was made": `docs/video/README.md` and SPEC/00 §15 disagree | the sentence is removed; Unsure F |
+| F4 | "ledger written by CI": CI writes envelopes, Product writes cells | the hero and its alt text read "held to CI's runs" |
+| F5 | row 5 "from inside the agent's network"; row 10 "a borrowed name" | row 5 reads "each expected to be refused"; row 10 reads "one the manifest does not name" |
+| F6 | row 7's "F6_1 not held" left out beside the timed run | added to the README's list and the second image's footer |
+| F7 | row 3 "No regression merged" reads as if a pull request carried one | reads "refused in a copy of the tree; no pull request carried it" |
+
+Notes N1, N2, N3 and N5 were taken as wording changes. N6 is Unsure G.
+
 ## What a reader can falsify
 
 - `git diff 3962809..<head> --stat` touches the nine files this ruling
@@ -145,6 +169,14 @@ for `andaro74/pharmadelta` the same day (its #43, #45, #46).
   with the cell.
 - **E. `docs/platform/overview.md` is not touched.** It was written at
   M02 and says so. The README now overlaps it.
+- **F. How many walkthrough recordings exist.** SPEC/00 §15 says one act
+  is committed; `docs/video/README.md` says none recorded. The README
+  says nothing about the acts. Which file is right is Product's.
+- **G. The README links to files that hold identifiers** (cold review
+  N6): `milestones/maintenance/README.md` (an account id, security group
+  and pool ids) and envelope `dee74c3` (an IAM user ARN with a person's
+  name). Both were on `main` before this PR and neither is changed by
+  it. Whether they stay is Security's.
 
 ## What will go stale
 

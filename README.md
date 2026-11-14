@@ -1,7 +1,7 @@
 # agentkeel
 A platform on Amazon Bedrock and AgentCore that controls change to an AI agent: who may alter its rules, tests, thresholds or model, what is measured first, and what record is kept. Eleven claims, each planted false first and measured in CI: five GREEN, six RED.
 
-![AgentKeel: who may change an AI agent's rules, tests and model, and what is measured before the change ships, each claim tested with a planted failure. A change (a rule, a test, a threshold, a model) enters the platform, needs its owning seat's ruling, passes gates that ask for two keys to loosen anything, and reaches an agent that is signed, deployed and listed, held by a door for named callers, a guardrail with pinned rules, and an audit record in a second account. Below the platform, a ledger written by CI: planted, measured, ruled. Eleven claims measured: five green, six red. A proof of concept; the film slate is fictional.](docs/assets/readme-header.png)
+![AgentKeel: who may change an AI agent's rules, tests and model, and what is measured before the change ships, each claim tested with a planted failure. A change (a rule, a test, a threshold, a model) enters the platform, needs its owning seat's ruling, passes gates that ask for two keys to loosen anything, and reaches an agent that is signed, deployed and listed, held by a door for named callers, a guardrail with pinned rules, and an audit record in a second account. Below the platform, a ledger held to CI's runs: planted, measured, ruled. Eleven claims measured: five green, six red. A proof of concept; the film slate is fictional.](docs/assets/readme-header.png)
 
 > AgentCore proves the agent obeyed the policy tonight; this platform proves the policy could only have been changed by the seat that owns it, and that a model swap cannot relax it unnoticed.
 
@@ -23,7 +23,7 @@ agentkeel answers those three for every agent built on it:
 
 | The question | What agentkeel does | Measured at |
 |---|---|---|
-| Who may change a rule, a test or a bar? | Each file has one owning seat. A change merges only with that seat's ruling file. Loosening anything needs rulings from two seats. | Row 2, GREEN |
+| Who may change a rule, a test or a bar? | Each file has one owning seat. A change merges only with that seat's ruling file. Loosening a bar or retiring a test needs rulings from two seats. | Row 2, GREEN |
 | Can a change make the agent worse quietly? | A test that used to pass and now fails stops the merge. Every planted attack must be blocked, or the run goes RED. | Row 3, GREEN |
 | Is a model swap tested first? | The swap runs against the tests on its own pull request. A breaking swap went RED. So did the one named equivalent. | Row 4, **RED** |
 | Is what runs what was reviewed? | CI signs the bundle. The deploy checks the signature. An unsigned or altered bundle was refused. The agent inside the platform's construct was not measured at this row. | Row 1, **RED** |
@@ -38,7 +38,7 @@ Each row, with its numbers and its CI run, is in the table under [What the platf
 2. **Every file has a seat.** [`.github/CODEOWNERS`](.github/CODEOWNERS) maps each path to one of seven seats. A change to a seat's file needs a ruling file from that seat.
 3. **Gates read the change.** Required checks in GitHub Actions refuse a change with no ruling, a loosening with one key, a regressed test or a silent plant. The owner has no bypass.
 4. **CI signs, and only CI deploys.** The bundle is signed with cosign. The deploy role is assumed through GitHub OIDC, on `main` only.
-5. **A question goes through the door.** An HTTP API with an authoriser admits only the callers the manifest names. The runtime answers the door and nothing else.
+5. **A question goes through the door.** For an agent whose manifest names callers, an HTTP API with an authoriser admits only the callers the manifest names. The runtime answers the door and nothing else.
 6. **The agent answers from a table.** It runs in AgentCore Runtime, in a VPC with no route out. Its one tool returns a table row. Every call to the model carries the agent's pinned guardrail.
 7. **The record leaves the account.** Calls, refusals and network flows are delivered to a bucket in a separate security account, which the agent account cannot edit.
 
@@ -50,12 +50,13 @@ The picture shows the design. It is not a measurement. The reference agent, `ref
 
 A team does not build any of the above. It creates a repository from [`agentkeel-studio/agent-template`](https://github.com/agentkeel-studio/agent-template), fills in a manifest, and opens a pull request. The steps are in the [quickstart](docs/developer/quickstart.md).
 
-![From template to running agent, in five steps. 1, create: a team makes a repository from the platform's template and names its agent (agent-template, manifest.yaml). 2, fill the seats: seven owners are named, and the team writes its tests, its rules and who may call the agent (seats, callers, goldens, rules/guardrail.yaml). 3, pass the check: every pull request is read by the platform, and with an empty seat or no tests it cannot merge (platform-check.yml, a GitHub App's check required by a ruleset). 4, signed: after the merge the platform builds the agent and signs what it built; the team does nothing here (deploy.yml, cosign, Amazon ECR). 5, deployed: the agent runs in the platform's network, is asked its own tests and is listed in the registry (infra/construct, AgentCore Runtime, DynamoDB). What was measured, ledger rows 6 and 7, both RED: timed once, 3,615 seconds from a new repository to an agent deployed and listed; the first agent from the template took 32,264 seconds to deploy after its merge, against a bar of 3,600; at row 6 the check refused every change, a correct one too, and no agent shipped.](docs/assets/workflow-template-to-agent.svg)
+![From template to running agent, in five steps. 1, create: a team makes a repository from the platform's template and names its agent (agent-template, manifest.yaml). 2, fill the seats: seven owners are named, and the team writes its tests, its rules and who may call the agent (seats, callers, goldens, rules/guardrail.yaml). 3, pass the check: every pull request is read by the platform, and with an empty seat or no tests it cannot merge (platform-check.yml, a GitHub App's check required by a ruleset). 4, signed: after the merge the platform builds the agent and signs what it built; the team does nothing here (deploy.yml, cosign, Amazon ECR). 5, deployed: the agent runs in the platform's network, is asked its own tests and is listed in the registry (infra/construct, AgentCore Runtime, DynamoDB). What was measured, ledger rows 6 and 7, both RED: timed once, 3,615 seconds from a new repository to an agent deployed and listed; the first agent from the template took 32,264 seconds to deploy after its merge, against a bar of 3,600; on the timed run the first commit was refused, and not for its planted fault; at row 6 the check refused every change, a correct one too, and no agent shipped.](docs/assets/workflow-template-to-agent.svg)
 
 What was measured, from [row 7's envelope](evals/history/dee74c3cf4102bfb6d4315faafb161c154618ed9.json), written by [CI run 37149475766](https://github.com/andaro74/agentkeel/actions/runs/37149475766):
 
 - The path was timed once: 3,615 seconds from a new repository to an agent deployed and listed. The bar is one working day. One run is not a rate.
 - The first agent made from the template took 32,264 seconds to deploy after its merge. The bar is 3,600. Faults in the platform's own deploy caused it.
+- On that timed run the developer's first commit was refused, and not for its planted fault.
 - At row 6 the platform check refused every change, a correct one included. No agent shipped at that milestone.
 
 Rows 6 and 7 are both RED.
@@ -64,16 +65,16 @@ Rows 6 and 7 are both RED.
 
 Every claim was planted false before any code that could catch it was written. CI then measured what happened. A GREEN row means the claim held on its planted case. A RED row means part of it did not, and the row says which part.
 
-![What was planted and what happened, one card per ledger row. Row 0, M00, GREEN, start from nothing: planted a result with no baseline behind it; refused. Row 1, M01, RED, nothing runs unsigned: planted an unsigned bundle, a changed byte, a deploy from a laptop; each was refused; not measured: the agent running inside the platform's construct. Row 2, M02, GREEN, rules have owners: planted a bar loosened with one key, a test edited to pass, the owner's bypass; none merged. Row 3, M03, GREEN, it can't get worse quietly: planted seven attack questions and an unsigned contract amendment; 7 of 7 blocked, the amendment not admitted. Row 4, M04, RED, a model swap is tested: the breaking swap went RED, caught; the equivalent one went RED too, on one question. Row 5, M05, RED, the agent stays in its box: six hostile attempts; 4 refused and recorded, the slowest in 307 seconds; 2 left no record of a refusal. Row 6, M06, RED, a team ships in a day: a fake copy of the platform's check did not count, but the check refused every change and no agent shipped. Row 7, M07, RED, upgrades arrive as a pull request: 2 of 3 taken; the first agent took 32,264 seconds to deploy against a bar of 3,600; five pull requests against a cap of four. Row 8, M08, RED, the bad day rehearsed: a hostile agent making six attempts; 2 of 6 refused, 3 of 6 recorded; the emergency stop held once attached by hand. Row 9, M09, GREEN, each agent its own rules: 1 of 1 planted question stopped by the team's own rule. Row 10, M10, GREEN, in by the front door: 3 of 3 wrong callers refused, 1 of 1 admitted, each on the record. Five GREEN, six RED.](docs/assets/workflow-planted-and-measured.svg)
+![What was planted and what happened, one card per ledger row. Row 0, M00, GREEN, start from nothing: planted a result with no baseline behind it; refused. Row 1, M01, RED, nothing runs unsigned: planted an unsigned bundle, a changed byte, a deploy from a laptop; each was refused; not measured: the agent running inside the platform's construct. Row 2, M02, GREEN, rules have owners: planted a bar loosened with one key, a test edited to pass, the owner's bypass; none merged. Row 3, M03, GREEN, it can't get worse quietly: planted seven attack questions and an unsigned contract amendment; 7 of 7 blocked, the amendment not admitted. Row 4, M04, RED, a model swap is tested: the breaking swap went RED, caught; the equivalent one went RED too, on one question. Row 5, M05, RED, the agent stays in its box: six hostile attempts, each expected to be refused; 4 refused and recorded, the slowest in 307 seconds; 2 left no record of a refusal. Row 6, M06, RED, a team ships in a day: a fake copy of the platform's check did not count, but the check refused every change and no agent shipped. Row 7, M07, RED, upgrades arrive as a pull request: 2 of 3 taken; the first agent took 32,264 seconds to deploy against a bar of 3,600; five pull requests against a cap of four. Row 8, M08, RED, the bad day rehearsed: a hostile agent making six attempts; 2 of 6 refused, 3 of 6 recorded; the emergency stop held once attached by hand. Row 9, M09, GREEN, each agent its own rules: 1 of 1 planted question stopped by the team's own rule. Row 10, M10, GREEN, in by the front door: 3 of 3 wrong callers refused, 1 of 1 admitted, each on the record. Five GREEN, six RED.](docs/assets/workflow-planted-and-measured.svg)
 
-Every number below is the row's Measured cell in the [ledger](milestones/README.md). `make ledger` fails if a cell differs from its envelope. Each envelope was written by the CI run linked beside it.
+Every number below is in the row's cells in the [ledger](milestones/README.md). `make ledger` fails if a cell differs from its envelope. Each envelope was written by the CI run linked beside it.
 
 | Row | What was planted | What was measured | State | Evidence |
 |---|---|---|---|---|
 | 0 | A result with no baseline behind it. | Refused. The frozen plain model, the control, passed 1 of 3 trick questions and 0 of 9 ordinary ones. | GREEN | [envelope](evals/history/9407615dcde09308490f6699c21a18100bfedcd2.json), [run](https://github.com/andaro74/agentkeel/actions/runs/35406351135) |
 | 1 | An unsigned bundle; one changed after signing; egress the manifest does not list; a deploy from a laptop. | Each was refused. The agent was measured on the test runner only, not inside the construct, so the row is RED. | **RED** | [envelope](evals/history/e97125e970ccfc6d044612eb006cdbdbcdb99337.json), [run](https://github.com/andaro74/agentkeel/actions/runs/35680056132) |
 | 2 | A bar loosened with one key; a test edited to pass; a one-sided edge; a renamed test id; the owner's bypass. | None of the five merged. | GREEN | [envelope](evals/history/8033c2a7a0588e557df577464c190e64a435e88a.json), [run](https://github.com/andaro74/agentkeel/actions/runs/35951008874) |
-| 3 | A regressed test; seven attack questions; an unsigned contract amendment. | Plants fired 7 of 7. No regression merged. The amendment was not admitted. | GREEN | [envelope](evals/history/cb06c0dbf0019088c664c6df1ce7d67cc64f7d58.json), [run](https://github.com/andaro74/agentkeel/actions/runs/36270471757) |
+| 3 | A regressed test; seven attack questions; an unsigned contract amendment. | Plants fired 7 of 7. The regressed test was refused in a copy of the tree; no pull request carried it. The amendment was not admitted. | GREEN | [envelope](evals/history/cb06c0dbf0019088c664c6df1ce7d67cc64f7d58.json), [run](https://github.com/andaro74/agentkeel/actions/runs/36270471757) |
 | 4 | A model swap known to break the agent; a swap named equivalent. | The breaking swap went RED with 11 tests regressed. The equivalent swap went RED too, with 1 regressed, where GREEN was expected. | **RED** | [envelope](evals/history/05bd718feb0cc72ab78df13fccf47c3efb8a9314.json), [run](https://github.com/andaro74/agentkeel/actions/runs/36362949356) |
 | 5 | Six hostile attempts, each expected in the security account within 600 seconds. | Four refused and recorded, in 199 to 307 seconds. The request to the internet and the call after the quarantine were not shown refused and left no record. | **RED** | [envelope](evals/history/28634e9a1405b034a3efbe898cc7675ebfab3587.json), [run](https://github.com/andaro74/agentkeel/actions/runs/36666223908) |
 | 6 | A first pull request with an empty seat; a fake copy of the platform's check; a timed first agent. | The fake check did not count. The empty-seat case and the timed run were not read: the check refused every change. | **RED** | [envelope](evals/history/245eb9baf796cd9ceed652abe3805825208358c9.json), [run](https://github.com/andaro74/agentkeel/actions/runs/36886530498) |
@@ -134,7 +135,7 @@ Read from [`infra/`](infra/) and [`.github/workflows/deploy.yml`](.github/workfl
 | AWS CloudTrail and VPC flow logs | The record of calls, refusals and network flows. |
 | Amazon Data Firehose | Delivers the door's call records to the security account. |
 | Amazon S3 with Object Lock | The audit bucket in the security account, and the corpus buckets. |
-| Amazon DynamoDB, Amazon Athena and Grafana | The registry of deployed agents, and a panel over it. |
+| Amazon DynamoDB, Amazon Athena and Grafana | The registry of deployed agents, and two panels: the registry and the stored verdicts. |
 | Sigstore cosign | Signs each bundle, keyless. The deploy checks the signature. |
 | GitHub Actions, a ruleset and a GitHub App | The gates, the deploy, and the platform check on an agent repository's pull requests. |
 | Python and `uv` | The gates, the verdict builder and the observers. |
@@ -143,7 +144,7 @@ Read from [`infra/`](infra/) and [`.github/workflows/deploy.yml`](.github/workfl
 
 - **Not an agent framework.** An agent is plain code inside the platform's construct.
 - **Not a production landing zone.** It runs in two accounts: one for agents, one for evidence. An account per team is a named follow-on.
-- **Not a dashboard product.** One Grafana panel over the registry.
+- **Not a dashboard product.** Two Grafana panels: the registry, and the stored verdicts.
 - **Not a compliance certification.** The [compliance map](docs/compliance/map.md) links controls to evidence paths. It certifies nothing.
 
 ## Shortcomings
@@ -152,7 +153,7 @@ Read from [`infra/`](infra/) and [`.github/workflows/deploy.yml`](.github/workfl
 - **One person holds all seven seats.** The gates show that a change was named and under which seat. They do not show that a second person looked.
 - **Each row was measured once.** One run is not a rate.
 - **A request to the internet leaves no record.** The network drops it before any rule sees it. Rows 5 and 8.
-- **A credential in a tool result is not stopped.** No filter on tool results was built. At row 8 the planted key reached the answer.
+- **A credential in a tool result is not stopped.** No filter on tool results was built. At row 8 the planted key was not refused.
 - **The quarantine is attached by hand.** Nothing attaches it by itself.
 - **The audit bucket's lock is one day.** SPEC/00 first asked for seven years.
 - **The model-upgrade pull request was opened and not merged.** Its own run was RED.
@@ -160,7 +161,7 @@ Read from [`infra/`](infra/) and [`.github/workflows/deploy.yml`](.github/workfl
 
 **Not built, so not measured:** retrieval from a knowledge base; a model that judges answers (correct means the answer's fields match, compared by code); the AgentCore Gateway and Identity's credential vault; a human-approval step; a second agent's code and the edge to it; canary rollout; per-caller limits; the `docs-current` check. The full list is [SPEC/00 §12](SPEC/00-overview.md).
 
-**Not recorded:** videos for M09 and M10, by ruling. Of six planned walkthrough recordings, one was made.
+**Not recorded:** videos for M09 and M10, by ruling.
 
 ## A worked tenant: pharmadelta
 
@@ -184,7 +185,7 @@ With Claude Code, one milestone at a time. Each milestone has one claim, one pla
 3. **Repair.** Whatever a cold review of the measurement found.
 4. **Close.** The measured cell, the explainer, the tag.
 
-A milestone that needs a fifth pull request closes RED. Only a result written by CI counts; a local run is not evidence. Every pull request ends with a ruling file, and the person who writes the diff does not merge it.
+A milestone that needs a fifth pull request closes RED. Only a result written by CI counts; a local run is not evidence. Every pull request ends with a ruling file, and the session that writes the diff does not merge it.
 
 The rules a session works under are in [CLAUDE.md](CLAUDE.md). Each rule change is an [ADR](docs/adr/). The seat subagents and the three skills that open, review and close a milestone are under [`.claude/`](.claude/).
 

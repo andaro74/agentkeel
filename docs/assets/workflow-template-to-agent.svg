@@ -1,4 +1,4 @@
-<svg width="980" height="500" viewBox="0 0 980 500" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif">
+<svg width="980" height="522" viewBox="0 0 980 522" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif">
   <!--
     From template to running agent, in five steps, as
     docs/developer/quickstart.md gives them. One hue per step. Each card
@@ -14,7 +14,7 @@
     </marker>
   </defs>
   <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">
-    <rect x="1" y="1" width="978" height="498" rx="16" fill="#0d1a2e" stroke="#2c3d5c" stroke-width="1.5"/>
+    <rect x="1" y="1" width="978" height="520" rx="16" fill="#0d1a2e" stroke="#2c3d5c" stroke-width="1.5"/>
     <text x="30" y="42" fill="#cbd6e6" font-size="13" letter-spacing="3">FROM TEMPLATE TO RUNNING AGENT &#183; FIVE STEPS</text>
   </g>
 
@@ -109,7 +109,8 @@
     <text x="30" y="372" fill="#cbd6e6" letter-spacing="2">WHAT WAS MEASURED &#183; LEDGER ROWS 6 AND 7, BOTH RED</text>
     <text x="30" y="400" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; timed once: 3,615 s from a new repository to an agent deployed and listed (row 7)</text>
     <text x="30" y="422" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; the first agent from the template took 32,264 s to deploy after its merge; the bar is 3,600 s (row 7)</text>
-    <text x="30" y="444" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; at row 6 the check refused every change, a correct one too, and no agent shipped</text>
-    <text x="30" y="472" fill="#667799"><tspan fill="#f0a43a">&#9679;</tspan>&#160; a proof of concept &#183; one person holds all seven seats</text>
+    <text x="30" y="444" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; on the timed run the first commit was refused, and not for its planted fault (row 7)</text>
+    <text x="30" y="466" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; at row 6 the check refused every change, a correct one too, and no agent shipped</text>
+    <text x="30" y="494" fill="#667799"><tspan fill="#f0a43a">&#9679;</tspan>&#160; a proof of concept &#183; one person holds all seven seats</text>
   </g>
 </svg>

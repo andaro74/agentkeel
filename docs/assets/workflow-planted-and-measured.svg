@@ -1,7 +1,7 @@
 <svg width="980" height="944" viewBox="0 0 980 944" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif">
   <!--
     What was planted and what happened: one card per ledger row. Every
-    state and every number is the row's State and Measured cell in
+    state and every number is in the row's State and Measured cell in
     milestones/README.md, which `make ledger` holds to the CI-written
     envelope under evals/history/. A RED row is drawn RED, with what was
     not caught. None of CLAUDE.md's three restricted words. No account id,
@@ -70,8 +70,8 @@
   <rect x="886" y="282" width="46" height="22" rx="4" fill="#f87171"/>
   <text x="909" y="297.5" text-anchor="middle" fill="#0d1a2e" font-size="11.5" font-weight="bold" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" letter-spacing="1">RED</text>
   <text x="668" y="326" fill="#fecaca" font-size="16" font-weight="bold">The agent stays in its box</text>
-  <text x="668" y="352" fill="#dbe4f0" font-size="12.5"><tspan fill="#8b9bb4">Planted: </tspan>six hostile attempts from</text>
-  <text x="668" y="370" fill="#dbe4f0" font-size="12.5">inside the agent's network.</text>
+  <text x="668" y="352" fill="#dbe4f0" font-size="12.5"><tspan fill="#8b9bb4">Planted: </tspan>six hostile attempts, each</text>
+  <text x="668" y="370" fill="#dbe4f0" font-size="12.5">expected to be refused.</text>
   <text x="668" y="396" fill="#f4f7fb" font-size="12.5">4 refused and recorded, the slowest</text>
   <text x="668" y="414" fill="#f4f7fb" font-size="12.5">in 307 s. 2 left no record of a</text>
   <text x="668" y="432" fill="#f4f7fb" font-size="12.5">refusal.</text>
@@ -125,10 +125,11 @@
   <rect x="560" y="690" width="62" height="22" rx="4" fill="#34d399"/>
   <text x="591" y="705.5" text-anchor="middle" fill="#0d1a2e" font-size="11.5" font-weight="bold" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" letter-spacing="1">GREEN</text>
   <text x="358" y="734" fill="#a7f3d0" font-size="16" font-weight="bold">In by the front door</text>
-  <text x="358" y="760" fill="#dbe4f0" font-size="12.5"><tspan fill="#8b9bb4">Planted: </tspan>a caller with no name, a borrowed</text>
-  <text x="358" y="778" fill="#dbe4f0" font-size="12.5">name, a call around the door.</text>
-  <text x="358" y="804" fill="#f4f7fb" font-size="12.5">3 of 3 refused, 1 of 1 admitted,</text>
-  <text x="358" y="822" fill="#f4f7fb" font-size="12.5">each on the record with who asked.</text>
+  <text x="358" y="760" fill="#dbe4f0" font-size="12.5"><tspan fill="#8b9bb4">Planted: </tspan>a caller with no name, one the</text>
+  <text x="358" y="778" fill="#dbe4f0" font-size="12.5">manifest does not name, and a</text>
+  <text x="358" y="796" fill="#dbe4f0" font-size="12.5">call around the door.</text>
+  <text x="358" y="822" fill="#f4f7fb" font-size="12.5">3 of 3 refused, 1 of 1 admitted,</text>
+  <text x="358" y="840" fill="#f4f7fb" font-size="12.5">each on the record with who asked.</text>
   <!-- how to read it -->
   <rect x="650" y="678" width="300" height="190" rx="12" fill="rgba(19,33,58,0.35)" stroke="#5b7091" stroke-width="1.5" stroke-dasharray="6 5"/>
   <text x="668" y="705" fill="#cbd6e6" font-size="11.5" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" letter-spacing="2">HOW TO READ THIS</text>
@@ -139,7 +140,7 @@
   <text x="668" y="806" fill="#dbe4f0" font-size="12.5">row says which part.</text>
   <text x="668" y="838" fill="#f0c37a" font-size="13" font-weight="bold" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" letter-spacing="1">5 GREEN &#183; 6 RED</text>
   <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" font-size="11.5">
-    <text x="30" y="898" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; every number is the row's Measured cell in milestones/README.md, written from a CI run</text>
+    <text x="30" y="898" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; every number is in the row's cells in milestones/README.md, held to a CI-written envelope</text>
     <text x="30" y="920" fill="#667799"><tspan fill="#f0a43a">&#9679;</tspan>&#160; a proof of concept &#183; each row was measured once &#183; one person holds all seven seats</text>
   </g>
 </svg>
