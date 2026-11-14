@@ -12,7 +12,7 @@ the README of the stack it changed.
 |---|---|---|
 | `endpoints-one-subnet` (Security), `endpoints-one-subnet-engineering`, `endpoints-one-subnet-product` | #58 | the five interface VPC endpoints in one subnet: ten ENIs to five, $74.40 a month to $36.50 expected |
 | `retire-four-agents` (Security), `retire-four-agents-product` | #59 | the four closed milestones' agents removed: festival-desk retired through the platform, window-check and drill-agent by hand (finding 1), then all four stacks and their retained keys, tables, pool, guardrail, log groups, markers and image repositories deleted by the admin; registry rows kept with `retired_at`. Read-back owed below |
-| `readme-first-visit` (Product) | #60 | the README rewritten for a first-time visitor, with a header image and four diagrams under `docs/assets/`; no claim, no measurement; "Governed" removed from its first line |
+| `readme-first-visit` (Product) | #61 | the README rewritten for a first-time visitor, with a header image and four diagrams under `docs/assets/`; no claim, no measurement; "Governed" removed from its first line |
 
 ## Findings
 

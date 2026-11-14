@@ -1,5 +1,5 @@
 ---
-# Maintenance PR #60. Product's key over the README, the six files under
+# Maintenance PR #61. Product's key over the README, the six files under
 # docs/assets/ and the maintenance README's row. Every path is Product's
 # (SPEC/00 §5: README.md, docs/**, milestones/**); no other seat's path
 # is touched.
@@ -34,10 +34,10 @@ evidence:
   - https://github.com/andaro74/pharmadelta/blob/c2d45c3/README.md
   - https://github.com/andaro74/pharmadelta/blob/c2d45c3/milestones/adoption/rulings/readme.md
   - https://github.com/andaro74/pharmadelta/blob/c2d45c3/milestones/adoption/rulings/exec-overview.md
-pr: 60
+pr: 61
 ---
 
-# Ruling: maintenance PR #60, Product: the README a first-time visitor reads
+# Ruling: maintenance PR #61, Product: the README a first-time visitor reads
 
 Drafted by Claude Fable 5.2 for Product, 2026-11-14; not yet ruled. The seat replaces this line with `Ruled by <login> as Product, <date>, as written` (or with the changes it made named) before the merge; `cold-review-ruling` fails while it reads Drafted.
 
