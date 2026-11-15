@@ -1,0 +1,80 @@
+<svg width="980" height="540" viewBox="0 0 980 540" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif">
+  <!--
+    Who owns what: the seven seats and the one decision each owns, from
+    SPEC/00 section 5's table ("Owns the truth about"), with the paths
+    .github/CODEOWNERS gives each seat. The image says one person holds
+    all seven seats (ruling R1) and that the gates read files, not people.
+    None of CLAUDE.md's three restricted words; no measured number.
+  -->
+  <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">
+    <rect x="1" y="1" width="978" height="538" rx="16" fill="#0d1a2e" stroke="#2c3d5c" stroke-width="1.5"/>
+    <text x="30" y="42" fill="#cbd6e6" font-size="13" letter-spacing="3">WHO OWNS WHAT &#183; SEVEN SEATS, ONE DECISION EACH</text>
+  </g>
+
+  <!-- row 1: y 64, cards 218 x 176 at x = 30, 264, 498, 732 -->
+  <rect x="30" y="64" width="218" height="176" rx="12" fill="#182a47" stroke="#f0a43a" stroke-width="2"/>
+  <text x="48" y="96" fill="#ffe1ad" font-size="17" font-weight="bold">Product</text>
+  <text x="48" y="134" fill="#dbe4f0" font-size="13.5">What to build, and</text>
+  <text x="48" y="154" fill="#dbe4f0" font-size="13.5">when it is acceptable.</text>
+  <text x="48" y="204" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">SPEC/ &#183; milestones/</text>
+  <text x="48" y="221" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">docs/ &#183; README.md</text>
+
+  <rect x="264" y="64" width="218" height="176" rx="12" fill="#2a1a30" stroke="#f472b6" stroke-width="2"/>
+  <text x="282" y="96" fill="#fcd0e4" font-size="17" font-weight="bold">Rule Owner</text>
+  <text x="282" y="134" fill="#dbe4f0" font-size="13.5">What the agent may</text>
+  <text x="282" y="154" fill="#dbe4f0" font-size="13.5">say and do.</text>
+  <text x="282" y="204" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">rules/</text>
+  <text x="282" y="221" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">the guardrail id and version</text>
+
+  <rect x="498" y="64" width="218" height="176" rx="12" fill="#12283b" stroke="#34d399" stroke-width="2"/>
+  <text x="516" y="96" fill="#a7f3d0" font-size="17" font-weight="bold">Data Owner</text>
+  <text x="516" y="134" fill="#dbe4f0" font-size="13.5">What a correct answer</text>
+  <text x="516" y="154" fill="#dbe4f0" font-size="13.5">is.</text>
+  <text x="516" y="204" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">evals/goldens/</text>
+  <text x="516" y="221" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">data/</text>
+
+  <rect x="732" y="64" width="218" height="176" rx="12" fill="#182342" stroke="#a78bfa" stroke-width="2"/>
+  <text x="750" y="96" fill="#ddd2fe" font-size="17" font-weight="bold">Threshold Owner</text>
+  <text x="750" y="134" fill="#dbe4f0" font-size="13.5">The bars the agent must</text>
+  <text x="750" y="154" fill="#dbe4f0" font-size="13.5">clear, and which model</text>
+  <text x="750" y="174" fill="#dbe4f0" font-size="13.5">is pinned.</text>
+  <text x="750" y="204" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">thresholds.yaml</text>
+  <text x="750" y="221" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">the model pin in a manifest</text>
+
+  <!-- row 2: y 256 -->
+  <rect x="30" y="256" width="218" height="176" rx="12" fill="#0f2a3a" stroke="#22d3ee" stroke-width="2"/>
+  <text x="48" y="288" fill="#a5f3fc" font-size="17" font-weight="bold">Tool Owner</text>
+  <text x="48" y="326" fill="#dbe4f0" font-size="13.5">What a tool returns, and</text>
+  <text x="48" y="346" fill="#dbe4f0" font-size="13.5">who may call an agent.</text>
+  <text x="48" y="396" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">tools/</text>
+  <text x="48" y="413" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">callers: in a manifest</text>
+
+  <rect x="264" y="256" width="218" height="176" rx="12" fill="#12253f" stroke="#4da3ff" stroke-width="2"/>
+  <text x="282" y="288" fill="#bfdcff" font-size="17" font-weight="bold">Security</text>
+  <text x="282" y="326" fill="#dbe4f0" font-size="13.5">What tooling and</text>
+  <text x="282" y="346" fill="#dbe4f0" font-size="13.5">infrastructure may do.</text>
+  <text x="282" y="396" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">.github/workflows/</text>
+  <text x="282" y="413" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">infra/</text>
+
+  <rect x="498" y="256" width="218" height="176" rx="12" fill="#151f33" stroke="#94a3b8" stroke-width="2"/>
+  <text x="516" y="288" fill="#e2e8f0" font-size="17" font-weight="bold">Engineering</text>
+  <text x="516" y="326" fill="#dbe4f0" font-size="13.5">That it works.</text>
+  <text x="516" y="396" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">src/ &#183; scripts/ &#183; tests/</text>
+  <text x="516" y="413" fill="#8b9bb4" font-size="11" font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace">an agent's code</text>
+
+  <!-- how a change gets in -->
+  <rect x="732" y="256" width="218" height="176" rx="12" fill="rgba(19,33,58,0.35)" stroke="#5b7091" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="750" y="288" fill="#cbd6e6" font-size="13" font-weight="bold" letter-spacing="1">HOW A CHANGE GETS IN</text>
+  <text x="750" y="322" fill="#dbe4f0" font-size="13.5">A change to a seat's file</text>
+  <text x="750" y="342" fill="#dbe4f0" font-size="13.5">needs that seat's ruling</text>
+  <text x="750" y="362" fill="#dbe4f0" font-size="13.5">file. Loosening a bar or</text>
+  <text x="750" y="382" fill="#dbe4f0" font-size="13.5">retiring a test needs two</text>
+  <text x="750" y="402" fill="#dbe4f0" font-size="13.5">seats' rulings.</text>
+
+  <!-- footer -->
+  <g font-family="ui-monospace,'Cascadia Mono',Consolas,Menlo,monospace" font-size="11.5">
+    <text x="30" y="468" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; the gates read files, not people: a ruling file is read for its seat and its paths, never for what it says</text>
+    <text x="30" y="490" fill="#8b9bb4"><tspan fill="#f0a43a">&#9679;</tspan>&#160; in this project one person holds all seven seats, so a person holding every seat can write both keys</text>
+    <text x="30" y="512" fill="#667799"><tspan fill="#f0a43a">&#9679;</tspan>&#160; a proof of concept &#183; the seats are SPEC/00 section 5's table</text>
+  </g>
+</svg>
